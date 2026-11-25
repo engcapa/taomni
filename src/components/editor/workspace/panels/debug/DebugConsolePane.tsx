@@ -169,14 +169,14 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
   return (
     <div
       data-testid="debug-console-pane"
-      className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)] text-[11px]"
+      className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)] text-ui-small"
     >
       {/* Console toolbar */}
       <div className="h-6 shrink-0 flex items-center justify-between border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]/40 px-2">
         <div className="flex items-center gap-2">
-          <span className="font-medium text-[10px] text-[var(--taomni-text-muted)]">Console Output</span>
+          <span className="font-medium text-ui-caption text-[var(--taomni-text-muted)]">Console Output</span>
           {outputLength > 0 && (
-            <span className="text-[10px] text-[var(--taomni-text-muted)]/70">
+            <span className="text-ui-caption text-[var(--taomni-text-muted)]/70">
               ({outputLength} lines)
             </span>
           )}
@@ -185,7 +185,7 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
           <button
             type="button"
             data-testid="debug-console-follow-tail"
-            className={`inline-flex h-5 items-center gap-1 rounded px-1.5 text-[10px] transition-colors ${
+            className={`inline-flex h-5 items-center gap-1 rounded px-1.5 text-ui-caption transition-colors ${
               followTail
                 ? "bg-sky-500/20 text-sky-400 font-medium"
                 : "text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)]"
@@ -200,7 +200,7 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
             <button
               type="button"
               data-testid="debug-console-scroll-bottom"
-              className="inline-flex h-5 items-center gap-1 rounded px-1.5 text-[10px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)] hover:text-[var(--taomni-text)] transition-colors"
+              className="inline-flex h-5 items-center gap-1 rounded px-1.5 text-ui-caption text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)] hover:text-[var(--taomni-text)] transition-colors"
               title="Scroll to end"
               onClick={scrollToBottom}
             >
@@ -211,7 +211,7 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
           <button
             type="button"
             data-testid="debug-console-clear"
-            className="inline-flex h-5 items-center gap-1 rounded px-1.5 text-[10px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)] hover:text-[var(--taomni-text)] transition-colors"
+            className="inline-flex h-5 items-center gap-1 rounded px-1.5 text-ui-caption text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)] hover:text-[var(--taomni-text)] transition-colors"
             title="Clear console"
             onClick={() => debug.clearConsole()}
           >
@@ -226,7 +226,7 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
         ref={consoleRef}
         data-testid="debug-console-output"
         onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-auto p-2 font-mono text-[10px] space-y-0.5"
+        className="flex-1 min-h-0 overflow-auto p-2 font-mono text-ui-caption space-y-0.5"
       >
         {!state || state.output.length === 0 ? (
           <div className="text-[var(--taomni-text-muted)] italic p-1">
@@ -243,10 +243,10 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
 
       {/* REPL prompt input */}
       <div className="flex items-center gap-1.5 px-2 py-1 border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]/20 shrink-0">
-        <span className="font-mono text-[11px] text-[var(--taomni-text-muted)]">&gt;</span>
+        <span className="font-mono text-ui-small text-[var(--taomni-text-muted)]">&gt;</span>
         <input
           data-testid="debug-console-input"
-          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none disabled:opacity-40"
+          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none disabled:opacity-40"
           placeholder={stopped ? "Evaluate expression or command (↑↓ History)" : "REPL active when target is stopped"}
           value={consoleInput}
           disabled={!stopped}

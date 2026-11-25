@@ -56,11 +56,11 @@ export function SurroundWithDialog({ open, languageId, onClose, onPick }: Surrou
       onKeyDown={handleKeyDown}
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[12vh]"
     >
-      <div className="flex w-full max-w-md flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[12px] text-[var(--taomni-code-fg)] shadow-2xl">
+      <div className="flex w-full max-w-md flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-fg)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
           <div className="flex items-center gap-2">
             <BoxSelect className="h-4 w-4 text-sky-400" />
-            <h2 id="surround-with-title" className="text-[13px] font-semibold">Surround With…</h2>
+            <h2 id="surround-with-title" className="text-ui-body font-semibold">Surround With…</h2>
           </div>
           <button
             type="button"
@@ -74,7 +74,7 @@ export function SurroundWithDialog({ open, languageId, onClose, onPick }: Surrou
         </div>
         <div role="listbox" aria-label="Surround kinds" data-testid="surround-with-kinds" className="max-h-72 overflow-y-auto p-1.5">
           {kinds.length === 0 ? (
-            <div data-testid="surround-with-empty" className="px-3 py-6 text-center text-[11px] text-[var(--taomni-code-muted)]">
+            <div data-testid="surround-with-empty" className="px-3 py-6 text-center text-ui-small text-[var(--taomni-code-muted)]">
               No surround kinds are available for this language.
             </div>
           ) : (
@@ -100,14 +100,14 @@ export function SurroundWithDialog({ open, languageId, onClose, onPick }: Surrou
                 {/* Honest provenance up front: templates are applied from the
                     local adapter; syntax alignment is verified at apply time
                     and recorded in the edit evidence, not advertised here. */}
-                <span className="rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 text-[10px] text-[var(--taomni-code-muted)]">
+                <span className="rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 text-ui-caption text-[var(--taomni-code-muted)]">
                   template
                 </span>
               </button>
             ))
           )}
         </div>
-        <div className="flex items-center justify-between border-t border-[var(--taomni-code-border)] px-4 py-2 text-[10px] text-[var(--taomni-code-muted)]">
+        <div className="flex items-center justify-between border-t border-[var(--taomni-code-border)] px-4 py-2 text-ui-caption text-[var(--taomni-code-muted)]">
           <span>↑↓ Navigate · ↵ Apply · Esc Cancel</span>
           <span data-testid="surround-with-language">{languageId ?? "unknown"}</span>
         </div>

@@ -131,7 +131,7 @@ function OpenTabOverview() {
   return createPortal(
     <div ref={dialogRef} data-testid="tab-overview" data-scope={all ? "all" : mode} data-preview-delay-ms={OVERVIEW_PREVIEW_DELAY_MS} role="dialog" aria-modal="true" aria-labelledby="tab-overview-title" className="taomni-tab-overview" onScroll={clearPreview}>
       <div className="taomni-overview-header">
-        <div><h2 id="tab-overview-title" className="flex items-center gap-2 text-[16px] font-bold"><LayoutGrid className="h-4 w-4" />{t("platform.tabOverview")}<kbd className="text-[11px] font-normal">Ctrl/Cmd+Shift+E</kbd></h2><p className="mt-1 text-[12px] text-[var(--taomni-text-muted)]">{t("platform.overviewHint")}</p></div>
+        <div><h2 id="tab-overview-title" className="flex items-center gap-2 text-ui-heading font-bold"><LayoutGrid className="h-4 w-4" />{t("platform.tabOverview")}<kbd className="text-ui-small font-normal">Ctrl/Cmd+Shift+E</kbd></h2><p className="mt-1 text-ui-body text-[var(--taomni-text-muted)]">{t("platform.overviewHint")}</p></div>
         <button data-testid="tab-overview-close" className="taomni-btn" onClick={close}><X className="mr-1 h-3 w-3" />{t("common.close")} (Esc)</button>
       </div>
       <div className="taomni-overview-search-row">
@@ -153,7 +153,7 @@ function OpenTabOverview() {
           {query && <button data-testid="tab-overview-search-clear" type="button" aria-label={t("platform.overviewClearSearch")}
             onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X className="h-4 w-4" /></button>}
         </div>
-        <span data-testid="tab-overview-results" className="shrink-0 text-[11px] text-[var(--taomni-text-muted)]">{t("platform.overviewResults", { visible: matching.length, total: items.length })}</span>
+        <span data-testid="tab-overview-results" className="shrink-0 text-ui-small text-[var(--taomni-text-muted)]">{t("platform.overviewResults", { visible: matching.length, total: items.length })}</span>
       </div>
       {(mode === "sessions" || mode === "workspaces" || mode === "explorer") && <div className="mb-3 flex gap-2">
         <button data-testid="tab-overview-current" className="taomni-toolbar-pill" aria-pressed={!all} onClick={() => setAll(false)}>{t("platform.overviewCurrent")}</button>

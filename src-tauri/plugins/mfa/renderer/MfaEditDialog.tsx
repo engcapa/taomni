@@ -72,15 +72,15 @@ export function MfaEditDialog({
         }}
       >
         <div className="text-sm font-semibold">{t("mfa.editTitle")}</div>
-        <label className="block text-[12px]" style={labelStyle}>
+        <label className="block text-ui-body" style={labelStyle}>
           {t("mfa.issuer")}
           <input ref={firstRef} data-testid="mfa-edit-issuer" className="taomni-input mt-1 w-full" value={issuer} onChange={(event) => setIssuer(event.target.value)} />
         </label>
-        <label className="block text-[12px]" style={labelStyle}>
+        <label className="block text-ui-body" style={labelStyle}>
           {t("mfa.accountName")}
           <input data-testid="mfa-edit-account" className="taomni-input mt-1 w-full" value={accountName} onChange={(event) => setAccountName(event.target.value)} />
         </label>
-        <label className="block text-[12px]" style={labelStyle}>
+        <label className="block text-ui-body" style={labelStyle}>
           {t("mfa.group")}
           <input data-testid="mfa-edit-group" className="taomni-input mt-1 w-full" list="mfa-edit-groups" value={group} placeholder={t("mfa.groupPlaceholder")} onChange={(event) => setGroup(event.target.value)} />
           <datalist id="mfa-edit-groups">
@@ -89,16 +89,16 @@ export function MfaEditDialog({
             ))}
           </datalist>
         </label>
-        <label className="block text-[12px]" style={labelStyle}>
+        <label className="block text-ui-body" style={labelStyle}>
           {t("mfa.note")}
           <textarea data-testid="mfa-edit-note" className="taomni-input mt-1 w-full" rows={2} value={note} onChange={(event) => setNote(event.target.value)} />
         </label>
-        {error ? <div data-testid="mfa-edit-error" role="alert" className="text-[12px]" style={{ color: "var(--taomni-error, #c33)" }}>{error}</div> : null}
+        {error ? <div data-testid="mfa-edit-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-error, #c33)" }}>{error}</div> : null}
         <div className="flex justify-end gap-2 pt-2">
-          <button type="button" data-testid="mfa-edit-cancel" className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]" onClick={onClose} disabled={busy}>
+          <button type="button" data-testid="mfa-edit-cancel" className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]" onClick={onClose} disabled={busy}>
             {t("mfa.cancel")}
           </button>
-          <button type="submit" data-testid="mfa-edit-save" className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50" style={{ background: "var(--taomni-accent)" }} disabled={busy}>
+          <button type="submit" data-testid="mfa-edit-save" className="px-3 py-1 text-ui-body rounded text-white disabled:opacity-50" style={{ background: "var(--taomni-accent)" }} disabled={busy}>
             {t("mfa.save")}
           </button>
         </div>

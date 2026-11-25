@@ -140,7 +140,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
     contextMenuItems,
   } = props;
   return ((
-    <div data-testid="code-workspace-find-in-files-panel" className="relative h-full min-h-0 flex flex-col text-[11px]">
+    <div data-testid="code-workspace-find-in-files-panel" className="relative h-full min-h-0 flex flex-col text-ui-small">
       <div className="shrink-0 flex flex-wrap items-center gap-1.5 border-b border-[var(--taomni-code-border)] px-2 py-1.5">
         <div className="flex min-w-44 flex-1 items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1.5">
           <Search className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
@@ -151,7 +151,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
             list={workspaceInstanceId ? "code-workspace-search-history" : undefined}
             placeholder="Search in files (Enter to run)"
             aria-label="Search query"
-            className="h-6 min-w-0 flex-1 bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            className="h-6 min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") void search.startSearch();
@@ -187,7 +187,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
             data-testid="code-workspace-find-scope-select"
             value={scopeKind}
             onChange={(event) => setScopeKind(event.target.value as FindInFilesScopeKind)}
-            className="h-full bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none"
+            className="h-full bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none"
           >
             <option value="project">Project</option>
             <option value="module">Module</option>
@@ -202,7 +202,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
               data-testid="code-workspace-find-module-select"
               value={scopeModuleId || factsModules[0]?.id || ""}
               onChange={(event) => setScopeModuleId(event.target.value)}
-              className="h-full min-w-0 flex-1 bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none"
+              className="h-full min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none"
             >
               {factsModules.length === 0 && <option value="">No modules</option>}
               {factsModules.map((mod) => (
@@ -219,7 +219,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
               placeholder="subdir (empty = root)"
               aria-label="Search directory"
               data-testid="code-workspace-find-directory-input"
-              className="min-w-0 flex-1 bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+              className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
               onChange={(event) => setScopeDirectory(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" && void search.startSearch()}
             />
@@ -231,7 +231,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
             value={includeGlobs}
             placeholder="include: *.ts, src/**"
             aria-label="Include globs"
-            className="min-w-0 flex-1 bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => setIncludeGlobs(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && void search.startSearch()}
           />
@@ -242,7 +242,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
             value={excludeGlobs}
             placeholder="exclude: dist/**"
             aria-label="Exclude globs"
-            className="min-w-0 flex-1 bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => setExcludeGlobs(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && void search.startSearch()}
           />
@@ -253,7 +253,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
             value={replacement}
             placeholder="Replace with"
             aria-label="Replace text"
-            className="min-w-0 flex-1 bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => setReplacement(event.target.value)}
           />
         </label>
@@ -299,7 +299,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
                 type="button"
                 aria-label="Cancel preparing replace"
                 data-testid="code-workspace-replace-prepare-cancel"
-                className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-[11px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-ui-small text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
                 onClick={cancelReplacePrepare}
               >
                 <span>Cancel</span>
@@ -308,14 +308,14 @@ export function FindInFilesView(props: FindInFilesViewProps) {
             {replacePreparing && (
               <span
                 data-testid="code-workspace-replace-preparing"
-                className="flex items-center gap-1 text-[11px] text-[var(--taomni-code-muted)]"
+                className="flex items-center gap-1 text-ui-small text-[var(--taomni-code-muted)]"
               >
                 <span>Preparing…</span>
               </span>
             )}
           </div>
         )}
-        <span className="ml-auto flex items-center gap-1.5 text-[10px] text-[var(--taomni-code-muted)]">
+        <span className="ml-auto flex items-center gap-1.5 text-ui-caption text-[var(--taomni-code-muted)]">
           {status === "searching" && <Loader2 className="h-3 w-3 animate-spin" />}
           {status === "searching" && `${totalShown} so far`}
           {status === "done" && summary && (
@@ -327,7 +327,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
         <div
           role="alert"
           data-testid="code-workspace-replace-error"
-          className="border-b border-red-500/30 bg-red-500/10 px-2 py-1 text-[11px] text-red-500"
+          className="border-b border-red-500/30 bg-red-500/10 px-2 py-1 text-ui-small text-red-500"
         >
           {replaceCommitError}
         </div>
@@ -335,20 +335,20 @@ export function FindInFilesView(props: FindInFilesViewProps) {
       {replaceNotice && (
         <div
           data-testid="code-workspace-find-replaced-notice"
-          className="shrink-0 border-b border-[var(--taomni-code-border)] px-2 py-1 text-[10px] text-[var(--taomni-code-muted)]"
+          className="shrink-0 border-b border-[var(--taomni-code-border)] px-2 py-1 text-ui-caption text-[var(--taomni-code-muted)]"
         >
           Replaced {replaceNotice.appliedCount} occurrence{replaceNotice.appliedCount === 1 ? "" : "s"} in {replaceNotice.fileCount} file{replaceNotice.fileCount === 1 ? "" : "s"}
         </div>
       )}
       {(summary?.truncated || summary?.cancelled) && (
-        <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] text-amber-500">
+        <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-ui-caption text-amber-500">
           {summary.cancelled ? "Search cancelled — results are partial." : `Match limit reached (${MAX_TOTAL_MATCHES}) — refine the query to see everything.`}
         </div>
       )}
       {scopePlan.status !== "ready" && (
         <div
           data-testid="code-workspace-find-scope-notice"
-          className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] text-amber-500"
+          className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-ui-caption text-amber-500"
         >
           {scopePlan.reason} — switch scope or refresh project facts.
         </div>
@@ -393,7 +393,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
                 <Chevron className="h-3.5 w-3.5 shrink-0" />
                 <File className="h-3.5 w-3.5 shrink-0" />
                 <span className="min-w-0 flex-1 truncate text-left">{group.title}</span>
-                <span className="shrink-0 text-[10px] tabular-nums" data-testid="code-workspace-find-file-count">
+                <span className="shrink-0 text-ui-caption tabular-nums" data-testid="code-workspace-find-file-count">
                   {collapsed || hiddenCount === 0
                     ? `${total}`
                     : `${visibleLimit}/${total}`}
@@ -441,17 +441,17 @@ export function FindInFilesView(props: FindInFilesViewProps) {
                     onClick={() => onOpenMatch(match, { preview: true })}
                     onDoubleClick={() => onOpenMatch(match, { preview: false })}
                   >
-                    <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
+                    <span className="shrink-0 font-mono text-ui-caption text-[var(--taomni-code-muted)]">
                       {match.lineNumber}:{match.column}
                     </span>
-                    <span className="taomni-find-line min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--taomni-code-text)]">
+                    <span className="taomni-find-line min-w-0 flex-1 truncate font-mono text-ui-small text-[var(--taomni-code-text)]">
                       {renderMatchLine(match, segments)}
                     </span>
                   </button>
                 );
               })}
               {!collapsed && hiddenCount > 0 && (
-                <div className="flex items-center gap-2 px-4 py-0.5 text-[10px] text-[var(--taomni-code-muted)]">
+                <div className="flex items-center gap-2 px-4 py-0.5 text-ui-caption text-[var(--taomni-code-muted)]">
                   <button
                     type="button"
                     className="rounded px-1 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"

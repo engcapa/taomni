@@ -179,10 +179,10 @@ export function RefactorRecoveryReviewDialog({
         <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3">
           <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-semibold text-[var(--taomni-code-text)]">
+            <div className="truncate text-ui-body font-semibold text-[var(--taomni-code-text)]">
               Review refactor recovery
             </div>
-            <div className="truncate text-[10px] text-[var(--taomni-code-muted)]">
+            <div className="truncate text-ui-caption text-[var(--taomni-code-muted)]">
               {entry.kind} · {affectedCount} affected file{affectedCount === 1 ? "" : "s"} · {new Date(entry.createdAt).toLocaleString()}
             </div>
           </div>
@@ -206,10 +206,10 @@ export function RefactorRecoveryReviewDialog({
         </header>
 
         <div className="min-h-0 flex-1 overflow-auto px-3 py-2">
-          <div className="mb-1 text-[10px] text-[var(--taomni-code-muted)]">
+          <div className="mb-1 text-ui-caption text-[var(--taomni-code-muted)]">
             Workspace: <span className="break-all font-mono">{workspaceRoot}</span>
           </div>
-          <div className="mb-2 text-[11px] leading-5 text-[var(--taomni-code-text)]">
+          <div className="mb-2 text-ui-small leading-5 text-[var(--taomni-code-text)]">
             {overall === "already-restored"
               ? "Every affected file already matches its pre-refactor content. Closing keeps no pending reminder."
               : overall === "restorable"
@@ -217,12 +217,12 @@ export function RefactorRecoveryReviewDialog({
                 : "Some files cannot be restored automatically and will not be overwritten. Keeping or abandoning changes no files."}
           </div>
           {loading && (
-            <div className="mb-2 text-[11px] text-[var(--taomni-code-muted)]">
+            <div className="mb-2 text-ui-small text-[var(--taomni-code-muted)]">
               Loading and verifying the pending entry…
             </div>
           )}
           {error && (
-            <div className="mb-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-300" role="alert">
+            <div className="mb-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-ui-small text-red-300" role="alert">
               {error}
             </div>
           )}
@@ -233,21 +233,21 @@ export function RefactorRecoveryReviewDialog({
                 data-testid="refactor-recovery-resource"
                 className="rounded border border-[var(--taomni-code-border)] px-2 py-1.5"
               >
-                <div className="break-all font-mono text-[11px] text-[var(--taomni-code-text)]" title={row.full}>
+                <div className="break-all font-mono text-ui-small text-[var(--taomni-code-text)]" title={row.full}>
                   {row.label}
                 </div>
-                <div className="mt-0.5 break-all text-[10px] text-[var(--taomni-code-muted)]" title={row.full}>
+                <div className="mt-0.5 break-all text-ui-caption text-[var(--taomni-code-muted)]" title={row.full}>
                   {row.state} · <span className="select-text">{row.full}</span>
                 </div>
               </li>
             ))}
           </ul>
           {rows.length === 0 && (
-            <div className="py-4 text-center text-[11px] text-[var(--taomni-code-muted)]">
+            <div className="py-4 text-center text-ui-small text-[var(--taomni-code-muted)]">
               This entry records no files.
             </div>
           )}
-          <div className="mt-2 text-[10px] leading-4 text-[var(--taomni-code-muted)]">
+          <div className="mt-2 text-ui-caption leading-4 text-[var(--taomni-code-muted)]">
             Abandon ends only this record&apos;s reminder and keeps files exactly as they are now.
             It never rebuilds deleted files or edits references.
           </div>
@@ -256,10 +256,10 @@ export function RefactorRecoveryReviewDialog({
               className="mt-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5"
               data-testid="refactor-recovery-dismiss-confirm"
             >
-              <div className="text-[11px] font-semibold text-red-200">
+              <div className="text-ui-small font-semibold text-red-200">
                 Abandon recovery for {affectedCount} file{affectedCount === 1 ? "" : "s"}?
               </div>
-              <div className="mt-0.5 break-all text-[11px] leading-4 text-red-100/90">
+              <div className="mt-0.5 break-all text-ui-small leading-4 text-red-100/90">
                 This ends only this reminder and keeps the current state (files stay missing as they are now).
                 It does not restore files, edit references, or affect other pending entries.
               </div>
@@ -275,7 +275,7 @@ export function RefactorRecoveryReviewDialog({
                 type="button"
                 data-testid="refactor-recovery-dismiss-cancel"
                 disabled={busy}
-                className="h-8 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
+                className="h-8 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                 onClick={() => setConfirmingDismiss(false)}
               >
                 Keep pending
@@ -284,7 +284,7 @@ export function RefactorRecoveryReviewDialog({
                 type="button"
                 data-testid="refactor-recovery-dismiss-confirm-button"
                 disabled={!canDismiss}
-                className="h-8 rounded bg-red-700 px-3 text-[11px] font-medium text-white hover:brightness-110 disabled:opacity-40"
+                className="h-8 rounded bg-red-700 px-3 text-ui-small font-medium text-white hover:brightness-110 disabled:opacity-40"
                 onClick={onDismiss}
               >
                 Abandon recovery
@@ -297,7 +297,7 @@ export function RefactorRecoveryReviewDialog({
                 type="button"
                 data-testid="refactor-recovery-keep"
                 disabled={busy}
-                className="h-8 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
+                className="h-8 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                 onClick={onKeep}
               >
                 Keep pending
@@ -307,7 +307,7 @@ export function RefactorRecoveryReviewDialog({
                 data-testid="refactor-recovery-dismiss"
                 disabled={!canDismiss}
                 title="Abandon this recovery reminder; files stay as they are"
-                className="h-8 rounded px-3 text-[11px] hover:bg-red-500/15 hover:text-red-300 disabled:opacity-40"
+                className="h-8 rounded px-3 text-ui-small hover:bg-red-500/15 hover:text-red-300 disabled:opacity-40"
                 onClick={() => setConfirmingDismiss(true)}
               >
                 Abandon recovery…
@@ -317,7 +317,7 @@ export function RefactorRecoveryReviewDialog({
                 data-testid="refactor-recovery-restore"
                 disabled={!canRestore}
                 title={canRestore ? "Restore pre-refactor content" : "Restore is available only when the recorded post-state is intact"}
-                className="h-8 rounded bg-[var(--taomni-accent)] px-3 text-[11px] font-medium text-white hover:brightness-110 disabled:opacity-40"
+                className="h-8 rounded bg-[var(--taomni-accent)] px-3 text-ui-small font-medium text-white hover:brightness-110 disabled:opacity-40"
                 onClick={onRestore}
               >
                 Restore files

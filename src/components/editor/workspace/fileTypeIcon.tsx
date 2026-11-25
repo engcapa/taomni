@@ -39,7 +39,7 @@ export function FileTypeIcon({ path }: { path: string }) {
       data-file-type={fileTypeKey(path)}
       title={badge.title}
       aria-hidden="true"
-      className={`inline-flex h-3.5 min-w-3.5 shrink-0 items-center justify-center rounded-sm px-0.5 text-[8px] font-bold leading-none ${badge.className}`}
+      className={`inline-flex h-3.5 min-w-3.5 shrink-0 items-center justify-center rounded-sm px-0.5 text-ui-caption font-bold leading-none ${badge.className}`}
     >
       {badge.label}
     </span>

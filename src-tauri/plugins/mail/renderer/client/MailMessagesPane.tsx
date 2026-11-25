@@ -54,10 +54,10 @@ export function MailMessagesPane(viewProps: MailMessagesPaneProps) {
                     disabled={filteredMessages.length === 0}
                     onChange={(event) => toggleFilteredMessagesChecked(event.target.checked)}
                   />
-                  <span className="text-[12px] font-semibold truncate" title={activeFolder?.name}>{folderLabel(activeFolder)}</span>
+                  <span className="text-ui-body font-semibold truncate" title={activeFolder?.name}>{folderLabel(activeFolder)}</span>
                   <button
                     type="button"
-                    className={`taomni-btn h-6 px-1.5 text-[11px] inline-flex items-center gap-1 ${threadView ? "text-[var(--taomni-accent)]" : ""}`}
+                    className={`taomni-btn h-6 px-1.5 text-ui-small inline-flex items-center gap-1 ${threadView ? "text-[var(--taomni-accent)]" : ""}`}
                     data-testid="mail-thread-view-toggle"
                     aria-pressed={threadView}
                     title={threadView ? "Show messages unthreaded" : "Group messages into conversations"}
@@ -76,7 +76,7 @@ export function MailMessagesPane(viewProps: MailMessagesPaneProps) {
                   </button>
                 </div>
                 <span
-                  className="text-[11px] text-[var(--taomni-text-muted)]"
+                  className="text-ui-small text-[var(--taomni-text-muted)]"
                   data-testid="mail-message-count"
                   data-count={messages.length}
                   data-has-more={hasMoreMessages ? "true" : "false"}
@@ -87,7 +87,7 @@ export function MailMessagesPane(viewProps: MailMessagesPaneProps) {
               <div className="min-h-8 shrink-0 px-3 py-1 flex flex-wrap items-center gap-2 border-b border-[var(--taomni-divider)]">
                 <button
                   type="button"
-                  className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
+                  className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-ui-small"
                   data-testid="mail-delete-selected"
                   disabled={busyAction || checkedMessages.length === 0}
                   onClick={() => void handleDeleteMessages(checkedMessages)}
@@ -96,11 +96,11 @@ export function MailMessagesPane(viewProps: MailMessagesPaneProps) {
                   <Trash2 className="w-3 h-3" />
                   Delete selected
                 </button>
-                <span className="text-[11px] text-[var(--taomni-text-muted)]" data-testid="mail-selection-count" aria-live="polite">
+                <span className="text-ui-small text-[var(--taomni-text-muted)]" data-testid="mail-selection-count" aria-live="polite">
                   {checkedMessages.length} selected
                 </span>
                 {checkedMessages.length > 0 && (
-                  <button type="button" className="taomni-btn h-6 px-1.5 text-[11px]" onClick={() => setCheckedMessageKeys(new Set())}>
+                  <button type="button" className="taomni-btn h-6 px-1.5 text-ui-small" onClick={() => setCheckedMessageKeys(new Set())}>
                     Clear selection
                   </button>
                 )}
@@ -121,12 +121,12 @@ export function MailMessagesPane(viewProps: MailMessagesPaneProps) {
                 }}
               >
                 {loadingMessages && messages.length === 0 ? (
-                  <div className="h-20 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+                  <div className="h-20 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Loading cached headers
                   </div>
                 ) : filteredMessages.length === 0 ? (
-                  <div className="h-28 flex items-center justify-center px-4 text-center text-[12px] text-[var(--taomni-text-muted)]">
+                  <div className="h-28 flex items-center justify-center px-4 text-center text-ui-body text-[var(--taomni-text-muted)]">
                     {query || quickFilterActive ? "No messages match the search or filter." : "No cached messages. Run Sync to refresh all folders."}
                   </div>
                 ) : (
@@ -147,7 +147,7 @@ export function MailMessagesPane(viewProps: MailMessagesPaneProps) {
                       <div className="p-2">
                         <button
                           type="button"
-                          className="taomni-btn h-7 w-full inline-flex items-center justify-center gap-1.5 text-[12px]"
+                          className="taomni-btn h-7 w-full inline-flex items-center justify-center gap-1.5 text-ui-body"
                           onClick={() => void loadMoreMessages()}
                           disabled={loadingMoreMessages}
                           data-testid="mail-load-more"

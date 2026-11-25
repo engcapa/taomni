@@ -71,7 +71,7 @@ export function Magnifier({
         <canvas ref={canvasRef} style={{ display: "block", width: size, height: size }} />
       </div>
       <div
-        className="mt-1 rounded px-1.5 py-0.5 text-center font-mono text-[11px]"
+        className="mt-1 rounded px-1.5 py-0.5 text-center font-mono text-ui-small"
         style={{ background: "rgba(0,0,0,0.75)", color: "#fff" }}
       >
         {Math.round(cursor.x * sx)}, {Math.round(cursor.y * sy)} {hex}

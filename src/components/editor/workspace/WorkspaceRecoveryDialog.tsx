@@ -135,10 +135,10 @@ export function WorkspaceRecoveryDialog({
         <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3">
           <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-semibold text-[var(--taomni-code-text)]">
+            <div className="truncate text-ui-body font-semibold text-[var(--taomni-code-text)]">
               Workspace recovery
             </div>
-            <div className="truncate text-[10px] text-[var(--taomni-code-muted)]">
+            <div className="truncate text-ui-caption text-[var(--taomni-code-muted)]">
               Unsaved buffers and unresolved disk results from previous sessions.
             </div>
           </div>
@@ -157,7 +157,7 @@ export function WorkspaceRecoveryDialog({
           <div className="flex shrink-0 items-center gap-1 border-b border-[var(--taomni-code-border)] px-3 py-1.5">
             <button
               type="button"
-              className={`inline-flex h-7 items-center gap-1.5 rounded px-2.5 text-[11px] ${
+              className={`inline-flex h-7 items-center gap-1.5 rounded px-2.5 text-ui-small ${
                 tab === "buffers" ? "bg-[var(--taomni-code-selection-match-bg)] text-[var(--taomni-code-text)]" : "text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
               }`}
               onClick={() => setTab("buffers")}
@@ -168,7 +168,7 @@ export function WorkspaceRecoveryDialog({
             <button
               type="button"
               data-testid="workspace-recovery-disk-results-tab"
-              className={`inline-flex h-7 items-center gap-1.5 rounded px-2.5 text-[11px] ${
+              className={`inline-flex h-7 items-center gap-1.5 rounded px-2.5 text-ui-small ${
                 tab === "disk" ? "bg-[var(--taomni-code-selection-match-bg)] text-[var(--taomni-code-text)]" : "text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
               }`}
               onClick={() => setTab("disk")}
@@ -182,7 +182,7 @@ export function WorkspaceRecoveryDialog({
         {tab === "disk" ? (
           <section className="min-h-0 flex-1 overflow-auto p-3" data-testid="workspace-recovery-disk-results">
             {ledgerByPath.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-[11px] text-[var(--taomni-code-muted)]">
+              <div className="flex h-full items-center justify-center text-ui-small text-[var(--taomni-code-muted)]">
                 No unresolved disk results. Every write settled cleanly.
               </div>
             ) : (
@@ -194,11 +194,11 @@ export function WorkspaceRecoveryDialog({
                   >
                     <div className="mb-1.5 flex items-center gap-2">
                       <FileWarning className={`h-3.5 w-3.5 shrink-0 ${resolutionBadgeTone(group[0]) === "blocked" ? "text-red-400" : "text-sky-400"}`} />
-                      <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[var(--taomni-code-text)]" title={path}>
+                      <span className="min-w-0 flex-1 truncate text-ui-small font-semibold text-[var(--taomni-code-text)]" title={path}>
                         {path}
                       </span>
                       {group.some((row) => resolutionBadgeTone(row) === "blocked") && (
-                        <span className="shrink-0 rounded bg-red-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-red-400">
+                        <span className="shrink-0 rounded bg-red-500/15 px-1.5 py-0.5 text-ui-caption font-semibold uppercase tracking-wide text-red-400">
                           Save blocked
                         </span>
                       )}
@@ -212,14 +212,14 @@ export function WorkspaceRecoveryDialog({
                         >
                           <div className="flex items-start gap-2">
                             <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[var(--taomni-code-muted)]">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-ui-caption text-[var(--taomni-code-muted)]">
                                 <span className={resolutionBadgeTone(row) === "blocked" ? "font-semibold text-red-400" : "font-semibold text-[var(--taomni-code-text)]"}>
                                   {resolutionBadgeLabel(row)}
                                 </span>
                                 <span>·</span>
                                 <span>disk {row.diskEffect} / buffer {row.memoryEffect} / provider {row.providerEffect}</span>
                               </div>
-                              <div className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 font-mono text-[10px] text-[var(--taomni-code-muted)]">
+                              <div className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 font-mono text-ui-caption text-[var(--taomni-code-muted)]">
                                 <span>before</span>
                                 <span className="break-all">{hashDigest(row.expectedOldHash)}</span>
                                 <span>intended</span>
@@ -227,7 +227,7 @@ export function WorkspaceRecoveryDialog({
                                 <span>observed</span>
                                 <span className="break-all">{hashDigest(row.observedHash)}</span>
                               </div>
-                              <div className="mt-1 text-[10px] text-[var(--taomni-code-muted)]">
+                              <div className="mt-1 text-ui-caption text-[var(--taomni-code-muted)]">
                                 {capturedLabel(row.createdAt)}
                                 {row.verifiedAt !== null ? ` · verified ${capturedLabel(row.verifiedAt)}` : ""}
                                 {` · ${row.transactionId}`}
@@ -237,7 +237,7 @@ export function WorkspaceRecoveryDialog({
                               {onReopenLedgerEntry && (
                                 <button
                                   type="button"
-                                  className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[10px] hover:bg-[var(--taomni-code-selection-match-bg)]"
+                                  className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-ui-caption hover:bg-[var(--taomni-code-selection-match-bg)]"
                                   title="Open the file as it is on disk right now"
                                   onClick={() => onReopenLedgerEntry(row)}
                                 >
@@ -248,7 +248,7 @@ export function WorkspaceRecoveryDialog({
                               {onAcknowledgeLedgerEntry && (
                                 <button
                                   type="button"
-                                  className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[10px] hover:bg-emerald-500/15 hover:text-emerald-400"
+                                  className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-ui-caption hover:bg-emerald-500/15 hover:text-emerald-400"
                                   title="Acknowledge only this row and unblock saving this path"
                                   onClick={() => onAcknowledgeLedgerEntry(row)}
                                 >
@@ -269,7 +269,7 @@ export function WorkspaceRecoveryDialog({
         ) : (
           <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[280px_1fr]">
             <aside className="min-h-0 overflow-auto border-b border-[var(--taomni-code-border)] md:border-b-0 md:border-r">
-              <div className="border-b border-[var(--taomni-code-border)] px-3 py-2 text-[10px] text-[var(--taomni-code-muted)]">
+              <div className="border-b border-[var(--taomni-code-border)] px-3 py-2 text-ui-caption text-[var(--taomni-code-muted)]">
                 {entries.length} unsaved {entries.length === 1 ? "buffer" : "buffers"}
               </div>
               <ul className="py-1">
@@ -284,10 +284,10 @@ export function WorkspaceRecoveryDialog({
                         className="min-w-0 flex-1 truncate px-1 py-1 text-left"
                         onClick={() => setSelectedKey(entry.key)}
                       >
-                        <span className="block truncate text-[11px] text-[var(--taomni-code-text)]" title={entry.path}>
+                        <span className="block truncate text-ui-small text-[var(--taomni-code-text)]" title={entry.path}>
                           {entry.path}
                         </span>
-                        <span className="block truncate text-[10px] text-[var(--taomni-code-muted)]">
+                        <span className="block truncate text-ui-caption text-[var(--taomni-code-muted)]">
                           {capturedLabel(entry.capturedAt)} · {lineCount(entry.text)} lines
                         </span>
                       </button>
@@ -310,20 +310,20 @@ export function WorkspaceRecoveryDialog({
               {selected ? (
                 <>
                   <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2">
-                    <div className="truncate text-[11px] font-semibold text-[var(--taomni-code-text)]" title={selected.path}>
+                    <div className="truncate text-ui-small font-semibold text-[var(--taomni-code-text)]" title={selected.path}>
                       {selected.path}
                     </div>
-                    <div className="mt-0.5 text-[10px] text-[var(--taomni-code-muted)]">
+                    <div className="mt-0.5 text-ui-caption text-[var(--taomni-code-muted)]">
                       {capturedLabel(selected.capturedAt)} · {selected.text.length.toLocaleString()} characters
                     </div>
                   </div>
-                  <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-[11px] leading-5 text-[var(--taomni-code-text)]">
+                  <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-ui-small leading-5 text-[var(--taomni-code-text)]">
                     {selected.text}
                   </pre>
                   <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-3 py-2">
                     <button
                       type="button"
-                      className="inline-flex h-8 items-center gap-1.5 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+                      className="inline-flex h-8 items-center gap-1.5 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
                       onClick={() => onDiscard(selected)}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -334,7 +334,7 @@ export function WorkspaceRecoveryDialog({
                       type="button"
                       disabled={busy}
                       data-testid="workspace-recovery-recover-selected"
-                      className="inline-flex h-8 items-center gap-1.5 rounded bg-[var(--taomni-accent)] px-3 text-[11px] font-medium text-white hover:brightness-110 disabled:opacity-50"
+                      className="inline-flex h-8 items-center gap-1.5 rounded bg-[var(--taomni-accent)] px-3 text-ui-small font-medium text-white hover:brightness-110 disabled:opacity-50"
                       onClick={() => void onRecover(selected)}
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
@@ -343,7 +343,7 @@ export function WorkspaceRecoveryDialog({
                   </footer>
                 </>
               ) : (
-                <div className="flex flex-1 items-center justify-center p-6 text-[11px] text-[var(--taomni-code-muted)]">
+                <div className="flex flex-1 items-center justify-center p-6 text-ui-small text-[var(--taomni-code-muted)]">
                   No recovery buffers remain.
                 </div>
               )}
@@ -352,7 +352,7 @@ export function WorkspaceRecoveryDialog({
         )}
 
         <footer className="flex shrink-0 flex-wrap items-center gap-2 border-t border-[var(--taomni-code-border)] px-3 py-2">
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 text-[10px] text-[var(--taomni-code-muted)]">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 text-ui-caption text-[var(--taomni-code-muted)]">
             <HardDrive className="h-3.5 w-3.5 shrink-0" />
             Recovery data stays local to this workspace.
             <ShieldCheck className="ml-1 h-3 w-3 shrink-0" />
@@ -364,7 +364,7 @@ export function WorkspaceRecoveryDialog({
                 type="button"
                 disabled={busy || entries.length === 0}
                 data-testid="workspace-recovery-recover-all"
-                className="h-8 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
+                className="h-8 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                 onClick={() => void runRecoverAll()}
               >
                 Recover all
@@ -373,7 +373,7 @@ export function WorkspaceRecoveryDialog({
                 type="button"
                 disabled={busy || entries.length === 0}
                 data-testid="workspace-recovery-discard-all"
-                className="h-8 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
+                className="h-8 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                 onClick={onDiscardAll}
               >
                 Discard all
@@ -382,7 +382,7 @@ export function WorkspaceRecoveryDialog({
           )}
           <button
             type="button"
-            className="h-8 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+            className="h-8 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={onClose}
           >
             Decide later

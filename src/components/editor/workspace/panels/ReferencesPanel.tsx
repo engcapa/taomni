@@ -127,11 +127,11 @@ export function ReferencesPanel({ result, roots, semanticIndex, onOpenLocation, 
     : workspaceSemanticIndexStatusLabel(semanticIndex);
 
   return (
-    <div data-testid="code-workspace-references-panel" className="h-full min-h-0 overflow-auto py-1 text-[11px]">
+    <div data-testid="code-workspace-references-panel" className="h-full min-h-0 overflow-auto py-1 text-ui-small">
       <div className="flex items-center gap-1 border-b border-[var(--taomni-code-border)] px-3 py-1">
         <div
           data-testid="references-semantic-index"
-          className={`min-w-0 flex-1 truncate text-[10px] ${resultCurrent ? "text-[var(--taomni-code-muted)]" : "text-amber-500"}`}
+          className={`min-w-0 flex-1 truncate text-ui-caption ${resultCurrent ? "text-[var(--taomni-code-muted)]" : "text-amber-500"}`}
           title="References are supplied by the active language server. This is not an IntelliJ PSI index guarantee."
         >
           Provider snapshot: {semanticLabel}
@@ -171,7 +171,7 @@ export function ReferencesPanel({ result, roots, semanticIndex, onOpenLocation, 
           <select
             data-testid="references-recent-sessions"
             aria-label="Recent usages sessions"
-            className="h-6 max-w-[140px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[10px]"
+            className="h-6 max-w-[140px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-ui-caption"
             defaultValue=""
             onChange={(event) => {
               if (event.target.value) onRestoreRecent(event.target.value);
@@ -189,7 +189,7 @@ export function ReferencesPanel({ result, roots, semanticIndex, onOpenLocation, 
       {scopeSelection && (
         <div
           data-testid="references-scope-line"
-          className="truncate px-3 pt-1 text-[10px] text-[var(--taomni-code-muted)]"
+          className="truncate px-3 pt-1 text-ui-caption text-[var(--taomni-code-muted)]"
           title="Scope is a client-side selection over one document-scope provider response"
         >
           Scope: {scopeSelection.scope}
@@ -205,7 +205,7 @@ export function ReferencesPanel({ result, roots, semanticIndex, onOpenLocation, 
         </div>
       )}
       {result.origin && (
-        <div className="truncate px-3 py-1 text-[10px] text-[var(--taomni-code-muted)]" title={result.origin}>
+        <div className="truncate px-3 py-1 text-ui-caption text-[var(--taomni-code-muted)]" title={result.origin}>
           {result.origin}
         </div>
       )}
@@ -215,7 +215,7 @@ export function ReferencesPanel({ result, roots, semanticIndex, onOpenLocation, 
           it classifies by URI owner against the workspace roots. */}
       {!result.loading && result.locations.length > 0 && (
         <div
-          className="flex items-center gap-2 border-b border-[var(--taomni-code-border)] px-3 py-1 text-[10px] text-[var(--taomni-code-muted)]"
+          className="flex items-center gap-2 border-b border-[var(--taomni-code-border)] px-3 py-1 text-ui-caption text-[var(--taomni-code-muted)]"
           data-testid="references-filters"
         >
           {(["reads", "writes", "declarations"] as const).map((key) => (
@@ -251,7 +251,7 @@ export function ReferencesPanel({ result, roots, semanticIndex, onOpenLocation, 
       {[...new Set(batch.items.map((item) => item.path ?? item.uri))].map((groupKey) => (
         <div key={groupKey}>
           {session.groups.length > 1 && (
-            <div className="sticky top-0 bg-[var(--taomni-code-bg)] px-3 py-0.5 text-[9px] uppercase tracking-wide text-[var(--taomni-code-muted)]">
+            <div className="sticky top-0 bg-[var(--taomni-code-bg)] px-3 py-0.5 text-ui-caption uppercase tracking-wide text-[var(--taomni-code-muted)]">
               {groupsByKey.get(groupKey)?.label ?? groupKey}
             </div>
           )}
@@ -272,7 +272,7 @@ export function ReferencesPanel({ result, roots, semanticIndex, onOpenLocation, 
                 >
                   <File className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                   <span className="min-w-0 flex-1 truncate">{label}</span>
-                  <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
+                  <span className="shrink-0 font-mono text-ui-caption text-[var(--taomni-code-muted)]">
                     {item.range.start.line + 1}:{item.range.start.character + 1}
                   </span>
                 </button>
@@ -293,7 +293,7 @@ export function ReferencesPanel({ result, roots, semanticIndex, onOpenLocation, 
       {/* Pinned marker: ownership lives in the tab so new requests must ask
           before replacing this session (§8.19.7). */}
       {isPinned && (
-        <div className="px-3 py-1 text-[10px] text-[var(--taomni-code-muted)]">Result pinned — a new Find Usages will ask before replacing it.</div>
+        <div className="px-3 py-1 text-ui-caption text-[var(--taomni-code-muted)]">Result pinned — a new Find Usages will ask before replacing it.</div>
       )}
       {itemsById.size === 0 && !result.loading && null}
     </div>

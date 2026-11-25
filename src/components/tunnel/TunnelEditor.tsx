@@ -211,7 +211,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
           style={{ background: "linear-gradient(to bottom,#5895c8,#2b5d8b)", color: "white" }}
         >
           <LinkIcon className="w-3.5 h-3.5 mr-1.5" />
-          <div className="text-[12px] font-semibold">{initial ? t("tunnels.editor.titleEdit") : t("tunnels.editor.titleNew")}</div>
+          <div className="text-ui-body font-semibold">{initial ? t("tunnels.editor.titleEdit") : t("tunnels.editor.titleNew")}</div>
           <button
             title={t("tunnels.editor.close")}
             className="ml-auto hover:bg-red-500 rounded p-0.5"
@@ -239,11 +239,11 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                 checked={draft.kind === opt.id}
                 onChange={() => update("kind", opt.id)}
               />
-              <div className="text-[12px] leading-tight">
+              <div className="text-ui-body leading-tight">
                 <div className="font-semibold" style={{ color: draft.kind === opt.id ? "var(--taomni-accent)" : "var(--taomni-text)" }}>
                   {t(opt.label)}
                 </div>
-                <div className="text-[11px] mt-0.5" style={{ color: "var(--taomni-text-muted)" }}>
+                <div className="text-ui-small mt-0.5" style={{ color: "var(--taomni-text-muted)" }}>
                   {t(opt.description)}
                 </div>
               </div>
@@ -258,14 +258,14 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
         >
           {/* Name / saved-session row */}
           <div className="flex items-center gap-2 mb-4">
-            <label className="text-[12px] w-28 text-right">{t("tunnels.editor.tunnelNameRequired")}</label>
+            <label className="text-ui-body w-28 text-right">{t("tunnels.editor.tunnelNameRequired")}</label>
             <input
               className="taomni-input w-64"
               placeholder={t("tunnels.editor.namePlaceholder")}
               value={draft.name}
               onChange={(e) => update("name", e.target.value)}
             />
-            <label className="text-[12px] w-32 text-right ml-3">{t("tunnels.editor.useSavedSession")}</label>
+            <label className="text-ui-body w-32 text-right ml-3">{t("tunnels.editor.useSavedSession")}</label>
             <select
               className="taomni-input w-64 appearance-none"
               value={draft.sshSessionId ?? ""}
@@ -299,7 +299,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                   value={draft.listenPort || ""}
                   onChange={(e) => update("listenPort", parseInt(e.target.value || "0", 10) || 0)}
                 />
-                <span className="text-[11px] ml-1" style={{ color: "var(--taomni-text-muted)" }}>
+                <span className="text-ui-small ml-1" style={{ color: "var(--taomni-text-muted)" }}>
                   {isRemote ? t("tunnels.editor.serverBindHint") : t("tunnels.editor.listenHint")}
                 </span>
               </Field>
@@ -312,7 +312,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                 />
               </Field>
               {isRemote && (
-                <div className="text-[11px] mt-2" style={{ color: "var(--taomni-text-muted)" }}>
+                <div className="text-ui-small mt-2" style={{ color: "var(--taomni-text-muted)" }}>
                   {t("tunnels.editor.remoteListenNote")}
                 </div>
               )}
@@ -391,7 +391,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
               </Field>
               <Field label={t("tunnels.editor.vault")} disabled={draft.ssh.authMethod === "Agent"}>
                 <label
-                  className="flex items-center gap-1.5 text-[11px]"
+                  className="flex items-center gap-1.5 text-ui-small"
                   title={
                     vaultState === "empty"
                       ? t("tunnels.editor.vaultSetupHint")
@@ -459,7 +459,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                 />
               </Field>
               {isDynamic && (
-                <div className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
+                <div className="text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>
                   {t("tunnels.editor.dynamicHintPrefix")}{" "}
                   <strong>
                     socks5://{draft.listenHost || "127.0.0.1"}:{draft.listenPort || "<port>"}
@@ -472,14 +472,14 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
 
           {/* Description / autostart */}
           <div className="mt-4 grid grid-cols-12 gap-3 items-center">
-            <label className="col-span-2 text-[12px] text-right">{t("tunnels.editor.description")}</label>
+            <label className="col-span-2 text-ui-body text-right">{t("tunnels.editor.description")}</label>
             <input
               className="taomni-input col-span-7"
               placeholder={t("tunnels.editor.descriptionPlaceholder")}
               value={draft.description ?? ""}
               onChange={(e) => update("description", e.target.value)}
             />
-            <label className="col-span-3 flex items-center gap-1.5 text-[12px] justify-end">
+            <label className="col-span-3 flex items-center gap-1.5 text-ui-body justify-end">
               <input
                 type="checkbox"
                 className="taomni-checkbox"
@@ -492,7 +492,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
 
           {error && (
             <div
-              className="mt-3 px-3 py-2 rounded text-[12px]"
+              className="mt-3 px-3 py-2 rounded text-ui-body"
               style={{ background: "#fff1f0", color: "#9b1c1c", border: "1px solid #f5b3b3" }}
             >
               {error}
@@ -543,8 +543,8 @@ function DiagramCard({
       <div className="flex items-center gap-2 mb-1">
         {icon}
         <div>
-          <div className="text-[12px] font-semibold">{title}</div>
-          <div className="text-[10.5px]" style={{ color: "var(--taomni-text-muted)" }}>{subtitle}</div>
+          <div className="text-ui-body font-semibold">{title}</div>
+          <div className="text-ui-caption" style={{ color: "var(--taomni-text-muted)" }}>{subtitle}</div>
         </div>
       </div>
       {children}
@@ -563,7 +563,7 @@ function Field({
 }) {
   return (
     <div
-      className="flex items-center gap-2 text-[12px]"
+      className="flex items-center gap-2 text-ui-body"
       style={{ opacity: disabled ? 0.45 : 1 }}
     >
       <label className="w-32 text-right shrink-0" style={{ color: "var(--taomni-text-muted)" }}>{label}</label>

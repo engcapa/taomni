@@ -17,7 +17,7 @@ export function DiffNotice({ text, children, path }: { text: string; children?: 
     <div
       data-testid={path ? "git-diff-viewer" : undefined}
       data-path={path}
-      className="h-full min-h-24 flex flex-col items-center justify-center px-4 text-center text-[12px] text-[var(--taomni-text-muted)]"
+      className="h-full min-h-24 flex flex-col items-center justify-center px-4 text-center text-ui-body text-[var(--taomni-text-muted)]"
     >
       <div>{text}</div>
       {children}
@@ -41,11 +41,11 @@ export function ImageDiff({ pair }: { pair: GitBlobPair }) {
 export function ImageSide({ label, url, missing }: { label: string; url: string | null; missing: string }) {
   return (
     <div className="min-w-0 flex flex-col items-center gap-2">
-      <div className="text-[11px] text-slate-300">{label}</div>
+      <div className="text-ui-small text-slate-300">{label}</div>
       {url ? (
         <img src={url} alt={label} className="max-w-full object-contain border border-[var(--taomni-divider)]" />
       ) : (
-        <div className="flex-1 flex items-center justify-center text-[12px] text-slate-400">{missing}</div>
+        <div className="flex-1 flex items-center justify-center text-ui-body text-slate-400">{missing}</div>
       )}
     </div>
   );

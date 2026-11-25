@@ -301,11 +301,11 @@ export function AsrPanel() {
       {localModels.map((m) => {
         const job = m.streaming ? sherpaProgress : installation;
         return <section key={m.id} className={`min-w-0 flex flex-col gap-3 rounded-lg border p-4 ${config?.asr.active === m.id ? "border-[var(--taomni-accent)]/50 bg-[var(--taomni-accent)]/5" : "border-[var(--taomni-divider)]"}`} data-testid={`asr-model-${m.id}`}>
-        <div className="flex items-center justify-between gap-2"><strong className="text-sm capitalize">{modelTitle(m.id)}</strong>{config?.asr.active === m.id && <span className="rounded-full px-2 py-0.5 text-[10px] bg-[var(--taomni-accent)]/10 text-[var(--taomni-accent)]">{t("voice.selected")}</span>}</div>
+        <div className="flex items-center justify-between gap-2"><strong className="text-sm capitalize">{modelTitle(m.id)}</strong>{config?.asr.active === m.id && <span className="rounded-full px-2 py-0.5 text-ui-caption bg-[var(--taomni-accent)]/10 text-[var(--taomni-accent)]">{t("voice.selected")}</span>}</div>
         <p className="text-[var(--taomni-text-muted)]">{Math.round(m.bytes / 1e6)} MB{m.license ? ` · ${m.license}` : ""} · {t(m.streaming ? "voice.streamingRecognition" : "voice.batchRecognition")}</p>
         <p>{m.update_available ? t("voice.updateAvailable") : m.integrity === "corrupt" ? t("voice.corrupt") : m.integrity === "verified" ? t("voice.verified") : m.installed ? t("voice.installed") : t("voice.notInstalled")}</p>
         {!!m.resumable_bytes && <p className="text-[var(--taomni-text-muted)]">{t("voice.partialDownload")} {megabytes(m.resumable_bytes)} MB</p>}
-        {m.available_version && <p className="text-[10px] text-[var(--taomni-text-muted)]">{t("voice.version")} {m.available_version}{m.installed_version && m.installed_version !== m.available_version ? ` ← ${m.installed_version}` : ""}</p>}
+        {m.available_version && <p className="text-ui-caption text-[var(--taomni-text-muted)]">{t("voice.version")} {m.available_version}{m.installed_version && m.installed_version !== m.available_version ? ` ← ${m.installed_version}` : ""}</p>}
         {m.id === "sensevoice-small" && <p>Supports zh/yue/en/ja/ko only. Downloading accepts FunASR Model License v1.1; weights are not bundled with the application.</p>}
         {m.replacement && m.installed && <button type="button" className="taomni-btn p-2" data-testid={`asr-replace-${m.id}`} disabled={blocked || proxyDirty} onClick={() => {
           const replacement = models.find((candidate) => candidate.id === m.replacement);
@@ -317,7 +317,7 @@ export function AsrPanel() {
           <button type="button" className="taomni-btn px-2 py-1.5 col-span-2 row-start-2 justify-self-start" disabled={blocked || !m.installed || config?.asr.active === m.id} data-testid={`asr-select-${m.id}`} onClick={() => void select({ active: m.id, mode: "local" })}>{t("voice.useModel")}</button>
         </div>
         {m.download_url && <div className="border-t border-[var(--taomni-divider)] pt-3 space-y-2">
-          <a className="block break-all text-[10px] leading-relaxed text-[var(--taomni-text-muted)] hover:underline" href={m.download_url} title={t("voice.openDownloadLink")} data-testid={`asr-download-url-${m.id}`} onClick={(e) => { e.preventDefault(); void openExternalUrl(m.download_url!).catch((e) => setError(String(e))); }}>{m.download_url}</a>
+          <a className="block break-all text-ui-caption leading-relaxed text-[var(--taomni-text-muted)] hover:underline" href={m.download_url} title={t("voice.openDownloadLink")} data-testid={`asr-download-url-${m.id}`} onClick={(e) => { e.preventDefault(); void openExternalUrl(m.download_url!).catch((e) => setError(String(e))); }}>{m.download_url}</a>
           <div className="flex flex-wrap gap-3">
             <button type="button" className="inline-flex items-center gap-1 hover:underline" data-testid={`asr-copy-url-${m.id}`} onClick={() => void copyLink(m)}><Copy className="h-3 w-3" />{copied === m.id ? t("voice.linkCopied") : t("voice.copyDownloadLink")}</button>
             <button type="button" className="inline-flex items-center gap-1 hover:underline" data-testid={`asr-open-url-${m.id}`} onClick={() => void openExternalUrl(m.download_url!).catch((e) => setError(String(e)))}><ExternalLink className="h-3 w-3" />{t("voice.openDownloadLink")}</button>
@@ -325,7 +325,7 @@ export function AsrPanel() {
         </div>}
       </section>; })}
     </div>
-    <footer className="space-y-2 text-[11px] leading-relaxed text-[var(--taomni-text-muted)]"><p>{t("voice.browserDownloadHelp")}</p><p>{t("voice.updateHelp")}</p></footer>
+    <footer className="space-y-2 text-ui-small leading-relaxed text-[var(--taomni-text-muted)]"><p>{t("voice.browserDownloadHelp")}</p><p>{t("voice.updateHelp")}</p></footer>
     {error && <p role="alert" className="text-red-400 break-words">{error}</p>}
   </div>;
 }

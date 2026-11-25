@@ -57,7 +57,7 @@ export function LspMessageRequestDialog({
             <div className="text-sm font-semibold truncate">{request.serverLabel}</div>
             <div
               data-testid="lsp-message-request-message"
-              className="mt-2 text-[13px] whitespace-pre-wrap break-words"
+              className="mt-2 text-ui-body whitespace-pre-wrap break-words"
               style={{ color: "var(--taomni-text)" }}
             >
               {request.message}
@@ -79,7 +79,7 @@ export function LspMessageRequestDialog({
               key={`${request.requestId}-${index}`}
               ref={index === 0 ? firstActionRef : undefined}
               type="button"
-              className="max-w-full rounded px-3 py-1.5 text-[12px] font-medium whitespace-normal break-words hover:brightness-110"
+              className="max-w-full rounded px-3 py-1.5 text-ui-body font-medium whitespace-normal break-words hover:brightness-110"
               style={{ background: "var(--taomni-accent)", color: "white" }}
               onClick={() => onSelect(index)}
             >
@@ -88,7 +88,7 @@ export function LspMessageRequestDialog({
           ))}
           <button
             type="button"
-            className="rounded px-3 py-1.5 text-[12px] hover:bg-[var(--taomni-hover)]"
+            className="rounded px-3 py-1.5 text-ui-body hover:bg-[var(--taomni-hover)]"
             style={{ border: "1px solid var(--taomni-divider)" }}
             onClick={() => onSelect(null)}
           >

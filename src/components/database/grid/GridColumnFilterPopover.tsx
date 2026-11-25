@@ -13,7 +13,7 @@ export function GridColumnFilterPopover(context: GridColumnFilterPopoverContext)
   return filters.openColumnFilter && openFilterColumn && (
     <div
       ref={filters.columnFilterPopoverRef}
-      className="fixed z-[10000] w-[280px] rounded shadow-xl p-2 text-[12px]"
+      className="fixed z-[10000] w-[280px] rounded shadow-xl p-2 text-ui-body"
       style={{
         left: filters.openColumnFilter.left,
         top: filters.openColumnFilter.top,
@@ -47,7 +47,7 @@ export function GridColumnFilterPopover(context: GridColumnFilterPopoverContext)
           if (event.key === "Enter") filters.applyLocalColumnFilter();
           if (event.key === "Escape") filters.setOpenColumnFilter(null);
         }}
-        className="taomni-input h-7 w-full text-[12px]"
+        className="taomni-input h-7 w-full text-ui-body"
         placeholder="Filter this column"
         aria-label={`Filter ${openFilterColumn.name}`}
       />
@@ -69,7 +69,7 @@ export function GridColumnFilterPopover(context: GridColumnFilterPopoverContext)
           Exact
         </button>
       </div>
-      <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-[var(--taomni-text-muted)]">
+      <div className="mt-3 flex items-center justify-between gap-2 text-ui-small text-[var(--taomni-text-muted)]">
         <span>Distinct values</span>
         <span className="shrink-0">
           {filters.openFilterConfig.selectedValues.length > 0
@@ -82,14 +82,14 @@ export function GridColumnFilterPopover(context: GridColumnFilterPopoverContext)
         style={{ border: "1px solid var(--taomni-divider)", background: "var(--taomni-bg)" }}
       >
         {filters.openFilterDistinctValues.values.length === 0 ? (
-          <div className="px-2 py-3 text-center text-[11px] text-[var(--taomni-text-muted)]">
+          <div className="px-2 py-3 text-center text-ui-small text-[var(--taomni-text-muted)]">
             No values
           </div>
         ) : (
           filters.openFilterDistinctValues.values.map((item) => (
             <label
               key={item.key}
-              className="flex h-7 items-center gap-2 px-2 text-[11px] hover:bg-[var(--taomni-hover)]"
+              className="flex h-7 items-center gap-2 px-2 text-ui-small hover:bg-[var(--taomni-hover)]"
               title={item.value === null ? "NULL" : item.value}
             >
               <input
@@ -106,7 +106,7 @@ export function GridColumnFilterPopover(context: GridColumnFilterPopoverContext)
         )}
       </div>
       {filters.openFilterDistinctValues.truncated && (
-        <div className="mt-1 text-[10px] text-[var(--taomni-text-muted)]">
+        <div className="mt-1 text-ui-caption text-[var(--taomni-text-muted)]">
           Showing first {DISTINCT_FILTER_VALUE_LIMIT} values
         </div>
       )}

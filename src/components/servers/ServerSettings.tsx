@@ -26,9 +26,9 @@ export function ServerSettings() {
       className="flex-1 min-w-0 h-full overflow-y-auto px-4 py-3 flex flex-col"
       style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}
     >
-      <div className="text-[13px] font-semibold">{t(def.labelKey)}</div>
+      <div className="text-ui-body font-semibold">{t(def.labelKey)}</div>
       <div className="border-t my-2" style={{ borderColor: "var(--taomni-divider)" }} />
-      <div className="text-[11px] mb-3" style={{ color: "var(--taomni-text-muted)" }}>
+      <div className="text-ui-small mb-3" style={{ color: "var(--taomni-text-muted)" }}>
         {t(def.descKey)}
       </div>
 

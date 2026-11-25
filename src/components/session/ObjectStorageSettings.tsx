@@ -139,7 +139,7 @@ interface ObjectStorageSettingsProps {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>{label}</span>
+      <span className="text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>{label}</span>
       {children}
     </label>
   );
@@ -185,7 +185,7 @@ export function ObjectStorageSettings({ value, onChange, saveInVault, setSaveInV
   const input = "taomni-input w-full";
 
   return (
-    <div data-testid="session-objectstorage-section" className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-[12px]">
+    <div data-testid="session-objectstorage-section" className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-ui-body">
       <Row label="Provider">
         <select
           data-testid="session-storage-provider"
@@ -238,12 +238,12 @@ export function ObjectStorageSettings({ value, onChange, saveInVault, setSaveInV
             </Row>
           )}
           {value.awsAuth === "environment" && (
-            <p className="col-span-2 text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
+            <p className="col-span-2 text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>
               Uses AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (and AWS_SESSION_TOKEN) from the app's environment at connect time.
             </p>
           )}
           {value.awsAuth === "profile" && (
-            <p className="col-span-2 text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
+            <p className="col-span-2 text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>
               Reads ~/.aws/credentials and ~/.aws/config. SSO / assume-role / instance-role profiles are resolved via the AWS CLI (<code>aws configure export-credentials</code>).
             </p>
           )}
@@ -303,7 +303,7 @@ export function ObjectStorageSettings({ value, onChange, saveInVault, setSaveInV
               <Row label="Access token (optional — blank uses Azure CLI)">
                 <input className={input} type="password" value={value.azureBearerToken} autoComplete="off" onChange={(e) => patch({ azureBearerToken: e.target.value })} />
               </Row>
-              <p className="col-span-2 text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
+              <p className="col-span-2 text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>
                 Leave blank to obtain a token from the Azure CLI (<code>az account get-access-token</code>; run <code>az login</code> first). Share links (SAS) are unavailable with Entra ID auth.
               </p>
             </>
@@ -340,7 +340,7 @@ export function ObjectStorageSettings({ value, onChange, saveInVault, setSaveInV
         </button>
         {test && (
           <span
-            className="text-[11px] min-w-0 max-w-[280px] truncate"
+            className="text-ui-small min-w-0 max-w-[280px] truncate"
             title={test.msg}
             data-testid="oss-test-result-summary"
             style={{ color: test.ok ? "#2f8a3e" : "#b22222" }}

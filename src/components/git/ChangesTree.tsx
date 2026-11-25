@@ -64,7 +64,7 @@ function StatusPill({ change }: { change: GitChange }) {
     <span
       data-testid="git-change-status"
       data-change-status={change.conflict ? "conflict" : change.status}
-      className={`shrink-0 w-[68px] text-center rounded px-1 py-0.5 text-[10px] uppercase ${color}`}
+      className={`shrink-0 w-[68px] text-center rounded px-1 py-0.5 text-ui-caption uppercase ${color}`}
     >
       {gitChangeLabel(change)}
     </span>
@@ -126,9 +126,9 @@ export function ChangesTree({
         />
         <StatusPill change={change} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px]">{treeMode ? lastSegment(change.path) : change.path}</div>
+          <div className="truncate text-ui-body">{treeMode ? lastSegment(change.path) : change.path}</div>
           {change.oldPath && (
-            <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">from {change.oldPath}</div>
+            <div className="truncate text-ui-small text-[var(--taomni-text-muted)]">from {change.oldPath}</div>
           )}
         </div>
       </div>
@@ -166,7 +166,7 @@ export function ChangesTree({
           />
           {isCollapsed ? <ChevronRight className="w-3.5 h-3.5 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" />}
           <Folder className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
-          <span className="truncate text-[12px]">{node.name}</span>
+          <span className="truncate text-ui-body">{node.name}</span>
         </div>
         {!isCollapsed && node.children.map((child) => renderNode(child, depth + 1, sectionKey))}
       </div>
@@ -212,14 +212,14 @@ export function ChangesTree({
             state={pathsState(paths)}
             onChange={(value) => onToggleChecked(paths, value)}
           />
-          <span className="min-w-0 truncate text-[11px] font-semibold uppercase text-[var(--taomni-text-muted)]">
+          <span className="min-w-0 truncate text-ui-small font-semibold uppercase text-[var(--taomni-text-muted)]">
             {section.title} ({section.changes.length})
           </span>
           <div className="flex-1" />
           {showSectionActions && action.run ? (
             <button
               type="button"
-              className="taomni-btn h-6 px-1.5 text-[10px]"
+              className="taomni-btn h-6 px-1.5 text-ui-caption"
               disabled={busy || paths.length === 0}
               onClick={(event) => {
                 event.stopPropagation();
@@ -237,7 +237,7 @@ export function ChangesTree({
 
   if (changes.length === 0) {
     return (
-      <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+      <div className="h-full min-h-24 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
         {emptyLabel}
       </div>
     );

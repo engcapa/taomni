@@ -57,7 +57,7 @@ export function BookmarkSettings({
   };
 
   return (
-    <div data-testid="bookmark-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+    <div data-testid="bookmark-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-ui-body">
       <Field label={t("sessionEditor2.fieldSessionName")}>
         <input
           data-testid="session-name"

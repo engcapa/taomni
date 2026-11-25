@@ -71,7 +71,7 @@ export function PluginTabPane<Props extends object = Record<never, never>>({ tab
 
   const retryLoad = () => { setRetry((value) => value + 1); void state.refresh(slug); };
   const errorView = (message: string) => (
-    <div data-testid="plugin-tab-error" role="alert" className="m-auto max-w-lg space-y-3 p-6 text-[13px]">
+    <div data-testid="plugin-tab-error" role="alert" className="m-auto max-w-lg space-y-3 p-6 text-ui-body">
       <p className="font-semibold">{t("plugins.loadFailed")}</p>
       <p className="break-words text-[var(--taomni-text-muted)]">{message}</p>
       <button data-testid="plugin-tab-retry" className="taomni-btn px-3 py-1" onClick={retryLoad}>{t("plugins.retry")}</button>
@@ -82,7 +82,7 @@ export function PluginTabPane<Props extends object = Record<never, never>>({ tab
   if (state.status === "failed") {
     content = errorView(state.error ?? t("plugins.loadFailed"));
   } else if (state.status === "idle" || state.status === "loading" || state.pending.has(slug)) {
-    content = <p data-testid="plugin-tab-loading" role="status" className="m-auto p-6 text-[13px]">{t("plugins.loading")}</p>;
+    content = <p data-testid="plugin-tab-loading" role="status" className="m-auto p-6 text-ui-body">{t("plugins.loading")}</p>;
   } else if (!available) {
     const reason = record?.lifecycle === "uninstalled" || !record ? "missing" : record.lifecycle !== "enabled" ? "disabled" : "unavailable";
     content = <PluginUnavailablePane reason={reason} detail={record?.reason} onOpenSettings={onOpenSettings}>
@@ -96,7 +96,7 @@ export function PluginTabPane<Props extends object = Record<never, never>>({ tab
       {createElement(loaded.component, { ...componentProps as Props, tabId: tab.id, kind, active, api: loaded.api })}
     </PluginRenderBoundary>;
   } else {
-    content = <p data-testid="plugin-tab-loading" role="status" className="m-auto p-6 text-[13px]">{t("plugins.loading")}</p>;
+    content = <p data-testid="plugin-tab-loading" role="status" className="m-auto p-6 text-ui-body">{t("plugins.loading")}</p>;
   }
   return <section data-testid="plugin-tab-panel" data-plugin-slug={slug} data-plugin-kind={kind}
     data-plugin-version={record?.manifest?.version ?? ""} className={className}>

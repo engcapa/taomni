@@ -261,7 +261,7 @@ export function ControlBar({
         ) : activeSideTab === "explorer" ? (
           <ExplorerTabStrip />
         ) : activeSideTab === "home" || activeSideTab === "agents" || (activeSideTab === "tools" && !hasToolsSurfaceTabs) ? (
-          <div className="flex h-full items-center gap-2 px-2 text-[12px] font-semibold" data-testid="platform-mode-title">
+          <div className="flex h-full items-center gap-2 px-2 text-ui-body font-semibold" data-testid="platform-mode-title">
             {t(activeSideTab === "home" ? "platform.homeTitle" : activeSideTab === "tools" ? "platform.tools" : "platform.agentsTitle")}
           </div>
         ) : (

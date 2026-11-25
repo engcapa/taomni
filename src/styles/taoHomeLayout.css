@@ -77,7 +77,7 @@
   flex: none;
   gap: 4px;
   color: var(--taomni-text-muted);
-  font-size: 10px;
+  font-size: var(--taomni-fs-caption);
   white-space: nowrap;
 }
 
@@ -92,7 +92,7 @@
   background: var(--taomni-card-bg);
   color: var(--taomni-text-muted);
   padding: 5px 8px;
-  font-size: 11px;
+  font-size: var(--taomni-fs-small);
   cursor: pointer;
 }
 
@@ -162,7 +162,7 @@
   flex: 1;
   min-height: 0;
   padding: 14px;
-  font-size: 12px;
+  font-size: var(--taomni-fs-body);
   color: var(--taomni-text-muted);
   overflow: auto;
   overflow-wrap: anywhere;
@@ -204,10 +204,10 @@
 
 @container (max-width: 540px) {
   .tao-home-empty-stage { gap: 10px; }
-  .tao-home-empty-stage > p { margin: 0; font-size: 12px; }
+  .tao-home-empty-stage > p { margin: 0; font-size: var(--taomni-fs-body); }
   .tao-home-no-key-card { width: 100%; padding: 12px; }
-  .tao-home-no-key-card h2 { font-size: 15px; }
-  .tao-home-no-key-card p { font-size: 12px; margin-bottom: 8px; }
+  .tao-home-no-key-card h2 { font-size: var(--taomni-fs-title); }
+  .tao-home-no-key-card p { font-size: var(--taomni-fs-body); margin-bottom: 8px; }
   .tao-home-dock-button { font-size: 0; gap: 0; }
 }
 .tao-home-topbar-leading {

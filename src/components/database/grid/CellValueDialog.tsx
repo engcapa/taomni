@@ -42,14 +42,14 @@ export function CellValueDialog({
         <div className="h-10 shrink-0 flex items-center gap-2 px-3" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>
           <FileText className="w-4 h-4 text-[var(--taomni-accent)]" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-semibold" title={viewer.column.name}>
+            <div className="truncate text-ui-body font-semibold" title={viewer.column.name}>
               {viewer.column.name}
             </div>
-            <div className="truncate text-[10px] text-[var(--taomni-text-muted)]">
+            <div className="truncate text-ui-caption text-[var(--taomni-text-muted)]">
               Row {viewer.rowNumber} | {viewer.column.type} | {charCount} chars | {lineCount} lines
             </div>
           </div>
-          <label className="h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--taomni-text-muted)]">
+          <label className="h-6 inline-flex items-center gap-1 px-1 text-ui-small text-[var(--taomni-text-muted)]">
             <input
               data-testid="query-cell-value-wrap"
               type="checkbox"
@@ -61,7 +61,7 @@ export function CellValueDialog({
           <button
             type="button"
             data-testid="query-cell-value-copy"
-            className="h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)]"
+            className="h-6 px-2 inline-flex items-center gap-1 rounded text-ui-small hover:bg-[var(--taomni-hover)]"
             title="Copy full value"
             onClick={onCopy}
           >
@@ -79,7 +79,7 @@ export function CellValueDialog({
         <textarea
           ref={textareaRef}
           data-testid="query-cell-value-text"
-          className={`m-3 min-h-[280px] max-h-[calc(86vh-96px)] flex-1 resize-none rounded p-2 text-[12px] font-mono ${
+          className={`m-3 min-h-[280px] max-h-[calc(86vh-96px)] flex-1 resize-none rounded p-2 text-ui-body font-mono ${
             wrap ? "whitespace-pre-wrap" : "whitespace-pre"
           }`}
           style={{

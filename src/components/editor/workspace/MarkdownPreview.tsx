@@ -55,15 +55,15 @@ export function MarkdownPreview({
       const toolbar = document.createElement("div");
       toolbar.className = "h-8 flex items-center gap-1 border-b border-[var(--taomni-code-border)] px-2";
       const label = document.createElement("span");
-      label.className = "min-w-0 flex-1 truncate text-[11px] font-semibold text-[var(--taomni-code-muted)]";
+      label.className = "min-w-0 flex-1 truncate text-ui-small font-semibold text-[var(--taomni-code-muted)]";
       label.textContent = `Mermaid ${index + 1}`;
       const svgButton = document.createElement("button");
       svgButton.type = "button";
-      svgButton.className = "h-5 px-1.5 rounded text-[10px] hover:bg-[var(--taomni-code-active-line-bg)]";
+      svgButton.className = "h-5 px-1.5 rounded text-ui-caption hover:bg-[var(--taomni-code-active-line-bg)]";
       svgButton.textContent = "SVG";
       const pngButton = document.createElement("button");
       pngButton.type = "button";
-      pngButton.className = "h-5 px-1.5 rounded text-[10px] hover:bg-[var(--taomni-code-active-line-bg)]";
+      pngButton.className = "h-5 px-1.5 rounded text-ui-caption hover:bg-[var(--taomni-code-active-line-bg)]";
       pngButton.textContent = "PNG";
       const diagram = document.createElement("div");
       diagram.className = "overflow-auto p-3";
@@ -93,7 +93,7 @@ export function MarkdownPreview({
         })
         .catch((err) => {
           if (cancelled) return;
-          diagram.className = "p-3 text-[12px] text-red-500";
+          diagram.className = "p-3 text-ui-body text-red-500";
           diagram.textContent = errorMessage(err);
         });
     }

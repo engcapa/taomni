@@ -52,7 +52,7 @@ function StepMarker({ index, state }: { index: number; state: StepState }) {
   }
   return (
     <span
-      className={`w-5 h-5 shrink-0 rounded-full inline-flex items-center justify-center text-[10px] font-semibold border ${
+      className={`w-5 h-5 shrink-0 rounded-full inline-flex items-center justify-center text-ui-caption font-semibold border ${
         state === "current"
           ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)] text-white"
           : "border-[var(--taomni-divider)] text-[var(--taomni-text-muted)]"
@@ -159,14 +159,14 @@ export function SocksCapMacosSetupGuide({
             <HelpCircle className="w-5 h-5 shrink-0 text-[var(--taomni-accent)]" />
           )}
           <div className="min-w-0 flex-1">
-            <h2 id="sockscap-macos-setup-title" className="text-[14px] font-semibold">
+            <h2 id="sockscap-macos-setup-title" className="text-ui-title font-semibold">
               {t(
                 mode === "onboarding"
                   ? "sockscap.macosSetupTitle"
                   : "sockscap.macosSetupHelpTitle",
               )}
             </h2>
-            <p className="mt-0.5 text-[11px] text-[var(--taomni-text-muted)]">
+            <p className="mt-0.5 text-ui-small text-[var(--taomni-text-muted)]">
               {t("sockscap.macosSetupIntro")}
             </p>
           </div>
@@ -186,7 +186,7 @@ export function SocksCapMacosSetupGuide({
           <div
             data-testid="sockscap-macos-setup-status"
             data-installer-source={installStatus?.resourceSource ?? undefined}
-            className="mb-3 flex items-start gap-2 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[11px] text-sky-800 dark:text-sky-300"
+            className="mb-3 flex items-start gap-2 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-ui-small text-sky-800 dark:text-sky-300"
           >
             {busy ? (
               <Loader2 className="mt-0.5 w-3.5 h-3.5 shrink-0 animate-spin" />
@@ -215,17 +215,17 @@ export function SocksCapMacosSetupGuide({
               >
                 <StepMarker index={index + 1} state={stepStates[index]} />
                 <div className="min-w-0">
-                  <div className="text-[12px] font-semibold">{step.title}</div>
-                  <div className="mt-1 text-[11px] leading-5 text-[var(--taomni-text-muted)]">
+                  <div className="text-ui-body font-semibold">{step.title}</div>
+                  <div className="mt-1 text-ui-small leading-5 text-[var(--taomni-text-muted)]">
                     {step.body}
                   </div>
                   {index === 2 && (
-                    <div className="mt-1.5 inline-flex rounded bg-[var(--taomni-bg)] px-2 py-1 font-mono text-[10px] text-[var(--taomni-text)] border border-[var(--taomni-divider)]">
+                    <div className="mt-1.5 inline-flex rounded bg-[var(--taomni-bg)] px-2 py-1 font-mono text-ui-caption text-[var(--taomni-text)] border border-[var(--taomni-divider)]">
                       {t("sockscap.macosSetupPrivacyPath")}
                     </div>
                   )}
                   {index === 3 && (
-                    <div className="mt-1.5 text-[10px] text-[var(--taomni-text-muted)]">
+                    <div className="mt-1.5 text-ui-caption text-[var(--taomni-text-muted)]">
                       {t("sockscap.macosSetupNetworkPath")}
                     </div>
                   )}
@@ -237,7 +237,7 @@ export function SocksCapMacosSetupGuide({
           {error && (
             <div
               data-testid="sockscap-macos-setup-error"
-              className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-600 dark:text-red-300 break-words"
+              className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-ui-small text-red-600 dark:text-red-300 break-words"
             >
               {error}
             </div>
@@ -247,7 +247,7 @@ export function SocksCapMacosSetupGuide({
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[var(--taomni-divider)]">
           <button
             type="button"
-            className="px-3 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50"
+            className="px-3 py-1.5 rounded text-ui-body border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50"
             disabled={busy}
             onClick={onClose}
           >
@@ -260,7 +260,7 @@ export function SocksCapMacosSetupGuide({
             <button
               type="button"
               data-testid="sockscap-macos-setup-install"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-50"
               disabled={busy || !canInstall}
               onClick={onInstall}
             >
@@ -277,7 +277,7 @@ export function SocksCapMacosSetupGuide({
             <button
               type="button"
               data-testid="sockscap-macos-setup-refresh"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-50"
               disabled={busy}
               onClick={onRefreshApproval}
             >
@@ -294,7 +294,7 @@ export function SocksCapMacosSetupGuide({
             <button
               type="button"
               data-testid="sockscap-macos-setup-continue"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-50"
               disabled={busy}
               onClick={onContinueToStart}
             >
@@ -307,7 +307,7 @@ export function SocksCapMacosSetupGuide({
             <button
               type="button"
               data-testid="sockscap-macos-setup-finish"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-emerald-600 text-white hover:bg-emerald-500"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body bg-emerald-600 text-white hover:bg-emerald-500"
               onClick={onClose}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />

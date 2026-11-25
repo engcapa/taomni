@@ -173,8 +173,8 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     </div>
 
     {viewProps.showHome === false && (!activeTab || activeTab.type === "welcome") && (
-      <div data-testid={viewProps.toolsView ? "tools-empty-state" : "sessions-empty-state"} className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-[12px]">
-        <span className="text-[14px] font-semibold">{t(viewProps.toolsView ? "platform.toolsEmpty" : "platform.sessionsEmpty")}</span>
+      <div data-testid={viewProps.toolsView ? "tools-empty-state" : "sessions-empty-state"} className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-ui-body">
+        <span className="text-ui-title font-semibold">{t(viewProps.toolsView ? "platform.toolsEmpty" : "platform.sessionsEmpty")}</span>
         {!viewProps.toolsView && <button data-testid="sessions-empty-new-session" className="taomni-btn" onClick={() => handleNewSession()}>{t("menu.newSession")}</button>}
       </div>
     )}

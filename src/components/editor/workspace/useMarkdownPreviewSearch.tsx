@@ -104,7 +104,7 @@ export function useMarkdownPreviewSearch(
   }, [index, count, query]);
 
   const toolbar = open ? <div data-testid="markdown-preview-search" role="search"
-    className="sticky top-0 z-10 flex items-center gap-1 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 py-1 text-[12px]"
+    className="sticky top-0 z-10 flex items-center gap-1 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 py-1 text-ui-body"
     onKeyDown={(event) => {
       if (event.nativeEvent.isComposing) return;
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }

@@ -54,9 +54,9 @@ export function GoToLineDialog({ current, lineCount, onGo, onCancel, restoreFocu
         aria-modal="true"
         aria-label="Go to Line:Column"
         data-testid="code-workspace-goto-line-dialog"
-        className="w-[320px] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] p-3 text-[12px] text-[var(--taomni-code-text)] shadow-xl"
+        className="w-[320px] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] p-3 text-ui-body text-[var(--taomni-code-text)] shadow-xl"
       >
-        <label className="mb-1 block text-[11px] text-[var(--taomni-code-muted)]" htmlFor="code-workspace-goto-line-input">
+        <label className="mb-1 block text-ui-small text-[var(--taomni-code-muted)]" htmlFor="code-workspace-goto-line-input">
           [Line] [:column]:
         </label>
         <input
@@ -79,7 +79,7 @@ export function GoToLineDialog({ current, lineCount, onGo, onCancel, restoreFocu
           }}
         />
         {!target && (
-          <div role="alert" data-testid="code-workspace-goto-line-error" className="mt-1 text-[11px] text-red-500">
+          <div role="alert" data-testid="code-workspace-goto-line-error" className="mt-1 text-ui-small text-red-500">
             Enter a line between 1 and {Math.max(1, lineCount)}, optionally followed by :column
           </div>
         )}

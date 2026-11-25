@@ -158,7 +158,7 @@ export function MfaAccountRow({
         </button>
         <div
           data-testid="mfa-account-avatar"
-          className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center font-bold text-[12px] tracking-wider select-none border"
+          className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center font-bold text-ui-body tracking-wider select-none border"
           style={{
             backgroundColor: avatar.palette.bg,
             color: avatar.palette.text,
@@ -169,19 +169,19 @@ export function MfaAccountRow({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span data-testid="mfa-account-issuer" className="truncate text-[14px] font-semibold tracking-tight">
+            <span data-testid="mfa-account-issuer" className="truncate text-ui-title font-semibold tracking-tight">
               {account.issuer || account.accountName}
             </span>
             {account.group ? (
-              <span data-testid="mfa-account-group" className="taomni-pill shrink-0 text-[10px]" style={{ color: "var(--taomni-text-muted)" }}>
+              <span data-testid="mfa-account-group" className="taomni-pill shrink-0 text-ui-caption" style={{ color: "var(--taomni-text-muted)" }}>
                 {account.group}
               </span>
             ) : null}
             {account.kind === "hotp" ? (
-              <span className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-medium border" style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}>HOTP</span>
+              <span className="shrink-0 px-1.5 py-0.2 rounded text-ui-caption font-medium border" style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}>HOTP</span>
             ) : null}
           </div>
-          <div data-testid="mfa-account-name" className="truncate text-[12px] mt-0.5" style={{ color: "var(--taomni-text-muted)" }}>
+          <div data-testid="mfa-account-name" className="truncate text-ui-body mt-0.5" style={{ color: "var(--taomni-text-muted)" }}>
             {account.issuer ? account.accountName : ""}
           </div>
         </div>
@@ -196,7 +196,7 @@ export function MfaAccountRow({
             aria-label={t("mfa.copyCode", { name })}
             title={t("mfa.copyCode", { name })}
             disabled={!code}
-            className="group/code relative rounded-md px-2 py-0.5 font-mono text-[22px] sm:text-[24px] font-bold tabular-nums tracking-widest hover:bg-[var(--taomni-hover)] focus-visible:outline focus-visible:outline-2 disabled:opacity-40 transition-colors"
+            className="group/code relative rounded-md px-2 py-0.5 font-mono text-[length:calc(var(--taomni-ui-font-size,12px)*1.8333)] sm:text-[length:calc(var(--taomni-ui-font-size,12px)*2)] font-bold tabular-nums tracking-widest hover:bg-[var(--taomni-hover)] focus-visible:outline focus-visible:outline-2 disabled:opacity-40 transition-colors"
             style={{ color: "var(--taomni-accent)" }}
             onClick={() => onCopy("current")}
             onKeyDown={onCodeKeyDown}
@@ -209,7 +209,7 @@ export function MfaAccountRow({
               data-testid="mfa-account-next-code"
               aria-label={t("mfa.copyNextCode", { name })}
               title={t("mfa.copyNextCode", { name })}
-              className="rounded px-1.5 py-0.2 text-[11px] font-mono tabular-nums hover:bg-[var(--taomni-hover)] transition-colors"
+              className="rounded px-1.5 py-0.2 text-ui-small font-mono tabular-nums hover:bg-[var(--taomni-hover)] transition-colors"
               style={{ color: "var(--taomni-text-muted)" }}
               onClick={() => onCopy("next")}
             >
@@ -227,7 +227,7 @@ export function MfaAccountRow({
               data-testid="mfa-account-hotp-next"
               aria-label={t("mfa.hotpNextLabel", { name })}
               title={t("mfa.hotpNextLabel", { name })}
-              className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium hover:bg-[var(--taomni-hover)] transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-ui-small font-medium hover:bg-[var(--taomni-hover)] transition-colors"
               style={{ borderColor: "var(--taomni-input-border)" }}
               onClick={onHotpNext}
             >

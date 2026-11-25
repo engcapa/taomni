@@ -7,7 +7,7 @@ import { MfaImportError, isOtpauthLink, parseImportText, parseOtpauthUri, type M
 import { defaultMfaInput, type MfaAccountInput, type MfaAlgorithm, type MfaKind } from "../../../../src/lib/mfa/types";
 import { useMfaStore } from "../../../../src/stores/mfaStore";
 
-const labelClass = "block text-[12px] mb-1";
+const labelClass = "block text-ui-body mb-1";
 const labelStyle = { color: "var(--taomni-text-muted)" };
 
 /** Manual entry: issuer/account/secret with advanced parameters or an otpauth link. */
@@ -108,7 +108,7 @@ export function MfaSecretForm({
         <input
           id="mfa-add-uri"
           data-testid="mfa-add-uri"
-          className="taomni-input w-full font-mono text-[12px]"
+          className="taomni-input w-full font-mono text-ui-body"
           value={uri}
           placeholder={t("mfa.uriPlaceholder")}
           onChange={(event) => applyUri(event.target.value)}
@@ -130,7 +130,7 @@ export function MfaSecretForm({
       <div>
         <label className={labelClass} style={labelStyle} htmlFor="mfa-add-secret">{t("mfa.secret")}</label>
         <input id="mfa-add-secret" data-testid="mfa-add-secret" className="taomni-input w-full font-mono" value={input.secret} placeholder={t("mfa.secretPlaceholder")} onChange={(event) => update({ secret: event.target.value })} aria-invalid={invalid("secret")} autoComplete="off" spellCheck={false} />
-        <div className="mt-0.5 text-[11px]" style={labelStyle}>{t("mfa.secretHint")}</div>
+        <div className="mt-0.5 text-ui-small" style={labelStyle}>{t("mfa.secretHint")}</div>
       </div>
       <div>
         <label className={labelClass} style={labelStyle} htmlFor="mfa-add-group">{t("mfa.group")}</label>
@@ -140,7 +140,7 @@ export function MfaSecretForm({
         type="button"
         data-testid="mfa-add-advanced"
         aria-expanded={advanced}
-        className="inline-flex items-center gap-1 text-[12px] hover:underline"
+        className="inline-flex items-center gap-1 text-ui-body hover:underline"
         style={labelStyle}
         onClick={() => setAdvanced((value) => !value)}
       >
@@ -185,13 +185,13 @@ export function MfaSecretForm({
           )}
         </div>
       ) : null}
-      {notice && !error ? <div data-testid="mfa-add-notice" className="text-[12px]" style={{ color: "var(--taomni-success-text, #2f855a)" }}>{notice}</div> : null}
-      {error ? <div data-testid="mfa-add-error" role="alert" className="text-[12px]" style={{ color: "var(--taomni-error, #c33)" }}>{error.message}</div> : null}
+      {notice && !error ? <div data-testid="mfa-add-notice" className="text-ui-body" style={{ color: "var(--taomni-success-text, #2f855a)" }}>{notice}</div> : null}
+      {error ? <div data-testid="mfa-add-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-error, #c33)" }}>{error.message}</div> : null}
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" data-testid="mfa-add-cancel" className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]" onClick={onCancel} disabled={busy}>
+        <button type="button" data-testid="mfa-add-cancel" className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]" onClick={onCancel} disabled={busy}>
           {t("mfa.cancel")}
         </button>
-        <button type="submit" data-testid="mfa-add-submit" className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50" style={{ background: "var(--taomni-accent)" }} disabled={busy}>
+        <button type="submit" data-testid="mfa-add-submit" className="px-3 py-1 text-ui-body rounded text-white disabled:opacity-50" style={{ background: "var(--taomni-accent)" }} disabled={busy}>
           {t("mfa.submit")}
         </button>
       </div>

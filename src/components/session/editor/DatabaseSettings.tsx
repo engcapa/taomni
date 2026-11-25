@@ -44,7 +44,7 @@ export function DatabaseSettings({
   const isPresto = proto === "Presto";
   const isOracle = proto === "Oracle";
   return (
-    <div data-testid="database-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+    <div data-testid="database-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-ui-body">
       <Field label="Username">
         <input
           className="taomni-input w-64"
@@ -68,7 +68,7 @@ export function DatabaseSettings({
             }}
           />
         <label
-          className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
+          className="flex items-center gap-1 text-ui-small cursor-pointer ml-2"
           title={vaultState === "empty" ? "Set up the vault on save to store passwords" : "Encrypt and store this password in the vault"}
         >
           <input

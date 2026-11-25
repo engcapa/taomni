@@ -69,7 +69,7 @@ export function WelcomeHistoryPanel({
                 key={tab.id}
                 id={`welcome-history-tab-${tab.id}`}
                 data-testid={`welcome-history-tab-${tab.id}`}
-                className="h-8 min-w-0 rounded px-3 inline-flex items-center gap-1.5 text-[12px] font-medium"
+                className="h-8 min-w-0 rounded px-3 inline-flex items-center gap-1.5 text-ui-body font-medium"
                 style={{
                   background: selected ? "var(--taomni-selected)" : "transparent",
                   color: selected ? "var(--taomni-text)" : "var(--taomni-text-muted)",
@@ -83,7 +83,7 @@ export function WelcomeHistoryPanel({
               >
                 <span className="shrink-0 text-[var(--taomni-accent)]">{tab.icon}</span>
                 <span className="truncate">{tab.label}</span>
-                <span className="shrink-0 text-[11px] taomni-mono text-[var(--taomni-text-muted)]">
+                <span className="shrink-0 text-ui-small taomni-mono text-[var(--taomni-text-muted)]">
                   {tab.count}
                 </span>
               </button>

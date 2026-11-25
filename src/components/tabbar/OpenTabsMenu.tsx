@@ -292,7 +292,7 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab, show
         </button>
       </div>}
 
-      <div className="px-3 pb-1.5 flex items-center justify-between gap-2 text-[10px] text-[var(--taomni-text-muted)]">
+      <div className="px-3 pb-1.5 flex items-center justify-between gap-2 text-ui-caption text-[var(--taomni-text-muted)]">
         <span>{t("tabs.detailsVisibleCount", { visible: stripVisibleCount, total: tabs.length })}</span>
         <span>{t("tabs.detailsShortcutHint", { shortcut: detailsShortcut })}</span>
       </div>
@@ -376,7 +376,7 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab, show
                   data-testid={`open-tabs-group-${slug}`}
                 >
                   <span className={`flex-1 truncate ${muted}`}>{label}</span>
-                  <span className={`text-[11px] ${muted}`}>({group.tabs.length})</span>
+                  <span className={`text-ui-small ${muted}`}>({group.tabs.length})</span>
                 </button>
               </div>
               {!isCollapsed &&
@@ -423,7 +423,7 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab, show
                         </span>
                         <span className="flex-1 min-w-0">
                           <span className="block truncate">{tab.title}</span>
-                          <span className="block truncate text-[10px] text-[var(--taomni-text-muted)]">
+                          <span className="block truncate text-ui-caption text-[var(--taomni-text-muted)]">
                             {details.sessionLabel} · {details.activityLabel}
                           </span>
                         </span>

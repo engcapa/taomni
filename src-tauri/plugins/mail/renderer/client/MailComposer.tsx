@@ -102,14 +102,14 @@ export function MailComposer(viewProps: MailComposerProps) {
               setComposePrompt(null);
             }}
           >
-            <div className="h-8 px-3 flex items-center gap-1 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)] text-[12px]" data-testid="mail-compose-menu-bar">
+            <div className="h-8 px-3 flex items-center gap-1 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)] text-ui-body" data-testid="mail-compose-menu-bar">
               <button type="button" className="taomni-btn h-6 px-2" onClick={() => void saveCurrentDraft("manual")} disabled={savingDraft || sending}>File</button>
               <button type="button" className="taomni-btn h-6 px-2" onClick={() => document.execCommand("undo")} disabled={sending}>Edit</button>
               <button type="button" className="taomni-btn h-6 px-2" onClick={() => void handleAddDraftAttachments()} disabled={sending}>Insert</button>
               <button type="button" className="taomni-btn h-6 px-2" onClick={() => setDraft((current) => ({ ...current, richFormatUsed: true }))} disabled={sending}>Format</button>
               <button type="button" className="taomni-btn h-6 px-2" disabled={sending}>Options</button>
               <button type="button" className="taomni-btn h-6 px-2" disabled={sending}>Tools</button>
-              <span className="ml-auto text-[11px] text-[var(--taomni-text-muted)]">
+              <span className="ml-auto text-ui-small text-[var(--taomni-text-muted)]">
                 {attachProgress
                   ? `${attachProgress.label} ${attachProgress.done}/${attachProgress.total}`
                   : savingDraft
@@ -121,7 +121,7 @@ export function MailComposer(viewProps: MailComposerProps) {
             </div>
             {attachProgress && (
               <div
-                className="px-3 py-1.5 border-b border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] text-[11px] text-[var(--taomni-text-muted)] flex items-center gap-2"
+                className="px-3 py-1.5 border-b border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] text-ui-small text-[var(--taomni-text-muted)] flex items-center gap-2"
                 data-testid="mail-compose-attach-progress"
               >
                 {attachProgress.done < attachProgress.total
@@ -140,7 +140,7 @@ export function MailComposer(viewProps: MailComposerProps) {
                 </div>
               </div>
             )}
-            <div className="p-3 grid grid-cols-[56px_1fr] gap-2 text-[12px]">
+            <div className="p-3 grid grid-cols-[56px_1fr] gap-2 text-ui-body">
               <label className="self-center text-[var(--taomni-text-muted)]" htmlFor={`mail-from-${tabId}`}>From</label>
               <select
                 id={`mail-from-${tabId}`}
@@ -238,7 +238,7 @@ export function MailComposer(viewProps: MailComposerProps) {
                   {draft.attachments.map((attachment, index) => (
                     <span
                       key={`${attachment.path}-${index}`}
-                      className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-2 py-1 text-[11px] text-[var(--taomni-text-muted)] bg-[var(--taomni-sidebar-bg)]"
+                      className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-2 py-1 text-ui-small text-[var(--taomni-text-muted)] bg-[var(--taomni-sidebar-bg)]"
                       data-testid="mail-compose-attachment-chip"
                       title={attachment.path}
                     >
@@ -259,24 +259,24 @@ export function MailComposer(viewProps: MailComposerProps) {
                   ))}
                 </div>
               ) : (
-                <div className="text-[11px] text-[var(--taomni-text-muted)] flex items-center gap-1.5">
+                <div className="text-ui-small text-[var(--taomni-text-muted)] flex items-center gap-1.5">
                   <Paperclip className="w-3.5 h-3.5" />
                   Drop files here to attach, or use Attach / paste images into the editor
                 </div>
               )}
             </div>
             <div className="h-10 px-3 flex items-center justify-end gap-2 border-t border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
-              <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 mr-auto" onClick={() => void handleAddDraftAttachments()} disabled={sending}>
+              <button type="button" className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5 mr-auto" onClick={() => void handleAddDraftAttachments()} disabled={sending}>
                 <Paperclip className="w-3.5 h-3.5" />
                 Attach
               </button>
-              <button type="button" className="taomni-btn h-7 px-3 text-[12px]" data-testid="mail-compose-save-draft" onClick={() => void saveCurrentDraft("manual")} disabled={savingDraft || sending || !draftHasContent(draft)}>
+              <button type="button" className="taomni-btn h-7 px-3 text-ui-body" data-testid="mail-compose-save-draft" onClick={() => void saveCurrentDraft("manual")} disabled={savingDraft || sending || !draftHasContent(draft)}>
                 {savingDraft ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 Save draft
               </button>
               <button
                 type="button"
-                className="taomni-btn h-7 px-3 text-[12px]"
+                className="taomni-btn h-7 px-3 text-ui-body"
                 data-testid="mail-compose-save-template"
                 onClick={() => void saveCurrentAsTemplate()}
                 disabled={savingDraft || sending || !draftHasContent(draft)}
@@ -284,10 +284,10 @@ export function MailComposer(viewProps: MailComposerProps) {
               >
                 Save as template
               </button>
-              <button type="button" className="taomni-btn h-7 px-3 text-[12px]" data-testid="mail-compose-discard" onClick={() => void discardCurrentDraft()} disabled={sending}>
+              <button type="button" className="taomni-btn h-7 px-3 text-ui-body" data-testid="mail-compose-discard" onClick={() => void discardCurrentDraft()} disabled={sending}>
                 Discard
               </button>
-              <label className="inline-flex items-center gap-1 text-[12px] text-[var(--taomni-text-muted)]" title="Ask the recipient's client to send a read receipt">
+              <label className="inline-flex items-center gap-1 text-ui-body text-[var(--taomni-text-muted)]" title="Ask the recipient's client to send a read receipt">
                 <input
                   type="checkbox"
                   checked={draft.readReceipt === true}
@@ -299,7 +299,7 @@ export function MailComposer(viewProps: MailComposerProps) {
               <div className="relative">
                 <button
                   type="button"
-                  className="taomni-btn h-7 px-3 text-[12px]"
+                  className="taomni-btn h-7 px-3 text-ui-body"
                   data-testid="mail-compose-send-later"
                   disabled={sending}
                   onClick={() => {
@@ -311,7 +311,7 @@ export function MailComposer(viewProps: MailComposerProps) {
                 </button>
                 {sendLaterOpen && (
                   <div
-                    className="absolute bottom-9 right-0 z-10 w-72 p-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg text-[12px] flex flex-col gap-2"
+                    className="absolute bottom-9 right-0 z-10 w-72 p-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg text-ui-body flex flex-col gap-2"
                     data-testid="mail-send-later-panel"
                   >
                     <label className="flex flex-col gap-1">
@@ -324,7 +324,7 @@ export function MailComposer(viewProps: MailComposerProps) {
                         onChange={(event) => setSendLaterAt(event.target.value)}
                       />
                     </label>
-                    <span className="text-[11px] text-[var(--taomni-text-muted)]">
+                    <span className="text-ui-small text-[var(--taomni-text-muted)]">
                       Scheduled mail only goes out while this account's tab is open.
                     </span>
                     <div className="flex justify-end gap-2">
@@ -336,7 +336,7 @@ export function MailComposer(viewProps: MailComposerProps) {
                   </div>
                 )}
               </div>
-              <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5" data-primary="true" data-testid="mail-compose-send" onClick={() => void handleSendDraft()} disabled={sending}>
+              <button type="button" className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5" data-primary="true" data-testid="mail-compose-send" onClick={() => void handleSendDraft()} disabled={sending}>
                 {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 Send
               </button>

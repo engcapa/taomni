@@ -219,15 +219,15 @@ export function SdkSettings() {
       <div className="mb-3 flex flex-wrap items-start gap-2">
         <Wrench className="mt-0.5 h-4 w-4 shrink-0 text-[var(--taomni-accent)]" />
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-semibold">{t("settings.sdkTitle")}</div>
-          <div className="text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-title font-semibold">{t("settings.sdkTitle")}</div>
+          <div className="text-ui-body text-[var(--taomni-text-muted)]">
             {t("settings.sdkSubtitle")}
           </div>
         </div>
         <button
           type="button"
           data-testid="sdk-discover"
-          className="taomni-btn inline-flex h-7 items-center gap-1 px-2.5 text-[11px]"
+          className="taomni-btn inline-flex h-7 items-center gap-1 px-2.5 text-ui-small"
           disabled={busy !== null}
           onClick={() => void discover()}
         >
@@ -237,7 +237,7 @@ export function SdkSettings() {
         <button
           type="button"
           data-testid="sdk-add"
-          className="taomni-btn inline-flex h-7 items-center gap-1 px-2.5 text-[11px]"
+          className="taomni-btn inline-flex h-7 items-center gap-1 px-2.5 text-ui-small"
           disabled={busy !== null}
           onClick={() => openNew()}
         >
@@ -258,7 +258,7 @@ export function SdkSettings() {
       </div>
 
       {error && (
-        <div data-testid="sdk-settings-error" className="mb-2 rounded border border-red-500/35 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-600 dark:text-red-400">
+        <div data-testid="sdk-settings-error" className="mb-2 rounded border border-red-500/35 bg-red-500/10 px-2 py-1.5 text-ui-small text-red-600 dark:text-red-400">
           {error}
         </div>
       )}
@@ -266,7 +266,7 @@ export function SdkSettings() {
       {draft && (
         <div data-testid="sdk-editor" className="mb-3 rounded border border-[var(--taomni-accent)]/40 bg-[var(--taomni-bg)] p-2.5">
           <div className="mb-2 flex items-center gap-2">
-            <span className="text-[12px] font-semibold">
+            <span className="text-ui-body font-semibold">
               {draft.id ? t("settings.sdkEditTitle") : t("settings.sdkAddTitle")}
             </span>
             <button
@@ -279,13 +279,13 @@ export function SdkSettings() {
             </button>
           </div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[160px_minmax(160px,1fr)]">
-            <label className="text-[11px] text-[var(--taomni-text-muted)]">
+            <label className="text-ui-small text-[var(--taomni-text-muted)]">
               {t("settings.sdkKind")}
               <select
                 data-testid="sdk-editor-kind"
                 value={draft.kind}
                 disabled={!!draft.id}
-                className="mt-0.5 h-8 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-2 text-[12px]"
+                className="mt-0.5 h-8 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-2 text-ui-body"
                 onChange={(event) => {
                   setProbe(null);
                   setDraft((current) => current ? { ...current, kind: event.target.value as SdkKind } : current);
@@ -294,7 +294,7 @@ export function SdkSettings() {
                 {SDK_KINDS.map((kind) => <option key={kind} value={kind}>{kindLabel(kind)}</option>)}
               </select>
             </label>
-            <label className="text-[11px] text-[var(--taomni-text-muted)]">
+            <label className="text-ui-small text-[var(--taomni-text-muted)]">
               {t("settings.sdkName")}
               <input
                 data-testid="sdk-editor-name"
@@ -305,13 +305,13 @@ export function SdkSettings() {
               />
             </label>
           </div>
-          <label className="mt-2 block text-[11px] text-[var(--taomni-text-muted)]">
+          <label className="mt-2 block text-ui-small text-[var(--taomni-text-muted)]">
             {t("settings.sdkLocation")}
             <div className="mt-0.5 flex gap-1.5">
               <input
                 data-testid="sdk-editor-location"
                 value={draft.location}
-                className="taomni-input h-8 min-w-0 flex-1 font-mono text-[11px]"
+                className="taomni-input h-8 min-w-0 flex-1 font-mono text-ui-small"
                 placeholder={t("settings.sdkLocationPlaceholder")}
                 onChange={(event) => { setProbe(null); setDraft((current) => current ? { ...current, location: event.target.value } : current); }}
                 onKeyDown={(event) => { if (event.key === "Enter") void saveDraft(); }}
@@ -323,7 +323,7 @@ export function SdkSettings() {
             </div>
           </label>
           {probe && (
-            <div data-testid="sdk-editor-probe" className={`mt-2 rounded border px-2 py-1.5 text-[11px] ${statusTone(probe.status)}`}>
+            <div data-testid="sdk-editor-probe" className={`mt-2 rounded border px-2 py-1.5 text-ui-small ${statusTone(probe.status)}`}>
               <div className="flex items-center gap-1.5 font-medium">
                 {probe.status === "ready" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
                 {kindLabel(probe.kind)} · {probe.version ?? t("settings.sdkUnknownVersion")} · {probe.status}
@@ -332,10 +332,10 @@ export function SdkSettings() {
             </div>
           )}
           <div className="mt-2 flex justify-end gap-1.5">
-            <button type="button" data-testid="sdk-editor-probe-button" className="taomni-btn h-7 px-2.5 text-[11px]" disabled={!draft.location.trim() || busy !== null} onClick={() => void checkDraft()}>
+            <button type="button" data-testid="sdk-editor-probe-button" className="taomni-btn h-7 px-2.5 text-ui-small" disabled={!draft.location.trim() || busy !== null} onClick={() => void checkDraft()}>
               {busy === "probe" ? t("settings.sdkChecking") : t("settings.sdkCheck")}
             </button>
-            <button type="button" data-testid="sdk-editor-save" className="taomni-btn h-7 px-2.5 text-[11px]" disabled={!draft.location.trim() || busy !== null} onClick={() => void saveDraft()}>
+            <button type="button" data-testid="sdk-editor-save" className="taomni-btn h-7 px-2.5 text-ui-small" disabled={!draft.location.trim() || busy !== null} onClick={() => void saveDraft()}>
               {busy === "save" ? t("settings.sdkSaving") : t("settings.sdkSave")}
             </button>
           </div>
@@ -345,10 +345,10 @@ export function SdkSettings() {
       {discoveries && (
         <div data-testid="sdk-discovery-results" className="mb-3 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] p-2.5">
           <div className="mb-1.5 flex items-center gap-2">
-            <span className="text-[12px] font-semibold">{t("settings.sdkDiscoveredTitle")}</span>
-            <span className="text-[10px] text-[var(--taomni-text-muted)]">{availableDiscoveries.length}</span>
+            <span className="text-ui-body font-semibold">{t("settings.sdkDiscoveredTitle")}</span>
+            <span className="text-ui-caption text-[var(--taomni-text-muted)]">{availableDiscoveries.length}</span>
             {availableDiscoveries.length > 1 && (
-              <button type="button" data-testid="sdk-discovery-add-all" className="taomni-btn ml-auto h-6 px-2 text-[10px]" disabled={busy !== null} onClick={() => void addAllDiscoveries()}>
+              <button type="button" data-testid="sdk-discovery-add-all" className="taomni-btn ml-auto h-6 px-2 text-ui-caption" disabled={busy !== null} onClick={() => void addAllDiscoveries()}>
                 {t("settings.sdkAddAll")}
               </button>
             )}
@@ -357,15 +357,15 @@ export function SdkSettings() {
             </button>
           </div>
           {availableDiscoveries.length === 0 ? (
-            <div className="text-[11px] text-[var(--taomni-text-muted)]">{t("settings.sdkNoDiscoveries")}</div>
+            <div className="text-ui-small text-[var(--taomni-text-muted)]">{t("settings.sdkNoDiscoveries")}</div>
           ) : availableDiscoveries.map((candidate) => {
             const key = pathKey(candidate.kind, candidate.location);
             return (
               <div key={key} className="mt-1.5 flex min-w-0 items-center gap-2 rounded border border-[var(--taomni-divider)] px-2 py-1.5">
-                <span className="rounded bg-[var(--taomni-selected)] px-1.5 py-0.5 text-[10px] font-semibold">{kindLabel(candidate.kind)}</span>
-                <span className="min-w-0 flex-1 truncate font-mono text-[10px]" title={candidate.location}>{candidate.location}</span>
-                <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{candidate.version ?? "?"}</span>
-                <button type="button" data-testid="sdk-discovery-add" className="taomni-btn h-6 px-2 text-[10px]" disabled={busy !== null} onClick={() => void addDiscovery(candidate)}>
+                <span className="rounded bg-[var(--taomni-selected)] px-1.5 py-0.5 text-ui-caption font-semibold">{kindLabel(candidate.kind)}</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-ui-caption" title={candidate.location}>{candidate.location}</span>
+                <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">{candidate.version ?? "?"}</span>
+                <button type="button" data-testid="sdk-discovery-add" className="taomni-btn h-6 px-2 text-ui-caption" disabled={busy !== null} onClick={() => void addDiscovery(candidate)}>
                   {busy === `discover:${key}` ? t("settings.sdkAdding") : t("settings.sdkAdd")}
                 </button>
               </div>
@@ -375,7 +375,7 @@ export function SdkSettings() {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 py-4 text-[11px] text-[var(--taomni-text-muted)]">
+        <div className="flex items-center gap-2 py-4 text-ui-small text-[var(--taomni-text-muted)]">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           {t("settings.sdkLoading")}
         </div>
@@ -387,18 +387,18 @@ export function SdkSettings() {
             return (
               <div key={kind} data-testid={`sdk-kind-${kind}`} className="rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] p-2.5">
                 <div className="mb-2 flex items-center gap-2">
-                  <span className="text-[12px] font-semibold">{kindLabel(kind)}</span>
-                  <span className="text-[10px] text-[var(--taomni-text-muted)]">{installations.length}</span>
+                  <span className="text-ui-body font-semibold">{kindLabel(kind)}</span>
+                  <span className="text-ui-caption text-[var(--taomni-text-muted)]">{installations.length}</span>
                   <button type="button" data-testid={`sdk-add-${kind}`} aria-label={`${t("settings.sdkAdd")} ${kindLabel(kind)}`} className="ml-auto inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-control-hover)]" onClick={() => openNew(kind)}>
                     <Plus className="h-3.5 w-3.5" />
                   </button>
                 </div>
-                <label className="mb-2 block text-[10px] text-[var(--taomni-text-muted)]">
+                <label className="mb-2 block text-ui-caption text-[var(--taomni-text-muted)]">
                   {t("settings.sdkDefault")}
                   <select
                     data-testid={`sdk-default-${kind}`}
                     value={defaultId}
-                    className="mt-0.5 h-7 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-[11px]"
+                    className="mt-0.5 h-7 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-ui-small"
                     disabled={busy !== null}
                     onChange={(event) => void runMutation(`default:${kind}`, () => sdkSetDefault(kind, event.target.value || null))}
                   >
@@ -409,17 +409,17 @@ export function SdkSettings() {
                   </select>
                 </label>
                 {installations.length === 0 ? (
-                  <div className="rounded border border-dashed border-[var(--taomni-divider)] px-2 py-3 text-center text-[11px] text-[var(--taomni-text-muted)]">
+                  <div className="rounded border border-dashed border-[var(--taomni-divider)] px-2 py-3 text-center text-ui-small text-[var(--taomni-text-muted)]">
                     {t("settings.sdkEmptyKind")}
                   </div>
                 ) : installations.map((installation) => (
                   <div key={installation.id} data-testid={`sdk-row-${installation.id}`} className="mt-1.5 rounded border border-[var(--taomni-divider)] px-2 py-1.5">
                     <div className="flex min-w-0 items-center gap-1.5">
-                      <span className={`rounded border px-1 py-0.5 text-[9px] font-semibold uppercase ${statusTone(installation.status)}`}>
+                      <span className={`rounded border px-1 py-0.5 text-ui-caption font-semibold uppercase ${statusTone(installation.status)}`}>
                         {installation.status}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-[11px] font-medium" title={installation.name}>{installation.name}</span>
-                      {defaultId === installation.id && <span className="text-[9px] font-semibold text-[var(--taomni-accent)]">{t("settings.sdkDefaultBadge")}</span>}
+                      <span className="min-w-0 flex-1 truncate text-ui-small font-medium" title={installation.name}>{installation.name}</span>
+                      {defaultId === installation.id && <span className="text-ui-caption font-semibold text-[var(--taomni-accent)]">{t("settings.sdkDefaultBadge")}</span>}
                       <button type="button" data-testid="sdk-installation-refresh" aria-label={`${t("settings.sdkRefresh")} ${installation.name}`} className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-control-hover)]" disabled={busy !== null} onClick={() => void runMutation(`refresh:${installation.id}`, () => sdkRefreshInstallations(installation.id))}>
                         <RefreshCw className={`h-3 w-3 ${busy === `refresh:${installation.id}` ? "animate-spin" : ""}`} />
                       </button>
@@ -430,14 +430,14 @@ export function SdkSettings() {
                         <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
-                    <div className="mt-1 flex flex-wrap gap-x-2 text-[9px] text-[var(--taomni-text-muted)]">
+                    <div className="mt-1 flex flex-wrap gap-x-2 text-ui-caption text-[var(--taomni-text-muted)]">
                       <span>{installation.version ?? t("settings.sdkUnknownVersion")}</span>
                       {installation.vendor && <span>{installation.vendor}</span>}
                       {installation.architecture && <span>{installation.architecture}</span>}
                       <span>{installation.origin}</span>
                     </div>
-                    <div className="mt-0.5 truncate font-mono text-[9px] text-[var(--taomni-text-muted)]" title={installation.location}>{installation.location}</div>
-                    {installation.lastError && <div className="mt-1 text-[9px] text-red-500">{installation.lastError}</div>}
+                    <div className="mt-0.5 truncate font-mono text-ui-caption text-[var(--taomni-text-muted)]" title={installation.location}>{installation.location}</div>
+                    {installation.lastError && <div className="mt-1 text-ui-caption text-red-500">{installation.lastError}</div>}
                   </div>
                 ))}
               </div>

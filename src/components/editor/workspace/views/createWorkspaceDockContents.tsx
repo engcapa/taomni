@@ -446,7 +446,7 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
           />
         </div>
       ) : (
-        <div data-testid="code-workspace-git-tool-window-empty" role="status" className="px-3 py-3 text-[11px] text-[var(--taomni-code-muted)]">
+        <div data-testid="code-workspace-git-tool-window-empty" role="status" className="px-3 py-3 text-ui-small text-[var(--taomni-code-muted)]">
           {gitSnapshotOwner.gitRootsLoading ? "Detecting Git repositories…" : "No Git repository in this workspace"}
         </div>
       ),

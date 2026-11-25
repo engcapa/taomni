@@ -57,7 +57,7 @@ export const ProjectTreeDirectoryRow = memo(function ProjectTreeDirectoryRow({
         <span className="truncate">{displayName}</span>
         {(changeCount > 0 || loading) && (
           <span className="ml-auto flex shrink-0 items-center gap-1">
-            {changeCount > 0 && <span className="rounded border border-[var(--taomni-code-border)] px-1 text-[10px] text-[var(--taomni-code-muted)]">{changeCount}</span>}
+            {changeCount > 0 && <span className="rounded border border-[var(--taomni-code-border)] px-1 text-ui-caption text-[var(--taomni-code-muted)]">{changeCount}</span>}
             {loading && <Loader2 className="w-3 h-3 animate-spin" />}
           </span>
         )}

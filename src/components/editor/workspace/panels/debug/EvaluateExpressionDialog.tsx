@@ -69,7 +69,7 @@ export function EvaluateExpressionDialog({ debug, initialExpression = "", onClos
         aria-modal="true"
         aria-label="Evaluate"
         data-testid="debug-evaluate-dialog"
-        className="flex max-h-[80vh] w-[560px] max-w-[95vw] flex-col rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[11px] shadow-xl"
+        className="flex max-h-[80vh] w-[560px] max-w-[95vw] flex-col rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-small shadow-xl"
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             event.preventDefault();
@@ -90,7 +90,7 @@ export function EvaluateExpressionDialog({ debug, initialExpression = "", onClos
             data-testid="debug-evaluate-expression"
             aria-label="Expression"
             rows={2}
-            className="w-full resize-y rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-2 py-1 font-mono text-[12px] outline-none focus:border-[var(--taomni-accent)]"
+            className="w-full resize-y rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-2 py-1 font-mono text-ui-body outline-none focus:border-[var(--taomni-accent)]"
             placeholder={stopped ? "Expression" : "Evaluation needs a suspended program"}
             value={expression}
             onChange={(event) => setExpression(event.target.value)}
@@ -102,7 +102,7 @@ export function EvaluateExpressionDialog({ debug, initialExpression = "", onClos
               }
             }}
           />
-          <div className="text-[10px] text-[var(--taomni-text-muted)]">Result:</div>
+          <div className="text-ui-caption text-[var(--taomni-text-muted)]">Result:</div>
           <div data-testid="debug-evaluate-result" className="min-h-[80px] max-h-[40vh] overflow-auto rounded border border-[var(--taomni-code-border)] py-1">
             {result ? (
               <VariableRow node={result} depth={0} onExpand={expand} />

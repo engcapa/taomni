@@ -61,7 +61,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                       ? viewProps.t("sockscap.appModeUnsupported")
                       : undefined
                 }
-                className={`px-3 py-1.5 rounded text-[12px] border disabled:opacity-50 disabled:cursor-not-allowed ${viewProps.selectedProf.mode === m
+                className={`px-3 py-1.5 rounded text-ui-body border disabled:opacity-50 disabled:cursor-not-allowed ${viewProps.selectedProf.mode === m
                   ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] font-medium"
                   : "border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
                   }`}
@@ -73,7 +73,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
           })}
         </div>
         {viewProps.caps !== null && !viewProps.caps.appFilter && (
-          <p className="mt-2 text-[11px] text-[var(--taomni-text-muted)]">
+          <p className="mt-2 text-ui-small text-[var(--taomni-text-muted)]">
             {viewProps.t("sockscap.appModeUnsupported")}
           </p>
         )}
@@ -91,7 +91,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                 <div className="flex gap-1">
                   <input
                     data-testid="sockscap-rootless-command"
-                    className="flex-1 min-w-0 text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
+                    className="flex-1 min-w-0 text-ui-small px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
                     value={viewProps.draft.rootlessCommand}
                     disabled={viewProps.locked}
                     placeholder={viewProps.t("sockscap.rootlessCommandPlaceholder")}
@@ -100,7 +100,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                   <button
                     type="button"
                     data-testid="sockscap-pick-linux-application"
-                    className="shrink-0 px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50"
+                    className="shrink-0 px-2 py-1.5 rounded text-ui-small border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50"
                     onClick={() => void viewProps.draft.pickRootlessApplication()}
                     disabled={viewProps.locked}
                   >
@@ -111,7 +111,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
               <Field label={viewProps.t("sockscap.rootlessArgumentsLabel")}>
                 <input
                   data-testid="sockscap-rootless-arguments"
-                  className="w-full text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
+                  className="w-full text-ui-small px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
                   value={viewProps.draft.rootlessArguments}
                   disabled={viewProps.locked}
                   placeholder={viewProps.t("sockscap.rootlessArgumentsPlaceholder")}
@@ -124,7 +124,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
               <Field label={viewProps.t("sockscap.rootlessLaunchModeLabel")}>
                 <select
                   data-testid="sockscap-rootless-launch-mode"
-                  className="w-full text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
+                  className="w-full text-ui-small px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
                   value={viewProps.draft.rootlessLaunchMode}
                   disabled={viewProps.locked}
                   onChange={(event) =>
@@ -145,7 +145,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                 <button
                   type="button"
                   data-testid="sockscap-add-rootless-application"
-                  className="inline-flex flex-1 items-center justify-center gap-1 px-3 py-1.5 rounded text-[11px] border border-[var(--taomni-accent)] text-[var(--taomni-accent)] hover:bg-[var(--taomni-accent)]/10 disabled:opacity-50"
+                  className="inline-flex flex-1 items-center justify-center gap-1 px-3 py-1.5 rounded text-ui-small border border-[var(--taomni-accent)] text-[var(--taomni-accent)] hover:bg-[var(--taomni-accent)]/10 disabled:opacity-50"
                   disabled={viewProps.locked || !viewProps.draft.rootlessCommand.trim()}
                   onClick={() => void viewProps.addRootlessApplication()}
                 >
@@ -178,7 +178,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
             <button
               type="button"
               data-testid="sockscap-rootless-preparation-toggle"
-              className="mt-2 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] disabled:opacity-50"
+              className="mt-2 inline-flex items-center gap-1 text-ui-small text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] disabled:opacity-50"
               disabled={viewProps.locked}
               aria-expanded={viewProps.draft.rootlessPreparationOpen}
               onClick={() => viewProps.draft.setRootlessPreparationOpen((open) => !open)}
@@ -200,7 +200,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                     <div className="flex gap-1">
                       <input
                         data-testid="sockscap-rootless-working-directory"
-                        className="flex-1 min-w-0 text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
+                        className="flex-1 min-w-0 text-ui-small px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
                         value={viewProps.draft.rootlessWorkingDirectory}
                         disabled={viewProps.locked}
                         placeholder={viewProps.t("sockscap.rootlessWorkingDirectoryPlaceholder")}
@@ -224,7 +224,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                   <Field label={viewProps.t("sockscap.rootlessShellLabel")}>
                     <select
                       data-testid="sockscap-rootless-shell"
-                      className="w-full text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
+                      className="w-full text-ui-small px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
                       value={viewProps.draft.rootlessLaunchShell}
                       disabled={viewProps.locked}
                       onChange={(event) =>
@@ -239,7 +239,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                 <Field label={viewProps.t("sockscap.rootlessPreCommandLabel")}>
                   <textarea
                     data-testid="sockscap-rootless-pre-command"
-                    className="w-full min-h-20 resize-y font-mono text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
+                    className="w-full min-h-20 resize-y font-mono text-ui-small px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
                     value={viewProps.draft.rootlessPreCommand}
                     disabled={viewProps.locked}
                     placeholder={viewProps.t("sockscap.rootlessPreCommandPlaceholder")}
@@ -248,13 +248,13 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                 </Field>
                 <div>
                   <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-medium">
+                    <span className="text-ui-small font-medium">
                       {viewProps.t("sockscap.rootlessEnvironmentLabel")}
                     </span>
                     <button
                       type="button"
                       data-testid="sockscap-add-rootless-environment"
-                      className="inline-flex items-center gap-1 text-[10px] text-[var(--taomni-accent)] hover:underline disabled:opacity-50"
+                      className="inline-flex items-center gap-1 text-ui-caption text-[var(--taomni-accent)] hover:underline disabled:opacity-50"
                       disabled={viewProps.locked}
                       onClick={() =>
                         viewProps.draft.setRootlessEnvironment((entries) => [
@@ -280,7 +280,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                         <input
                           data-testid={`sockscap-rootless-environment-name-${index}`}
                           aria-label={viewProps.t("sockscap.environmentName")}
-                          className="min-w-0 font-mono text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
+                          className="min-w-0 font-mono text-ui-small px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
                           value={entry.name}
                           disabled={viewProps.locked}
                           placeholder={viewProps.t("sockscap.environmentName")}
@@ -297,7 +297,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                         <input
                           data-testid={`sockscap-rootless-environment-value-${index}`}
                           aria-label={viewProps.t("sockscap.environmentValue")}
-                          className="min-w-0 font-mono text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
+                          className="min-w-0 font-mono text-ui-small px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
                           value={entry.value}
                           disabled={viewProps.locked}
                           placeholder={viewProps.t("sockscap.environmentValue")}
@@ -331,7 +331,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                 </div>
               </div>
             )}
-            <p className="mt-2 text-[10px] text-[var(--taomni-text-muted)]">
+            <p className="mt-2 text-ui-caption text-[var(--taomni-text-muted)]">
               {viewProps.t("sockscap.rootlessCommandHint")}
             </p>
           </div>
@@ -340,7 +340,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
             {viewProps.caps?.platform === "macos" && (
               <button
                 type="button"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded text-ui-small border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => void viewProps.pickMacosApplication()}
                 disabled={viewProps.locked}
                 title={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
@@ -353,7 +353,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
               <button
                 type="button"
                 data-testid="sockscap-pick-linux-application"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded text-ui-small border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => void viewProps.pickLinuxApplication()}
                 disabled={viewProps.locked}
                 title={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
@@ -364,7 +364,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
             )}
             <button
               type="button"
-              className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded text-ui-small border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => void viewProps.loadProcesses()}
               disabled={viewProps.locked}
               title={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
@@ -376,7 +376,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
           </div>
         )}
         {viewProps.selectedProf.apps.length === 0 ? (
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">
             {viewProps.t(viewProps.linuxLaunchOnly ? "sockscap.rootlessAppsEmpty" : "sockscap.appsEmpty")}
           </div>
         ) : (
@@ -406,16 +406,16 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
               return (
                 <li
                   key={appKey}
-                  className="flex items-center gap-2 text-[12px] px-2 py-1 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
+                  className="flex items-center gap-2 text-ui-body px-2 py-1 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
                 >
                   <span className="flex-1 min-w-0" title={a.path}>
                     <span className="block truncate">{a.name || a.path}</span>
                     {viewProps.linuxLaunchOnly && (
                       <>
-                        <span className="block truncate font-mono text-[10px] text-[var(--taomni-text-muted)]">
+                        <span className="block truncate font-mono text-ui-caption text-[var(--taomni-text-muted)]">
                           {formatRootlessCommand(a.path, a.args)}
                         </span>
-                        <span className="block text-[10px] text-sky-700 dark:text-sky-300">
+                        <span className="block text-ui-caption text-sky-700 dark:text-sky-300">
                           {viewProps.t(
                             a.launchMode === "terminal"
                               ? "sockscap.rootlessLaunchModeTerminal"
@@ -423,14 +423,14 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                           )}
                         </span>
                         {a.launchPreparation?.workingDirectory && (
-                          <span className="block truncate font-mono text-[10px] text-[var(--taomni-text-muted)]">
+                          <span className="block truncate font-mono text-ui-caption text-[var(--taomni-text-muted)]">
                             {viewProps.t("sockscap.rootlessWorkingDirectorySummary", {
                               path: a.launchPreparation.workingDirectory,
                             })}
                           </span>
                         )}
                         {a.launchPreparation?.preCommand && (
-                          <span className="block truncate font-mono text-[10px] text-[var(--taomni-text-muted)]">
+                          <span className="block truncate font-mono text-ui-caption text-[var(--taomni-text-muted)]">
                             {viewProps.t("sockscap.rootlessPreCommandSummary", {
                               command: a.launchPreparation.preCommand.split(/\r?\n/)[0],
                             })}
@@ -439,7 +439,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                       </>
                     )}
                     {a.macosIdentity && (
-                      <span className="block truncate text-[10px] text-[var(--taomni-text-muted)]">
+                      <span className="block truncate text-ui-caption text-[var(--taomni-text-muted)]">
                         {a.macosIdentity.mainExecutablePath} ·{" "}
                         {a.macosIdentity.kind === "executable"
                           ? viewProps.t("sockscap.executableOnlyCoverage")
@@ -448,7 +448,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                     )}
                     {launched && (
                       <span
-                        className={`block text-[10px] ${launched.phase === "preparing"
+                        className={`block text-ui-caption ${launched.phase === "preparing"
                           ? "text-amber-600 dark:text-amber-400"
                           : "text-emerald-600 dark:text-emerald-400"
                           }`}
@@ -463,7 +463,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                     )}
                     {!launched && latestLaunch?.phase === "failed" && (
                       <span
-                        className="block truncate text-[10px] text-red-600 dark:text-red-400"
+                        className="block truncate text-ui-caption text-red-600 dark:text-red-400"
                         title={latestLaunch.launchError}
                       >
                         {viewProps.t("sockscap.applicationLaunchFailed", {
@@ -474,7 +474,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                   </span>
                   {a.macosIdentity?.teamId && (
                     <span
-                      className="text-[10px] text-[var(--taomni-text-muted)]"
+                      className="text-ui-caption text-[var(--taomni-text-muted)]"
                       title={a.macosIdentity.designatedRequirement}
                     >
                       {a.macosIdentity.teamId}

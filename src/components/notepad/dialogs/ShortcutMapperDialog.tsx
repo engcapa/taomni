@@ -63,7 +63,7 @@ export function ShortcutMapperDialog({ open, onClose }: { open: boolean; onClose
 
         {conflicts.length > 0 && (
           <div
-            className="flex items-center gap-2 text-[12px] p-2 rounded border border-amber-500/60 bg-amber-500/10"
+            className="flex items-center gap-2 text-ui-body p-2 rounded border border-amber-500/60 bg-amber-500/10"
             data-testid="notepad-keymap-conflict-banner"
           >
             <AlertTriangle size={14} className="text-amber-500 shrink-0" />
@@ -76,7 +76,7 @@ export function ShortcutMapperDialog({ open, onClose }: { open: boolean; onClose
           </div>
         )}
 
-        <div className="max-h-80 overflow-auto border border-[var(--taomni-divider)] rounded text-[12px]">
+        <div className="max-h-80 overflow-auto border border-[var(--taomni-divider)] rounded text-ui-body">
           {rows.map((cmd) => {
             const current = resolveShortcut(cmd.id);
             const isCapturing = capturingId === cmd.id;
@@ -86,7 +86,7 @@ export function ShortcutMapperDialog({ open, onClose }: { open: boolean; onClose
                 key={cmd.id}
                 className="flex items-center gap-2 px-2.5 py-1.5 border-b border-[var(--taomni-divider)]/50"
               >
-                <span className="text-[10px] uppercase w-16 text-[var(--taomni-text-muted)]">{cmd.category}</span>
+                <span className="text-ui-caption uppercase w-16 text-[var(--taomni-text-muted)]">{cmd.category}</span>
                 <span className="flex-1 truncate">{cmd.defaultLabel}</span>
                 <button
                   type="button"

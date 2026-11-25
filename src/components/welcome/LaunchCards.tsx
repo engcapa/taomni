@@ -42,7 +42,7 @@ export function LocalTerminalCard({
         <span className="font-semibold">{t("welcome.localTerminal")}</span>
         {kbd && (
           <span
-            className="ml-auto text-[10px] taomni-mono px-1.5 py-0.5 rounded border"
+            className="ml-auto text-ui-caption taomni-mono px-1.5 py-0.5 rounded border"
             style={{
               background: "var(--taomni-input-bg)",
               borderColor: "var(--taomni-divider)",
@@ -53,7 +53,7 @@ export function LocalTerminalCard({
           </span>
         )}
       </div>
-      <div className="text-[12px] text-[var(--taomni-text-muted)]">
+      <div className="text-ui-body text-[var(--taomni-text-muted)]">
         {selectedShell ? t("welcome.openShell", { shell: selectedShell.name }) : t("welcome.openLocalShell")}
       </div>
 
@@ -149,7 +149,7 @@ export function WslCard({
         </span>
         <span className="font-semibold">{t("welcome.openWsl")}</span>
       </div>
-      <div className="text-[12px] text-[var(--taomni-text-muted)]">{detail}</div>
+      <div className="text-ui-body text-[var(--taomni-text-muted)]">{detail}</div>
 
       <div className="taomni-home-shell-actions">
         <select
@@ -199,9 +199,9 @@ export function MailSessionsCard({
       <div className="flex items-center gap-2 mb-1">
         <span style={{ color: "var(--taomni-accent)" }}><MailIcon className="w-5 h-5" /></span>
         <span className="font-semibold">{t("welcome.mailTitle")}</span>
-        <span className="ml-auto text-[11px] taomni-mono text-[var(--taomni-text-muted)]">{sessions.length}</span>
+        <span className="ml-auto text-ui-small taomni-mono text-[var(--taomni-text-muted)]">{sessions.length}</span>
       </div>
-      <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("welcome.mailDesc")}</div>
+      <div className="text-ui-body text-[var(--taomni-text-muted)]">{t("welcome.mailDesc")}</div>
       <div className="mt-3 flex-1 min-h-0 max-h-[132px] overflow-auto space-y-1">
         {sessions.map((session) => {
           const title = session.name || session.username || session.host || "Mailbox";
@@ -219,9 +219,9 @@ export function MailSessionsCard({
             >
               <MailIcon className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12px] font-medium text-[var(--taomni-accent)]">{title}</span>
+                <span className="block truncate text-ui-body font-medium text-[var(--taomni-accent)]">{title}</span>
                 {detail && detail !== title ? (
-                  <span className="block truncate text-[11px] text-[var(--taomni-text-muted)]">{detail}</span>
+                  <span className="block truncate text-ui-small text-[var(--taomni-text-muted)]">{detail}</span>
                 ) : null}
               </span>
             </button>
@@ -261,7 +261,7 @@ export function ActionCard({
         <span className="font-semibold">{title}</span>
         {kbd && (
           <span
-            className="ml-auto text-[10px] taomni-mono px-1.5 py-0.5 rounded border"
+            className="ml-auto text-ui-caption taomni-mono px-1.5 py-0.5 rounded border"
             style={{
               background: "var(--taomni-input-bg)",
               borderColor: "var(--taomni-divider)",
@@ -272,7 +272,7 @@ export function ActionCard({
           </span>
         )}
       </div>
-      <div className="text-[12px] text-[var(--taomni-text-muted)]">{desc}</div>
+      <div className="text-ui-body text-[var(--taomni-text-muted)]">{desc}</div>
     </button>
   );
 }

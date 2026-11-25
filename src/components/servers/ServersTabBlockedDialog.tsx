@@ -46,7 +46,7 @@ export function ServersTabBlockedDialog() {
         <div className="text-sm font-semibold mb-3">{t("servers.tabAlreadyOpenTitle")}</div>
         <div
           data-testid="servers-blocked-message"
-          className="text-[12px] mb-4 whitespace-pre-line"
+          className="text-ui-body mb-4 whitespace-pre-line"
           style={{ color: "var(--taomni-text)" }}
         >
           {message}
@@ -56,7 +56,7 @@ export function ServersTabBlockedDialog() {
             ref={okButtonRef}
             type="button"
             data-testid="servers-blocked-ok"
-            className="px-3 py-1 text-[12px] rounded text-white"
+            className="px-3 py-1 text-ui-body rounded text-white"
             style={{ background: "var(--taomni-accent)" }}
             onClick={dismiss}
           >

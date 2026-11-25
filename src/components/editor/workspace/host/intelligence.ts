@@ -91,7 +91,7 @@ export function createHoverDocDom({
   header.className = "flex h-8 shrink-0 items-center gap-1 border-b border-[var(--taomni-code-border)] px-2 select-none bg-[var(--taomni-code-tooltip-bg)]";
 
   const titleSpan = document.createElement("span");
-  titleSpan.className = "min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--taomni-code-text)]";
+  titleSpan.className = "min-w-0 flex-1 truncate text-ui-small font-medium text-[var(--taomni-code-text)]";
   titleSpan.textContent = content.title;
   header.appendChild(titleSpan);
 
@@ -129,7 +129,7 @@ export function createHoverDocDom({
 
   // Markdown body
   const body = document.createElement("div");
-  body.className = "cm-lsp-hover taomni-chat-md min-h-0 flex-1 overflow-auto px-3 py-2 text-[12px] leading-relaxed text-[var(--taomni-code-text)]";
+  body.className = "cm-lsp-hover taomni-chat-md min-h-0 flex-1 overflow-auto px-3 py-2 text-ui-body leading-relaxed text-[var(--taomni-code-text)]";
   body.innerHTML = renderFormatted(content.body, "md") ?? "";
   body.onclick = (event) => {
     const href = referenceHrefFromEventTarget(event.target);
@@ -142,7 +142,7 @@ export function createHoverDocDom({
 
   if (content.source || content.links?.length) {
     const footer = document.createElement("div");
-    footer.className = "flex min-h-7 shrink-0 items-center gap-2 border-t border-[var(--taomni-code-border)] px-2 py-1 text-[10px] text-[var(--taomni-code-muted)]";
+    footer.className = "flex min-h-7 shrink-0 items-center gap-2 border-t border-[var(--taomni-code-border)] px-2 py-1 text-ui-caption text-[var(--taomni-code-muted)]";
     const source = document.createElement("span");
     source.className = "min-w-0 flex-1 truncate";
     source.textContent = content.source;
@@ -381,7 +381,7 @@ export function foldHoverProvenanceTooltip(resolvePath: () => string | null | un
       above: true,
       create() {
         const dom = document.createElement("div");
-        dom.className = "cm-fold-hover-tooltip px-2 py-1 text-[11px] rounded bg-[var(--taomni-code-bg)] text-[var(--taomni-code-text)] border border-[var(--taomni-code-border)] shadow-md";
+        dom.className = "cm-fold-hover-tooltip px-2 py-1 text-ui-small rounded bg-[var(--taomni-code-bg)] text-[var(--taomni-code-text)] border border-[var(--taomni-code-border)] shadow-md";
         dom.setAttribute("data-testid", "code-workspace-fold-hover-tooltip");
         dom.setAttribute("data-fold-provenance", provenance);
         dom.textContent = `Region fold source: ${provenance}`;

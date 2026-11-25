@@ -312,7 +312,7 @@ export function EditorGroup({
                 <EditorBanner banners={visibleBanners} onDismiss={onDismissBanner ?? (() => { })} />
               )}
               {activeFile.error && (
-                <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-red-500/30 bg-red-500/10 text-[12px] text-red-500">
+                <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-red-500/30 bg-red-500/10 text-ui-body text-red-500">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span className="min-w-0 truncate">{activeFile.error}</span>
                 </div>
@@ -320,7 +320,7 @@ export function EditorGroup({
               {activeFile.library?.decompiled && (
                 <div
                   data-testid="code-workspace-decompiled-banner"
-                  className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-amber-500/30 bg-amber-500/10 text-[12px] text-[var(--taomni-code-fg)]"
+                  className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-amber-500/30 bg-amber-500/10 text-ui-body text-[var(--taomni-code-fg)]"
                 >
                   <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
                   <span className="min-w-0 flex-1 truncate">
@@ -334,7 +334,7 @@ export function EditorGroup({
                         data-testid="code-workspace-download-sources"
                         disabled={downloading}
                         onClick={() => onDownloadSources(activeFile.key)}
-                        className="shrink-0 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[12px] font-medium border border-[var(--taomni-code-border)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-60"
+                        className="shrink-0 inline-flex items-center gap-1 rounded px-2 py-0.5 text-ui-body font-medium border border-[var(--taomni-code-border)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-60"
                       >
                         {downloading
                           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -361,7 +361,7 @@ export function EditorGroup({
                     <span
                       data-testid="code-workspace-fold-provenance"
                       data-provenance={activeFoldProvenance}
-                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-muted)]"
+                      className="shrink-0 rounded px-1.5 py-0.5 text-ui-caption bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-muted)]"
                       title={`Region fold source: ${activeFoldProvenance}`}
                     >
                       Region: {activeFoldProvenance}
@@ -649,7 +649,7 @@ export function EditorGroup({
           ) : (
             <div
               data-testid="code-workspace-empty-editor"
-              className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]"
+              className="h-full flex items-center justify-center text-ui-body text-[var(--taomni-code-muted)]"
             >
               {emptyHints && emptyHints.length > 0 ? (
                 <ul aria-label="Editor tips" className="flex flex-col gap-2">
@@ -657,7 +657,7 @@ export function EditorGroup({
                     <li key={hint.label} data-testid="code-workspace-empty-editor-hint" className="flex items-center justify-between gap-6">
                       <span>{hint.label}</span>
                       {hint.shortcut && (
-                        <kbd className="rounded border border-[var(--taomni-code-border)] px-1.5 text-[11px] text-[var(--taomni-accent)]">
+                        <kbd className="rounded border border-[var(--taomni-code-border)] px-1.5 text-ui-small text-[var(--taomni-accent)]">
                           {hint.shortcut}
                         </kbd>
                       )}

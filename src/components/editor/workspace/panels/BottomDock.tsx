@@ -446,9 +446,9 @@ export function BottomDock({
                     onClick={() => selectTab(tab.id)}
                   >
                     {tab.icon}
-                    {showNames && <span className="w-full truncate px-0.5 text-center text-[9px] leading-3">{tab.label}</span>}
+                    {showNames && <span className="w-full truncate px-0.5 text-center text-ui-caption leading-3">{tab.label}</span>}
                     {showBadge && (
-                      <span className="absolute right-0 top-0 rounded bg-[var(--taomni-code-active-line-bg)] px-0.5 text-[8px] leading-3 tabular-nums text-[var(--taomni-code-text)]">
+                      <span className="absolute right-0 top-0 rounded bg-[var(--taomni-code-active-line-bg)] px-0.5 text-ui-caption leading-3 tabular-nums text-[var(--taomni-code-text)]">
                         {tab.badge}
                       </span>
                     )}
@@ -505,7 +505,7 @@ export function BottomDock({
               data-testid="code-workspace-tool-window-header"
               className="flex h-8 shrink-0 items-center gap-1 border-b border-[var(--taomni-code-border)]/50 px-2"
             >
-              <span data-testid="code-workspace-tool-window-title" className="text-[12px] font-medium text-[var(--taomni-code-text)]">
+              <span data-testid="code-workspace-tool-window-title" className="text-ui-body font-medium text-[var(--taomni-code-text)]">
                 {active.label}
               </span>
               <span className="flex-1" />
@@ -571,13 +571,13 @@ export function BottomDock({
                 data-testid={`code-workspace-bottom-tab-${tab.id}`}
                 aria-selected={selected && open}
                 data-active={(selected && open) || undefined}
-                className="h-8 shrink-0 inline-flex items-center gap-1.5 rounded px-2.5 text-[12px] font-medium text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
+                className="h-8 shrink-0 inline-flex items-center gap-1.5 rounded px-2.5 text-ui-body font-medium text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
                 onClick={() => selectTab(tab.id)}
               >
                 {tab.icon}
                 <span className="truncate max-w-[120px]">{tab.label}</span>
                 {(typeof tab.badge === "number" ? tab.badge > 0 : !!tab.badge) && (
-                  <span className="min-w-4 rounded bg-[var(--taomni-code-active-line-bg)] px-1 text-center text-[10px] tabular-nums text-[var(--taomni-code-text)]">
+                  <span className="min-w-4 rounded bg-[var(--taomni-code-active-line-bg)] px-1 text-center text-ui-caption tabular-nums text-[var(--taomni-code-text)]">
                     {tab.badge}
                   </span>
                 )}
@@ -624,7 +624,7 @@ export function BottomDock({
                       <span className="shrink-0">{tab.icon}</span>
                       <span className="flex-1 text-left truncate">{tab.label}</span>
                       {tab.badge && (
-                        <span className="rounded bg-[var(--taomni-code-active-line-bg)] px-1 text-[10px] tabular-nums">
+                        <span className="rounded bg-[var(--taomni-code-active-line-bg)] px-1 text-ui-caption tabular-nums">
                           {tab.badge}
                         </span>
                       )}

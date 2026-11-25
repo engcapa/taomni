@@ -117,7 +117,7 @@ export function NewJavaClassDialog({
       onKeyDown={handleKeyDown}
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[12vh]"
     >
-      <div className="flex w-full max-w-md flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[12px] text-[var(--taomni-code-fg)] shadow-2xl">
+      <div className="flex w-full max-w-md flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-fg)] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
           <div className="flex items-center gap-2 font-medium">
@@ -151,7 +151,7 @@ export function NewJavaClassDialog({
         <div className="flex flex-col gap-3 p-4">
           {/* Name & Kind inputs */}
           <div className="flex flex-col gap-1">
-            <label htmlFor="new-java-class-name" className="text-[11px] font-semibold text-[var(--taomni-code-muted)]">
+            <label htmlFor="new-java-class-name" className="text-ui-small font-semibold text-[var(--taomni-code-muted)]">
               Name:
             </label>
             <input
@@ -162,12 +162,12 @@ export function NewJavaClassDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. MyService"
               data-testid="new-java-class-name-input"
-              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-[12px] text-[var(--taomni-code-fg)] outline-none focus:border-blue-500"
+              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-fg)] outline-none focus:border-blue-500"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="new-java-class-kind" className="text-[11px] font-semibold text-[var(--taomni-code-muted)]">
+            <label htmlFor="new-java-class-kind" className="text-ui-small font-semibold text-[var(--taomni-code-muted)]">
               Kind:
             </label>
             <select
@@ -175,7 +175,7 @@ export function NewJavaClassDialog({
               value={kind}
               onChange={(e) => setKind(e.target.value as JavaTemplateKind)}
               data-testid="new-java-class-kind-select"
-              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-[12px] text-[var(--taomni-code-fg)] outline-none focus:border-blue-500"
+              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-fg)] outline-none focus:border-blue-500"
             >
               {TEMPLATE_KIND_OPTIONS.map((opt) => (
                 <option key={opt.kind} value={opt.kind}>
@@ -186,7 +186,7 @@ export function NewJavaClassDialog({
           </div>
 
           {/* Package and Facts Information */}
-          <div className="rounded bg-[var(--taomni-code-hover)]/40 px-3 py-2 text-[11px] space-y-1">
+          <div className="rounded bg-[var(--taomni-code-hover)]/40 px-3 py-2 text-ui-small space-y-1">
             <div className="flex items-center justify-between" data-testid="new-java-class-package">
               <span className="text-[var(--taomni-code-muted)]">Package:</span>
               <span className="font-mono text-[var(--taomni-code-fg)]">
@@ -207,7 +207,7 @@ export function NewJavaClassDialog({
           {/* Error message */}
           {error && (
             <div
-              className="flex items-center gap-1.5 rounded bg-red-950/40 border border-red-900/50 p-2 text-[11px] text-red-400"
+              className="flex items-center gap-1.5 rounded bg-red-950/40 border border-red-900/50 p-2 text-ui-small text-red-400"
               data-testid="new-java-class-error"
             >
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
@@ -221,7 +221,7 @@ export function NewJavaClassDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded px-3 py-1 text-[11px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-hover)] hover:text-[var(--taomni-code-fg)]"
+            className="rounded px-3 py-1 text-ui-small text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-hover)] hover:text-[var(--taomni-code-fg)]"
           >
             Cancel
           </button>
@@ -230,7 +230,7 @@ export function NewJavaClassDialog({
             onClick={() => void handleSubmit()}
             disabled={!plan?.valid || submitting}
             data-testid="new-java-class-submit"
-            className="rounded bg-blue-600 px-3 py-1 font-medium text-[11px] text-white hover:bg-blue-500 disabled:opacity-50 disabled:pointer-events-none"
+            className="rounded bg-blue-600 px-3 py-1 font-medium text-ui-small text-white hover:bg-blue-500 disabled:opacity-50 disabled:pointer-events-none"
           >
             {submitting ? "Creating..." : "OK"}
           </button>

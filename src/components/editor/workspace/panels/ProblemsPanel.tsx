@@ -120,10 +120,10 @@ export function ProblemsPanel({
   );
 
   return (
-    <div data-testid="code-workspace-problems-panel" className="h-full min-h-0 flex flex-col text-[11px]">
+    <div data-testid="code-workspace-problems-panel" className="h-full min-h-0 flex flex-col text-ui-small">
       <div className="h-8 shrink-0 flex items-center gap-1 border-b border-[var(--taomni-code-border)] px-2">
         {scope && onScopeChange ? (
-          <div className="mr-1 inline-flex rounded border border-[var(--taomni-code-border)] text-[10px]">
+          <div className="mr-1 inline-flex rounded border border-[var(--taomni-code-border)] text-ui-caption">
             {(["open", "project"] as const).map((value) => (
               <button
                 key={value}
@@ -139,12 +139,12 @@ export function ProblemsPanel({
             ))}
           </div>
         ) : (
-          <span className="mr-1 text-[10px] text-[var(--taomni-code-muted)]">Open files</span>
+          <span className="mr-1 text-ui-caption text-[var(--taomni-code-muted)]">Open files</span>
         )}
         {fullProjectNote && projectScope && (
           <span
             data-testid="problems-full-project-note"
-            className="mr-1 truncate text-[10px] text-amber-500"
+            className="mr-1 truncate text-ui-caption text-amber-500"
             title={fullProjectNote}
           >
             {fullProjectNote}
@@ -154,7 +154,7 @@ export function ProblemsPanel({
           <button
             type="button"
             data-testid="problems-rebuild"
-            className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-[10px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-ui-caption text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={onRebuild}
             disabled={rebuilding}
             title="Rebuild project (jdtls java.buildWorkspace)"
@@ -171,14 +171,14 @@ export function ProblemsPanel({
             aria-label={`Show ${kind} diagnostics`}
             aria-pressed={visible[kind]}
             data-active={visible[kind] || undefined}
-            className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-[10px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
+            className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-ui-caption text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
             onClick={() => setVisible((current) => ({ ...current, [kind]: !current[kind] }))}
           >
             <SeverityIcon kind={kind} />
             <span className="tabular-nums">{counts[kind]}</span>
           </button>
         ))}
-        <span className="ml-auto text-[10px] text-[var(--taomni-code-muted)]">
+        <span className="ml-auto text-ui-caption text-[var(--taomni-code-muted)]">
           {counts.error + counts.warning + counts.info} problem{counts.error + counts.warning + counts.info === 1 ? "" : "s"}
         </span>
       </div>
@@ -188,7 +188,7 @@ export function ProblemsPanel({
             data-testid="code-workspace-problems-stale"
             data-state={readiness.kind}
             role="status"
-            className="px-3 py-1 text-[10px] text-amber-600 dark:text-amber-400"
+            className="px-3 py-1 text-ui-caption text-amber-600 dark:text-amber-400"
           >
             Results may be outdated: {readiness.message}
           </div>
@@ -209,7 +209,7 @@ export function ProblemsPanel({
               <button
                 type="button"
                 data-testid="code-workspace-problems-configure"
-                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[10px] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-ui-caption text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
                 onClick={onConfigureLanguageService}
               >
                 Configure…
@@ -219,7 +219,7 @@ export function ProblemsPanel({
               <button
                 type="button"
                 data-testid="code-workspace-problems-retry"
-                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[10px] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-ui-caption text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
                 onClick={onRetryLanguageService}
               >
                 Retry
@@ -240,7 +240,7 @@ export function ProblemsPanel({
           <section key={file.key}>
             <div className="h-6 flex items-center gap-2 px-3 font-medium text-[var(--taomni-code-muted)]" title={file.subtitle}>
               <span className="min-w-0 flex-1 truncate">{file.subtitle}</span>
-              <span className="shrink-0 text-[10px] tabular-nums">{file.diagnostics.length}</span>
+              <span className="shrink-0 text-ui-caption tabular-nums">{file.diagnostics.length}</span>
             </div>
             {file.diagnostics.map(({ original, display: diagnostic }, index) => {
               const kind = severityKind(diagnostic.severity);
@@ -295,12 +295,12 @@ export function ProblemsPanel({
                   <SeverityIcon kind={kind} />
                   <span className="min-w-0 flex-1">
                     <span className="block break-words text-[var(--taomni-code-text)]">{diagnostic.message}</span>
-                    {detail && <span className="block truncate text-[10px] text-[var(--taomni-code-muted)]">{detail}</span>}
+                    {detail && <span className="block truncate text-ui-caption text-[var(--taomni-code-muted)]">{detail}</span>}
                     {/* §8.20.4 DoD: provider/scope/revision/completeness on every row. */}
                     {evidenceLine && (
                       <span
                         data-testid="problems-evidence-line"
-                        className="block truncate text-[10px] text-[var(--taomni-code-muted)]"
+                        className="block truncate text-ui-caption text-[var(--taomni-code-muted)]"
                       >
                         {evidenceLine(file.key, original)}
                       </span>
@@ -308,23 +308,23 @@ export function ProblemsPanel({
                     {suppressedInSource?.(file.key, original) && (
                       <span
                         data-testid="problems-suppressed-in-source"
-                        className="block text-[10px] text-emerald-500"
+                        className="block text-ui-caption text-emerald-500"
                       >
                         Suppressed in source
                       </span>
                     )}
                     {diagnostic.tags?.includes(1) && (
-                      <span className="block text-[10px] text-[var(--taomni-code-muted)]">unnecessary</span>
+                      <span className="block text-ui-caption text-[var(--taomni-code-muted)]">unnecessary</span>
                     )}
                     {diagnostic.tags?.includes(2) && (
-                      <span className="block text-[10px] text-[var(--taomni-code-muted)]">deprecated</span>
+                      <span className="block text-ui-caption text-[var(--taomni-code-muted)]">deprecated</span>
                     )}
                   </span>
                   {/* DEC-015-04: IDEA shows ":line"; the column stays in the tooltip. */}
                   <span
                     data-testid="problems-diagnostic-line"
                     title={`Line ${diagnostic.range.start.line + 1}, column ${diagnostic.range.start.character + 1}`}
-                    className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]"
+                    className="shrink-0 font-mono text-ui-caption text-[var(--taomni-code-muted)]"
                   >
                     :{diagnostic.range.start.line + 1}
                   </span>

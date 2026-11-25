@@ -71,8 +71,8 @@ export function EditorToolbar({
   const t = useT();
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const txManual = txStatus?.manual === true;
-  const btn = "h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
-  const input = "taomni-input h-6 w-[68px] text-[11px]";
+  const btn = "h-6 px-2 inline-flex items-center gap-1 rounded text-ui-small hover:bg-[var(--taomni-hover)] disabled:opacity-40";
+  const input = "taomni-input h-6 w-[68px] text-ui-small";
   return (
     <div
       className="h-8 shrink-0 flex items-center gap-1 px-2"
@@ -131,7 +131,7 @@ export function EditorToolbar({
                 <Undo2 className="w-3.5 h-3.5" /> Rollback
               </button>
               <span
-                className="text-[11px] tabular-nums"
+                className="text-ui-small tabular-nums"
                 style={{ color: txStatus && txStatus.pending > 0 ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
                 title="Statements executed since the last commit or rollback"
                 data-testid="db-tx-pending"
@@ -173,7 +173,7 @@ export function EditorToolbar({
           </button>
           {langMenuOpen && (
             <div
-              className="absolute right-0 top-full mt-1 z-50 py-1 rounded shadow-lg border text-[11px] min-w-[120px]"
+              className="absolute right-0 top-full mt-1 z-50 py-1 rounded shadow-lg border text-ui-small min-w-[120px]"
               style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
             >
               {AI_ANSWER_LANGUAGES.map((lang) => (
@@ -196,7 +196,7 @@ export function EditorToolbar({
         </div>
       )}
       <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
-      <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
+      <label className="h-6 inline-flex items-center gap-1 text-ui-small text-[var(--taomni-text-muted)]">
         Rows
         <input
           className={input}
@@ -208,7 +208,7 @@ export function EditorToolbar({
           onChange={(event) => onRowLimitChange(Number(event.target.value))}
         />
       </label>
-      <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
+      <label className="h-6 inline-flex items-center gap-1 text-ui-small text-[var(--taomni-text-muted)]">
         Tab limit
         <input
           data-testid="db-tab-limit"
@@ -224,7 +224,7 @@ export function EditorToolbar({
       <div className="flex-1" />
       {schemas.length > 0 && (
         <select
-          className="taomni-input h-6 max-w-[180px] text-[11px]"
+          className="taomni-input h-6 max-w-[180px] text-ui-small"
           value={activeSchema ?? ""}
           aria-label="Schema"
           title="Schema / database"
@@ -237,7 +237,7 @@ export function EditorToolbar({
           ))}
         </select>
       )}
-      <span className="text-[10px] text-[var(--taomni-text-muted)]">{engine}</span>
+      <span className="text-ui-caption text-[var(--taomni-text-muted)]">{engine}</span>
     </div>
   );
 }

@@ -85,14 +85,14 @@ export function WorkspaceFlatChangesList({
                 )}
               />
               <GitBranch className="w-3 h-3 shrink-0 text-[var(--taomni-accent)]" />
-              <span className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text)]">
+              <span className="min-w-0 truncate text-ui-small font-semibold uppercase tracking-wide text-[var(--taomni-text)]">
                 {group.root.name}
               </span>
               {branch ? (
-                <span className="min-w-0 truncate text-[10px] text-[var(--taomni-text-muted)]">{branch}</span>
+                <span className="min-w-0 truncate text-ui-caption text-[var(--taomni-text-muted)]">{branch}</span>
               ) : null}
               <div className="flex-1" />
-              <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">
+              <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">
                 {checkedCount}/{group.changes.length}
               </span>
             </div>
@@ -193,21 +193,21 @@ export function WorkspaceFlatChangeRow({
       <span
         data-testid="git-change-status"
         data-change-status={change.conflict ? "conflict" : change.status}
-        className={`shrink-0 w-5 rounded px-0.5 py-0 text-center text-[10px] font-semibold ${status.kindClass}`}
+        className={`shrink-0 w-5 rounded px-0.5 py-0 text-center text-ui-caption font-semibold ${status.kindClass}`}
         title={status.statusLabel}
         aria-label={status.statusLabel}
       >
         {status.kindLabel}
       </span>
       <div className="min-w-0 flex-1 flex items-baseline gap-1.5 overflow-hidden">
-        <span className="shrink-0 max-w-[55%] truncate text-[12px] font-medium">{name}</span>
+        <span className="shrink-0 max-w-[55%] truncate text-ui-body font-medium">{name}</span>
         {pathDir ? (
-          <span className="min-w-0 truncate text-[10px] text-[var(--taomni-text-muted)]" data-testid="workspace-change-path">
+          <span className="min-w-0 truncate text-ui-caption text-[var(--taomni-text-muted)]" data-testid="workspace-change-path">
             {pathDir}
           </span>
         ) : null}
         {change.oldPath ? (
-          <span className="min-w-0 truncate text-[10px] text-[var(--taomni-text-muted)]">
+          <span className="min-w-0 truncate text-ui-caption text-[var(--taomni-text-muted)]">
             · {t("git.workspaceChanges.fromPath", { path: change.oldPath })}
           </span>
         ) : null}
@@ -229,11 +229,11 @@ export function RepoFlatStatusRow({
   const color = repoColorFor(root.repoRoot);
   return (
     <div
-      className="min-h-[36px] px-2 py-2 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[12px]"
+      className="min-h-[36px] px-2 py-2 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-ui-body"
       style={{ borderLeft: `3px solid ${color.border}` }}
     >
       <span
-        className="shrink-0 w-12 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold uppercase"
+        className="shrink-0 w-12 rounded px-1.5 py-0.5 text-center text-ui-caption font-semibold uppercase"
         style={{ background: color.bg, border: `1px solid ${color.border}`, color: color.text }}
       >
         {repoAbbr(root.name || root.repoRoot)}

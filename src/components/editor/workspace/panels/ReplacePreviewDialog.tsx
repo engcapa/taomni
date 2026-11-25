@@ -171,26 +171,26 @@ export function ReplacePreviewDialog({
       aria-modal="true"
       aria-label="Replace in files preview"
       onKeyDown={handleKeyDown}
-      className="flex max-h-[70vh] min-h-0 w-[560px] max-w-[90vw] flex-col rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[12px] text-[var(--taomni-code-text)]"
+      className="flex max-h-[70vh] min-h-0 w-[560px] max-w-[90vw] flex-col rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)]"
     >
       <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2">
         <div className="font-medium">Replace in files preview</div>
         <div
           data-testid="code-workspace-replace-summary"
-          className="mt-0.5 text-[11px] text-[var(--taomni-code-text)]"
+          className="mt-0.5 text-ui-small text-[var(--taomni-code-text)]"
         >
           Replace {live.includedMatches} occurrence{live.includedMatches === 1 ? "" : "s"} of '{query}' across {includedFiles} file{includedFiles === 1 ? "" : "s"} with '{replacement}'?
         </div>
         <div
           data-testid="code-workspace-replace-counts"
-          className="mt-0.5 text-[11px] text-[var(--taomni-code-muted)]"
+          className="mt-0.5 text-ui-small text-[var(--taomni-code-muted)]"
         >
           {live.includedMatches} of {live.totalMatches} occurrences · replace with “{replacement}”
         </div>
         {scopeLabel && (
           <div
             data-testid="code-workspace-replace-scope"
-            className="mt-0.5 text-[10px] text-[var(--taomni-code-muted)]"
+            className="mt-0.5 text-ui-caption text-[var(--taomni-code-muted)]"
           >
             {scopeLabel}
           </div>
@@ -212,7 +212,7 @@ export function ReplacePreviewDialog({
                   onChange={(event) => toggleFile(path, event.target.checked)}
                 />
                 <span className="min-w-0 flex-1 truncate text-left">{path}</span>
-                <span className="shrink-0 text-[10px] tabular-nums">
+                <span className="shrink-0 text-ui-caption tabular-nums">
                   {usages.length - excludedCount}/{usages.length}
                 </span>
               </label>
@@ -231,10 +231,10 @@ export function ReplacePreviewDialog({
                       data-usage-id={usage.id}
                       onChange={() => toggleUsageKey(key)}
                     />
-                    <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
+                    <span className="shrink-0 font-mono text-ui-caption text-[var(--taomni-code-muted)]">
                       {usage.range.start.line + 1}:{usage.range.start.character}
                     </span>
-                    <span className="min-w-0 flex-1 truncate font-mono text-[11px]">
+                    <span className="min-w-0 flex-1 truncate font-mono text-ui-small">
                       → {usage.newText}
                     </span>
                   </label>
@@ -253,7 +253,7 @@ export function ReplacePreviewDialog({
         <div
           data-testid="code-workspace-replace-commit-error"
           role="alert"
-          className="shrink-0 border-t border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[11px] text-red-500"
+          className="shrink-0 border-t border-red-500/30 bg-red-500/10 px-3 py-1.5 text-ui-small text-red-500"
         >
           {commitError}
         </div>

@@ -246,7 +246,7 @@ export function DbNetworkSettings({
   onSaveAsProxySession?: () => void;
 }) {
   return (
-    <div data-testid="db-network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+    <div data-testid="db-network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-ui-body">
       <ProxyJumpFields t={t} value={value} onChange={onChange} sshSessions={sshSessions} proxySessions={proxySessions} onSaveAsProxySession={onSaveAsProxySession} />
     </div>
   );
@@ -332,7 +332,7 @@ export function NetworkSettings({
   };
 
   return (
-    <div data-testid="network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+    <div data-testid="network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-ui-body">
       <ProxyJumpFields t={t} value={value} onChange={onChange} sshSessions={sshSessions} proxySessions={proxySessions} onSaveAsProxySession={onSaveAsProxySession} />
 
       {capabilities.keepAlive && <Field label={t("sessionEditor2.fieldKeepAlive")}>
@@ -421,7 +421,7 @@ export function NetworkSettings({
                 </div>
                 {rowError && (
                   <div
-                    className="text-[11px] text-red-400 ml-[2px]"
+                    className="text-ui-small text-red-400 ml-[2px]"
                     role="status"
                     data-testid={`forward-row-error-${forward.id}`}
                   >

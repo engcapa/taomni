@@ -38,7 +38,7 @@ export function WorkspaceBottomDock({ workspace }: { workspace: PlatformWorkspac
     </div>
     <div className="min-h-0 flex-1 overflow-auto" data-testid="workspace-dock-content" data-tool={dock.activeTool}>
       <div ref={hostRef} className="h-full min-h-0" style={{ display: dock.activeTool === "terminal" ? undefined : "none" }} />
-      {dock.activeTool !== "terminal" && <div className="p-3 text-[11.5px]" style={{ color: "var(--taomni-text-muted)" }}>
+      {dock.activeTool !== "terminal" && <div className="p-3 text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>
         {t("platform.emptyWorkspaceHint")}
       </div>}
     </div>

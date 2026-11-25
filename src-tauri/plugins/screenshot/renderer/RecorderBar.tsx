@@ -249,7 +249,7 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
     <div
       data-testid="screenshot-recorder"
       data-renderer={signedRenderer ? "signed-module" : "bundled"}
-      className="fixed inset-0 flex flex-col items-stretch gap-2 px-3 py-2 text-[13px] select-none overflow-x-hidden overflow-y-auto break-words"
+      className="fixed inset-0 flex flex-col items-stretch gap-2 px-3 py-2 text-ui-body select-none overflow-x-hidden overflow-y-auto break-words"
       style={{
         background: "var(--taomni-panel-bg)",
         border: "1px solid var(--taomni-divider)",
@@ -258,14 +258,14 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
     >
       {initFailed ? (
         <div className="flex flex-col gap-2 py-1">
-          <p data-testid="screenshot-recorder-error" className="text-[12px]" style={{ color: "#ff6b6b" }}>
+          <p data-testid="screenshot-recorder-error" className="text-ui-body" style={{ color: "#ff6b6b" }}>
             {t("screenshot.noRecording")}
           </p>
           <button
             type="button"
             data-testid="screenshot-recorder-cancel"
             onClick={() => void handleCancel()}
-            className="rounded-lg px-3 py-1.5 text-[12px] self-end"
+            className="rounded-lg px-3 py-1.5 text-ui-body self-end"
             style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
           >
             {t("screenshot.cancel")}
@@ -289,14 +289,14 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
                 <img data-testid="screenshot-recorder-preview" src={previewUrl} alt="" className="max-w-full max-h-full object-contain" />
               ))}
           </div>
-          <p data-testid="screenshot-recorder-meta" className="text-[11px] text-[var(--taomni-text-muted)]">
+          <p data-testid="screenshot-recorder-meta" className="text-ui-small text-[var(--taomni-text-muted)]">
             {`${preview.width}×${preview.height} · ${formatElapsed(preview.durationMs / 1000)} · ${preview.frames} ${t("screenshot.frames")}${
               previewBytes ? ` · ${formatSize(previewBytes)}` : ""
             }`}
           </p>
-          {notice && <p data-testid="screenshot-recorder-notice" className="text-[11px] text-[var(--taomni-text-muted)]">{notice}</p>}
+          {notice && <p data-testid="screenshot-recorder-notice" className="text-ui-small text-[var(--taomni-text-muted)]">{notice}</p>}
           {error && (
-            <p data-testid="screenshot-recorder-error" className="text-[12px]" style={{ color: "#ff6b6b" }}>
+            <p data-testid="screenshot-recorder-error" className="text-ui-body" style={{ color: "#ff6b6b" }}>
               {error}
             </p>
           )}
@@ -306,7 +306,7 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
                 type="button"
                 data-testid="screenshot-recorder-copy"
                 onClick={() => void handleCopyGif()}
-                className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-[12px]"
+                className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-ui-body"
                 style={{ background: "var(--taomni-hover)", color: "var(--taomni-text)" }}
               >
                 <Copy size={13} />
@@ -317,7 +317,7 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
               type="button"
               data-testid="screenshot-recorder-save"
               onClick={() => void handleSave()}
-              className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-[12px]"
+              className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-ui-body"
               style={{ background: "var(--taomni-hover)", color: "var(--taomni-text)" }}
             >
               <Download size={13} />
@@ -327,7 +327,7 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
               type="button"
               data-testid="screenshot-recorder-done"
               onClick={() => void closeAll()}
-              className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-[12px]"
+              className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-ui-body"
               style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
             >
               <Check size={13} />
@@ -337,7 +337,7 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
         </>
       ) : (
         <>
-          <p data-testid="screenshot-recorder-range-hint" className="text-[11px] text-[var(--taomni-text-muted)]">{range ? `${range} · ` : ""}{t("screenshot.recordingRangeHint")}</p>
+          <p data-testid="screenshot-recorder-range-hint" className="text-ui-small text-[var(--taomni-text-muted)]">{range ? `${range} · ` : ""}{t("screenshot.recordingRangeHint")}</p>
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full animate-pulse shrink-0" style={{ background: "#ff4d4f" }} />
             <span data-testid="screenshot-recorder-timer" className="tabular-nums font-medium">
@@ -369,10 +369,10 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
               <X size={14} />
             </button>
           </div>
-          {stopping && <p className="text-[12px] text-[var(--taomni-text-muted)]">{t("screenshot.recordFinishing")}</p>}
-          {notice && <p data-testid="screenshot-recorder-notice" className="text-[11px] text-[var(--taomni-text-muted)]">{notice}</p>}
+          {stopping && <p className="text-ui-body text-[var(--taomni-text-muted)]">{t("screenshot.recordFinishing")}</p>}
+          {notice && <p data-testid="screenshot-recorder-notice" className="text-ui-small text-[var(--taomni-text-muted)]">{notice}</p>}
           {error && (
-            <p data-testid="screenshot-recorder-error" className="text-[12px]" style={{ color: "#ff6b6b" }}>
+            <p data-testid="screenshot-recorder-error" className="text-ui-body" style={{ color: "#ff6b6b" }}>
               {error}
             </p>
           )}

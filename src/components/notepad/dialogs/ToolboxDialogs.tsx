@@ -73,7 +73,7 @@ export function ToolboxDialogs({
             <button type="button" className="np-btn" onClick={onClose}><X size={14} /></button>
           </div>
 
-          <div className="flex flex-wrap gap-2 text-[12px]">
+          <div className="flex flex-wrap gap-2 text-ui-body">
             {(["md5", "sha1", "sha256", "sha512"] as const).map((a) => (
               <button
                 key={a}
@@ -87,7 +87,7 @@ export function ToolboxDialogs({
             ))}
           </div>
 
-          <div className="flex gap-4 text-[12px]">
+          <div className="flex gap-4 text-ui-body">
             <label className="inline-flex items-center gap-1">
               <input type="radio" checked={hashSource === "doc"} onChange={() => setHashSource("doc")} />
               {label("当前全文", "Document")}
@@ -130,7 +130,7 @@ export function ToolboxDialogs({
               </button>
             </div>
           )}
-          {hashErr && <div className="text-[12px] text-red-500">{hashErr}</div>}
+          {hashErr && <div className="text-ui-body text-red-500">{hashErr}</div>}
         </div>
       </div>
     );
@@ -173,7 +173,7 @@ export function ToolboxDialogs({
           value={workText}
           onChange={(e) => setWorkText(e.target.value)}
         />
-        {mimeErr && <div className="text-[12px] text-red-500">{mimeErr}</div>}
+        {mimeErr && <div className="text-ui-body text-red-500">{mimeErr}</div>}
 
         <div className="flex justify-end gap-2">
           <button type="button" className="np-btn" onClick={onClose}>{label("关闭", "Close")}</button>

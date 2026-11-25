@@ -23,7 +23,7 @@ interface EditorSelectionAiToolbarProps {
 }
 
 const BUTTON_CLASS =
-  "h-7 inline-flex items-center gap-1 rounded px-2 text-[11px] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40";
+  "h-7 inline-flex items-center gap-1 rounded px-2 text-ui-small text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40";
 
 export function EditorSelectionAiToolbar({
   visible,
@@ -125,7 +125,7 @@ export function EditorSelectionAiToolbar({
             data-testid="code-workspace-ai-answer-language"
             aria-haspopup="menu"
             aria-expanded={languageMenuOpen}
-            className="h-7 inline-flex items-center gap-1 rounded border-l border-[var(--taomni-code-border)] pl-2 pr-1.5 text-[10px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
+            className="h-7 inline-flex items-center gap-1 rounded border-l border-[var(--taomni-code-border)] pl-2 pr-1.5 text-ui-caption text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
             title={t("codeWorkspaceAi.answerLanguageTooltip", { current: languageBadge })}
             onClick={() => setLanguageMenuOpen((open) => !open)}
           >
@@ -146,7 +146,7 @@ export function EditorSelectionAiToolbar({
                   role="menuitemradio"
                   aria-checked={language === answerLanguage}
                   data-testid={`code-workspace-ai-answer-language-${language}`}
-                  className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-[11px] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                  className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-ui-small text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
                   onClick={() => {
                     setLanguageMenuOpen(false);
                     onSetAnswerLanguage(language);

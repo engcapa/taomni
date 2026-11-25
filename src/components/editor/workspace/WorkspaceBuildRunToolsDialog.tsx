@@ -115,7 +115,7 @@ export function WorkspaceBuildRunToolsDialog({
               placeholder="One JVM option per line, for example: --add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
               onChange={(event) => setMavenJvmArgs(event.target.value)}
               rows={4}
-              className="block w-full resize-y rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 font-mono text-[11px]"
+              className="block w-full resize-y rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 font-mono text-ui-small"
             />
             <p className="text-[var(--taomni-code-muted)]">
               Applied to the Maven JVM through MAVEN_OPTS, one option per line.
@@ -147,7 +147,7 @@ export function WorkspaceBuildRunToolsDialog({
             </label>
             {stepFiltersEnabled && (
               <>
-                <label className="block text-[11px] text-[var(--taomni-code-muted)]" htmlFor="workspace-debug-step-filter-patterns">
+                <label className="block text-ui-small text-[var(--taomni-code-muted)]" htmlFor="workspace-debug-step-filter-patterns">
                   Class & package patterns to skip (one per line, e.g. <code>java.*</code>, <code>javax.*</code>, <code>sun.*</code>, <code>com.sun.*</code>)
                 </label>
                 <textarea
@@ -157,7 +157,7 @@ export function WorkspaceBuildRunToolsDialog({
                   value={stepFilterPatterns}
                   onChange={(e) => setStepFilterPatterns(e.target.value)}
                   rows={4}
-                  className="block w-full resize-y rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 font-mono text-[11px]"
+                  className="block w-full resize-y rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 font-mono text-ui-small"
                 />
                 <div className="flex flex-wrap gap-4 pt-1">
                   <label className="flex items-center gap-1.5">

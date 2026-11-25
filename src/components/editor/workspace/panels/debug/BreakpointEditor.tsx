@@ -21,7 +21,7 @@ export function BreakpointEditor({
   onChange,
   onModeChange,
 }: BreakpointEditorProps) {
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none";
   // Committed on blur / Enter so every keystroke does not re-push to the adapter.
   const commit = (key: "condition" | "hitCondition" | "logMessage") => (value: string) => {
     onChange({ [key]: value.trim() || undefined });
@@ -38,7 +38,7 @@ export function BreakpointEditor({
             data-testid={`debug-breakpoint-mode-${breakpoint.line}`}
             aria-label={`Breakpoint mode at line ${breakpoint.line}`}
             title={modes.find((entry) => entry.mode === mode)?.description}
-            className="h-5 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-[11px] outline-none"
+            className="h-5 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-ui-small outline-none"
             value={mode ?? modes[0].mode}
             onChange={(event) => onModeChange(event.target.value)}
           >

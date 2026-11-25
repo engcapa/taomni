@@ -45,7 +45,7 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
       >
         <div className="text-sm font-semibold mb-1">{title}</div>
         <div
-          className="text-[12px] mb-4 break-all"
+          className="text-ui-body mb-4 break-all"
           style={{ color: "var(--taomni-text-muted)" }}
           title={fileName}
         >
@@ -58,7 +58,7 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
               ref={firstButtonRef}
               type="button"
               data-testid="zmodem-overwrite"
-              className="w-full px-3 py-1.5 text-[12px] rounded text-left hover:opacity-90"
+              className="w-full px-3 py-1.5 text-ui-body rounded text-left hover:opacity-90"
               style={{ background: "var(--taomni-accent)", color: "#fff" }}
               onClick={() => resolve("overwrite")}
             >
@@ -69,7 +69,7 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
             ref={mode === "send" ? firstButtonRef : undefined}
             type="button"
             data-testid="zmodem-rename"
-            className="w-full px-3 py-1.5 text-[12px] rounded text-left"
+            className="w-full px-3 py-1.5 text-ui-body rounded text-left"
             style={{
               background: mode === "send" ? "var(--taomni-accent)" : "var(--taomni-input-bg)",
               border: mode === "send" ? "none" : "1px solid var(--taomni-input-border)",
@@ -82,7 +82,7 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
           <button
             type="button"
             data-testid="zmodem-skip"
-            className="w-full px-3 py-1.5 text-[12px] rounded text-left"
+            className="w-full px-3 py-1.5 text-ui-body rounded text-left"
             style={{
               background: "var(--taomni-input-bg)",
               border: "1px solid var(--taomni-input-border)",
@@ -95,7 +95,7 @@ export function ZmodemConflictDialog({ fileName, hasMore, mode, onResolve }: Zmo
         </div>
 
         {hasMore && (
-          <label className="flex items-center gap-2 text-[12px] cursor-pointer select-none">
+          <label className="flex items-center gap-2 text-ui-body cursor-pointer select-none">
             <input
               type="checkbox"
               checked={applyToAll}

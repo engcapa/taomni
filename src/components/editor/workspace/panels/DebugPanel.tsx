@@ -239,7 +239,7 @@ export function DebugPanel({
     <div
       ref={containerRef}
       data-testid="debug-panel"
-      className="h-full min-h-0 flex flex-col text-[11px] bg-[var(--taomni-code-bg)]"
+      className="h-full min-h-0 flex flex-col text-ui-small bg-[var(--taomni-code-bg)]"
     >
       {/* Primary Sub Tab Bar (Debugger, Console, Breakpoints, Memory) */}
       <DebugSubTabBar
@@ -266,7 +266,7 @@ export function DebugPanel({
         ) : undefined}
         trailing={
           isCompact && currentTab === "debugger" && state ? (
-            <div className="flex items-center rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-0.5 text-[10px]">
+            <div className="flex items-center rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-0.5 text-ui-caption">
               <button
                 type="button"
                 data-testid="debug-compact-tab-frames"
@@ -315,7 +315,7 @@ export function DebugPanel({
                 title="Select Run/Debug configuration"
                 value={activeConfigurationId ?? configurations[0].id}
                 onChange={(event) => onActiveConfigurationChange?.(event.target.value)}
-                className="ml-2 h-6 min-w-0 max-w-52 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[10px]"
+                className="ml-2 h-6 min-w-0 max-w-52 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-ui-caption"
               >
                 {configurations.map((configuration) => (
                   <option
@@ -333,7 +333,7 @@ export function DebugPanel({
               <div
                 data-testid="debug-configuration-diagnostic"
                 role="status"
-                className="max-w-64 truncate text-[10px] text-amber-600 dark:text-amber-400"
+                className="max-w-64 truncate text-ui-caption text-amber-600 dark:text-amber-400"
                 title={configurationDiagnostic}
               >
                 {configurationDiagnostic}

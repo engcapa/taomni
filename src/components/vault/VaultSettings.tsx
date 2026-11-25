@@ -84,7 +84,7 @@ export function VaultSettings() {
   const stateBadge = (
     <span
       data-testid="vault-state-badge"
-      className="px-2 py-0.5 text-[11px] rounded"
+      className="px-2 py-0.5 text-ui-small rounded"
       style={{
         background:
           state === "unlocked"
@@ -108,13 +108,13 @@ export function VaultSettings() {
         {stateBadge}
       </div>
 
-      <div className="text-[12px] mb-4" style={{ color: "var(--taomni-text-muted)" }}>
+      <div className="text-ui-body mb-4" style={{ color: "var(--taomni-text-muted)" }}>
         {t("vaultSettings.description")}
       </div>
 
       <div className="mb-4" data-testid="vault-unlock-mode-setting">
-        <div className="text-[12px] font-semibold mb-1">{t("vaultSettings.unlockModeTitle")}</div>
-        <div className="text-[11px] mb-2" style={{ color: "var(--taomni-text-muted)" }}>
+        <div className="text-ui-body font-semibold mb-1">{t("vaultSettings.unlockModeTitle")}</div>
+        <div className="text-ui-small mb-2" style={{ color: "var(--taomni-text-muted)" }}>
           {t("vaultSettings.unlockModeDescription")}
         </div>
         <div
@@ -127,7 +127,7 @@ export function VaultSettings() {
             type="button"
             data-testid="vault-unlock-mode-startup"
             aria-pressed={vaultUnlockMode === "startup"}
-            className="min-w-[116px] px-3 py-1.5 text-[12px] transition-colors"
+            className="min-w-[116px] px-3 py-1.5 text-ui-body transition-colors"
             style={{
               background: vaultUnlockMode === "startup" ? "var(--taomni-accent)" : "transparent",
               color: vaultUnlockMode === "startup" ? "white" : "var(--taomni-text)",
@@ -140,7 +140,7 @@ export function VaultSettings() {
             type="button"
             data-testid="vault-unlock-mode-on-demand"
             aria-pressed={vaultUnlockMode === "on-demand"}
-            className="min-w-[116px] border-l px-3 py-1.5 text-[12px] transition-colors"
+            className="min-w-[116px] border-l px-3 py-1.5 text-ui-body transition-colors"
             style={{
               borderColor: "var(--taomni-card-border)",
               background: vaultUnlockMode === "on-demand" ? "var(--taomni-accent)" : "transparent",
@@ -152,7 +152,7 @@ export function VaultSettings() {
           </button>
         </div>
         <div
-          className="mt-2 text-[11px]"
+          className="mt-2 text-ui-small"
           style={{ color: "var(--taomni-text-muted)" }}
           data-testid="vault-unlock-mode-hint"
         >
@@ -167,7 +167,7 @@ export function VaultSettings() {
           <button
             type="button"
             data-testid="vault-init-button"
-            className="px-3 py-1 text-[12px] rounded text-white"
+            className="px-3 py-1 text-ui-body rounded text-white"
             style={{ background: "var(--taomni-accent)" }}
             onClick={() => setAction("init")}
           >
@@ -179,7 +179,7 @@ export function VaultSettings() {
             type="button"
             data-testid="vault-unlock-button"
             disabled={transitionPending}
-            className="px-3 py-1 text-[12px] rounded text-white"
+            className="px-3 py-1 text-ui-body rounded text-white"
             style={{ background: "var(--taomni-accent)" }}
             onClick={() => setAction("unlock")}
           >
@@ -191,7 +191,7 @@ export function VaultSettings() {
             <button
               type="button"
               data-testid="vault-lock-button"
-              className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+              className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]"
               onClick={() => void handleLock()}
               disabled={transitionPending}
             >
@@ -200,7 +200,7 @@ export function VaultSettings() {
             <button
               type="button"
               data-testid="vault-change-master-button"
-              className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+              className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]"
               onClick={() => {
                 setAction("change-master");
                 setError(null);
@@ -214,7 +214,7 @@ export function VaultSettings() {
       </div>
 
       {lockError && (
-        <div role="alert" data-testid="vault-operation-error" className="mb-4 text-[12px]" style={{ color: "var(--taomni-error, #c33)" }}>
+        <div role="alert" data-testid="vault-operation-error" className="mb-4 text-ui-body" style={{ color: "var(--taomni-error, #c33)" }}>
           {lockError}
         </div>
       )}
@@ -225,7 +225,7 @@ export function VaultSettings() {
           style={{ border: "1px solid var(--taomni-card-border)" }}
           data-testid="vault-change-master-form"
         >
-          <div className="text-[12px] font-semibold mb-2">{t("vaultSettings.changeMasterPassword")}</div>
+          <div className="text-ui-body font-semibold mb-2">{t("vaultSettings.changeMasterPassword")}</div>
           <input
             type="password"
             value={oldPw}
@@ -254,19 +254,19 @@ export function VaultSettings() {
             data-testid="vault-change-master-new2"
           />
           {error && (
-            <div className="text-[12px] mb-2" style={{ color: "var(--taomni-error, #c33)" }}>
+            <div className="text-ui-body mb-2" style={{ color: "var(--taomni-error, #c33)" }}>
               {error}
             </div>
           )}
           {info && (
-            <div className="text-[12px] mb-2" style={{ color: "var(--taomni-accent)" }}>
+            <div className="text-ui-body mb-2" style={{ color: "var(--taomni-accent)" }}>
               {info}
             </div>
           )}
           <div className="flex gap-2 justify-end">
             <button
               type="button"
-              className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+              className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]"
               onClick={() => {
                 setAction(null);
                 setError(null);
@@ -278,7 +278,7 @@ export function VaultSettings() {
             </button>
             <button
               type="button"
-              className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
+              className="px-3 py-1 text-ui-body rounded text-white disabled:opacity-50"
               style={{ background: "var(--taomni-accent)" }}
               onClick={() => void handleChangeMaster()}
               disabled={busy}
@@ -292,14 +292,14 @@ export function VaultSettings() {
 
       {state === "unlocked" && (
         <div data-testid="vault-entries-section" className="flex flex-col gap-2">
-          <div className="text-[12px] font-semibold">
+          <div className="text-ui-body font-semibold">
             {t("vaultSettings.savedEntries", { count: entries.length })}
           </div>
           <div>
             <button
               type="button"
               data-testid="vault-manage-entries-button"
-              className="px-3 py-1 text-[12px] rounded text-white hover:opacity-90 transition-opacity"
+              className="px-3 py-1 text-ui-body rounded text-white hover:opacity-90 transition-opacity"
               style={{ background: "var(--taomni-accent)" }}
               onClick={() => setShowEntriesDialog(true)}
             >

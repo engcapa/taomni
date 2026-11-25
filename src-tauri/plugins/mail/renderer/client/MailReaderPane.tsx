@@ -48,7 +48,7 @@ export function MailReaderPane(viewProps: MailReaderPaneProps) {
               onContextMenu={(event) => showReaderMenu(event, selectedMessage)}
             >
               <div className="h-8 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)]">
-                <span className="text-[12px] font-semibold min-w-0 truncate">
+                <span className="text-ui-body font-semibold min-w-0 truncate">
                   {selectedMessage?.subject || "Message"}
                 </span>
                 {selectedMessage && bodyLoadingKey === messageKey(selectedMessage) && (
@@ -57,7 +57,7 @@ export function MailReaderPane(viewProps: MailReaderPaneProps) {
                 <div className="ml-auto flex items-center gap-1">
                   <button
                     type="button"
-                    className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                    className="taomni-btn h-6 px-2 text-ui-small inline-flex items-center gap-1"
                     onClick={() => openReply()}
                     disabled={!selectedMessage}
                     title="Reply"
@@ -67,7 +67,7 @@ export function MailReaderPane(viewProps: MailReaderPaneProps) {
                   </button>
                   <button
                     type="button"
-                    className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                    className="taomni-btn h-6 px-2 text-ui-small inline-flex items-center gap-1"
                     onClick={() => openReplyAll()}
                     disabled={!selectedMessage}
                     title="Reply all"
@@ -77,7 +77,7 @@ export function MailReaderPane(viewProps: MailReaderPaneProps) {
                   </button>
                   <button
                     type="button"
-                    className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                    className="taomni-btn h-6 px-2 text-ui-small inline-flex items-center gap-1"
                     onClick={() => selectedMessage && openMessagePopup(selectedMessage)}
                     disabled={!selectedMessage}
                     title="Open message in popup window"
@@ -87,7 +87,7 @@ export function MailReaderPane(viewProps: MailReaderPaneProps) {
                   </button>
                   <button
                     type="button"
-                    className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                    className="taomni-btn h-6 px-2 text-ui-small inline-flex items-center gap-1"
                     onClick={() => void handleAiAction("summarize")}
                     disabled={!selectedMessage || !info.ai.enabled}
                     title="Summarize with AI"
@@ -97,7 +97,7 @@ export function MailReaderPane(viewProps: MailReaderPaneProps) {
                   </button>
                   <button
                     type="button"
-                    className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                    className="taomni-btn h-6 px-2 text-ui-small inline-flex items-center gap-1"
                     onClick={() => void handleAiAction("reply")}
                     disabled={!selectedMessage || !info.ai.enabled}
                     title="Draft reply with AI"
@@ -107,7 +107,7 @@ export function MailReaderPane(viewProps: MailReaderPaneProps) {
                   </button>
                   <button
                     type="button"
-                    className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+                    className="taomni-btn h-6 px-2 text-ui-small inline-flex items-center gap-1"
                     onClick={() => void handleAiAction("tasks")}
                     disabled={!selectedMessage || !info.ai.enabled}
                     title="Extract tasks with AI"
@@ -119,16 +119,16 @@ export function MailReaderPane(viewProps: MailReaderPaneProps) {
               </div>
 
               {!selectedMessage ? (
-                <div className="flex-1 min-h-0 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+                <div className="flex-1 min-h-0 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
                   Select a message
                 </div>
               ) : (
                 <div className="flex-1 min-h-0 overflow-auto">
                   <div className="px-4 py-3 border-b border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
-                    <h2 className="text-[17px] font-semibold leading-6 mb-1 break-words">
+                    <h2 className="text-ui-heading font-semibold leading-6 mb-1 break-words">
                       {selectedMessage.subject || "(no subject)"}
                     </h2>
-                    <div className="grid grid-cols-[56px_1fr] gap-x-2 gap-y-1 text-[12px]">
+                    <div className="grid grid-cols-[56px_1fr] gap-x-2 gap-y-1 text-ui-body">
                       <span className="text-[var(--taomni-text-muted)]">From</span>
                       <span className="truncate" title={addressLabel(selectedMessage.from)}>{addressLabel(selectedMessage.from) || "(unknown)"}</span>
                       <span className="text-[var(--taomni-text-muted)]">To</span>
@@ -146,14 +146,14 @@ export function MailReaderPane(viewProps: MailReaderPaneProps) {
                       <span className="text-[var(--taomni-text-muted)]">Date</span>
                       <span>{formatFullDate(selectedMessage.dateTs) || "(unknown)"}</span>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-ui-small text-[var(--taomni-text-muted)]">
                       <span>{selectedBody?.source === "cache" ? "cached body" : selectedBody?.source === "remote" ? "remote body" : "header cached"}</span>
                       {selectedMessage.rawSize ? <span>{formatBytes(selectedMessage.rawSize)}</span> : null}
                       {info.ai.enabled && <span>AI confirm {info.ai.skipBodyConfirm ? "skipped" : "required"}</span>}
                       {selectedHasRemoteImages && selectedMessageRemoteKey && (
                         <button
                           type="button"
-                          className="taomni-btn h-5 px-2 text-[10px]"
+                          className="taomni-btn h-5 px-2 text-ui-caption"
                           data-testid="mail-remote-images-header-toggle"
                           onClick={() => toggleRemoteForMessage(selectedMessageRemoteKey)}
                         >
@@ -167,7 +167,7 @@ export function MailReaderPane(viewProps: MailReaderPaneProps) {
                         {visibleAttachments.length > 1 && (
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
+                            className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-ui-small text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
                             title="Save all attachments"
                             onClick={() => void handleSaveAllAttachments(selectedMessage, visibleAttachments)}
                             disabled={downloadingAttachmentIndex !== null}
@@ -186,7 +186,7 @@ export function MailReaderPane(viewProps: MailReaderPaneProps) {
                               type="button"
                               data-testid="mail-attachment-open"
                               data-name={name}
-                              className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
+                              className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-ui-small text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
                               title={`Double-click to open ${name}; right-click to save`}
                               onDoubleClick={() => void handleOpenAttachment(selectedMessage, attachment, index)}
                               onContextMenu={(event) => handleAttachmentContextMenu(event, selectedMessage, visibleAttachments, attachment, index)}

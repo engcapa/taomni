@@ -73,7 +73,7 @@ function CompareSide({
       <div className="flex min-w-0 items-center justify-between gap-2 border-b border-[var(--taomni-code-border)] px-3 py-1.5">
         <div className="min-w-0">
           <div className="truncate text-xs font-medium">{side.title}</div>
-          <div className="truncate text-[10px] text-[var(--taomni-code-muted)]">
+          <div className="truncate text-ui-caption text-[var(--taomni-code-muted)]">
             {side.path ?? side.source ?? "buffer"} · {metadataLabel(side)}
           </div>
         </div>
@@ -90,7 +90,7 @@ function CompareSide({
         </button>
       </div>
       {copyStatus && (
-        <div role="status" className="border-b border-[var(--taomni-code-border)] px-3 py-1 text-[10px] text-amber-400">
+        <div role="status" className="border-b border-[var(--taomni-code-border)] px-3 py-1 text-ui-caption text-amber-400">
           {copyStatus}
         </div>
       )}
@@ -225,7 +225,7 @@ export function EditorCompareDialog({
             <ArrowLeftRight className="h-4 w-4 shrink-0 text-[var(--taomni-accent)]" />
             <h2 className="truncate text-sm font-semibold">{session.title}</h2>
           </div>
-          <div data-testid="compare-session-metadata" className="mt-1 truncate text-[10px] text-[var(--taomni-code-muted)]">
+          <div data-testid="compare-session-metadata" className="mt-1 truncate text-ui-caption text-[var(--taomni-code-muted)]">
             {session.source ?? "file"} · {session.target ? `target revision ${session.target.documentRevision}` : "read-only comparison"}
           </div>
         </div>

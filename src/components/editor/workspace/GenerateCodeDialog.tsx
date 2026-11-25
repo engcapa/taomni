@@ -68,11 +68,11 @@ export function GenerateCodeDialog({
       }}
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[12vh]"
     >
-      <div className="flex w-full max-w-lg flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[12px] text-[var(--taomni-code-fg)] shadow-2xl">
+      <div className="flex w-full max-w-lg flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-fg)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-sky-400" />
-            <h2 id="generate-code-title" className="text-[13px] font-semibold">Generate Code</h2>
+            <h2 id="generate-code-title" className="text-ui-body font-semibold">Generate Code</h2>
           </div>
           <button
             type="button"
@@ -88,20 +88,20 @@ export function GenerateCodeDialog({
 
         <div data-testid="generate-code-body" className="max-h-72 overflow-y-auto p-3">
           {phase === "loading" && (
-            <div data-testid="generate-code-loading" className="flex items-center gap-2 px-1 py-6 text-[11px] text-[var(--taomni-code-muted)]">
+            <div data-testid="generate-code-loading" className="flex items-center gap-2 px-1 py-6 text-ui-small text-[var(--taomni-code-muted)]">
               <Loader2 className="h-4 w-4 animate-spin" />
               Requesting generation actions from the language server…
             </div>
           )}
           {phase === "empty" && (
-            <div data-testid="generate-code-empty" className="px-1 py-6 text-center text-[11px] text-[var(--taomni-code-muted)]">
+            <div data-testid="generate-code-empty" className="px-1 py-6 text-center text-ui-small text-[var(--taomni-code-muted)]">
               The language server did not offer any generation actions here.
             </div>
           )}
           {phase === "error" && (
             <div data-testid="generate-code-error" className="space-y-1 px-1 py-2">
-              <p className="text-[11px] text-red-400">{error ?? "Generation failed."}</p>
-              <p className="text-[10px] text-[var(--taomni-code-muted)]">
+              <p className="text-ui-small text-red-400">{error ?? "Generation failed."}</p>
+              <p className="text-ui-caption text-[var(--taomni-code-muted)]">
                 Nothing was inserted by Taomni itself; retry re-requests the provider.
               </p>
             </div>
@@ -128,7 +128,7 @@ export function GenerateCodeDialog({
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{candidate.title}</span>
-                    <span className="block truncate font-mono text-[10px] text-[var(--taomni-code-muted)]">{candidate.kind}</span>
+                    <span className="block truncate font-mono text-ui-caption text-[var(--taomni-code-muted)]">{candidate.kind}</span>
                   </span>
                 </label>
               ))}
@@ -137,7 +137,7 @@ export function GenerateCodeDialog({
         </div>
 
         {phase === "ready" && (
-          <p className="border-t border-[var(--taomni-code-border)] px-4 py-1.5 text-[10px] text-[var(--taomni-code-muted)]">
+          <p className="border-t border-[var(--taomni-code-border)] px-4 py-1.5 text-ui-caption text-[var(--taomni-code-muted)]">
             Placement and imports come from the provider edit; all selected actions apply as one history entry after a freshness re-check.
           </p>
         )}
@@ -149,7 +149,7 @@ export function GenerateCodeDialog({
                 type="button"
                 data-testid="generate-code-retry"
                 onClick={onRetry}
-                className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-2.5 py-1 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+                className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-2.5 py-1 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
               >
                 <RefreshCw className="h-3 w-3" /> Retry
               </button>
@@ -157,7 +157,7 @@ export function GenerateCodeDialog({
                 type="button"
                 data-testid="generate-code-cancel"
                 onClick={onCancel}
-                className="rounded border border-[var(--taomni-code-border)] px-2.5 py-1 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+                className="rounded border border-[var(--taomni-code-border)] px-2.5 py-1 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
               >
                 Cancel
               </button>
@@ -169,7 +169,7 @@ export function GenerateCodeDialog({
                 data-testid="generate-code-cancel-footer"
                 onClick={onCancel}
                 disabled={busy}
-                className="rounded border border-[var(--taomni-code-border)] px-2.5 py-1 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-50"
+                className="rounded border border-[var(--taomni-code-border)] px-2.5 py-1 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -178,7 +178,7 @@ export function GenerateCodeDialog({
                 data-testid="generate-code-apply"
                 onClick={() => onApply([...selected])}
                 disabled={busy || selected.size === 0}
-                className="rounded bg-sky-500/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+                className="rounded bg-sky-500/80 px-2.5 py-1 text-ui-small font-medium text-white hover:bg-sky-500 disabled:opacity-50"
               >
                 {phase === "running" ? "Applying…" : "Generate"}
               </button>

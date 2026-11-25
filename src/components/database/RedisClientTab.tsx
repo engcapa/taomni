@@ -230,7 +230,7 @@ export default function RedisClientTab({ tabId, info, visible, chatToggle }: Red
       )}
       {connError && (
         <div
-          className="h-7 shrink-0 px-2 flex items-center gap-2 text-[11px] border-b"
+          className="h-7 shrink-0 px-2 flex items-center gap-2 text-ui-small border-b"
           style={{ color: "#d9534f", borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           title={connError}
           data-testid="redis-connection-error-banner"
@@ -242,7 +242,7 @@ export default function RedisClientTab({ tabId, info, visible, chatToggle }: Red
       )}
       {/* Toolbar: DB index switcher */}
       <div
-        className="h-7 shrink-0 flex items-center gap-2 px-2 text-[11px]"
+        className="h-7 shrink-0 flex items-center gap-2 px-2 text-ui-small"
         style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
       >
         <span className="font-semibold" style={{ color: "var(--taomni-accent)" }}>
@@ -279,7 +279,7 @@ export default function RedisClientTab({ tabId, info, visible, chatToggle }: Red
                 <div className="h-7 shrink-0 flex border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
                   <button
                     type="button"
-                    className="flex-1 text-[11px] font-semibold inline-flex items-center justify-center gap-1"
+                    className="flex-1 text-ui-small font-semibold inline-flex items-center justify-center gap-1"
                     style={{ color: leftPanelTab === "keys" ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
                     onClick={() => setLeftPanelTab("keys")}
                   >
@@ -287,7 +287,7 @@ export default function RedisClientTab({ tabId, info, visible, chatToggle }: Red
                   </button>
                   <button
                     type="button"
-                    className="flex-1 text-[11px] font-semibold inline-flex items-center justify-center gap-1 border-l border-[var(--taomni-divider)]"
+                    className="flex-1 text-ui-small font-semibold inline-flex items-center justify-center gap-1 border-l border-[var(--taomni-divider)]"
                     style={{ color: leftPanelTab === "queries" ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
                     onClick={() => setLeftPanelTab("queries")}
                     data-testid="redis-query-library-tab"

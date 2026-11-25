@@ -173,7 +173,7 @@ export function CodeBlockToolbar({
 
   return (
     <div className="rounded border border-[var(--taomni-divider)] my-2 overflow-hidden">
-      <div className="flex items-center gap-1 px-2 py-1 bg-[var(--taomni-divider)]/40 text-[10px] text-[var(--taomni-text-muted)]">
+      <div className="flex items-center gap-1 px-2 py-1 bg-[var(--taomni-divider)]/40 text-ui-caption text-[var(--taomni-text-muted)]">
         <span className="font-mono uppercase tracking-wide">{lang || t("chat.codeLangFallback")}</span>
         <span className="flex-1" />
         <button
@@ -212,7 +212,7 @@ export function CodeBlockToolbar({
           t={t}
         />
       </div>
-      <pre className="m-0 p-2 text-[11px] leading-snug overflow-x-auto bg-[var(--taomni-bg)]">
+      <pre className="m-0 p-2 text-ui-small leading-snug overflow-x-auto bg-[var(--taomni-bg)]">
         <code>
           {selecting
             ? lineMeta.map((line, i) => {
@@ -457,7 +457,7 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend, t }: SendTo
             <button
               key={t.tabId}
               type="button"
-              className="block w-full text-left px-2 py-1 text-[11px] hover:bg-[var(--taomni-selected)]"
+              className="block w-full text-left px-2 py-1 text-ui-small hover:bg-[var(--taomni-selected)]"
               onClick={() => {
                 onSend(t);
                 setOpen(false);
@@ -541,7 +541,7 @@ function SendToQueryButton({ targetEntry, disabled, sent, onSend, t }: SendToQue
             <button
               key={query.tabId}
               type="button"
-              className="block w-full text-left px-2 py-1 text-[11px] hover:bg-[var(--taomni-selected)]"
+              className="block w-full text-left px-2 py-1 text-ui-small hover:bg-[var(--taomni-selected)]"
               onClick={() => {
                 onSend(query);
                 setOpen(false);

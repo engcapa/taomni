@@ -99,7 +99,7 @@ export function NoteStatusFilter({ filters, onToggleFilter, className = "", pref
                 role="menuitemcheckbox"
                 aria-checked={active}
                 data-testid={`${prefix}-filter-${f}`}
-                className={`flex h-7 w-full items-center gap-2 rounded px-2 text-left text-[11px] ${
+                className={`flex h-7 w-full items-center gap-2 rounded px-2 text-left text-ui-small ${
                   active ? "bg-[var(--taomni-selected)] text-[var(--taomni-accent)]" : "hover:bg-[var(--taomni-hover)]"
                 }`}
                 title={t(`notes.filters.${f}`)}
@@ -136,7 +136,7 @@ export function NoteTagFilters({
             role="tab"
             aria-selected={active}
             data-testid={`${prefix}-tag-filter-${tag.id}`}
-            className={`h-5 px-2 rounded-full text-[10px] whitespace-nowrap border transition-colors ${
+            className={`h-5 px-2 rounded-full text-ui-caption whitespace-nowrap border transition-colors ${
               active
                 ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)]"
                 : "border-[var(--taomni-divider)] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"

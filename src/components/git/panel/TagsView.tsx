@@ -108,14 +108,14 @@ export function TagsView({
         <Tag className="w-4 h-4 shrink-0 text-[var(--taomni-text-muted)]" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[12px] truncate font-medium">{tag.name}</span>
+            <span className="text-ui-body truncate font-medium">{tag.name}</span>
             {dateLabel? (
-              <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]" title={tag.date??undefined}>
+              <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]" title={tag.date??undefined}>
                 {dateLabel}
               </span>
             ):null}
           </div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+          <div className="text-ui-small text-[var(--taomni-text-muted)] truncate">
             <span className="taomni-mono text-[var(--taomni-accent)]">{tag.oid}</span>
             {tag.annotated? " · annotated":" · lightweight"}{tag.subject? ` · ${tag.subject}`:""}
           </div>
@@ -138,10 +138,10 @@ export function TagsView({
           {isCollapsed
             ? <ChevronRight className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
             :<ChevronDown className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
+          <span className="text-ui-small font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
             {label}
           </span>
-          <span className="text-[10px] text-[var(--taomni-text-muted)]">({list.length})</span>
+          <span className="text-ui-caption text-[var(--taomni-text-muted)]">({list.length})</span>
         </button>
         {isCollapsed? null:list.map(renderTagRow)}
       </section>

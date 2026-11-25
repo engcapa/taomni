@@ -208,7 +208,7 @@ export function WorkspaceEditorAppearanceSettingsDialog({
                 onChange={(event) => setSoftWrapPatterns(event.target.value)}
                 placeholder="One glob per line, for example: **/*.md"
                 rows={3}
-                className="block w-full resize-y rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 font-mono text-[11px]"
+                className="block w-full resize-y rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 font-mono text-ui-small"
               />
             </label>
             <label className="flex items-center gap-2">
@@ -317,7 +317,7 @@ export function WorkspaceEditorAppearanceSettingsDialog({
                 onChange={(event) => setBreadcrumbLanguages(event.target.value)}
                 placeholder="One language id or glob per line, for example: typescript"
                 rows={3}
-                className="block w-full resize-y rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 font-mono text-[11px]"
+                className="block w-full resize-y rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 font-mono text-ui-small"
               />
             </label>
           </section>
@@ -326,7 +326,7 @@ export function WorkspaceEditorAppearanceSettingsDialog({
             <h3 id="workspace-editor-appearance-clipboard-heading" className="font-medium">Clipboard History</h3>
             <p
               data-testid="workspace-editor-appearance-clipboard-scope-note"
-              className="text-[11px] text-[var(--taomni-code-muted)]"
+              className="text-ui-small text-[var(--taomni-code-muted)]"
             >
               Policy settings persist per-workspace; clipboard content is stored in-memory for the current session only and is never written to disk or local storage.
             </p>
@@ -380,7 +380,7 @@ export function WorkspaceEditorAppearanceSettingsDialog({
             </label>
             <div
               data-testid="workspace-editor-appearance-clipboard-notice"
-              className="text-[11px] text-[var(--taomni-code-muted)]"
+              className="text-ui-small text-[var(--taomni-code-muted)]"
             >
               Oversized items (&gt;256KB) and sensitive secrets bypass the history ring and remain in the active paste slot only.
             </div>

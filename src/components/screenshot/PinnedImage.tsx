@@ -249,7 +249,7 @@ export function PinnedImage() {
     toolsLabel.current = `screenshot-tools-${getCurrentWindow().label}`;
     void openPinTools(viewSnapshot()).then(() => setMenuOpen(true)).catch((e) => setError(formatUnknownError(e)));
   };
-  if (!init || !url) return error ? <div role="alert" className="fixed inset-0 p-3 bg-black/80 text-white text-[12px]" onDoubleClick={() => void close()}>{error}</div> : null;
+  if (!init || !url) return error ? <div role="alert" className="fixed inset-0 p-3 bg-black/80 text-white text-ui-body" onDoubleClick={() => void close()}>{error}</div> : null;
 
   return <div data-testid="screenshot-pin-window" data-collapsed={collapsed} className="fixed inset-0 select-none group" style={{ cursor: "move" }}
     onMouseDown={handleMouseDown}
@@ -265,7 +265,7 @@ export function PinnedImage() {
       <button data-pin-controls data-testid="screenshot-pin-expand" title={t("screenshot.pinExpand")} aria-label={t("screenshot.pinExpand")} onClick={() => void collapse()}
         className="absolute bottom-0 right-0 p-1 rounded-tl bg-black/75 text-white"><Maximize2 size={16} /></button>
       {note && <p data-pin-controls data-testid="screenshot-pin-thumb-note" title={note}
-        className="absolute top-0 left-0 right-0 truncate bg-black/75 text-white text-[10px] leading-4 px-1 cursor-help">{note}</p>}
+        className="absolute top-0 left-0 right-0 truncate bg-black/75 text-white text-ui-caption leading-4 px-1 cursor-help">{note}</p>}
     </> : <>
       <div data-pin-controls data-testid="screenshot-pin-toolbar" className="absolute top-1 right-1 flex gap-0.5 p-1 rounded-lg bg-black/80 text-white cursor-default">
         <button data-testid="screenshot-pin-copy" className={buttonClass} title={`${t("screenshot.copy")} (Ctrl/Cmd+C)`} aria-label={t("screenshot.copy")} disabled={busy} onClick={() => void copy()}><Copy size={16} /></button>
@@ -277,7 +277,7 @@ export function PinnedImage() {
       </div>
 
     </>}
-    {!collapsed && note && <p data-pin-controls data-testid="screenshot-pin-note" title={note} className="absolute bottom-1 left-1 right-1 max-h-[30%] overflow-auto whitespace-pre-wrap break-words rounded bg-black/80 text-white text-[12px] p-2 cursor-text select-text">{note}</p>}
-    {(error || notice) && <p data-pin-controls data-testid="screenshot-pin-notice" role={error ? "alert" : "status"} className="absolute bottom-1 left-1 right-1 rounded bg-black/85 text-white text-[11px] p-2 cursor-default break-words pointer-events-none">{error ?? notice}</p>}
+    {!collapsed && note && <p data-pin-controls data-testid="screenshot-pin-note" title={note} className="absolute bottom-1 left-1 right-1 max-h-[30%] overflow-auto whitespace-pre-wrap break-words rounded bg-black/80 text-white text-ui-body p-2 cursor-text select-text">{note}</p>}
+    {(error || notice) && <p data-pin-controls data-testid="screenshot-pin-notice" role={error ? "alert" : "status"} className="absolute bottom-1 left-1 right-1 rounded bg-black/85 text-white text-ui-small p-2 cursor-default break-words pointer-events-none">{error ?? notice}</p>}
   </div>;
 }

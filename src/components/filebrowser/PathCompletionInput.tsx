@@ -141,7 +141,7 @@ export function PathCompletionInput({ path, value, onChange, onCommit, onCancel,
     {open && createPortal(
       <div
         data-testid={testId ? `${testId}-suggestions` : undefined}
-        className="rounded shadow-lg border overflow-y-auto text-[12px]"
+        className="rounded shadow-lg border overflow-y-auto text-ui-body"
         style={{ ...position, background: "var(--taomni-bg)", color: "var(--taomni-text)", borderColor: "var(--taomni-input-border)" }}
         onMouseDown={(e) => e.preventDefault()}
       >
@@ -161,7 +161,7 @@ export function PathCompletionInput({ path, value, onChange, onCommit, onCancel,
             <Folder className="w-3.5 h-3.5 shrink-0" />
             <div className="min-w-0">
               <div className="truncate font-medium">{suggestion.name}</div>
-              <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">{suggestion.value}</div>
+              <div className="truncate text-ui-small text-[var(--taomni-text-muted)]">{suggestion.value}</div>
             </div>
           </div>)}
         </div>

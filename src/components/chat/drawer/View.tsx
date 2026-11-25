@@ -252,7 +252,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
           ) : (
             <Bot className="w-4 h-4 text-[var(--taomni-accent)] shrink-0" />
           )}
-          <span className="text-[13px] font-semibold flex-1 truncate">
+          <span className="text-ui-body font-semibold flex-1 truncate">
             {hubTab === "notes"
               ? t("notes.title")
               : hubTab === "notifications"
@@ -262,7 +262,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
           <div className="relative">
             <button
               type="button"
-              className="taomni-btn h-6 px-1.5 inline-flex items-center gap-1 text-[11px]"
+              className="taomni-btn h-6 px-1.5 inline-flex items-center gap-1 text-ui-small"
               onClick={() => setShowPositionMenu((v) => !v)}
               title={t("chat.drawerPositionTitle", { position: positionLabel })}
               aria-label={t("chat.drawerPositionAria")}
@@ -282,7 +282,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
                     <button
                       key={position}
                       type="button"
-                      className={`w-full h-7 px-2 text-left text-[11px] flex items-center gap-2 hover:bg-[var(--taomni-hover)] ${drawerPosition === position ? "text-[var(--taomni-accent)] bg-[var(--taomni-selected)]" : ""
+                      className={`w-full h-7 px-2 text-left text-ui-small flex items-center gap-2 hover:bg-[var(--taomni-hover)] ${drawerPosition === position ? "text-[var(--taomni-accent)] bg-[var(--taomni-selected)]" : ""
                         }`}
                       onClick={() => {
                         setDrawerPosition(position);
@@ -334,7 +334,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
                   data-testid="ai-chat-drawer-opacity-menu"
                 >
                   <label
-                    className="mb-1 flex items-center justify-between gap-2 text-[10px] text-[var(--taomni-text-muted)]"
+                    className="mb-1 flex items-center justify-between gap-2 text-ui-caption text-[var(--taomni-text-muted)]"
                     htmlFor="ai-chat-drawer-opacity-slider"
                   >
                     <span>{t("chat.drawerOpacityLabel")}</span>
@@ -405,7 +405,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
 
         {/* Tao Hub tab strip — one drawer, three tabs (Chat | 便签 | Notifications). */}
         <div
-          className="flex items-stretch border-b border-[var(--taomni-divider)] shrink-0 text-[11px]"
+          className="flex items-stretch border-b border-[var(--taomni-divider)] shrink-0 text-ui-small"
           role="tablist"
           aria-label={t("tao.hubTitle")}
         >
@@ -452,7 +452,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
             <span>{t("tao.tabNotifications")}</span>
             {alertBadgeCount > 0 && (
               <span
-                className="min-w-[14px] h-[14px] px-1 rounded-full text-[8px] font-bold flex items-center justify-center bg-[var(--taomni-accent)] text-white"
+                className="min-w-[14px] h-[14px] px-1 rounded-full text-ui-caption font-bold flex items-center justify-center bg-[var(--taomni-accent)] text-white"
                 data-testid="tao-hub-notifications-badge"
               >
                 {alertBadgeCount > 99 ? "99+" : alertBadgeCount}
@@ -490,7 +490,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
             )}
 
             {/* Mode + provider switcher */}
-            <div className="px-2 py-1 text-[10px] text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] shrink-0 flex items-center gap-1.5 flex-wrap">
+            <div className="px-2 py-1 text-ui-caption text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] shrink-0 flex items-center gap-1.5 flex-wrap">
               {/* Scope badge: every visible thread is bound to a concrete app tab. */}
               {activeThread?.linked_session_id && (
                 <span
@@ -532,7 +532,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
               <span>{t("chat.providerLabel")}</span>
               {providerIds.length > 0 ? (
                 <select
-                  className="taomni-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)]"
+                  className="taomni-input h-5 text-ui-caption px-1 py-0 bg-transparent text-[var(--taomni-accent)]"
                   value={selectedProviderId}
                   aria-label={t("chat.threadProviderAria")}
                   data-testid="ai-chat-provider-select"
@@ -574,7 +574,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
               )}
               {activeThread && (activeThread.provider_id === "claude-code" || activeThread.provider_id === "codex") && (
                 <input
-                  className="taomni-input h-5 w-[150px] min-w-[120px] text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)] font-mono"
+                  className="taomni-input h-5 w-[150px] min-w-[120px] text-ui-caption px-1 py-0 bg-transparent text-[var(--taomni-accent)] font-mono"
                   value={ccModelDraft}
                   aria-label={t("chat.threadModelAria")}
                   title={t("chat.threadModelTitle")}
@@ -594,7 +594,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
               {activeThread && (activeThread.provider_id === "claude-code" || activeThread.provider_id === "codex") && activeThread.linked_session_id && (
                 <button
                   type="button"
-                  className={`taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px] ${ccTerminalEchoEnabled
+                  className={`taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-ui-caption ${ccTerminalEchoEnabled
                       ? "text-[var(--taomni-accent)]"
                       : "text-[var(--taomni-text-muted)]"
                     }`}
@@ -622,7 +622,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
                     </span>
                   ) : (
                     <select
-                      className="taomni-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)]"
+                      className="taomni-input h-5 text-ui-caption px-1 py-0 bg-transparent text-[var(--taomni-accent)]"
                       value={activeThread.output_format ?? ""}
                       aria-label={t("chat.formatAria")}
                       title={t("chat.formatEffectiveTooltip", { format: effectiveFormat, global: globalOutputFormat })}
@@ -639,7 +639,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
                   )}
                   <button
                     type="button"
-                    className="taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px]"
+                    className="taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-ui-caption"
                     onClick={cycleRenderFormat}
                     title={t("chat.convertCycleTitle", { format: effectiveFormat })}
                     aria-label={t("chat.convertVisibleAria")}
@@ -652,7 +652,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
               {activeThread && activeThreadMode === "chat" && isQueryThread && (
                 <button
                   type="button"
-                  className={`taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-[10px] ${sqlEcho
+                  className={`taomni-btn h-5 px-1.5 inline-flex items-center gap-1 text-ui-caption ${sqlEcho
                       ? "text-[var(--taomni-accent)]"
                       : "text-[var(--taomni-text-muted)]"
                     }`}
@@ -670,7 +670,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0">
               {activeMessages.length === 0 && !sending && (
-                <div className="text-[11px] text-[var(--taomni-text-muted)] text-center py-8">
+                <div className="text-ui-small text-[var(--taomni-text-muted)] text-center py-8">
                   <Bot className="w-8 h-8 mx-auto mb-2 opacity-30" />
                   {emptyHint}
                 </div>
@@ -687,7 +687,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
                 </div>
               ))}
               {sending && (
-                <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--taomni-text-muted)] p-1.5 border border-[var(--taomni-divider)] rounded bg-[var(--taomni-bg)]/50 shrink-0">
+                <div className="flex items-center justify-between gap-2 text-ui-small text-[var(--taomni-text-muted)] p-1.5 border border-[var(--taomni-divider)] rounded bg-[var(--taomni-bg)]/50 shrink-0">
                   <div className="flex items-center gap-2">
                     <div className="flex gap-0.5">
                       {[0, 1, 2].map((i) => (
@@ -700,14 +700,14 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
                     </div>
                     <span>{sendingLabel}</span>
                     {queuedSends.length > 0 && (
-                      <span className="text-[10px] text-[var(--taomni-accent)]" data-testid="ai-chat-queue-badge">
+                      <span className="text-ui-caption text-[var(--taomni-accent)]" data-testid="ai-chat-queue-badge">
                         {t("chat.queuedBadge", { count: queuedSends.length })}
                       </span>
                     )}
                   </div>
                   <button
                     type="button"
-                    className="taomni-btn h-5 px-2 text-[10px] flex items-center gap-1 hover:text-red-400 border border-[var(--taomni-divider)] rounded hover:bg-[var(--taomni-hover)] transition-colors"
+                    className="taomni-btn h-5 px-2 text-ui-caption flex items-center gap-1 hover:text-red-400 border border-[var(--taomni-divider)] rounded hover:bg-[var(--taomni-hover)] transition-colors"
                     // Stops this turn only — the queue keeps draining, so this is
                     // "skip this answer" rather than "abandon everything".
                     title={queuedSends.length > 0 ? t("chat.stopKeepsQueue") : undefined}
@@ -723,7 +723,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
                 </div>
               )}
               {error && (
-                <div className="text-[11px] text-red-400 rounded border border-red-500/30 bg-red-500/5 px-2 py-1.5">
+                <div className="text-ui-small text-red-400 rounded border border-red-500/30 bg-red-500/5 px-2 py-1.5">
                   {error}
                 </div>
               )}

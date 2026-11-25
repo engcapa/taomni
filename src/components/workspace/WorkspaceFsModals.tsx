@@ -146,9 +146,9 @@ export function WorkspaceFsModals({ request, initialPath, onCancel, onSubmit }: 
       >
         <div className="mb-1 font-semibold text-[var(--taomni-text)]">{t(TITLES[request.kind])}</div>
         {request.kind === "root" ? (
-          <p className="mb-2 text-[11.5px] text-[var(--taomni-text-muted)]">{t("platform.addRootHint")}</p>
+          <p className="mb-2 text-ui-small text-[var(--taomni-text-muted)]">{t("platform.addRootHint")}</p>
         ) : (
-          <p className="mb-2 text-[11.5px] text-[var(--taomni-text-muted)]">
+          <p className="mb-2 text-ui-small text-[var(--taomni-text-muted)]">
             {request.rootFolderName ?? ""}
             {request.directory ? ` / ${request.directory}` : ""}
           </p>
@@ -173,13 +173,13 @@ export function WorkspaceFsModals({ request, initialPath, onCancel, onSubmit }: 
           onClick={() => void browse()}
         ><FolderOpen className="h-3.5 w-3.5" />{t("platform.browseFolder")}</button>}
         </div>
-        {request.kind === "root" && <fieldset disabled={busy || picking} className="mt-3 space-y-2 text-[12px]">
+        {request.kind === "root" && <fieldset disabled={busy || picking} className="mt-3 space-y-2 text-ui-body">
           <legend className="mb-1 text-[var(--taomni-text-muted)]">{t("platform.folderDestination")}</legend>
           <label className="flex items-center gap-2"><input type="radio" name="workspace-root-destination" data-testid="workspace-root-current" checked={!createNew} onChange={() => setDestination("current")} />{t("platform.addToCurrentWorkspace")}</label>
           <label className="flex items-center gap-2"><input type="radio" name="workspace-root-destination" data-testid="workspace-root-new" checked={createNew} onChange={() => setDestination("new")} />{t("platform.createWorkspaceFromFolder")}</label>
           {createNew && <label className="flex items-center gap-2">{t("platform.workspaceName")}<input data-testid="workspace-root-name" className="taomni-input h-7 min-w-0 flex-1" aria-label={t("platform.workspaceName")} value={name} onChange={(event) => setWorkspaceName(event.target.value)} /></label>}
         </fieldset>}
-        {error && <p data-testid="workspace-fs-modal-error" role="alert" className="mt-2 text-[11.5px] text-red-500">{error}</p>}
+        {error && <p data-testid="workspace-fs-modal-error" role="alert" className="mt-2 text-ui-small text-red-500">{error}</p>}
         <div className="mt-3 flex justify-end gap-2">
           <button type="button" data-testid="workspace-fs-modal-cancel" className="taomni-btn h-7 px-2" onClick={onCancel}>
             {t("platform.cancel")}

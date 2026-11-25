@@ -51,7 +51,7 @@ export function Modal({ title, testId, initialFocus, onCancel, children, footer,
         } else if (event.key === "Tab") {
           const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
             'button:enabled, input:enabled, textarea:enabled, select:enabled, a[href], [tabindex="0"]',
-          )).filter((control) => !control.closest("[hidden], [inert]"));
+          )).filter((control) => control.tabIndex >= 0 && !control.closest("[hidden], [inert]"));
           const edge = event.shiftKey ? controls[0] : controls.at(-1);
           if (edge && document.activeElement === edge) {
             event.preventDefault();

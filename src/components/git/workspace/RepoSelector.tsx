@@ -137,19 +137,19 @@ export function RepoSelector({
               >
                 <GitBranch className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[12px] font-medium">All Repositories</div>
-                  <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">{roots.length} repositories</div>
+                  <div className="truncate text-ui-body font-medium">All Repositories</div>
+                  <div className="truncate text-ui-small text-[var(--taomni-text-muted)]">{roots.length} repositories</div>
                 </div>
-                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${totalChanges? "bg-[var(--taomni-accent)] text-white":"bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"}`}>
+                <span className={`shrink-0 rounded px-1.5 py-0.5 text-ui-small ${totalChanges? "bg-[var(--taomni-accent)] text-white":"bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"}`}>
                   {totalChanges}
                 </span>
               </button>
               {groups.length===0? (
-                <div className="px-3 py-3 text-[12px] text-[var(--taomni-text-muted)]">No repositories match</div>
+                <div className="px-3 py-3 text-ui-body text-[var(--taomni-text-muted)]">No repositories match</div>
               ):groups.map((group) => (
                 <div key={group.key}>
                   {groups.length>1&&(
-                    <div className="px-2 pt-2 pb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase text-[var(--taomni-text-muted)]">
+                    <div className="px-2 pt-2 pb-1 flex items-center gap-1.5 text-ui-caption font-semibold uppercase text-[var(--taomni-text-muted)]">
                       <FolderGit2 className="w-3 h-3" />
                       <span className="truncate">{group.name}</span>
                     </div>
@@ -188,16 +188,16 @@ export function RepoSelector({
                         <RepoStatusIcon loading={!!state?.loading} error={state?.error??null} changes={changes} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="min-w-0 truncate text-[12px] font-medium">{root.name||gitRepoName(root.repoRoot)}</span>
+                            <span className="min-w-0 truncate text-ui-body font-medium">{root.name||gitRepoName(root.repoRoot)}</span>
                             {root.isSubmodule&&(
-                              <span className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-[9px] uppercase text-[var(--taomni-text-muted)]">
+                              <span className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-ui-caption uppercase text-[var(--taomni-text-muted)]">
                                 sub
                               </span>
                             )}
                           </div>
-                          <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">{branch}</div>
+                          <div className="truncate text-ui-small text-[var(--taomni-text-muted)]">{branch}</div>
                         </div>
-                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${changes? "bg-[var(--taomni-accent)] text-white":"bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"}`}>
+                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-ui-small ${changes? "bg-[var(--taomni-accent)] text-white":"bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"}`}>
                           {changes}
                         </span>
                       </div>
@@ -207,15 +207,15 @@ export function RepoSelector({
               ))}
             </div>
             <div className="h-9 flex items-center gap-2 px-2 border-t border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
-              <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--taomni-text-muted)]">
+              <span className="min-w-0 flex-1 truncate text-ui-small text-[var(--taomni-text-muted)]">
                 {draftRoots.size} selected
               </span>
-              <button type="button" className="taomni-btn h-7 px-2 text-[12px]" onClick={closeMenu}>
+              <button type="button" className="taomni-btn h-7 px-2 text-ui-body" onClick={closeMenu}>
                 Cancel
               </button>
               <button
                 type="button"
-                className="taomni-btn h-7 px-2 text-[12px]"
+                className="taomni-btn h-7 px-2 text-ui-body"
                 disabled={draftRoots.size===0}
                 onClick={applyDraft}
               >

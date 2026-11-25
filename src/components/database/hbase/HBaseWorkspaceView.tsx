@@ -68,7 +68,7 @@ export interface HBaseWorkspaceViewProps {
   onFamiliesLoaded: (table: string, families: string[]) => void;
   execution: ReturnType<typeof useHBaseExecution>;
   queryTriggerRef: import("react").RefObject<(() => void) | null>;
-  btn: "h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
+  btn: "h-6 px-2 inline-flex items-center gap-1 rounded text-ui-small hover:bg-[var(--taomni-hover)] disabled:opacity-40";
   panelRunning: boolean;
   aiAnswerLanguage: AiAnswerLanguage;
   setLangMenuOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -156,7 +156,7 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
       )}
       {connError && (
         <div
-          className="h-7 shrink-0 px-2 flex items-center gap-2 text-[11px] border-b"
+          className="h-7 shrink-0 px-2 flex items-center gap-2 text-ui-small border-b"
           style={{ color: "#d9534f", borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           title={connError}
           data-testid="hbase-connection-error-banner"
@@ -177,7 +177,7 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
           onClick={expandSidebarPanel}
         >
           <ChevronRight className="w-3.5 h-3.5" />
-          <span className="text-[10px] leading-none" style={{ writingMode: "vertical-rl" }}>Objects</span>
+          <span className="text-ui-caption leading-none" style={{ writingMode: "vertical-rl" }}>Objects</span>
         </button>
       )}
       <PanelGroup
@@ -192,7 +192,7 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
             <div className="h-7 shrink-0 flex border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
               <button
                 type="button"
-                className="flex-1 text-[11px] font-semibold inline-flex items-center justify-center gap-1"
+                className="flex-1 text-ui-small font-semibold inline-flex items-center justify-center gap-1"
                 style={{ color: leftPanelTab === "objects" ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
                 onClick={() => setLeftPanelTab("objects")}
               >
@@ -200,7 +200,7 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
               </button>
               <button
                 type="button"
-                className="flex-1 text-[11px] font-semibold inline-flex items-center justify-center gap-1 border-l border-[var(--taomni-divider)]"
+                className="flex-1 text-ui-small font-semibold inline-flex items-center justify-center gap-1 border-l border-[var(--taomni-divider)]"
                 style={{ color: leftPanelTab === "queries" ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
                 onClick={() => setLeftPanelTab("queries")}
                 data-testid="hbase-query-library-tab"
@@ -347,7 +347,7 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
                   </button>
                   {langMenuOpen && (
                     <div
-                      className="absolute left-0 top-full mt-1 z-50 py-1 rounded shadow-lg border text-[11px] min-w-[120px]"
+                      className="absolute left-0 top-full mt-1 z-50 py-1 rounded shadow-lg border text-ui-small min-w-[120px]"
                       style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
                     >
                       {AI_ANSWER_LANGUAGES.map((lang) => (
@@ -385,16 +385,16 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
                   <HelpCircle className="w-3.5 h-3.5" /> {t("hbaseObjects.help")}
                 </button>
                 <div className="flex-1" />
-                <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
+                <label className="h-6 inline-flex items-center gap-1 text-ui-small text-[var(--taomni-text-muted)]">
                   Rows
-                  <input className="taomni-input h-6 w-[68px] text-[11px]" type="number" min={1} max={10000} value={rowLimit}
+                  <input className="taomni-input h-6 w-[68px] text-ui-small" type="number" min={1} max={10000} value={rowLimit}
                     title="Default scan row limit" onChange={(e) => setRowLimit(Math.max(1, Math.min(10000, Number(e.target.value) || DEFAULT_ROW_LIMIT)))} />
                 </label>
-                <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
+                <label className="h-6 inline-flex items-center gap-1 text-ui-small text-[var(--taomni-text-muted)]">
                   Tab limit
                   <input
                     data-testid="hbase-tab-limit"
-                    className="taomni-input h-6 w-[68px] text-[11px]"
+                    className="taomni-input h-6 w-[68px] text-ui-small"
                     type="number"
                     min={MIN_DATABASE_TAB_LIMIT}
                     max={MAX_DATABASE_TAB_LIMIT}
@@ -403,7 +403,7 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
                     onChange={(event) => workspace.setTabLimit(clampDatabaseTabLimit(Number(event.target.value)))}
                   />
                 </label>
-                <span className="text-[10px] text-[var(--taomni-text-muted)]">HBase ({transport})</span>
+                <span className="text-ui-caption text-[var(--taomni-text-muted)]">HBase ({transport})</span>
                 {showCommands && <CommandsMenu transport={transport} onPick={(ex) => onInsert(ex, "cursor")} onClose={() => setShowCommands(false)} />}
                 {showHistory && <HistoryDropdown history={execution.historyRef.current[workspace.activePanel.id] ?? []} onPick={(cmd) => { workspace.editorHandles.current[workspace.activePanel.id]?.setValue(cmd); setShowHistory(false); }} onClose={() => setShowHistory(false)} />}
               </div>

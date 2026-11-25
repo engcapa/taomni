@@ -33,7 +33,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
   } = inputs;
   const { editingConfiguration } = configurations;
   return ((
-    <section data-testid="code-workspace-run-panel" className="flex h-full min-h-0 flex-col text-[11px]">
+    <section data-testid="code-workspace-run-panel" className="flex h-full min-h-0 flex-col text-ui-small">
       <div className="flex h-8 shrink-0 items-center gap-1 border-b border-[var(--taomni-code-border)] px-2">
         <input
           data-testid="run-panel-custom-command"
@@ -117,7 +117,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                 <div className="mb-1 font-semibold">{root.name}</div>
                 {rootConfigurations.length > 0 && (
                   <div data-testid={`run-panel-configurations-${root.id}`}>
-                    <div className="px-1 pb-0.5 text-[10px] font-medium uppercase text-[var(--taomni-code-muted)]">
+                    <div className="px-1 pb-0.5 text-ui-caption font-medium uppercase text-[var(--taomni-code-muted)]">
                       Run configurations
                     </div>
                     {rootConfigurations.map(renderTask)}
@@ -125,7 +125,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                 )}
                 {rootTasks.length > 0 && (
                   <div className={rootConfigurations.length > 0 ? "mt-2" : ""}>
-                    <div className="px-1 pb-0.5 text-[10px] font-medium uppercase text-[var(--taomni-code-muted)]">
+                    <div className="px-1 pb-0.5 text-ui-caption font-medium uppercase text-[var(--taomni-code-muted)]">
                       Tasks
                     </div>
                     {rootTasks.map(renderTask)}
@@ -236,7 +236,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                   </button>
                 </div>
                 <label className="block">
-                  <span className="mb-0.5 block text-[10px] text-[var(--taomni-code-muted)]">Name</span>
+                  <span className="mb-0.5 block text-ui-caption text-[var(--taomni-code-muted)]">Name</span>
                   <input
                     data-testid="run-configuration-name"
                     value={configurations.configurationDraft.name}
@@ -245,7 +245,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-0.5 block text-[10px] text-[var(--taomni-code-muted)]">Active profiles (Maven -P / Spring)</span>
+                  <span className="mb-0.5 block text-ui-caption text-[var(--taomni-code-muted)]">Active profiles (Maven -P / Spring)</span>
                   <input
                     data-testid="run-configuration-profiles"
                     value={configurations.configurationDraft.activeProfiles}
@@ -255,7 +255,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-0.5 block text-[10px] text-[var(--taomni-code-muted)]">Working directory</span>
+                  <span className="mb-0.5 block text-ui-caption text-[var(--taomni-code-muted)]">Working directory</span>
                   <input
                     data-testid="run-configuration-cwd"
                     value={configurations.configurationDraft.cwd}
@@ -265,7 +265,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-0.5 block text-[10px] text-[var(--taomni-code-muted)]">VM / runtime options</span>
+                  <span className="mb-0.5 block text-ui-caption text-[var(--taomni-code-muted)]">VM / runtime options</span>
                   <textarea
                     data-testid="run-configuration-vm-options"
                     value={configurations.configurationDraft.vmOptions}
@@ -275,7 +275,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-0.5 block text-[10px] text-[var(--taomni-code-muted)]">Build / system properties (-Dkey=value)</span>
+                  <span className="mb-0.5 block text-ui-caption text-[var(--taomni-code-muted)]">Build / system properties (-Dkey=value)</span>
                   <textarea
                     data-testid="run-configuration-properties"
                     value={configurations.configurationDraft.properties}
@@ -286,7 +286,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-0.5 block text-[10px] text-[var(--taomni-code-muted)]">Program arguments</span>
+                  <span className="mb-0.5 block text-ui-caption text-[var(--taomni-code-muted)]">Program arguments</span>
                   <textarea
                     data-testid="run-configuration-args"
                     value={configurations.configurationDraft.args}
@@ -296,7 +296,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-0.5 block text-[10px] text-[var(--taomni-code-muted)]">Environment file</span>
+                  <span className="mb-0.5 block text-ui-caption text-[var(--taomni-code-muted)]">Environment file</span>
                   <input
                     data-testid="run-configuration-env-file"
                     value={configurations.configurationDraft.envFile}
@@ -306,7 +306,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                   />
                 </label>
                 <fieldset className="space-y-1" data-testid="run-configuration-before-launch">
-                  <legend className="text-[10px] text-[var(--taomni-code-muted)]">Before launch</legend>
+                  <legend className="text-ui-caption text-[var(--taomni-code-muted)]">Before launch</legend>
                   {(configurations.buildTargetsByRoot[configuration.rootId] ?? []).map((target) => {
                     const selected = configurations.configurationDraft.preLaunchTargets.split(/\r?\n/).includes(target.id);
                     return (
@@ -332,7 +332,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                   })}
                 </fieldset>
                 <label className="block">
-                  <span className="mb-0.5 block text-[10px] text-[var(--taomni-code-muted)]">Environment</span>
+                  <span className="mb-0.5 block text-ui-caption text-[var(--taomni-code-muted)]">Environment</span>
                   <textarea
                     data-testid="run-configuration-env"
                     value={configurations.configurationDraft.env}

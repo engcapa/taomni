@@ -112,11 +112,11 @@ export function MailAppearanceSettings({
   const previewFontFamily = profile.fontFamily || DEFAULT_MAIL_TERMINAL_PROFILE.fontFamily;
 
   return (
-    <div data-testid="mail-appearance-settings" className="space-y-4 text-[12px]">
+    <div data-testid="mail-appearance-settings" className="space-y-4 text-ui-body">
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="grid grid-cols-12 gap-3 items-end">
           <label className="col-span-12 md:col-span-8">
-            <span className="block text-[12px] font-semibold mb-1">{t("mailAppearance.fontLabel")}</span>
+            <span className="block text-ui-body font-semibold mb-1">{t("mailAppearance.fontLabel")}</span>
             <FontPickerSelect
               ariaLabel={t("mailAppearance.fontAria")}
               options={fontPickerOptions}
@@ -130,7 +130,7 @@ export function MailAppearanceSettings({
           </label>
 
           <div className="col-span-12 md:col-span-4">
-            <span className="block text-[12px] font-semibold mb-1">{t("mailAppearance.textSizeLabel")}</span>
+            <span className="block text-ui-body font-semibold mb-1">{t("mailAppearance.textSizeLabel")}</span>
             <div className="inline-flex items-center gap-1">
               <button
                 className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
@@ -195,7 +195,7 @@ export function MailAppearanceSettings({
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="grid grid-cols-12 gap-2 items-center">
           <label className="col-span-12 sm:col-span-6 flex items-center gap-2">
-            <span className="w-24 text-[12px] font-semibold">{t("mailAppearance.backgroundLabel")}</span>
+            <span className="w-24 text-ui-body font-semibold">{t("mailAppearance.backgroundLabel")}</span>
             <input
               type="color"
               value={isHexColor(bg) ? bg : "#000000"}
@@ -211,7 +211,7 @@ export function MailAppearanceSettings({
             />
           </label>
           <label className="col-span-12 sm:col-span-6 flex items-center gap-2">
-            <span className="w-24 text-[12px] font-semibold">{t("mailAppearance.foregroundLabel")}</span>
+            <span className="w-24 text-ui-body font-semibold">{t("mailAppearance.foregroundLabel")}</span>
             <input
               type="color"
               value={isHexColor(fg) ? fg : "#ffffff"}
@@ -262,12 +262,12 @@ function MailMessagePreview({
   return (
     <section
       data-testid="mail-appearance-preview"
-      className="rounded-md border overflow-hidden text-[12px]"
+      className="rounded-md border overflow-hidden text-ui-body"
       style={style}
     >
       <div className="px-3 py-2 border-b" style={{ background: header, borderColor: divider }}>
         <div className="font-semibold truncate">{`Quarterly plan <review@example.com>`}</div>
-        <div className="text-[11px] truncate" style={{ color: muted }}>
+        <div className="text-ui-small truncate" style={{ color: muted }}>
           Ada Lovelace to team@example.com
         </div>
       </div>
@@ -275,15 +275,15 @@ function MailMessagePreview({
         <div className="border-r p-2 space-y-1.5" style={{ borderColor: divider, background: panel }}>
           <div className="rounded px-2 py-1.5" style={{ background: selected }}>
             <div className="font-semibold truncate">Quarterly plan</div>
-            <div className="text-[11px] truncate" style={{ color: muted }}>Please review the attached brief.</div>
+            <div className="text-ui-small truncate" style={{ color: muted }}>Please review the attached brief.</div>
           </div>
           <div className="rounded px-2 py-1.5 opacity-80">
             <div className="font-semibold truncate">Release notes</div>
-            <div className="text-[11px] truncate" style={{ color: muted }}>Draft is ready for edits.</div>
+            <div className="text-ui-small truncate" style={{ color: muted }}>Draft is ready for edits.</div>
           </div>
         </div>
         <div className="p-3 leading-5">
-          <div className="text-[15px] font-semibold mb-1">Hello team,</div>
+          <div className="text-ui-title font-semibold mb-1">Hello team,</div>
           <p className="m-0 mb-2">
             Please review the <strong>planning brief</strong> before Friday and leave comments inline.
           </p>

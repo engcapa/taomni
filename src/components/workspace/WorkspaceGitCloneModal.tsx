@@ -236,15 +236,15 @@ export function WorkspaceGitCloneModal() {
         }}
       >
         <header className="shrink-0 border-b px-4 py-3" style={{ borderColor: "var(--taomni-divider)" }}>
-          <h2 id="workspace-git-clone-title" className="text-[15px] font-semibold text-[var(--taomni-text)]">{title}</h2>
-          <p className="mt-0.5 text-[11.5px] text-[var(--taomni-text-muted)]">{t("gitClone.subtitle")}</p>
+          <h2 id="workspace-git-clone-title" className="text-ui-title font-semibold text-[var(--taomni-text)]">{title}</h2>
+          <p className="mt-0.5 text-ui-small text-[var(--taomni-text-muted)]">{t("gitClone.subtitle")}</p>
         </header>
 
         <div data-testid="workspace-git-clone-body" className="min-h-0 flex-1 overflow-auto px-4 py-3">
           {showForm && (
             <>
               {defaultsStatus === "error" && (
-                <div data-testid="workspace-git-clone-defaults-error" role="alert" className="mb-3 flex items-center justify-between gap-2 rounded border px-3 py-2 text-[11.5px]"
+                <div data-testid="workspace-git-clone-defaults-error" role="alert" className="mb-3 flex items-center justify-between gap-2 rounded border px-3 py-2 text-ui-small"
                   style={{ borderColor: "var(--taomni-danger, #ef4444)" }}>
                   <span className="min-w-0 break-words">{t("gitClone.defaultsFailed", { error: defaultsError ?? "" })}</span>
                   <button type="button" className="taomni-btn h-6 shrink-0 px-2" onClick={() => void loadDefaults(true)}>
@@ -253,7 +253,7 @@ export function WorkspaceGitCloneModal() {
                 </div>
               )}
               {defaults && !defaults.gitAvailable && (
-                <div data-testid="workspace-git-clone-git-missing" role="alert" className="mb-3 rounded border px-3 py-2 text-[11.5px]"
+                <div data-testid="workspace-git-clone-git-missing" role="alert" className="mb-3 rounded border px-3 py-2 text-ui-small"
                   style={{ borderColor: "var(--taomni-warning, #d97706)" }}>
                   {t("gitClone.gitUnavailable")}
                 </div>
@@ -271,7 +271,7 @@ export function WorkspaceGitCloneModal() {
                 onBrowse={() => void browse()}
               />
               {formError && (
-                <p data-testid="workspace-git-clone-form-error" role="alert" className="mt-3 break-words text-[11.5px] text-red-500">{formError}</p>
+                <p data-testid="workspace-git-clone-form-error" role="alert" className="mt-3 break-words text-ui-small text-red-500">{formError}</p>
               )}
               <p data-testid="workspace-git-clone-destination-path" className="sr-only">{cloneDestination(form)}</p>
             </>
@@ -281,7 +281,7 @@ export function WorkspaceGitCloneModal() {
 
         <footer className="flex shrink-0 items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "var(--taomni-divider)" }}>
           {defaultsStatus === "loading" && showForm && (
-            <span data-testid="workspace-git-clone-loading" className="mr-auto inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
+            <span data-testid="workspace-git-clone-loading" className="mr-auto inline-flex items-center gap-1 text-ui-small text-[var(--taomni-text-muted)]">
               <Loader2 className="h-3 w-3 animate-spin" />
               {t("gitClone.loadingDefaults")}
             </span>

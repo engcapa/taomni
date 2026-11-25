@@ -169,7 +169,7 @@ export function WorkspaceTabStrip() {
       data-tab-kind={tab.kind}
       data-active={tab.id === workspace.activeTabId || undefined}
       title={tab.title}
-      className="taomni-workspace-tab group flex max-w-[185px] shrink-0 items-center gap-1 px-2 text-[12px]"
+      className="taomni-workspace-tab group flex max-w-[185px] shrink-0 items-center gap-1 px-2 text-ui-body"
       onClick={() => setActiveTab(workspace.id, tab.id)}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -198,7 +198,7 @@ export function WorkspaceTabStrip() {
         if (event.button === 1 && tab.closable) closeTab(workspace.id, tab.id);
       }}
     >
-      {tab.kind === "explorer" ? <ExplorerTabIcon /> : <span className="shrink-0 rounded px-0.5 text-[8.5px] font-bold" style={{ color: KIND_COLOR[tab.kind], border: `1px solid ${KIND_COLOR[tab.kind]}` }}>
+      {tab.kind === "explorer" ? <ExplorerTabIcon /> : <span className="shrink-0 rounded px-0.5 text-ui-caption font-bold" style={{ color: KIND_COLOR[tab.kind], border: `1px solid ${KIND_COLOR[tab.kind]}` }}>
         {KIND_LABEL[tab.kind]}
       </span>}
       <span className="truncate">{tab.title}</span>
@@ -208,7 +208,7 @@ export function WorkspaceTabStrip() {
           type="button"
           data-testid="workspace-tab-close"
           aria-label={t("platform.closeTab")}
-          className="ml-0.5 shrink-0 rounded px-0.5 text-[11px] opacity-50 hover:opacity-100"
+          className="ml-0.5 shrink-0 rounded px-0.5 text-ui-small opacity-50 hover:opacity-100"
           onClick={(event) => {
             event.stopPropagation();
             closeTab(workspace.id, tab.id);
@@ -256,7 +256,7 @@ export function WorkspaceTabStrip() {
         <span className="truncate">{filter.query.trim() || t(`tabs.category.${filter.category}`)}</span><span aria-hidden="true"> ×</span>
       </button>}
       {!visibleTabs.length && workspace.openTabs.length > 0 && <span data-testid="workspace-tab-filter-empty"
-        className="truncate px-2 text-[11px] text-[var(--taomni-text-muted)]">{t("tabs.filterNoMatch")}</span>}
+        className="truncate px-2 text-ui-small text-[var(--taomni-text-muted)]">{t("tabs.filterNoMatch")}</span>}
       {tabScroll.scrollState.overflow && (
         <IconBtn
           testId="workspace-tab-scroll-right"

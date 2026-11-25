@@ -131,7 +131,7 @@ export function VaultUnlockDialog({
         <div className="text-sm font-semibold mb-1">{t("vault.unlockTitle")}</div>
         {reason && (
           <div
-            className="text-[12px] mb-3"
+            className="text-ui-body mb-3"
             style={{ color: "var(--taomni-text-muted)" }}
             data-testid="vault-unlock-reason"
           >
@@ -139,7 +139,7 @@ export function VaultUnlockDialog({
           </div>
         )}
 
-        <label className="block text-[12px] mb-1" style={{ color: "var(--taomni-text-muted)" }}>
+        <label className="block text-ui-body mb-1" style={{ color: "var(--taomni-text-muted)" }}>
           {t("vault.masterPassword")}
         </label>
         <input
@@ -154,7 +154,7 @@ export function VaultUnlockDialog({
 
         {error && (
           <div
-            className="mt-2 text-[12px]"
+            className="mt-2 text-ui-body"
             style={{ color: "var(--taomni-error, #c33)" }}
             data-testid="vault-unlock-error"
           >
@@ -167,7 +167,7 @@ export function VaultUnlockDialog({
             <button
               type="button"
               data-testid="vault-unlock-cancel"
-              className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+              className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]"
               onClick={onCancel}
               disabled={busy}
             >
@@ -177,7 +177,7 @@ export function VaultUnlockDialog({
           <button
             type="button"
             data-testid="vault-unlock-confirm"
-            className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
+            className="px-3 py-1 text-ui-body rounded text-white disabled:opacity-50"
             style={{ background: "var(--taomni-accent)" }}
             onClick={() => void handleSubmit()}
             disabled={!valid || busy}

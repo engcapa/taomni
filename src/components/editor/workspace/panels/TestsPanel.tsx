@@ -197,7 +197,7 @@ export function TestsPanel({
               >
                 {result.name}
               </button>
-              <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{formatTestDuration(result.durationMs)}</span>
+              <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">{formatTestDuration(result.durationMs)}</span>
               {onRerun && (
                 <button
                   type="button"
@@ -215,7 +215,7 @@ export function TestsPanel({
               <button
                 type="button"
                 data-testid={`tests-failure-details-${result.id}`}
-                className="mt-0.5 block w-full whitespace-pre-wrap break-words border-l-2 border-red-500/50 pl-2 text-left text-[10px] text-red-500 hover:bg-[var(--taomni-hover-bg)]"
+                className="mt-0.5 block w-full whitespace-pre-wrap break-words border-l-2 border-red-500/50 pl-2 text-left text-ui-caption text-red-500 hover:bg-[var(--taomni-hover-bg)]"
                 onClick={() => onOpenFailure?.(result)}
               >
                 {result.message ?? result.details}
@@ -229,11 +229,11 @@ export function TestsPanel({
   ));
 
   return (
-    <div data-testid="code-workspace-tests-panel" className="h-full min-h-0 flex flex-col text-[11px]">
+    <div data-testid="code-workspace-tests-panel" className="h-full min-h-0 flex flex-col text-ui-small">
       <div className="h-8 shrink-0 flex items-center gap-2 border-b border-[var(--taomni-code-border)] px-2">
         <FlaskConical className="h-3.5 w-3.5" />
         <span className="font-medium">Tests</span>
-        {activeFileTitle && <span className="truncate text-[10px] text-[var(--taomni-text-muted)]">{activeFileTitle}</span>}
+        {activeFileTitle && <span className="truncate text-ui-caption text-[var(--taomni-text-muted)]">{activeFileTitle}</span>}
         <button
           type="button"
           data-testid="tests-refresh"
@@ -257,7 +257,7 @@ export function TestsPanel({
       </div>
       <div className="min-h-0 flex-1 overflow-auto py-1">
         {(testResults || resultsError) && (
-          <div data-testid="tests-result-summary" className="mx-2 mb-1 rounded border border-[var(--taomni-code-border)] px-2 py-1 text-[10px]">
+          <div data-testid="tests-result-summary" className="mx-2 mb-1 rounded border border-[var(--taomni-code-border)] px-2 py-1 text-ui-caption">
             {testResults && <div className="flex items-center gap-2">
               <span className="font-medium">Results</span>
               <span>{testResults.summary.total} total</span>

@@ -60,7 +60,7 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
               tabIndex={0}
               role="button"
               data-testid="about-version"
-              className="text-[12px] taomni-mono cursor-pointer hover:underline outline-none focus:underline"
+              className="text-ui-body taomni-mono cursor-pointer hover:underline outline-none focus:underline"
               style={{ color: "var(--taomni-text-muted)" }}
               title={t("about.versionTooltip")}
               onClick={handleCheckUpdate}
@@ -77,14 +77,14 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
           </div>
         </div>
 
-        <div className="text-[12px] mb-4" style={{ color: "var(--taomni-text-muted)" }}>
+        <div className="text-ui-body mb-4" style={{ color: "var(--taomni-text-muted)" }}>
           {t("about.description")}
         </div>
 
         <div className="flex items-center justify-between mt-4">
           <button
             type="button"
-            className="taomni-btn h-8 px-3 text-[12px]"
+            className="taomni-btn h-8 px-3 text-ui-body"
             onClick={handleCheckUpdate}
             data-testid="about-check-update"
           >

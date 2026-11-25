@@ -77,7 +77,7 @@ export function TabSwitcher({
         if (event.target === event.currentTarget) onCancel();
       }}
     >
-      <div className="flex w-[640px] max-w-[90vw] flex-col overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[12px] shadow-2xl text-[var(--taomni-code-text)]">
+      <div className="flex w-[640px] max-w-[90vw] flex-col overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body shadow-2xl text-[var(--taomni-code-text)]">
         <div ref={listRef} className="flex max-h-[50vh] min-h-0">
           {toolWindows.length > 0 && (
             <div
@@ -111,7 +111,7 @@ export function TabSwitcher({
                     <PanelBottom className="h-3.5 w-3.5 shrink-0" />
                     <span className="min-w-0 flex-1 truncate">{toolWindow.label}</span>
                     {toolWindow.open && (
-                      <span className="shrink-0 text-[9px] opacity-70">open</span>
+                      <span className="shrink-0 text-ui-caption opacity-70">open</span>
                     )}
                   </div>
                 );
@@ -161,7 +161,7 @@ export function TabSwitcher({
         </div>
         <div
           data-testid="workspace-tab-switcher-path"
-          className="min-w-0 truncate border-t border-[var(--taomni-code-border)] px-3 py-1 text-[10px] text-[var(--taomni-code-muted)]"
+          className="min-w-0 truncate border-t border-[var(--taomni-code-border)] px-3 py-1 text-ui-caption text-[var(--taomni-code-muted)]"
           title={selectedEntry?.subtitle ?? selectedTool?.label ?? ""}
         >
           {selectedEntry?.subtitle ?? (selectedTool ? `${selectedTool.label} tool window` : "")}

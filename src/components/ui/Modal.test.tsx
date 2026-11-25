@@ -1,5 +1,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import { useState } from "react";
+import { ThemedSelect } from "../ThemedSelect";
+import { Modal } from "./Modal";
 import { ConfirmDialog, TextInputDialog } from "../sidebar/ConfirmDialog";
 
 afterEach(cleanup);
@@ -42,4 +45,24 @@ it("lets the input method finish before submitting a prompt", () => {
   expect(cancel).not.toHaveBeenCalled();
   fireEvent.keyDown(input, { key: "Enter" });
   expect(confirm).toHaveBeenCalledExactlyOnceWith("文件");
+});
+
+it("keeps an owned listbox inside the top layer and dismisses one layer per Escape", () => {
+  const cancel = vi.fn();
+  function Fixture() {
+    const [value, setValue] = useState("a");
+    return <Modal title="Options" testId="options" initialFocus="button" onCancel={cancel} footer={null}>
+      <ThemedSelect label="Choice" value={value} options={[{ value: "a", label: "A" }, { value: "b", label: "B" }]} onChange={setValue} />
+    </Modal>;
+  }
+  render(<Fixture />);
+  const trigger = screen.getByRole("combobox");
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  expect(screen.getByRole("dialog")).toContainElement(screen.getByRole("listbox"));
+  fireEvent.keyDown(trigger, { key: "Escape" });
+  expect(screen.queryByRole("listbox")).toBeNull();
+  expect(trigger).toHaveFocus();
+  expect(cancel).not.toHaveBeenCalled();
+  fireEvent.keyDown(trigger, { key: "Escape" });
+  expect(cancel).toHaveBeenCalledTimes(1);
 });

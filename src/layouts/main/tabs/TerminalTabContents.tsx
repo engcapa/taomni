@@ -339,7 +339,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
               }}
             >
               <div
-                className="h-7 shrink-0 items-center gap-2 px-2 text-[11px]"
+                className="h-7 shrink-0 items-center gap-2 px-2 text-ui-small"
                 style={{
                   display: terminalSplitVisible ? "flex" : "none",
                   background: isActive ? "var(--taomni-selected)" : "var(--taomni-chrome-bg)",
@@ -357,7 +357,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
                 </button>
                 <span
                   data-testid={`terminal-split-activity-${tab.id}`}
-                  className="max-w-[150px] truncate rounded px-1.5 py-0.5 text-[10px] text-[var(--taomni-text-muted)]"
+                  className="max-w-[150px] truncate rounded px-1.5 py-0.5 text-ui-caption text-[var(--taomni-text-muted)]"
                   style={{ background: "var(--taomni-hover)" }}
                   title={tabDetails.activityLabel}
                 >

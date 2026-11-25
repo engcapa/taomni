@@ -118,7 +118,7 @@ export function CompareOverlay({
           </button>
         </div>
 
-        <div className="flex items-center gap-4 text-[12px]">
+        <div className="flex items-center gap-4 text-ui-body">
           <label className="inline-flex items-center gap-1.5">
             <input
               type="checkbox"
@@ -139,14 +139,14 @@ export function CompareOverlay({
           </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-[11px] font-semibold text-[var(--taomni-text-muted)]">
+        <div className="grid grid-cols-2 gap-2 text-ui-small font-semibold text-[var(--taomni-text-muted)]">
           <div className="truncate">{compare.leftTitle}</div>
           <div className="truncate">{compare.rightTitle}</div>
         </div>
 
         {exceedsLimit ? (
           <div
-            className="flex items-center gap-2 p-4 rounded border border-amber-500/50 bg-amber-500/10 text-[12px]"
+            className="flex items-center gap-2 p-4 rounded border border-amber-500/50 bg-amber-500/10 text-ui-body"
             data-testid="notepad-compare-too-large"
           >
             <AlertTriangle size={16} className="text-amber-500 shrink-0" />

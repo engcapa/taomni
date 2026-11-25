@@ -290,7 +290,7 @@ function RailIconButton({
       onClick={onClick}
     >
       <span aria-hidden="true" className="flex h-[20px] w-[20px] items-center justify-center [&>svg]:h-[16px] [&>svg]:w-[16px]">{children}</span>
-      {showNames && <span className="w-full truncate px-0.5 text-center text-[10px] leading-[12px]">{label}</span>}
+      {showNames && <span className="w-full truncate px-0.5 text-center text-ui-caption leading-[12px]">{label}</span>}
     </button>
   );
 }

@@ -26,13 +26,13 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
       className="mt-1 border-t border-[var(--taomni-code-border)]/60 pt-1"
     >
       <div className="flex items-center gap-1 px-3 py-1">
-        <span className="w-24 shrink-0 text-[10px] font-medium text-[var(--taomni-text-muted)]">
+        <span className="w-24 shrink-0 text-ui-caption font-medium text-[var(--taomni-text-muted)]">
           Function / method
         </span>
         <input
           data-testid="debug-function-breakpoint-input"
           aria-label="Function breakpoint name"
-          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none disabled:opacity-40"
+          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none disabled:opacity-40"
           placeholder="Type a qualified function name"
           maxLength={1024}
           value={name}
@@ -53,7 +53,7 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
         </button>
       </div>
       {active && !supported && (
-        <div data-testid="debug-function-breakpoint-unsupported" className="px-3 pb-1 text-[10px] text-amber-500">
+        <div data-testid="debug-function-breakpoint-unsupported" className="px-3 pb-1 text-ui-caption text-amber-500">
           The active debug adapter does not support function breakpoints.
         </div>
       )}
@@ -101,7 +101,7 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
               <button
                 type="button"
                 data-testid={`debug-function-breakpoint-edit-${index}`}
-                className="shrink-0 text-[10px] text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100"
+                className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100"
                 onClick={() => setEditingName(open ? null : breakpoint.name)}
               >
                 {open ? "Done" : "Edit"}
@@ -139,7 +139,7 @@ export function FunctionBreakpointEditor({
   index: number;
   onChange: (options: Partial<DebugFunctionBreakpoint>) => void;
 }) {
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none";
   return (
     <div className="space-y-1 bg-[var(--taomni-code-bg)] px-3 pb-1.5 pt-1">
       <CommitField

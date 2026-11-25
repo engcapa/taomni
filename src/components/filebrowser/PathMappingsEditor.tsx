@@ -80,23 +80,23 @@ export function PathMappingsEditor({
     ? "grid grid-cols-[1fr_1fr_auto] gap-1 items-center"
     : "grid grid-cols-[1fr_1fr_auto] gap-2 items-center";
 
-  const inputCls = "taomni-input w-full text-[11px]";
+  const inputCls = "taomni-input w-full text-ui-small";
 
   return (
     <div
       data-testid="sftp-path-mappings-editor"
-      className={compact ? "text-[11px]" : "text-[12px]"}
+      className={compact ? "text-ui-small" : "text-ui-body"}
     >
       {/* Header row */}
       <div className={`${rowCls} mb-1 text-[var(--taomni-text-muted)] font-medium`}>
-        <span className="text-[11px]">{t("pathMappings.colLocalPath")}</span>
-        <span className="text-[11px]">{t("pathMappings.colRemotePath")}</span>
+        <span className="text-ui-small">{t("pathMappings.colLocalPath")}</span>
+        <span className="text-ui-small">{t("pathMappings.colRemotePath")}</span>
         <span />
       </div>
 
       {mappings.length === 0 && (
         <div
-          className="py-2 text-center text-[var(--taomni-text-muted)] text-[11px] rounded border border-dashed"
+          className="py-2 text-center text-[var(--taomni-text-muted)] text-ui-small rounded border border-dashed"
           style={{ borderColor: "var(--taomni-divider)" }}
         >
           {t("pathMappings.empty")}
@@ -173,7 +173,7 @@ export function PathMappingsEditor({
 
       <button
         type="button"
-        className="mt-1 px-2 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-accent)] text-[11px]"
+        className="mt-1 px-2 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-accent)] text-ui-small"
         onClick={handleAdd}
         data-testid="path-mapping-add"
       >

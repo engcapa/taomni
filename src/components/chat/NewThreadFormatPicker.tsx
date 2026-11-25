@@ -70,7 +70,7 @@ export function NewThreadFormatPicker({
         aria-label={t("chat.pickerDialogAria")}
       >
         <div className="flex items-center px-3 py-2 border-b border-[var(--taomni-divider)]">
-          <span className="text-[12px] font-semibold flex-1">{t("chat.pickerTitle")}</span>
+          <span className="text-ui-body font-semibold flex-1">{t("chat.pickerTitle")}</span>
           <button
             type="button"
             className="taomni-btn h-5 w-5 p-0 inline-flex items-center justify-center"
@@ -83,8 +83,8 @@ export function NewThreadFormatPicker({
 
         <div className="p-3 space-y-3">
           <fieldset className="space-y-1">
-            <legend className="text-[11px] font-semibold mb-1">{t("chat.pickerScopeLegend")}</legend>
-            <label className="flex items-start gap-2 text-[11px] cursor-pointer">
+            <legend className="text-ui-small font-semibold mb-1">{t("chat.pickerScopeLegend")}</legend>
+            <label className="flex items-start gap-2 text-ui-small cursor-pointer">
               <input
                 type="radio"
                 name="scope"
@@ -98,14 +98,14 @@ export function NewThreadFormatPicker({
                   <Link2 className="w-2.5 h-2.5" />
                   {t("chat.pickerBindToTerminal")}
                 </span>
-                <span className="block text-[10px] text-[var(--taomni-text-muted)]">
+                <span className="block text-ui-caption text-[var(--taomni-text-muted)]">
                   {activeTerminalTitle
                     ? t("chat.pickerBindHelp", { title: activeTerminalTitle })
                     : t("chat.pickerBindNoTerminal")}
                 </span>
               </span>
             </label>
-            <label className="flex items-start gap-2 text-[11px] cursor-pointer">
+            <label className="flex items-start gap-2 text-ui-small cursor-pointer">
               <input
                 type="radio"
                 name="scope"
@@ -118,7 +118,7 @@ export function NewThreadFormatPicker({
                   <Globe className="w-2.5 h-2.5" />
                   {t("chat.pickerGlobal")}
                 </span>
-                <span className="block text-[10px] text-[var(--taomni-text-muted)]">
+                <span className="block text-ui-caption text-[var(--taomni-text-muted)]">
                   {t("chat.pickerGlobalDesc")}
                 </span>
               </span>
@@ -126,7 +126,7 @@ export function NewThreadFormatPicker({
           </fieldset>
 
           <fieldset className="space-y-1">
-            <legend className="text-[11px] font-semibold mb-1">{t("chat.pickerFormatLegend")}</legend>
+            <legend className="text-ui-small font-semibold mb-1">{t("chat.pickerFormatLegend")}</legend>
             {(["inherit", "md", "html", "plain"] as const).map((opt) => {
               const labels: Record<typeof opt, string> = {
                 inherit: t("chat.pickerInheritFormat", { format: defaultFormat }),
@@ -137,7 +137,7 @@ export function NewThreadFormatPicker({
               return (
                 <label
                   key={opt}
-                  className="flex items-center gap-2 text-[11px] cursor-pointer"
+                  className="flex items-center gap-2 text-ui-small cursor-pointer"
                 >
                   <input
                     type="radio"
@@ -150,7 +150,7 @@ export function NewThreadFormatPicker({
                 </label>
               );
             })}
-            <p className="text-[10px] text-[var(--taomni-text-muted)] mt-1">
+            <p className="text-ui-caption text-[var(--taomni-text-muted)] mt-1">
               {t("chat.pickerFormatTip")}
             </p>
           </fieldset>
@@ -159,7 +159,7 @@ export function NewThreadFormatPicker({
         <div className="flex justify-end gap-1.5 px-3 py-2 border-t border-[var(--taomni-divider)]">
           <button
             type="button"
-            className="taomni-btn h-7 px-3 text-[11px]"
+            className="taomni-btn h-7 px-3 text-ui-small"
             onClick={onCancel}
             disabled={submitting}
           >
@@ -167,7 +167,7 @@ export function NewThreadFormatPicker({
           </button>
           <button
             type="button"
-            className="taomni-btn h-7 px-3 text-[11px]"
+            className="taomni-btn h-7 px-3 text-ui-small"
             data-primary="true"
             onClick={handleConfirm}
             disabled={submitting}

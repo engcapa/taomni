@@ -255,7 +255,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
             />
           )}
           {shortcutFilter && (
-            <label className="flex shrink-0 items-center gap-1 text-[11px]">
+            <label className="flex shrink-0 items-center gap-1 text-ui-small">
               <input
                 type="checkbox"
                 data-testid="keymap-shortcut-filter-second"
@@ -290,12 +290,12 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
                   aria-expanded={expanded}
                   aria-selected={false}
                   data-testid={`keymap-group-${category}`}
-                  className="flex w-full items-center gap-1 py-1 text-left text-[12px] font-medium hover:bg-[var(--taomni-code-hover)]"
+                  className="flex w-full items-center gap-1 py-1 text-left text-ui-body font-medium hover:bg-[var(--taomni-code-hover)]"
                   onClick={() => toggleGroup(category)}
                 >
                   {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                   <span>{category}</span>
-                  <span className="ml-1 text-[10px] font-normal opacity-50">{items.length}</span>
+                  <span className="ml-1 text-ui-caption font-normal opacity-50">{items.length}</span>
                 </button>
                 {expanded && items.map(renderRow)}
               </div>
@@ -321,7 +321,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
                 role="menu"
                 aria-label={`${item.title} shortcuts`}
                 data-testid="keymap-row-menu"
-                className="fixed z-30 min-w-[220px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] py-1 text-[12px] shadow-lg"
+                className="fixed z-30 min-w-[220px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] py-1 text-ui-body shadow-lg"
                 style={{
                   left: Math.min(rowMenu.x, (typeof window === "undefined" ? 1200 : window.innerWidth) - 240),
                   top: Math.min(rowMenu.y, (typeof window === "undefined" ? 800 : window.innerHeight) - 160),
@@ -361,8 +361,8 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
         {mouseCapture && (
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-black/20">
             <div role="dialog" aria-modal="true" aria-label="Mouse Shortcut" data-testid="keymap-mouse-recorder"
-              className="w-[400px] max-w-[calc(100%-32px)] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-3 text-[11px] shadow-xl">
-              <div className="mb-2 text-[12px] font-medium">
+              className="w-[400px] max-w-[calc(100%-32px)] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-3 text-ui-small shadow-xl">
+              <div className="mb-2 text-ui-body font-medium">
                 Mouse Shortcut · {snapshot.find((item) => item.id === mouseCapture.actionId)?.title ?? mouseCapture.actionId}
               </div>
               <div
@@ -426,9 +426,9 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
               aria-modal="true"
               aria-label="Keyboard Shortcut"
               data-testid="keymap-recorder"
-              className="w-[440px] max-w-[calc(100%-32px)] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-3 text-[11px] shadow-xl"
+              className="w-[440px] max-w-[calc(100%-32px)] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-3 text-ui-small shadow-xl"
             >
-              <div className="mb-2 text-[12px] font-medium">
+              <div className="mb-2 text-ui-body font-medium">
                 Keyboard Shortcut · {snapshot.find((item) => item.id === capture.actionId)?.title ?? capture.actionId}
               </div>
               <div className="mb-1 opacity-70">First stroke</div>

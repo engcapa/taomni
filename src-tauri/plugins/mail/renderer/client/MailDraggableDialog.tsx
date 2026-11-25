@@ -35,7 +35,7 @@ export function MailDraggableDialog({
         className="h-9 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)] select-none"
       >
         {icon}
-        <span className="text-[12px] font-semibold min-w-0 flex-1 truncate">
+        <span className="text-ui-body font-semibold min-w-0 flex-1 truncate">
           {title}
         </span>
         {headerActions}

@@ -90,17 +90,17 @@ export function StructurePopup({
             <span style={{ width: `${symbol.depth * 14}px` }} className="shrink-0" />
             <span
               aria-hidden="true"
-              className={`h-4 w-4 shrink-0 inline-flex items-center justify-center rounded text-[9px] font-bold ${badge.className}`}
+              className={`h-4 w-4 shrink-0 inline-flex items-center justify-center rounded text-ui-caption font-bold ${badge.className}`}
             >
               {badge.label}
             </span>
             <span className="shrink-0 text-[var(--taomni-code-text)]">{symbol.name}</span>
             {symbol.detail && (
-              <span className="min-w-0 flex-1 truncate text-[10px] text-[var(--taomni-code-muted)]">
+              <span className="min-w-0 flex-1 truncate text-ui-caption text-[var(--taomni-code-muted)]">
                 {symbol.detail}
               </span>
             )}
-            <span className="ml-auto shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
+            <span className="ml-auto shrink-0 font-mono text-ui-caption text-[var(--taomni-code-muted)]">
               :{symbol.selectionRange.start.line + 1}
             </span>
           </>
@@ -113,7 +113,7 @@ export function StructurePopup({
       }}
       header={
         // IDEA titles File Structure with the file name.
-        <div className="flex h-7 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3 text-[11px]">
+        <div className="flex h-7 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3 text-ui-small">
           <span data-testid="code-workspace-structure-title" className="min-w-0 flex-1 truncate font-medium text-[var(--taomni-code-text)]">
             {fileTitle ?? "File structure"}
           </span>
@@ -121,7 +121,7 @@ export function StructurePopup({
             <span
               data-testid="code-workspace-structure-syntax-only"
               title="The language server is unavailable; this outline is parsed from the file's syntax only"
-              className="shrink-0 rounded border border-amber-500/40 px-1 text-[10px] text-amber-600 dark:text-amber-400"
+              className="shrink-0 rounded border border-amber-500/40 px-1 text-ui-caption text-amber-600 dark:text-amber-400"
             >
               syntax only
             </span>

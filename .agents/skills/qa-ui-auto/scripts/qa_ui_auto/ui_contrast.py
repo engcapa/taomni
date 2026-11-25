@@ -2,6 +2,7 @@
 
 import json
 import re
+import time
 from pathlib import Path
 
 from .steps import StepError
@@ -18,15 +19,22 @@ def luminance(color: str) -> float:
 
 def run_contrast(args: dict, evaluate, case_dir: Path) -> str:
     selector = json.dumps(args["selector"])
-    values = evaluate(f"""Array.from(document.querySelectorAll({selector}), element => {{
+    query = f"""Array.from(document.querySelectorAll({selector}), element => {{
       const style = getComputedStyle(element);
       let opacity = 1;
       for (let node = element; node; node = node.parentElement) opacity *= Number(getComputedStyle(node).opacity);
       return {{foreground: style.color, background: style.backgroundColor, image: style.backgroundImage,
-        opacity, visible: element.getBoundingClientRect().height > 0 && style.visibility === 'visible'}};
-    }})""")
-    if not values:
-        raise StepError(f"No elements matched {selector}")
+        opacity, animating: element.getAnimations().some(animation => animation.playState === 'running'),
+        visible: element.getBoundingClientRect().height > 0 && style.visibility === 'visible'}};
+    }})"""
+    deadline = time.monotonic() + 3
+    while True:
+        values = evaluate(query)
+        if values and all(not sample["animating"] for sample in values):
+            break
+        if time.monotonic() >= deadline:
+            raise StepError(f"Expected a settled control matching {selector}, observed {values}")
+        time.sleep(0.05)
     for sample in values:
         if not sample["visible"] or sample["opacity"] != 1 or sample["image"] != "none":
             raise StepError(f"Expected a visible opaque solid surface for {selector}: {sample}")

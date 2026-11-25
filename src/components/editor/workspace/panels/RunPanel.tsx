@@ -169,12 +169,12 @@ export const RunPanel = forwardRef<RunPanelHandle, RunPanelProps>(function RunPa
             ? <AlertTriangle className="h-3 w-3 shrink-0 text-amber-500" />
             : <Play className="h-3 w-3 shrink-0 text-emerald-500" />}
           <span className="truncate">{task.label}</span>
-          <span className="ml-auto shrink-0 text-[10px] text-[var(--taomni-code-muted)]">{task.source}</span>
+          <span className="ml-auto shrink-0 text-ui-caption text-[var(--taomni-code-muted)]">{task.source}</span>
           {task.runConfiguration && (
             <span
               data-testid={`run-panel-configuration-source-${task.id}`}
               data-configuration-source={task.runConfiguration.configurationSource ?? "detected"}
-              className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]"
+              className="shrink-0 text-ui-caption text-[var(--taomni-code-muted)]"
               title={`Configuration source: ${configurationSourceLabel(task.runConfiguration.configurationSource)}`}
             >
               {configurationSourceLabel(task.runConfiguration.configurationSource)}

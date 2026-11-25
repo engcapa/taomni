@@ -67,13 +67,13 @@ export function WorkspaceSwitcher({ onAddFolder }: WorkspaceSwitcherProps) {
   return (
     <div className="shrink-0 px-1.5 pb-1 pt-1.5" data-testid="workspace-switcher" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>
       <div className="flex items-center justify-between gap-1">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
+        <span className="text-ui-caption font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
           {t("platform.workspaceSwitcher")}
         </span>
         <button
           type="button"
           data-testid="workspace-create-button"
-          className="inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-semibold"
+          className="inline-flex items-center gap-0.5 rounded px-1 text-ui-caption font-semibold"
           style={{ color: "var(--taomni-accent)" }}
           onClick={() => {
             void dialogs.prompt({
@@ -114,14 +114,14 @@ export function WorkspaceSwitcher({ onAddFolder }: WorkspaceSwitcherProps) {
           {active.isDefault && (
             <span
               data-testid="workspace-default-badge"
-              className="shrink-0 rounded px-1 text-[9px] font-semibold"
+              className="shrink-0 rounded px-1 text-ui-caption font-semibold"
               style={{ border: "1px solid var(--taomni-divider)", color: "var(--taomni-text-muted)" }}
             >
               {t("platform.workspaceDefaultBadge")}
             </span>
           )}
         </span>
-        <span className="flex shrink-0 items-center gap-1 text-[10px] text-[var(--taomni-text-muted)]">
+        <span className="flex shrink-0 items-center gap-1 text-ui-caption text-[var(--taomni-text-muted)]">
           <span data-testid="workspace-switcher-root-count">{active.rootFolders.length}</span>
           <ChevronDown className="h-3 w-3" />
         </span>

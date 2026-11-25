@@ -78,7 +78,7 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
   useEffect(() => { if (value) setCfg(value); }, [value]);
 
   if (!cfg) {
-    return <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("aiSettings.loading")}</div>;
+    return <div className="text-ui-body text-[var(--taomni-text-muted)]">{t("aiSettings.loading")}</div>;
   }
 
   // Persist a change. Every field except the password is non-secret, so we
@@ -238,11 +238,11 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
   return (
     <div className="space-y-3">
       {!embedded && <div>
-        <div className="text-[13px] font-semibold flex items-center gap-2">
+        <div className="text-ui-body font-semibold flex items-center gap-2">
           <Network className="w-4 h-4 text-[var(--taomni-accent)]" />
           {t("settings.appProxyTitle")}
         </div>
-        <div className="text-[11px] text-[var(--taomni-text-muted)]">{t("settings.appProxySubtitle")}</div>
+        <div className="text-ui-small text-[var(--taomni-text-muted)]">{t("settings.appProxySubtitle")}</div>
       </div>}
 
       {/* Enable toggle */}
@@ -255,8 +255,8 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
         onClick={() => persist({ enabled: !cfg.enabled })}
       >
         <div className="flex-1">
-          <div className="text-[13px] font-semibold">{t("settings.appProxyEnable")}</div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">{t("settings.appProxyEnableDesc")}</div>
+          <div className="text-ui-body font-semibold">{t("settings.appProxyEnable")}</div>
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">{t("settings.appProxyEnableDesc")}</div>
         </div>
         <div className={`w-9 h-5 rounded-full transition-colors relative ${cfg.enabled ? "bg-[var(--taomni-accent)]" : "bg-[var(--taomni-divider)]"}`}>
           <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${cfg.enabled ? "translate-x-4" : "translate-x-0.5"}`} />
@@ -276,7 +276,7 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
                   onChange={() => persist({ mode: m })}
                   className="accent-[var(--taomni-accent)]"
                 />
-                <span className="text-[12px]">
+                <span className="text-ui-body">
                   {m === "session" ? t("settings.appProxyModeSession") : t("settings.appProxyModeManual")}
                 </span>
               </label>
@@ -286,9 +286,9 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
           {cfg.mode === "session" &&
             (proxySessions.length > 0 ? (
               <div>
-                <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1">{t("settings.appProxySessionSelect")}</div>
+                <div className="text-ui-small text-[var(--taomni-text-muted)] mb-1">{t("settings.appProxySessionSelect")}</div>
                 <select
-                  className="taomni-input h-8 w-full text-[12px]"
+                  className="taomni-input h-8 w-full text-ui-body"
                   value={cfg.session_id}
                   onChange={(e) => persist({ session_id: e.target.value })}
                 >
@@ -301,7 +301,7 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
                 </select>
               </div>
             ) : (
-              <div className="text-[11px] text-[var(--taomni-text-muted)]">{t("settings.appProxySessionNone")}</div>
+              <div className="text-ui-small text-[var(--taomni-text-muted)]">{t("settings.appProxySessionNone")}</div>
             ))}
 
           {/* Manual mode: enter fields directly */}
@@ -317,14 +317,14 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
                       onChange={() => persist({ kind: value })}
                       className="accent-[var(--taomni-accent)]"
                     />
-                    <span className="text-[12px]">{label}</span>
+                    <span className="text-ui-body">{label}</span>
                   </label>
                 ))}
               </div>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  className="taomni-input h-7 flex-1 text-[12px]"
+                  className="taomni-input h-7 flex-1 text-ui-body"
                   aria-label={t("settings.appProxyHost")}
                   placeholder={t("settings.appProxyHost")}
                   value={cfg.host}
@@ -332,7 +332,7 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
                 />
                 <input
                   type="number"
-                  className="taomni-input h-7 w-24 text-[12px]"
+                  className="taomni-input h-7 w-24 text-ui-body"
                   aria-label={t("settings.appProxyPort")}
                   placeholder={t("settings.appProxyPort")}
                   value={cfg.port || ""}
@@ -341,7 +341,7 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
               </div>
               <input
                 type="text"
-                className="taomni-input h-7 w-full text-[12px]"
+                className="taomni-input h-7 w-full text-ui-body"
                 aria-label={t("settings.appProxyUsername")}
                   placeholder={t("settings.appProxyUsername")}
                 value={cfg.username}
@@ -351,14 +351,14 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
               <div className="flex gap-2">
                 <input
                   type="password"
-                  className="taomni-input h-7 flex-1 text-[12px]"
+                  className="taomni-input h-7 flex-1 text-ui-body"
                   placeholder={cfg.password_ref ? t("settings.appProxyPasswordStored") : t("settings.appProxyPassword")}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
                 <button
                   type="button"
-                  className="taomni-btn h-7 px-2 text-[11px] shrink-0"
+                  className="taomni-btn h-7 px-2 text-ui-small shrink-0"
                   onClick={storePassword}
                   disabled={busy || !password}
                 >
@@ -367,7 +367,7 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
                 {cfg.password_ref && (
                   <button
                     type="button"
-                    className="taomni-btn h-7 px-2 text-[11px] shrink-0"
+                    className="taomni-btn h-7 px-2 text-ui-small shrink-0"
                     onClick={clearPassword}
                     disabled={busy}
                   >
@@ -377,7 +377,7 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
               </div>
               <button
                 type="button"
-                className="taomni-btn h-7 px-2.5 text-[11px] inline-flex items-center gap-1"
+                className="taomni-btn h-7 px-2.5 text-ui-small inline-flex items-center gap-1"
                 onClick={handleSaveAsSession}
                 disabled={busy}
               >
@@ -389,7 +389,7 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
           <div className="flex items-center flex-wrap gap-2 gap-y-1">
             <button
               type="button"
-              className="taomni-btn h-7 px-2.5 text-[11px] inline-flex items-center gap-1"
+              className="taomni-btn h-7 px-2.5 text-ui-small inline-flex items-center gap-1"
               onClick={handleTest}
               disabled={testing}
             >
@@ -397,10 +397,10 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
               {testing ? t("sessionEditor2.proxyTestTesting") : t("settings.appProxyTest")}
             </button>
             {msg && (
-              <span className={`text-[11px] break-all max-w-full ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</span>
+              <span className={`text-ui-small break-all max-w-full ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</span>
             )}
           </div>
-          {!embedded && <div className="text-[10px] text-[var(--taomni-text-muted)]">{t("settings.appProxyUpdaterNote")}</div>}
+          {!embedded && <div className="text-ui-caption text-[var(--taomni-text-muted)]">{t("settings.appProxyUpdaterNote")}</div>}
         </>
       )}
     </div>

@@ -82,7 +82,7 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
           }}
         >
           <Shield className="w-3.5 h-3.5 mr-1.5" />
-          <div className="text-[12px] font-semibold">
+          <div className="text-ui-body font-semibold">
             {t("vaultSettings.manageEntries")}
           </div>
           <div className="ml-auto flex items-center">
@@ -107,7 +107,7 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
             <input
               type="search"
               placeholder={t("vaultSettings.searchPlaceholder")}
-              className="taomni-input w-full text-[12px] h-7"
+              className="taomni-input w-full text-ui-body h-7"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ paddingLeft: "28px" }}
@@ -121,7 +121,7 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
           style={{ borderColor: "var(--taomni-input-border)", background: "var(--taomni-bg)" }}
         >
           {filteredEntries.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
+            <div className="flex flex-col items-center justify-center h-full text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>
               {searchQuery ? t("vaultSettings.noMatchingEntries") : t("vaultSettings.noEntries")}
             </div>
           ) : (
@@ -130,7 +130,7 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
                 <div
                   key={e.id}
                   data-testid={`vault-entry-${e.id}`}
-                  className="flex items-center gap-3 text-[12px] px-3 py-2 rounded transition-colors"
+                  className="flex items-center gap-3 text-ui-body px-3 py-2 rounded transition-colors"
                   style={{
                     border: "1px solid var(--taomni-card-border)",
                     background: "var(--taomni-card-bg, var(--taomni-quick-bg))"
@@ -174,12 +174,12 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
           className="h-12 flex items-center px-4 border-t shrink-0"
           style={{ background: "var(--taomni-quick-bg)", borderColor: "var(--taomni-divider)" }}
         >
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">
             {t("vaultSettings.savedEntries", { count: filteredEntries.length })}
           </div>
           <div className="flex-1" />
           <button
-            className="taomni-btn px-4 py-1.5 text-[12px]"
+            className="taomni-btn px-4 py-1.5 text-ui-body"
             onClick={onClose}
             type="button"
           >

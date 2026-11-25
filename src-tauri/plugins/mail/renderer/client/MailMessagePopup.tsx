@@ -25,7 +25,7 @@ export function MailMessagePopup(context: MailMessagePopupContext) {
         headerActions={(
           <button
             type="button"
-            className="taomni-btn h-6 px-2 text-[11px]"
+            className="taomni-btn h-6 px-2 text-ui-small"
             onClick={() => openMessageTab(popupMessage)}
           >
             Open tab

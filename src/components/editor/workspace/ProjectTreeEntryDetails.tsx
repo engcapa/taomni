@@ -29,7 +29,7 @@ export function GitStatusBadge({ change }: { change: GitChange | undefined }): R
   return (
     <span
       data-testid="code-workspace-git-status"
-      className={`inline-flex h-4 min-w-4 items-center justify-center rounded border px-1 text-[10px] font-semibold ${color}`}
+      className={`inline-flex h-4 min-w-4 items-center justify-center rounded border px-1 text-ui-caption font-semibold ${color}`}
       title={gitChangeLabel(change)}
     >
       {label}

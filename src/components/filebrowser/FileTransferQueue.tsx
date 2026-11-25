@@ -179,18 +179,18 @@ export function FileTransferQueue({
     return (
       <div
         data-testid="sftp-transfer-queue-collapsed"
-        className="h-6 border-t px-2 flex items-center gap-2 text-[11px] cursor-pointer hover:bg-[var(--taomni-hover)] select-none shrink-0 transition-colors"
+        className="h-6 border-t px-2 flex items-center gap-2 text-ui-small cursor-pointer hover:bg-[var(--taomni-hover)] select-none shrink-0 transition-colors"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
         onClick={toggleOpen}
         title={t("fileBrowser.transferExpand")}
       >
         <ChevronUp className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
         <span className="font-semibold">{t("fileBrowser.transferTitle")}</span>
-        <span className="text-[var(--taomni-text-muted)] text-[10px] px-1.5 py-0.5 rounded bg-[var(--taomni-hover)]">
+        <span className="text-[var(--taomni-text-muted)] text-ui-caption px-1.5 py-0.5 rounded bg-[var(--taomni-hover)]">
           {filtered.length}
         </span>
         {hasActive && (
-          <span className="text-emerald-500 text-[10px] flex items-center gap-1 font-medium">
+          <span className="text-emerald-500 text-ui-caption flex items-center gap-1 font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             {t("fileBrowser.transferActive", { count: activeCount })}
           </span>
@@ -199,7 +199,7 @@ export function FileTransferQueue({
         <button
           type="button"
           data-testid="sftp-transfer-queue-expand-btn"
-          className="px-1.5 py-0.5 text-[10px] text-[var(--taomni-accent)] hover:underline rounded"
+          className="px-1.5 py-0.5 text-ui-caption text-[var(--taomni-accent)] hover:underline rounded"
           title={t("fileBrowser.transferExpand")}
           onClick={(e) => {
             e.stopPropagation();
@@ -228,7 +228,7 @@ export function FileTransferQueue({
 
       {showCrossHostBanner && (
         <div
-          className="text-[11px] px-2 py-1 border-b shrink-0 flex items-center gap-2"
+          className="text-ui-small px-2 py-1 border-b shrink-0 flex items-center gap-2"
           style={{
             borderColor: "var(--taomni-divider)",
             background: "var(--taomni-quick-bg)",
@@ -242,7 +242,7 @@ export function FileTransferQueue({
           <button
             type="button"
             disabled
-            className="ml-auto px-1.5 py-0.5 rounded text-[10px] opacity-50 cursor-not-allowed"
+            className="ml-auto px-1.5 py-0.5 rounded text-ui-caption opacity-50 cursor-not-allowed"
             style={{ border: "1px solid var(--taomni-divider)" }}
             title={t("fileBrowser.crossHostPickPeerTitle")}
           >
@@ -252,15 +252,15 @@ export function FileTransferQueue({
       )}
 
       <div
-        className="h-6 px-2 flex items-center text-[11px] font-semibold gap-2 shrink-0 select-none"
+        className="h-6 px-2 flex items-center text-ui-small font-semibold gap-2 shrink-0 select-none"
         style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
         <span>{t("fileBrowser.transferTitle")}</span>
-        <span className="text-[var(--taomni-text-muted)] text-[10px] px-1.5 py-0.5 rounded bg-[var(--taomni-hover)]">
+        <span className="text-[var(--taomni-text-muted)] text-ui-caption px-1.5 py-0.5 rounded bg-[var(--taomni-hover)]">
           {filtered.length}
         </span>
         {hasActive && (
-          <span className="text-emerald-500 text-[10px] flex items-center gap-1 font-medium">
+          <span className="text-emerald-500 text-ui-caption flex items-center gap-1 font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             {t("fileBrowser.transferActive", { count: activeCount })}
           </span>
@@ -268,7 +268,7 @@ export function FileTransferQueue({
         <div className="flex-1" />
         <button
           type="button"
-          className="px-1.5 py-0.5 hover:bg-[var(--taomni-hover)] rounded inline-flex items-center gap-1 text-[10px]"
+          className="px-1.5 py-0.5 hover:bg-[var(--taomni-hover)] rounded inline-flex items-center gap-1 text-ui-caption"
           title={t("fileBrowser.transferClearTitle")}
           onClick={clearCompleted}
         >
@@ -285,7 +285,7 @@ export function FileTransferQueue({
         </button>
       </div>
 
-      <div className="overflow-auto text-[11px] flex-1 min-h-0">
+      <div className="overflow-auto text-ui-small flex-1 min-h-0">
         {filtered.length === 0 && (
           <div className="px-2 py-2 text-[var(--taomni-text-muted)]">
             {t("fileBrowser.transferEmptyText")}
@@ -408,7 +408,7 @@ export function FileTransferQueue({
                 />
               </div>
               {it.error && (
-                <div className="text-[10px] mt-0.5 text-red-500 truncate">{it.error}</div>
+                <div className="text-ui-caption mt-0.5 text-red-500 truncate">{it.error}</div>
               )}
             </div>
           );
@@ -428,7 +428,7 @@ function StateBadge({ state }: { state: TransferState }) {
     cancelled: "bg-slate-400",
   };
   return (
-    <span className={`text-white text-[10px] px-1 rounded ${colors[state]}`}>
+    <span className={`text-white text-ui-caption px-1 rounded ${colors[state]}`}>
       {state}
     </span>
   );

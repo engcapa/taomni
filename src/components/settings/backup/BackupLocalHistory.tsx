@@ -53,12 +53,12 @@ export function BackupLocalHistory(inputs: Pick<BackupSettingsViewProps, "t" | "
                         </td>
                         <td className="py-2 px-2">
                           {item.isEncrypted ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-amber-500">
+                            <span className="inline-flex items-center gap-1 text-ui-small text-amber-500">
                               <Lock className="w-3 h-3" />
                               {t("backupSettings.encrypted")}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-theme-muted">
+                            <span className="inline-flex items-center gap-1 text-ui-small text-theme-muted">
                               <Unlock className="w-3 h-3" />
                               {t("backupSettings.unencrypted")}
                             </span>

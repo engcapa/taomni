@@ -67,13 +67,13 @@ export function ThemePreviewSelect({
       >
         {selected ? (
           <>
-            <span className="min-w-[120px] max-w-[42%] truncate text-[12px] font-semibold">
+            <span className="min-w-[120px] max-w-[42%] truncate text-ui-body font-semibold">
               {selected.label}
             </span>
             <span className="min-w-0 flex-1 overflow-hidden">{selected.preview}</span>
           </>
         ) : (
-          <span className="text-[12px] text-[var(--taomni-text-muted)]">{ariaLabel}</span>
+          <span className="text-ui-body text-[var(--taomni-text-muted)]">{ariaLabel}</span>
         )}
         <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 text-[var(--taomni-text-muted)]" />
       </button>
@@ -126,7 +126,7 @@ export function ThemePreviewList({
       {grouped.map((group) => (
         <div key={group.group ?? "__ungrouped"} className="space-y-1">
           {group.group && (
-            <div className="px-2 pt-1 text-[10px] font-semibold uppercase text-[var(--taomni-text-muted)]">
+            <div className="px-2 pt-1 text-ui-caption font-semibold uppercase text-[var(--taomni-text-muted)]">
               {group.group}
             </div>
           )}
@@ -169,7 +169,7 @@ function ThemePreviewOptionRow({
       <span className="w-4 flex-shrink-0 inline-flex items-center justify-center">
         {selected && <Check className="w-3.5 h-3.5" />}
       </span>
-      <span className="min-w-[118px] max-w-[40%] truncate text-[12px] font-semibold">
+      <span className="min-w-[118px] max-w-[40%] truncate text-ui-body font-semibold">
         {option.label}
       </span>
       <span className="min-w-0 flex-1 overflow-hidden">{option.preview}</span>

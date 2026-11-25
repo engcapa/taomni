@@ -251,7 +251,7 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
       {lifecycle.effectiveReadOnly && (
         <div
           data-testid={inputLocked ? "terminal-input-locked" : "terminal-read-only"}
-          className="absolute right-3 bottom-3 z-40 px-2 py-1 rounded border bg-white/90 text-[11px] text-slate-700 shadow-sm pointer-events-none"
+          className="absolute right-3 bottom-3 z-40 px-2 py-1 rounded border bg-white/90 text-ui-small text-slate-700 shadow-sm pointer-events-none"
         >
           {inputLocked ? panel.t("terminal.inputLocked") : panel.t("terminal.readOnlyBadge")}
         </div>
@@ -259,7 +259,7 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
 
       {interaction.searchOpen && (
         <div
-          className="absolute right-3 top-3 z-50 flex items-center gap-1 rounded border border-slate-400 bg-white p-1 shadow-lg text-[12px]"
+          className="absolute right-3 top-3 z-50 flex items-center gap-1 rounded border border-slate-400 bg-white p-1 shadow-lg text-ui-body"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
           onContextMenu={(event) => event.stopPropagation()}
@@ -294,14 +294,14 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
           <button className="taomni-btn h-7 px-2" type="button" onClick={interaction.closeSearch}>
             {panel.t("terminal.findClose")}
           </button>
-          {interaction.searchStatus && <span className="px-1 text-[11px] text-[#b22222]">{interaction.searchStatus}</span>}
+          {interaction.searchStatus && <span className="px-1 text-ui-small text-[#b22222]">{interaction.searchStatus}</span>}
         </div>
       )}
 
       {panel.eventLogOpen && (
         <div
           data-testid="terminal-event-log"
-          className="absolute right-4 bottom-4 z-50 w-[520px] max-w-[calc(100%-2rem)] max-h-[360px] rounded border border-slate-500 bg-white shadow-xl text-[12px] overflow-hidden"
+          className="absolute right-4 bottom-4 z-50 w-[520px] max-w-[calc(100%-2rem)] max-h-[360px] rounded border border-slate-500 bg-white shadow-xl text-ui-body overflow-hidden"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
           onContextMenu={(event) => event.stopPropagation()}
@@ -338,7 +338,7 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
       )}
 
       {panel.zmodemState !== "idle" && (
-        <div className="absolute left-1/2 top-4 z-50 -translate-x-1/2 flex items-center gap-3 rounded border border-slate-400 bg-white px-4 py-2 shadow-lg text-[12px]">
+        <div className="absolute left-1/2 top-4 z-50 -translate-x-1/2 flex items-center gap-3 rounded border border-slate-400 bg-white px-4 py-2 shadow-lg text-ui-body">
           <span className="font-semibold">
             {panel.zmodemState === "receiving" ? panel.t("terminal.zmodemReceiving") : panel.t("terminal.zmodemSending")} {panel.t("terminal.zmodemViaZmodem")}
           </span>

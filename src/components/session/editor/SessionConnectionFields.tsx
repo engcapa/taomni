@@ -37,14 +37,14 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
             style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           >
             <div
-              className="text-[12px] font-semibold mb-2 flex items-center gap-2"
+              className="text-ui-body font-semibold mb-2 flex items-center gap-2"
               style={{ color: "var(--taomni-accent)" }}
             >
               <TerminalIcon className="w-3.5 h-3.5" />
               {t("sessionEditor2.basicTitle", { proto: proto })}
             </div>
             <div className="grid grid-cols-12 gap-2 items-center">
-              <label className="col-span-2 text-[12px] text-right">
+              <label className="col-span-2 text-ui-body text-right">
                 {proto === "Browser" ? t("sessionEditor2.browserUrl") : t("sessionEditor2.remoteHost")}
               </label>
               <div className="col-span-5 flex items-center gap-1">
@@ -69,7 +69,7 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
                 </button>}
               </div>
               {sessionCapabilities(proto).username && <>
-              <label className="col-span-3 text-[12px] flex items-center gap-1.5 justify-end">
+              <label className="col-span-3 text-ui-body flex items-center gap-1.5 justify-end">
                 <Checkbox checked={specifyUser} onChange={setSpecifyUser} dataTestId="session-specify-username" />
                 <span>{t("sessionEditor2.specifyUsername")}</span>
               </label>
@@ -85,7 +85,7 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
               </>}
 
               {!viewProps.hidePort && <>
-              <label className="col-span-2 text-[12px] text-right">{t("sessionEditor2.portLabel")}</label>
+              <label className="col-span-2 text-ui-body text-right">{t("sessionEditor2.portLabel")}</label>
               <input
                 data-testid="session-port"
                 className="taomni-input col-span-2"
@@ -94,7 +94,7 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
                 onChange={(e) => setPort(e.target.value)}
               />
               </>}
-              {sessionCapabilities(proto).sshAuthentication && <div className="col-span-8 text-[11px] text-[var(--taomni-text-muted)]">
+              {sessionCapabilities(proto).sshAuthentication && <div className="col-span-8 text-ui-small text-[var(--taomni-text-muted)]">
                 {(() => {
                   const tip = t("sessionEditor2.autofillTip", { snippet: "%SNIPPET%" });
                   const [before, after] = tip.split("%SNIPPET%");
@@ -116,7 +116,7 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
 
               {(proto === "RDP" || proto === "VNC" || isProxy || isMail) && (
                 <>
-                  <label className="col-span-2 text-[12px] text-right">
+                  <label className="col-span-2 text-ui-body text-right">
                     {t("sessionEditor2.passwordLabel")}
                   </label>
                   <div className="col-span-10 flex items-center gap-2">
@@ -133,7 +133,7 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
                         }}
                       />
                     <label
-                      className="flex items-center gap-1 text-[11px] cursor-pointer"
+                      className="flex items-center gap-1 text-ui-small cursor-pointer"
                       title={
                         vaultState === "empty"
                           ? t("sessionEditor2.saveInVaultTitleSetup")

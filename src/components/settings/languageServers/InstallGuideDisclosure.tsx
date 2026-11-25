@@ -24,7 +24,7 @@ export function InstallGuideDisclosure({
       <button
         type="button"
         data-testid="language-servers-install-toggle"
-        className="inline-flex h-6 items-center gap-1 rounded px-1 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)]"
+        className="inline-flex h-6 items-center gap-1 rounded px-1 text-ui-small text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)]"
         aria-expanded={open}
         onClick={onToggle}
       >
@@ -53,7 +53,7 @@ export function InstallGuideDisclosure({
                 className={`rounded px-1.5 py-1 ${isCurrent ? "bg-[var(--taomni-selected)]/40 ring-1 ring-[var(--taomni-accent-soft)]" : ""
                   }`}
               >
-                <div className="mb-0.5 flex items-center gap-1.5 text-[10px] font-medium text-[var(--taomni-text-muted)]">
+                <div className="mb-0.5 flex items-center gap-1.5 text-ui-caption font-medium text-[var(--taomni-text-muted)]">
                   {line.os
                     ? (
                       <>
@@ -70,7 +70,7 @@ export function InstallGuideDisclosure({
                     )}
                   <button
                     type="button"
-                    className="ml-auto inline-flex h-5 items-center gap-1 rounded px-1.5 text-[10px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)]"
+                    className="ml-auto inline-flex h-5 items-center gap-1 rounded px-1.5 text-ui-caption text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)]"
                     title={t("settings.languageServersCopyInstall")}
                     aria-label={`${t("settings.languageServersCopyInstall")} (${label}${line.os ? ` · ${osLabel(line.os)}` : ""})`}
                     data-testid={`language-servers-copy-install-${rowKey}`}
@@ -82,7 +82,7 @@ export function InstallGuideDisclosure({
                 </div>
                 {line.note && (
                   <div
-                    className="mb-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug text-[var(--taomni-text)]"
+                    className="mb-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-ui-caption leading-snug text-[var(--taomni-text)]"
                     data-testid={`language-servers-install-note-${rowKey}`}
                   >
                     <span className="font-semibold text-amber-600">
@@ -91,11 +91,11 @@ export function InstallGuideDisclosure({
                     {line.note}
                   </div>
                 )}
-                <div className="mb-0.5 text-[10px] text-[var(--taomni-text-muted)]">
+                <div className="mb-0.5 text-ui-caption text-[var(--taomni-text-muted)]">
                   {t("settings.languageServersCopyHint")}
                 </div>
                 <pre
-                  className="m-0 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-2 py-1.5 font-mono text-[11px] leading-snug text-[var(--taomni-text)]"
+                  className="m-0 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-2 py-1.5 font-mono text-ui-small leading-snug text-[var(--taomni-text)]"
                   data-testid={
                     // Keep a stable selector for the first/primary copyable command block.
                     line === guide.lines[0]

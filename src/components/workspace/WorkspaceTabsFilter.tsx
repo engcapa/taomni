@@ -92,7 +92,7 @@ export function WorkspaceTabsFilter() {
           {t(`tabs.category.${category}`)}<span className="ml-1 opacity-60">{category === "all" ? workspace.openTabs.length : counts.get(category) ?? 0}</span>
         </button>)}
       </div>
-      <div className="border-t px-3 py-1 text-[10px] text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
+      <div className="border-t px-3 py-1 text-ui-caption text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
         {t("tabs.detailsVisibleCount", { visible: matches.length, total: workspace.openTabs.length })}
       </div>
       <div id="workspace-filter-tab-list" role="listbox" aria-label={t("tabs.openTabs")} className="min-h-0 overflow-y-auto p-1">
@@ -102,7 +102,7 @@ export function WorkspaceTabsFilter() {
           aria-selected={tab.id === workspace.activeTabId} data-highlighted={highlightedId === tab.id || undefined}
           title={tab.filePath ?? tab.host ?? tab.title} onClick={() => pick(tab.id)}
           className="flex w-full min-w-0 items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-[var(--taomni-hover)] aria-selected:text-[var(--taomni-accent)] data-[highlighted=true]:bg-[var(--taomni-selected)]">
-          <span className="w-12 shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{t(`tabs.category.${workspaceTabCategory(tab)}`)}</span>
+          <span className="w-12 shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">{t(`tabs.category.${workspaceTabCategory(tab)}`)}</span>
           <span className="min-w-0 truncate">{tab.title}</span>
         </button>)}
       </div>

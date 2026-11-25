@@ -168,7 +168,7 @@ function TerminalAppearanceSettingsContent({
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="grid grid-cols-12 gap-3 items-end">
           <label className="col-span-12 md:col-span-7">
-            <span className="block text-[12px] font-semibold mb-1">{t("terminalAppearance.fontLabel")}</span>
+            <span className="block text-ui-body font-semibold mb-1">{t("terminalAppearance.fontLabel")}</span>
             <FontPickerSelect
               ariaLabel={t("terminalAppearance.fontAria")}
               options={fontPickerOptions}
@@ -180,14 +180,14 @@ function TerminalAppearanceSettingsContent({
               onSelect={(font) => updateProfile({ fontFamily: makeTerminalFontFamily(font) })}
             />
             {showFontWarning && (
-              <p className="mt-1.5 text-[11px] text-[#ff6b6b] leading-snug">
+              <p className="mt-1.5 text-ui-small text-[#ff6b6b] leading-snug">
                 ⚠️ {t("terminalAppearance.nonMonospaceWarning")}
               </p>
             )}
           </label>
 
           <div className="col-span-8 md:col-span-3">
-            <span className="block text-[12px] font-semibold mb-1">{t("terminalAppearance.textSizeLabel")}</span>
+            <span className="block text-ui-body font-semibold mb-1">{t("terminalAppearance.textSizeLabel")}</span>
             <div className="inline-flex items-center gap-1">
               <button
                 className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
@@ -241,14 +241,14 @@ function TerminalAppearanceSettingsContent({
               checked={profile.fontLigatures}
               onChange={(event) => updateProfile({ fontLigatures: event.target.checked })}
             />
-            <span className="text-[12px]">{t("terminalAppearance.ligaturesLabel")}</span>
+            <span className="text-ui-body">{t("terminalAppearance.ligaturesLabel")}</span>
           </label>
         </div>
       </section>
 
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="block">
-          <span className="block text-[12px] font-semibold mb-1">{t("terminalAppearance.themeHeading")}</span>
+          <span className="block text-ui-body font-semibold mb-1">{t("terminalAppearance.themeHeading")}</span>
           <ThemePreviewSelect
             ariaLabel={t("terminalAppearance.themeSelectAria")}
             testId="terminal-theme-select"
@@ -263,7 +263,7 @@ function TerminalAppearanceSettingsContent({
         <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
           <div className="grid grid-cols-12 gap-2 items-center">
             <label className="col-span-12 sm:col-span-6 flex items-center gap-2">
-              <span className="w-24 text-[12px] font-semibold">{t("terminalAppearance.customBackgroundLabel")}</span>
+              <span className="w-24 text-ui-body font-semibold">{t("terminalAppearance.customBackgroundLabel")}</span>
               <input
                 type="color"
                 value={isHexColor(bg) ? bg : "#000000"}
@@ -279,7 +279,7 @@ function TerminalAppearanceSettingsContent({
               />
             </label>
             <label className="col-span-12 sm:col-span-6 flex items-center gap-2">
-              <span className="w-24 text-[12px] font-semibold">{t("terminalAppearance.customForegroundLabel")}</span>
+              <span className="w-24 text-ui-body font-semibold">{t("terminalAppearance.customForegroundLabel")}</span>
               <input
                 type="color"
                 value={isHexColor(fg) ? fg : "#ffffff"}
@@ -299,8 +299,8 @@ function TerminalAppearanceSettingsContent({
       )}
 
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-        <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.behaviorHeading")}</div>
-        <div className="grid grid-cols-12 gap-x-3 gap-y-3 text-[12px]">
+        <div className="text-ui-body font-semibold mb-2">{t("terminalAppearance.behaviorHeading")}</div>
+        <div className="grid grid-cols-12 gap-x-3 gap-y-3 text-ui-body">
           <label className="col-span-12 md:col-span-4">
             <span className="block mb-1 text-[var(--taomni-text-muted)]">{t("terminalAppearance.cursorLabel")}</span>
             <select
@@ -441,8 +441,8 @@ function TerminalAppearanceSettingsContent({
       )}
 
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-        <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.inlineSuggestionsHeading")}</div>
-        <div className="grid grid-cols-12 gap-x-3 gap-y-3 text-[12px] items-end">
+        <div className="text-ui-body font-semibold mb-2">{t("terminalAppearance.inlineSuggestionsHeading")}</div>
+        <div className="grid grid-cols-12 gap-x-3 gap-y-3 text-ui-body items-end">
           <div className="col-span-12 md:col-span-7">
             <CheckControl
               testId="terminal-inline-suggestions-toggle"
@@ -450,7 +450,7 @@ function TerminalAppearanceSettingsContent({
               checked={profile.inlineSuggestions}
               onChange={(checked) => updateProfile({ inlineSuggestions: checked })}
             />
-            <p className="mt-1 text-[11px] text-[var(--taomni-text-muted)] leading-snug">
+            <p className="mt-1 text-ui-small text-[var(--taomni-text-muted)] leading-snug">
               {t("terminalAppearance.inlineSuggestionsHint")}
             </p>
           </div>
@@ -488,7 +488,7 @@ function TerminalAppearanceSettingsContent({
           <div className="col-span-12 md:col-span-2 flex md:justify-end">
             <button
               type="button"
-              className="taomni-btn h-8 px-2 text-[11px]"
+              className="taomni-btn h-8 px-2 text-ui-small"
               disabled={clearingHistory}
               onClick={async () => {
                 const confirmed = await confirmAppDialog({
@@ -514,10 +514,10 @@ function TerminalAppearanceSettingsContent({
       </section>
 
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-        <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.aiAssistanceHeading")}</div>
+        <div className="text-ui-body font-semibold mb-2">{t("terminalAppearance.aiAssistanceHeading")}</div>
         <div className="space-y-3">
           <div>
-            <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1.5">{t("terminalAppearance.suggestionSourceLabel")}</div>
+            <div className="text-ui-small text-[var(--taomni-text-muted)] mb-1.5">{t("terminalAppearance.suggestionSourceLabel")}</div>
             <div className="flex flex-col gap-1.5">
               {(
                 [
@@ -537,8 +537,8 @@ function TerminalAppearanceSettingsContent({
                     className="mt-0.5 accent-[var(--taomni-accent)]"
                   />
                   <div>
-                    <div className="text-[12px]">{label}</div>
-                    <div className="text-[11px] text-[var(--taomni-text-muted)]">{desc}</div>
+                    <div className="text-ui-body">{label}</div>
+                    <div className="text-ui-small text-[var(--taomni-text-muted)]">{desc}</div>
                   </div>
                 </label>
               ))}
@@ -552,13 +552,13 @@ function TerminalAppearanceSettingsContent({
               checked={profile.aiCommandRewriteEnabled}
               onChange={(checked) => updateProfile({ aiCommandRewriteEnabled: checked })}
             />
-            <p className="mt-1 text-[11px] text-[var(--taomni-text-muted)] leading-snug">
+            <p className="mt-1 text-ui-small text-[var(--taomni-text-muted)] leading-snug">
               {t("terminalAppearance.enableAiRewriteHint")}
             </p>
-            <label className="mt-2 flex items-center gap-2 text-[11px]">
+            <label className="mt-2 flex items-center gap-2 text-ui-small">
               <span className="text-[var(--taomni-text-muted)]">{t("terminalAppearance.aiRewriteShortcutLabel")}</span>
               <input
-                className="taomni-input h-7 w-32 text-[12px]"
+                className="taomni-input h-7 w-32 text-ui-body"
                 value={profile.aiCommandRewriteShortcut}
                 aria-label={t("terminalAppearance.aiRewriteShortcutAria")}
                 disabled={!profile.aiCommandRewriteEnabled}
@@ -577,7 +577,7 @@ function TerminalAppearanceSettingsContent({
               checked={profile.aiInlineQqRender}
               onChange={(checked) => updateProfile({ aiInlineQqRender: checked })}
             />
-            <p className="mt-1 text-[11px] text-[var(--taomni-text-muted)] leading-snug">
+            <p className="mt-1 text-ui-small text-[var(--taomni-text-muted)] leading-snug">
               {t("terminalAppearance.aiInlineQqHint")}
             </p>
           </div>
@@ -585,8 +585,8 @@ function TerminalAppearanceSettingsContent({
       </section>
 
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-        <div className="text-[12px] font-semibold mb-2">{t("terminalAppearance.commonCommandsHeading")}</div>
-        <p className="text-[11px] text-[var(--taomni-text-muted)] leading-snug mb-2">
+        <div className="text-ui-body font-semibold mb-2">{t("terminalAppearance.commonCommandsHeading")}</div>
+        <p className="text-ui-small text-[var(--taomni-text-muted)] leading-snug mb-2">
           {t("terminalAppearance.commonCommandsHint")}
         </p>
         <CommonCommandsEditor

@@ -241,11 +241,11 @@ function OpenGlobalCommandModal() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
-          <span className="shrink-0 rounded px-1 text-[10px]" style={{ border: "1px solid var(--taomni-divider)", color: "var(--taomni-text-muted)" }}>Ctrl+K</span>
+          <span className="shrink-0 rounded px-1 text-ui-caption" style={{ border: "1px solid var(--taomni-divider)", color: "var(--taomni-text-muted)" }}>Ctrl+K</span>
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-1.5" data-testid="global-search-results">
           {results.length === 0 && (
-            <div className="px-2 py-3 text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.globalSearchEmpty")}</div>
+            <div className="px-2 py-3 text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.globalSearchEmpty")}</div>
           )}
           {results.map((result, index) => (
             <button
@@ -262,10 +262,10 @@ function OpenGlobalCommandModal() {
             >
               <span className="shrink-0" style={{ color: "var(--taomni-text-muted)" }}>{result.icon}</span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12px]">{result.title}</span>
-                <span className="block truncate text-[10px]" style={{ color: "var(--taomni-text-muted)" }}>{result.detail}</span>
+                <span className="block truncate text-ui-body">{result.title}</span>
+                <span className="block truncate text-ui-caption" style={{ color: "var(--taomni-text-muted)" }}>{result.detail}</span>
               </span>
-              <span className="shrink-0 text-[9.5px] uppercase" style={{ color: "var(--taomni-text-muted)" }}>{result.kind}</span>
+              <span className="shrink-0 text-ui-caption uppercase" style={{ color: "var(--taomni-text-muted)" }}>{result.kind}</span>
             </button>
           ))}
         </div>

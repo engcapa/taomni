@@ -13,11 +13,11 @@ export function ModuleTabActions({ slug, disabled }: { slug: string; disabled: b
     {record.manifest.tabs.map((tab) => (
       <button key={tab.kind} type="button" data-testid={`module-action-open-${slug}-${tab.kind}`}
         disabled={disabled || runtime.status !== "ready" || runtime.pending.has(slug)}
-        className="taomni-btn h-7 px-2.5 text-[11px]" onClick={() => {
+        className="taomni-btn h-7 px-2.5 text-ui-small" onClick={() => {
           try { openPluginTab({ slug, kind: tab.kind }); setError(null); }
           catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
         }}>{t("plugins.open", { title: tab.title })}</button>
     ))}
-    {error && <span role="alert" className="text-[12px] text-red-600">{error}</span>}
+    {error && <span role="alert" className="text-ui-body text-red-600">{error}</span>}
   </>;
 }

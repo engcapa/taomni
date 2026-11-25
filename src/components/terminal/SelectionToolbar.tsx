@@ -62,7 +62,7 @@ export function SelectionToolbar({
     >
       <button
         type="button"
-        className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+        className="taomni-btn h-6 px-2 text-ui-small inline-flex items-center gap-1"
         title={t("terminal.selectionCopyTitle")}
         onClick={() => onCopy(selectionText)}
       >
@@ -71,7 +71,7 @@ export function SelectionToolbar({
       </button>
       <button
         type="button"
-        className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+        className="taomni-btn h-6 px-2 text-ui-small inline-flex items-center gap-1"
         title={t("terminal.selectionSendToAiTitle")}
         onClick={() => onSendToAi(selectionText)}
       >
@@ -80,7 +80,7 @@ export function SelectionToolbar({
       </button>
       <button
         type="button"
-        className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+        className="taomni-btn h-6 px-2 text-ui-small inline-flex items-center gap-1"
         title={t("terminal.selectionExplainTitle")}
         onClick={() => onExplain(selectionText)}
       >

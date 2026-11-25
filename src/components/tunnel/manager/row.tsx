@@ -6,7 +6,7 @@ import { type TunnelAuthStatus, type TunnelConfig, type TunnelStatus, type Tunne
 export function Th({ children, className = "" }: { children: React.ReactNode; className?: string; }) {
   return (
     <th
-      className={`px-2 py-1.5 text-[11px] font-semibold text-center border-b ${className}`}
+      className={`px-2 py-1.5 text-ui-small font-semibold text-center border-b ${className}`}
       style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
     >
       {children}
@@ -35,7 +35,7 @@ export function StatusBadge({ status, error }: { status?: TunnelStatus; error?: 
   }
   return (
     <span
-      className="inline-flex items-center gap-1 text-[11px]"
+      className="inline-flex items-center gap-1 text-ui-small"
       style={{ color }}
       title={error ?? label}
     >
@@ -119,7 +119,7 @@ export function TunnelRow({
       style={{ borderColor: "var(--taomni-divider)" }}
     >
       <Td className="text-center">
-        <div className="inline-flex items-center gap-0.5 text-[10px]" style={{ color: "var(--taomni-text-muted)" }}>
+        <div className="inline-flex items-center gap-0.5 text-ui-caption" style={{ color: "var(--taomni-text-muted)" }}>
           <button
             data-testid="tunnel-row-move-up"
             type="button"
@@ -144,16 +144,16 @@ export function TunnelRow({
         </div>
       </Td>
       <Td>
-        <div className="font-semibold text-[12px]">{tunnel.name || t("tunnels.unnamed")}</div>
+        <div className="font-semibold text-ui-body">{tunnel.name || t("tunnels.unnamed")}</div>
         {tunnel.description && (
-          <div className="text-[10.5px]" style={{ color: "var(--taomni-text-muted)" }}>
+          <div className="text-ui-caption" style={{ color: "var(--taomni-text-muted)" }}>
             {tunnel.description}
           </div>
         )}
       </Td>
       <Td className="text-center">
         <span
-          className="inline-block px-1.5 py-0.5 rounded text-[11px]"
+          className="inline-block px-1.5 py-0.5 rounded text-ui-small"
           style={{
             background: "var(--taomni-selected)",
             color: "var(--taomni-accent)",
@@ -180,25 +180,25 @@ export function TunnelRow({
           <StatusBadge status={status?.status} error={status?.error} />
         </div>
         {status?.status === "error" && status.error && (
-          <div className="text-[10.5px] mt-0.5 truncate max-w-[180px] mx-auto" title={status.error} style={{ color: "#b22222" }}>
+          <div className="text-ui-caption mt-0.5 truncate max-w-[180px] mx-auto" title={status.error} style={{ color: "#b22222" }}>
             {status.error}
           </div>
         )}
       </Td>
-      <Td className="text-center taomni-mono text-[12px]">
+      <Td className="text-center taomni-mono text-ui-body">
         {tunnel.listenHost}:{tunnel.listenPort || "?"}
       </Td>
-      <Td className="taomni-mono text-[12px]">{dest}</Td>
+      <Td className="taomni-mono text-ui-body">{dest}</Td>
       <Td>
         <div className="flex items-center gap-1">
-          <span className="taomni-mono text-[12px]">{sshLabel}</span>
-          <span className="text-[10.5px] px-1 rounded" style={{ background: "var(--taomni-hover)", color: "var(--taomni-text-muted)" }}>
+          <span className="taomni-mono text-ui-body">{sshLabel}</span>
+          <span className="text-ui-caption px-1 rounded" style={{ background: "var(--taomni-hover)", color: "var(--taomni-text-muted)" }}>
             {tunnel.ssh.authMethod}
           </span>
           <button
             data-testid="tunnel-row-toggle-reveal"
             type="button"
-            className="text-[10.5px] taomni-mono hover:underline cursor-pointer"
+            className="text-ui-caption taomni-mono hover:underline cursor-pointer"
             style={{ color: "var(--taomni-text-muted)" }}
             onClick={() => setRevealed((v) => !v)}
             title={revealed ? t("tunnels.rowHide") : t("tunnels.rowShow")}

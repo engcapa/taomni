@@ -324,11 +324,11 @@ export function SearchEverywhere({
             <>
               <CommandIcon className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
               <span className="min-w-0 flex-1 truncate text-[var(--taomni-code-text)]">{item.value.title}</span>
-              <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">{item.value.category}</span>
+              <span className="shrink-0 text-ui-caption text-[var(--taomni-code-muted)]">{item.value.category}</span>
               {item.value.keybinding && (
                 <kbd
                   data-testid={`search-everywhere-shortcut-${item.value.id}`}
-                  className="shrink-0 rounded border border-[var(--taomni-code-border)] px-1 text-[10px] text-[var(--taomni-code-muted)]"
+                  className="shrink-0 rounded border border-[var(--taomni-code-border)] px-1 text-ui-caption text-[var(--taomni-code-muted)]"
                 >
                   {item.value.keybinding}
                 </kbd>
@@ -343,11 +343,11 @@ export function SearchEverywhere({
                 ? <Box className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                 : <Braces className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-code-muted)]" />}
               <span className="shrink-0 text-[var(--taomni-code-text)]">{item.value.name}</span>
-              <span className="min-w-0 flex-1 truncate text-[10px] text-[var(--taomni-code-muted)]">
+              <span className="min-w-0 flex-1 truncate text-ui-caption text-[var(--taomni-code-muted)]">
                 {item.value.containerName ? `${item.value.containerName} · ` : ""}
                 {item.value.path}{item.value.resolved ? `:${item.value.line + 1}` : ""}
               </span>
-              <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">
+              <span className="shrink-0 text-ui-caption text-[var(--taomni-code-muted)]">
                 {symbolKindLabel(item.value.kind)}
               </span>
             </>
@@ -359,7 +359,7 @@ export function SearchEverywhere({
           <>
             <File className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
             <span className="shrink-0 text-[var(--taomni-code-text)]">{name}</span>
-            <span className="min-w-0 flex-1 truncate text-[10px] text-[var(--taomni-code-muted)]">
+            <span className="min-w-0 flex-1 truncate text-ui-caption text-[var(--taomni-code-muted)]">
               {item.value.rootName}{dir ? `/${dir}` : ""}
             </span>
           </>
@@ -399,7 +399,7 @@ export function SearchEverywhere({
               data-active={mode === tab.id || undefined}
               data-testid={`search-everywhere-tab-${tab.id}`}
               onMouseDown={(event) => event.preventDefault()}
-              className="h-7 shrink-0 rounded-t px-2.5 text-[11px] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
+              className="h-7 shrink-0 rounded-t px-2.5 text-ui-small text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
               onClick={() => setMode(tab.id)}
             >
               {tab.label}

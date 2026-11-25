@@ -28,7 +28,7 @@ export function MailSubscriptionsDialog(context: MailSubscriptionsDialogContext)
         className="w-[min(520px,90vw)] h-[min(520px,78vh)] min-h-[300px]"
         onClose={() => setSubscriptionsOpen(false)}
       >
-        <div className="h-9 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[12px]">
+        <div className="h-9 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-ui-body">
           <label className="inline-flex items-center gap-1.5">
             <input
               type="checkbox"
@@ -46,7 +46,7 @@ export function MailSubscriptionsDialog(context: MailSubscriptionsDialogContext)
             return (
               <label
                 key={folder.name}
-                className="h-7 px-2 flex items-center gap-2 rounded text-[12px] hover:bg-[var(--taomni-hover)]"
+                className="h-7 px-2 flex items-center gap-2 rounded text-ui-body hover:bg-[var(--taomni-hover)]"
                 style={{ paddingLeft: `${8 + Math.min(folderDepth(folder), 6) * 14}px` }}
                 data-testid="mail-subscription-row"
                 data-folder-name={folder.name}

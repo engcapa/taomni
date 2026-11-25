@@ -131,15 +131,15 @@ export function SqlExecutionSettings() {
       <div className="mb-3 flex items-center gap-3">
         <Crosshair className="h-4 w-4 text-[var(--taomni-accent)]" />
         <div>
-          <div className="text-[14px] font-semibold">{t("settings.sqlExecutionTitle")}</div>
-          <div className="text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-title font-semibold">{t("settings.sqlExecutionTitle")}</div>
+          <div className="text-ui-body text-[var(--taomni-text-muted)]">
             {t("settings.sqlExecutionSubtitle")}
           </div>
         </div>
         <button
           type="button"
           data-testid="sql-execution-reset"
-          className="taomni-btn ml-auto h-7 px-2.5 inline-flex items-center gap-1 text-[11px]"
+          className="taomni-btn ml-auto h-7 px-2.5 inline-flex items-center gap-1 text-ui-small"
           onClick={() => {
             setFieldErrors({});
             setConflictFields({});
@@ -158,13 +158,13 @@ export function SqlExecutionSettings() {
           const error = fieldErrors[field];
           return (
             <div key={field}>
-              <label htmlFor={testId} className="mb-1 block text-[12px] font-medium">
+              <label htmlFor={testId} className="mb-1 block text-ui-body font-medium">
                 {t(labelKey)}
               </label>
               <input
                 id={testId}
                 data-testid={testId}
-                className="taomni-input h-8 w-full font-mono text-[12px]"
+                className="taomni-input h-8 w-full font-mono text-ui-body"
                 value={displaySqlShortcut(preferences[field])}
                 readOnly
                 aria-invalid={error ? "true" : undefined}
@@ -174,7 +174,7 @@ export function SqlExecutionSettings() {
               />
               <p
                 id={`${testId}-hint`}
-                className={`mt-1 text-[11px] ${error ? "" : "text-[var(--taomni-text-muted)]"}`}
+                className={`mt-1 text-ui-small ${error ? "" : "text-[var(--taomni-text-muted)]"}`}
                 style={error ? { color: "var(--taomni-warning, #b45309)" } : undefined}
                 data-testid={error ? `${testId}-error` : undefined}
               >

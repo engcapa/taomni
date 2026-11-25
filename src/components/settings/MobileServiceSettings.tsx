@@ -54,8 +54,8 @@ export function MobileServiceSettings() {
     finally { setBusy(false); }
   }
 
-  return <section data-testid="mobile-settings" className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3 text-[13px]">
-    <h3 className="font-semibold text-[14px]">{t("mobileSettings.title")}</h3>
+  return <section data-testid="mobile-settings" className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3 text-ui-body">
+    <h3 className="font-semibold text-ui-title">{t("mobileSettings.title")}</h3>
     <p className="mt-1 mb-3 text-[var(--taomni-text-muted)]">{t("mobileSettings.description")}</p>
     <div className="flex flex-wrap items-center gap-3">
       <label>

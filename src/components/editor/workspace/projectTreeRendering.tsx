@@ -66,7 +66,7 @@ function renderEntries(
   }
   if (state.error) {
     return [{ key: `${root.id}:${path}:message`, render: () => (
-      <div className="m-2 rounded border border-red-500/30 bg-red-500/10 p-2 text-[12px] text-red-500">
+      <div className="m-2 rounded border border-red-500/30 bg-red-500/10 p-2 text-ui-body text-red-500">
         {state.error}
       </div>
     ) }];
@@ -187,7 +187,7 @@ export function projectTreeRows(props: ProjectTreeRenderProps): ProjectTreeRow[]
                 {root.path}
               </span>
               {rootChangeCount > 0 && (
-                <span className="ml-auto flex shrink-0 items-center gap-1 text-[10px] font-normal text-[var(--taomni-code-muted)]">
+                <span className="ml-auto flex shrink-0 items-center gap-1 text-ui-caption font-normal text-[var(--taomni-code-muted)]">
                   <span className="rounded border border-[var(--taomni-code-border)] px-1">
                     {rootChangeCount}
                   </span>

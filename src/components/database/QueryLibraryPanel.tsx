@@ -308,7 +308,7 @@ export function QueryLibraryPanel({
 
   return (
     <div
-      className="h-full flex flex-col min-h-0 bg-[var(--taomni-bg)] text-[var(--taomni-text)] text-[12px]"
+      className="h-full flex flex-col min-h-0 bg-[var(--taomni-bg)] text-[var(--taomni-text)] text-ui-body"
       data-testid="query-library-panel"
     >
       <div className="p-2 border-b border-[var(--taomni-divider)] flex flex-col gap-2 shrink-0 bg-[var(--taomni-quick-bg)]">
@@ -320,7 +320,7 @@ export function QueryLibraryPanel({
               aria-label="Search saved queries"
               data-testid="query-library-search"
               placeholder="Search queries..."
-              className="taomni-input w-full h-6 text-[11px]"
+              className="taomni-input w-full h-6 text-ui-small"
               style={{ paddingLeft: "24px" }}
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
@@ -338,7 +338,7 @@ export function QueryLibraryPanel({
           </button>
         </div>
 
-        <div className="flex items-center gap-1 text-[10px]">
+        <div className="flex items-center gap-1 text-ui-caption">
           <button
             type="button"
             className="px-1.5 h-5 rounded border"
@@ -387,7 +387,7 @@ export function QueryLibraryPanel({
                       selected ? current.filter((item) => item !== tag) : [...current, tag],
                     )
                   }
-                  className="px-1.5 py-0.5 rounded text-[10px] flex items-center gap-0.5 border"
+                  className="px-1.5 py-0.5 rounded text-ui-caption flex items-center gap-0.5 border"
                   style={{
                     background: selected ? "var(--taomni-selected)" : "transparent",
                     borderColor: selected ? "var(--taomni-accent)" : "var(--taomni-divider)",
@@ -428,8 +428,8 @@ export function QueryLibraryPanel({
                   <div className="flex items-start gap-1.5">
                     <FileText className="w-3.5 h-3.5 text-[var(--taomni-accent)] mt-0.5 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-[12px] truncate block">{query.name}</span>
-                      <span className="text-[9px] text-[var(--taomni-text-muted)] inline-flex items-center gap-0.5">
+                      <span className="font-semibold text-ui-body truncate block">{query.name}</span>
+                      <span className="text-ui-caption text-[var(--taomni-text-muted)] inline-flex items-center gap-0.5">
                         {query.scopeType === "connection" ? (
                           <Link2 className="w-2.5 h-2.5" />
                         ) : (
@@ -451,11 +451,11 @@ export function QueryLibraryPanel({
                       <MoreVertical className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
                     </button>
                   </div>
-                  <div className="taomni-mono text-[10px] text-[var(--taomni-text-muted)] truncate mt-1 px-1 rounded bg-[color-mix(in_srgb,var(--taomni-hover)_40%,transparent)]">
+                  <div className="taomni-mono text-ui-caption text-[var(--taomni-text-muted)] truncate mt-1 px-1 rounded bg-[color-mix(in_srgb,var(--taomni-hover)_40%,transparent)]">
                     {query.content.replace(/\s+/g, " ")}
                   </div>
                   {query.remarks && (
-                    <div className="text-[10px] text-[var(--taomni-text-muted)] truncate mt-0.5">
+                    <div className="text-ui-caption text-[var(--taomni-text-muted)] truncate mt-0.5">
                       {query.remarks}
                     </div>
                   )}
@@ -464,7 +464,7 @@ export function QueryLibraryPanel({
                       {query.tags.map((tag) => (
                         <span
                           key={tag}
-                          className="px-1 rounded-[3px] text-[9px] bg-[var(--taomni-divider)] text-[var(--taomni-text-muted)] inline-flex items-center gap-0.5"
+                          className="px-1 rounded-[3px] text-ui-caption bg-[var(--taomni-divider)] text-[var(--taomni-text-muted)] inline-flex items-center gap-0.5"
                         >
                           <Tag className="w-2 h-2" />
                           {tag}
@@ -478,7 +478,7 @@ export function QueryLibraryPanel({
           </div>
         )}
         {error && filteredQueries.length > 0 && (
-          <div className="px-2 py-1 text-[10px] text-red-500">{error}</div>
+          <div className="px-2 py-1 text-ui-caption text-red-500">{error}</div>
         )}
       </div>
 
@@ -498,7 +498,7 @@ export function QueryLibraryPanel({
             }}
           >
             <div className="flex justify-between items-center pb-2 border-b border-[var(--taomni-divider)] shrink-0">
-              <span className="font-semibold text-[13px]">
+              <span className="font-semibold text-ui-body">
                 {editingQuery ? "Edit Saved Query" : "Save Current Query"}
               </span>
               <button type="button" aria-label="Close" onClick={() => setModalOpen(false)}>
@@ -507,24 +507,24 @@ export function QueryLibraryPanel({
             </div>
             <form ref={formRef} onSubmit={saveQuery} className="flex-1 flex flex-col gap-3 min-h-0">
               <div className="grid grid-cols-[1fr_150px] gap-3 shrink-0">
-                <label className="flex flex-col gap-0.5 text-[11px] text-[var(--taomni-text-muted)]">
+                <label className="flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)]">
                   Name
                   <input
                     type="text"
                     aria-label="Query name"
                     data-testid="query-library-name"
                     placeholder="Automatic: Query-N"
-                    className="taomni-input h-7 w-full text-[12px] px-2"
+                    className="taomni-input h-7 w-full text-ui-body px-2"
                     value={modalName}
                     onChange={(event) => setModalName(event.target.value)}
                   />
                 </label>
-                <label className="flex flex-col gap-0.5 text-[11px] text-[var(--taomni-text-muted)]">
+                <label className="flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)]">
                   Scope
                   <select
                     aria-label="Query scope"
                     data-testid="query-library-scope"
-                    className="taomni-input h-7 w-full text-[12px] px-2"
+                    className="taomni-input h-7 w-full text-ui-body px-2"
                     value={modalScope}
                     onChange={(event) => setModalScope(event.target.value as DbSavedQueryScope)}
                   >
@@ -533,34 +533,34 @@ export function QueryLibraryPanel({
                   </select>
                 </label>
               </div>
-              <label className="flex flex-col gap-0.5 text-[11px] text-[var(--taomni-text-muted)] shrink-0">
+              <label className="flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)] shrink-0">
                 Remarks / Description
                 <textarea
-                  className="taomni-input w-full text-[12px] p-1.5 h-12 resize-none"
+                  className="taomni-input w-full text-ui-body p-1.5 h-12 resize-none"
                   value={modalRemarks}
                   onChange={(event) => setModalRemarks(event.target.value)}
                 />
               </label>
-              <label className="flex flex-col gap-0.5 text-[11px] text-[var(--taomni-text-muted)] shrink-0">
+              <label className="flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)] shrink-0">
                 Tags (comma separated)
                 <input
                   type="text"
-                  className="taomni-input h-7 w-full text-[12px] px-2"
+                  className="taomni-input h-7 w-full text-ui-body px-2"
                   value={modalTags}
                   onChange={(event) => setModalTags(event.target.value)}
                 />
               </label>
-              <label className="flex-1 flex flex-col gap-0.5 text-[11px] text-[var(--taomni-text-muted)] min-h-[120px]">
+              <label className="flex-1 flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)] min-h-[120px]">
                 {contentLabel} content
                 <textarea
                   aria-label={`${contentLabel} content`}
                   data-testid="query-library-content"
-                  className="taomni-input w-full flex-1 text-[11px] taomni-mono p-2 resize-none taomni-scroll-y"
+                  className="taomni-input w-full flex-1 text-ui-small taomni-mono p-2 resize-none taomni-scroll-y"
                   value={modalContent}
                   onChange={(event) => setModalContent(event.target.value)}
                 />
               </label>
-              {error && <div className="text-[11px] text-red-500">{error}</div>}
+              {error && <div className="text-ui-small text-red-500">{error}</div>}
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--taomni-divider)] shrink-0">
                 <button type="button" className="taomni-btn h-8 px-4" onClick={() => setModalOpen(false)}>
                   Cancel

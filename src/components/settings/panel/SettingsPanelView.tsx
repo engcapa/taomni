@@ -163,8 +163,8 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
       >
         <div className="mx-auto max-w-5xl p-5">
           <div className="mb-3">
-            <div className="text-[18px] font-semibold">{t("settings.title")}</div>
-            <div className="text-[12px] text-[var(--taomni-text-muted)]">
+            <div className="text-ui-heading font-semibold">{t("settings.title")}</div>
+            <div className="text-ui-body text-[var(--taomni-text-muted)]">
               {t("settings.subtitle")}
             </div>
           </div>
@@ -197,7 +197,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                 />
               </div>
               {searching && matchIds.length > 0 && (
-                <div className="flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
+                <div className="flex items-center gap-1 text-ui-small text-[var(--taomni-text-muted)]">
                   <span data-testid="settings-search-count" className="tabular-nums">
                     {t("settings.searchResultCount", { current: clampedIndex + 1, total: matchIds.length })}
                   </span>
@@ -232,7 +232,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
             {searching && matchIds.length === 0 && (
               <div
                 data-testid="settings-search-empty"
-                className="mt-2 text-[12px] text-[var(--taomni-text-muted)]"
+                className="mt-2 text-ui-body text-[var(--taomni-text-muted)]"
               >
                 {t("settings.searchNoResults", { query })}
               </div>
@@ -255,8 +255,8 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
               <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
                 <div className="mb-2 flex items-center gap-3">
                   <div>
-                    <h3 id="settings-theme-heading" className="text-[14px] font-semibold">{t("settings.appThemeTitle")}</h3>
-                    <div className="text-[12px] text-[var(--taomni-text-muted)]">
+                    <h3 id="settings-theme-heading" className="text-ui-title font-semibold">{t("settings.appThemeTitle")}</h3>
+                    <div className="text-ui-body text-[var(--taomni-text-muted)]">
                       {t("settings.appThemeCurrent", { mode: themeLabel(mode), resolved: resolvedTheme })}
                     </div>
                   </div>
@@ -270,15 +270,15 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                 <div className="mb-3 flex items-center gap-3">
                   <History className="w-4 h-4 text-[var(--taomni-accent)]" />
                   <div>
-                    <div className="text-[14px] font-semibold">{t("settings.welcomeHistoryTitle")}</div>
-                    <div className="text-[12px] text-[var(--taomni-text-muted)]">
+                    <div className="text-ui-title font-semibold">{t("settings.welcomeHistoryTitle")}</div>
+                    <div className="text-ui-body text-[var(--taomni-text-muted)]">
                       {t("settings.welcomeHistorySubtitle")}
                     </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pt-2 border-t border-[var(--taomni-divider)]">
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="welcome-recent-session-limit" className="text-[12px] font-medium text-[var(--taomni-text-muted)]">
+                    <label htmlFor="welcome-recent-session-limit" className="text-ui-body font-medium text-[var(--taomni-text-muted)]">
                       {t("settings.welcomeHistoryLimitLabel")}
                     </label>
                     <input
@@ -294,7 +294,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                       onChange={(e) => setWelcomeRecentSessionLimit(parseInt(e.target.value, 10))}
                     />
                   </div>
-                  <div className="text-[12px] text-[var(--taomni-text-muted)] flex items-center">
+                  <div className="text-ui-body text-[var(--taomni-text-muted)] flex items-center">
                     {t("settings.welcomeHistoryLimitHint")}
                   </div>
                 </div>
@@ -305,17 +305,17 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
               <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
                 <div className="mb-3 flex items-center gap-3">
                   <div>
-                    <div className="text-[14px] font-semibold flex items-center gap-2">
+                    <div className="text-ui-title font-semibold flex items-center gap-2">
                       <Type className="w-4 h-4 text-[var(--taomni-accent)]" />
                       {t("settings.globalUiTitle")}
                     </div>
-                    <div className="text-[12px] text-[var(--taomni-text-muted)]">
+                    <div className="text-ui-body text-[var(--taomni-text-muted)]">
                       {t("settings.globalUiSubtitle")}
                     </div>
                   </div>
                   <button
                     type="button"
-                    className="taomni-btn ml-auto h-7 px-2.5 inline-flex items-center gap-1 text-[11px]"
+                    className="taomni-btn ml-auto h-7 px-2.5 inline-flex items-center gap-1 text-ui-small"
                     onClick={() => {
                       setUiFontFamily('"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
                       setUiFontSize(12);
@@ -328,7 +328,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pt-2 border-t border-[var(--taomni-divider)]">
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="ui-font-family-select" className="text-[12px] font-medium text-[var(--taomni-text-muted)]">
+                    <label htmlFor="ui-font-family-select" className="text-ui-body font-medium text-[var(--taomni-text-muted)]">
                       {t("settings.fontFamilyLabel")}
                     </label>
                     <FontPickerSelect
@@ -344,14 +344,14 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center text-[12px] font-medium text-[var(--taomni-text-muted)]">
+                    <div className="flex justify-between items-center text-ui-body font-medium text-[var(--taomni-text-muted)]">
                       <label htmlFor="ui-font-size-slider">{t("settings.fontSizeLabel")}</label>
-                      <span className="font-mono bg-[var(--taomni-selected)] text-[var(--taomni-accent)] px-1.5 py-0.5 rounded text-[11px] font-semibold">
+                      <span className="font-mono bg-[var(--taomni-selected)] text-[var(--taomni-accent)] px-1.5 py-0.5 rounded text-ui-small font-semibold">
                         {uiFontSize}px
                       </span>
                     </div>
                     <div className="flex items-center gap-3 mt-1">
-                      <span className="text-[10px] text-[var(--taomni-text-muted)]">A</span>
+                      <span className="text-ui-caption text-[var(--taomni-text-muted)]">A</span>
                       <input
                         id="ui-font-size-slider"
                         type="range"
@@ -362,11 +362,11 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                         onChange={(e) => setUiFontSize(parseInt(e.target.value, 10))}
                         className="flex-1 h-1.5 rounded-lg appearance-none cursor-pointer accent-[var(--taomni-accent)] bg-[var(--taomni-divider)]"
                       />
-                      <span className="text-[14px] font-semibold text-[var(--taomni-text-muted)]">A</span>
+                      <span className="text-ui-title font-semibold text-[var(--taomni-text-muted)]">A</span>
                     </div>
                   </div>
                 </div>
-                <label className="mt-3 pt-2 border-t border-[var(--taomni-divider)] flex items-start gap-2 text-[12px] cursor-pointer">
+                <label className="mt-3 pt-2 border-t border-[var(--taomni-divider)] flex items-start gap-2 text-ui-body cursor-pointer">
                   <input
                     type="checkbox"
                     data-testid="settings-merge-tool-window-rail"
@@ -426,8 +426,8 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
             <SettingsAnchor id="code-view-appearance">
               <div className="mb-4 flex items-center gap-3">
                 <div>
-                  <div className="text-[18px] font-semibold">{t("settings.codeViewAppearanceTitle")}</div>
-                  <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("settings.codeViewAppearanceSubtitle")}</div>
+                  <div className="text-ui-heading font-semibold">{t("settings.codeViewAppearanceTitle")}</div>
+                  <div className="text-ui-body text-[var(--taomni-text-muted)]">{t("settings.codeViewAppearanceSubtitle")}</div>
                 </div>
                 <button
                   data-testid="settings-reset-code-view-profile"
@@ -495,8 +495,8 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
               <div className="mb-4 flex items-center gap-3">
                 <Terminal className="w-4 h-4 text-[var(--taomni-accent)]" />
                 <div>
-                  <div className="text-[18px] font-semibold">{t("settings.terminalDefaultsTitle")}</div>
-                  <div className="text-[12px] text-[var(--taomni-text-muted)]">
+                  <div className="text-ui-heading font-semibold">{t("settings.terminalDefaultsTitle")}</div>
+                  <div className="text-ui-body text-[var(--taomni-text-muted)]">
                     {t("settings.terminalDefaultsSubtitle")}
                   </div>
                 </div>
@@ -587,8 +587,8 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                 <div className="mb-3 flex items-center gap-2">
                   <Bot className="w-4 h-4 text-[var(--taomni-accent)]" />
                   <div>
-                    <div className="text-[14px] font-semibold">{t("settings.aiSection")}</div>
-                    <div className="text-[11px] text-[var(--taomni-text-muted)]">
+                    <div className="text-ui-title font-semibold">{t("settings.aiSection")}</div>
+                    <div className="text-ui-small text-[var(--taomni-text-muted)]">
                       {t("settings.aiSubtitle")}
                     </div>
                   </div>

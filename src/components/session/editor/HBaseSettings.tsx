@@ -112,7 +112,7 @@ export function HBaseSettings({
   };
 
   return (
-    <div data-testid="hbase-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+    <div data-testid="hbase-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-ui-body">
       <Field label="Mode">
         <select
           className="taomni-input w-64"
@@ -308,7 +308,7 @@ export function HBaseSettings({
                 </Field>
               )}
               {!keytabPath.trim() && (
-                <div className="col-span-12 text-[11px] text-[var(--taomni-text-muted)] flex items-center gap-1.5 pl-1">
+                <div className="col-span-12 text-ui-small text-[var(--taomni-text-muted)] flex items-center gap-1.5 pl-1">
                   <Info className="w-3 h-3 shrink-0" />
                   No keytab configured. Run <code className="taomni-mono">kinit</code> manually before connecting.
                 </div>
@@ -341,7 +341,7 @@ export function HBaseSettings({
             }}
           />
         <label
-          className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
+          className="flex items-center gap-1 text-ui-small cursor-pointer ml-2"
           title={vaultState === "empty" ? "Set up the vault on save to store passwords" : "Encrypt and store this password in the vault"}
         >
           <input

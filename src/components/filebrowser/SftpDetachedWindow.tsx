@@ -280,7 +280,7 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
       style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}
     >
       <div
-        className="h-6 px-2 flex items-center text-[11px] font-semibold border-b shrink-0"
+        className="h-6 px-2 flex items-center text-ui-small font-semibold border-b shrink-0"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
         <span className="truncate flex-1">{title}</span>

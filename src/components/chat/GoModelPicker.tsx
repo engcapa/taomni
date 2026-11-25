@@ -25,7 +25,7 @@ export function GoModelLabel({ model }: { model: GoModelEntry }) {
 export function GoCatalogStatus({ blocked = false }: { blocked?: boolean }) {
   const t = useT();
   const catalog = useOpencodeGoStore();
-  return <div className="text-[11px] text-[var(--taomni-text-muted)]" data-testid="go-catalog-status">
+  return <div className="text-ui-small text-[var(--taomni-text-muted)]" data-testid="go-catalog-status">
     <span>{t("opencodeGo.catalog", { count: catalog.models.length })} · {t(`opencodeGo.${catalog.source}`)} · {catalog.fetched_at
       ? new Date(catalog.fetched_at * 1000).toLocaleString() : t("opencodeGo.notRefreshed")}</span>
     <button type="button" data-testid="go-catalog-refresh" className="taomni-btn ml-2 px-2"
@@ -63,9 +63,9 @@ export function GoModelPicker({ value, defaultModel, onChange, blocked = false, 
     finally { setSaving(false); }
   };
   return <div data-testid={testId} className="min-w-0 max-w-full space-y-1">
-    <input data-testid={`${testId}-search`} className="taomni-input h-6 w-full text-[11px]"
+    <input data-testid={`${testId}-search`} className="taomni-input h-6 w-full text-ui-small"
       aria-label={t("opencodeGo.search")} placeholder={t("opencodeGo.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
-    {models.length > 0 ? <select data-testid={`${testId}-select`} className="taomni-input h-7 w-full text-[11px]"
+    {models.length > 0 ? <select data-testid={`${testId}-select`} className="taomni-input h-7 w-full text-ui-small"
       aria-label={t("opencodeGo.model")} value={selected} disabled={saving}
       onChange={(e) => void change(e.target.value || null)}>
       {inherit && <option value="">{t("opencodeGo.inherit", { model: defaultModel })}</option>}
@@ -74,7 +74,7 @@ export function GoModelPicker({ value, defaultModel, onChange, blocked = false, 
       {GO_PROTOCOLS.map((protocol) => <optgroup key={protocol} label={protocol}>
         {filtered.filter((m) => m.protocol === protocol).map((model) => <option key={model.id} value={model.id}><GoModelLabel model={model} /></option>)}
       </optgroup>)}
-    </select> : <input data-testid={`${testId}-fallback`} className="taomni-input h-7 w-full text-[11px]"
+    </select> : <input data-testid={`${testId}-fallback`} className="taomni-input h-7 w-full text-ui-small"
       aria-label={t("opencodeGo.model")} value={selected} onChange={(e) => void change(e.target.value || null)} />}
     {error && <p role="alert">{error}</p>}
   </div>;

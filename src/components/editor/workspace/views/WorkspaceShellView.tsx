@@ -185,7 +185,7 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
             data-testid="workspace-resource-cleanup-recovery"
             role="status"
             aria-live="polite"
-            className="shrink-0 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px]"
+            className="shrink-0 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-ui-small"
           >
             {recoveryState.resourceCleanupRecoveries.map((recovery) => (
               <div

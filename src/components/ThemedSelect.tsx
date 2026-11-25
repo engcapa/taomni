@@ -138,6 +138,6 @@ export function ThemedSelect<Value extends string>({ value, options, onChange, l
         onClick={() => pick(index)}>
         <span>{option.label}</span>{index === selected && <Check aria-hidden="true" />}
       </button>)}
-    </div>, document.body)}
+    </div>, trigger.current?.closest("dialog[open]") ?? document.body)}
   </>;
 }

@@ -112,7 +112,7 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
     <div data-testid="sftp-browser" className="w-full h-full flex flex-col" style={{ background: "var(--taomni-bg)" }}>
       {props.showHeader && (
         <div
-          className="h-6 px-2 flex items-center text-[11px] font-semibold border-b shrink-0 gap-1"
+          className="h-6 px-2 flex items-center text-ui-small font-semibold border-b shrink-0 gap-1"
           style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
         >
           <span className="truncate flex-1">{props.title ?? t("fileBrowser.headerSftp")}</span>
@@ -127,9 +127,9 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
               onClick={() => setShowMappings((v) => !v)}
             >
               <Map className="w-3 h-3" />
-              <span className="text-[10px]">{t("fileBrowser.pathMappingsToggle")}</span>
+              <span className="text-ui-caption">{t("fileBrowser.pathMappingsToggle")}</span>
               <span
-                className="text-[10px] rounded-full px-1"
+                className="text-ui-caption rounded-full px-1"
                 style={{ background: "var(--taomni-accent)", color: "white", minWidth: "14px", textAlign: "center" }}
               >
                 {mappings.length}
@@ -163,7 +163,7 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
       )}
       {showCwdToolbar && (
         <div
-          className="text-[11px] px-2 py-1 border-b shrink-0 flex items-center gap-2"
+          className="text-ui-small px-2 py-1 border-b shrink-0 flex items-center gap-2"
           style={{
             borderColor: "var(--taomni-divider)",
             background: "var(--taomni-quick-bg)",
@@ -199,7 +199,7 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
               <Map className="w-3 h-3" />
               <span>{t("fileBrowser.pathMappingsToggle")}</span>
               <span
-                className="text-[10px] rounded-full px-1"
+                className="text-ui-caption rounded-full px-1"
                 style={{ background: "var(--taomni-accent)", color: "white", minWidth: "14px", textAlign: "center" }}
               >
                 {mappings.length}
@@ -211,7 +211,7 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
       {/* Standalone mappings toolbar — shown for non-header tabs that have mappings */}
       {!props.showHeader && !showCwdToolbar && mappings.length > 0 && (
         <div
-          className="text-[11px] px-2 py-1 border-b shrink-0 flex items-center gap-2"
+          className="text-ui-small px-2 py-1 border-b shrink-0 flex items-center gap-2"
           style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
         >
           <OrientationToggle orientation={orientation} onChange={setOrientation} t={t} />
@@ -227,7 +227,7 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
             <Map className="w-3 h-3" />
             <span>{t("fileBrowser.pathMappingsToggle")}</span>
             <span
-              className="text-[10px] rounded-full px-1"
+              className="text-ui-caption rounded-full px-1"
               style={{ background: "var(--taomni-accent)", color: "white", minWidth: "14px", textAlign: "center" }}
             >
               {mappings.length}
@@ -242,7 +242,7 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
           className="border-b shrink-0 px-3 py-2"
           style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
         >
-          <div className="text-[11px] font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: "var(--taomni-accent)" }}>
+          <div className="text-ui-small font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: "var(--taomni-accent)" }}>
             <Map className="w-3 h-3" />
             {t("fileBrowser.pathMappingsTitle")}
           </div>
@@ -258,7 +258,7 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
                   <button
                     key={i}
                     type="button"
-                    className="text-[10px] px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] inline-flex items-center gap-1"
+                    className="text-ui-caption px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] inline-flex items-center gap-1"
                     style={{ border: "1px solid var(--taomni-divider)", color: "var(--taomni-text-muted)" }}
                     title={`${t("fileBrowser.pathMappingsNavigateLocal")}: ${m.localPath}`}
                     onClick={() => {
@@ -415,7 +415,7 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
       {/* Connection changes must not move the navigation controls during input. */}
       {banner && (
         <div
-          className="text-[11px] px-2 py-1 border-b shrink-0"
+          className="text-ui-small px-2 py-1 border-b shrink-0"
           style={{
             borderColor: "var(--taomni-divider)",
             background: session?.error ? "#fde7e2" : "var(--taomni-quick-bg)",

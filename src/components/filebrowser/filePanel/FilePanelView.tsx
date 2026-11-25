@@ -122,11 +122,11 @@ export function FilePanelView(inputs: FilePanelViewProps) {
   return ((
     <div data-testid={`sftp-${side}-pane`} className="h-full w-full min-w-0 flex flex-col min-h-0">
       <div
-        className="h-7 flex items-center px-2 text-[11px] border-b shrink-0 gap-2"
+        className="h-7 flex items-center px-2 text-ui-small border-b shrink-0 gap-2"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
         <span
-          className="px-1.5 py-[1px] text-[10px] font-bold tracking-wider rounded shrink-0"
+          className="px-1.5 py-[1px] text-ui-caption font-bold tracking-wider rounded shrink-0"
           style={{
             background: side === "remote" ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
             color: "#fff",
@@ -137,7 +137,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
         </span>
         {subtitle && (
           <span
-            className="truncate text-[11px]"
+            className="truncate text-ui-small"
             style={{ color: "var(--taomni-text-muted)" }}
             title={subtitle}
           >
@@ -152,7 +152,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
             value={filterText ?? ""}
             placeholder={t("fileBrowser.filterPlaceholder")}
             onChange={(e) => onFilterTextChange(e.target.value)}
-            className="taomni-input h-5 px-1.5 text-[11px] w-[140px] rounded shrink-0"
+            className="taomni-input h-5 px-1.5 text-ui-small w-[140px] rounded shrink-0"
             style={{
               background: "var(--taomni-input-bg)",
               border: "1px solid var(--taomni-input-border)",
@@ -273,7 +273,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
         <div
           data-testid={`sftp-${side}-listing-status`}
           role="status"
-          className="min-h-6 flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1 border-b shrink-0 text-[11px]"
+          className="min-h-6 flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1 border-b shrink-0 text-ui-small"
           style={{
             borderColor: "var(--taomni-divider)",
             background: "var(--taomni-quick-bg)",
@@ -328,7 +328,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
       <div
         ref={listRef}
         data-testid={`sftp-${side}-list`}
-        className="flex-1 overflow-auto text-[12px] relative"
+        className="flex-1 overflow-auto text-ui-body relative"
         onDragOver={interactions.handleDragOver}
         onDragLeave={interactions.handleDragLeave}
         onDrop={interactions.handleDrop}
@@ -365,7 +365,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
             <col style={{ width: columns.colWidths.type }} />
           </colgroup>
           <thead className="sticky top-0 z-10" style={{ background: "var(--taomni-quick-bg)" }}>
-            <tr className="text-[11px] uppercase tracking-wide" style={{ color: "var(--taomni-text-muted)" }}>
+            <tr className="text-ui-small uppercase tracking-wide" style={{ color: "var(--taomni-text-muted)" }}>
               <SortHeader
                 label={t("fileBrowser.sortName")}
                 active={sortKey === "name"}
@@ -413,7 +413,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
           <tbody>
             {pane.error && (
               <tr>
-                <td colSpan={4} className="px-2 py-2 text-red-500 text-[11px]">
+                <td colSpan={4} className="px-2 py-2 text-red-500 text-ui-small">
                   {pane.error}
                 </td>
               </tr>
@@ -452,7 +452,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
                     <FileTypeIcon entry={entry} />
                     <span className="truncate">{entry.name}</span>
                     {entry.symlinkTarget && (
-                      <span className="truncate text-[10px] text-[var(--taomni-text-muted)]">→ {entry.symlinkTarget}</span>
+                      <span className="truncate text-ui-caption text-[var(--taomni-text-muted)]">→ {entry.symlinkTarget}</span>
                     )}
                   </div>
                 </td>
@@ -472,7 +472,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
           </tbody>
         </table>
       </div>
-      <div className="h-5 px-2 text-[11px] flex items-center border-t shrink-0"
+      <div className="h-5 px-2 text-ui-small flex items-center border-t shrink-0"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-status-bg)", color: "var(--taomni-status-text)" }}>
         {pane.loading
           ? t("fileBrowser.statusLoading")

@@ -189,7 +189,7 @@ export function MailSettings({
   })();
 
   return (
-    <div data-testid="mail-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+    <div data-testid="mail-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-ui-body">
       <Field label="Provider">
         <Select
           value={provider}
@@ -289,7 +289,7 @@ export function MailSettings({
           Online lookup
         </label>
         {autoconfigResult && (
-          <span className="ml-2 text-[11px] text-[var(--taomni-text-muted)]" data-testid="mail-autoconfig-result">
+          <span className="ml-2 text-ui-small text-[var(--taomni-text-muted)]" data-testid="mail-autoconfig-result">
             {autoconfigResult}
           </span>
         )}
@@ -331,7 +331,7 @@ export function MailSettings({
                 }}
               />
               <label
-                className="ml-2 inline-flex items-center gap-1 text-[11px] cursor-pointer"
+                className="ml-2 inline-flex items-center gap-1 text-ui-small cursor-pointer"
                 title={vaultState === "empty" ? "Set up the vault to save this secret" : "Save this secret in the encrypted vault"}
               >
                 <input
@@ -453,7 +453,7 @@ export function MailSettings({
             }}
           />
           <label
-            className="ml-2 inline-flex items-center gap-1 text-[11px] cursor-pointer"
+            className="ml-2 inline-flex items-center gap-1 text-ui-small cursor-pointer"
             title={vaultState === "empty" ? "Set up the vault to save this secret" : "Save this secret in the encrypted vault"}
           >
             <input
@@ -527,7 +527,7 @@ export function MailSettings({
                 }}
               />
               <label
-                className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
+                className="flex items-center gap-1 text-ui-small cursor-pointer ml-2"
                 title={vaultState === "empty" ? "Set up the vault on save to store this token" : "Encrypt and store this token in the vault"}
               >
                 <input
@@ -737,7 +737,7 @@ export function MailSettings({
           title="0 keeps headers of any age; otherwise by server arrival time"
           onChange={(e) => setHeaderRetentionDays(e.target.value)}
         />
-        <span className="ml-1 text-[11px] text-[var(--taomni-text-muted)]">0 = all</span>
+        <span className="ml-1 text-ui-small text-[var(--taomni-text-muted)]">0 = all</span>
         <span className="ml-3 text-[var(--taomni-text-muted)]">Bodies</span>
         <input
           className="taomni-input w-16 ml-1"

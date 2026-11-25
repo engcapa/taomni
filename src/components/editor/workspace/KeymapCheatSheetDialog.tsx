@@ -100,16 +100,16 @@ export function KeymapCheatSheetDialog({
       data-testid="keymap-cheatsheet-dialog"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
     >
-      <div className="flex h-[80vh] w-full max-w-4xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-[12px] text-[var(--taomni-code-fg)]">
+      <div className="flex h-[80vh] w-full max-w-4xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-fg)]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-3">
           <div className="flex items-center gap-2">
             <Keyboard className="h-5 w-5 text-sky-400" />
             <div>
-              <h2 id="keymap-cheatsheet-title" className="text-[14px] font-semibold">
+              <h2 id="keymap-cheatsheet-title" className="text-ui-title font-semibold">
                 Keyboard Shortcuts & Keymap
               </h2>
-              <p className="text-[11px] text-[var(--taomni-code-muted)] mt-0.5">
+              <p className="text-ui-small text-[var(--taomni-code-muted)] mt-0.5">
                 {boundCommands.length} shortcut keybindings configured (IntelliJ IDEA keymap layout)
               </p>
             </div>
@@ -126,7 +126,7 @@ export function KeymapCheatSheetDialog({
         </div>
 
         {/* Toolbar & Search */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/30 px-4 py-2 text-[11px]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/30 px-4 py-2 text-ui-small">
           {/* Category Chips */}
           <div className="flex flex-wrap items-center gap-1.5">
             {categories.map((category) => (
@@ -155,7 +155,7 @@ export function KeymapCheatSheetDialog({
               placeholder="Search shortcut or action..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-7 w-60 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-7 pr-2 text-[11px] text-[var(--taomni-code-fg)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-sky-500"
+              className="h-7 w-60 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-7 pr-2 text-ui-small text-[var(--taomni-code-fg)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-sky-500"
             />
           </div>
         </div>
@@ -182,12 +182,12 @@ export function KeymapCheatSheetDialog({
                   className="group flex items-center justify-between py-2 px-2 rounded hover:bg-[var(--taomni-code-active-line-bg)]/50 transition-colors"
                 >
                   <div className="flex items-center gap-2 min-w-0 pr-4">
-                    <span className="rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 text-[10px] text-[var(--taomni-code-muted)] shrink-0 font-medium">
+                    <span className="rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 text-ui-caption text-[var(--taomni-code-muted)] shrink-0 font-medium">
                       {command.category}
                     </span>
                     {provenance && (
                       <span
-                        className={`rounded px-1.5 py-0.5 text-[9px] font-medium shrink-0 ${
+                        className={`rounded px-1.5 py-0.5 text-ui-caption font-medium shrink-0 ${
                           provenance === "local"
                             ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                             : provenance === "provider"
@@ -201,8 +201,8 @@ export function KeymapCheatSheetDialog({
                       </span>
                     )}
                     <div className="min-w-0 truncate">
-                      <span className="font-medium text-[12px]">{command.title}</span>
-                      <span className="ml-2 font-mono text-[10px] text-[var(--taomni-code-muted)] opacity-60">
+                      <span className="font-medium text-ui-body">{command.title}</span>
+                      <span className="ml-2 font-mono text-ui-caption text-[var(--taomni-code-muted)] opacity-60">
                         {command.id}
                       </span>
                     </div>
@@ -217,22 +217,22 @@ export function KeymapCheatSheetDialog({
                             {parts.map((p, pIdx) => (
                               <kbd
                                 key={pIdx}
-                                className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[var(--taomni-code-fg)] shadow-sm"
+                                className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 font-mono text-ui-caption font-semibold text-[var(--taomni-code-fg)] shadow-sm"
                               >
                                 {p}
                               </kbd>
                             ))}
                             {idx < bindings.length - 1 && (
-                              <span className="text-[10px] text-[var(--taomni-code-muted)] mx-0.5">or</span>
+                              <span className="text-ui-caption text-[var(--taomni-code-muted)] mx-0.5">or</span>
                             )}
                           </div>
                         );
                       })}
                       {bindings.length === 0 && (
-                        <span className="text-[10px] text-[var(--taomni-code-muted)] opacity-70">no shortcut</span>
+                        <span className="text-ui-caption text-[var(--taomni-code-muted)] opacity-70">no shortcut</span>
                       )}
                       {bindings.length > 1 && (
-                        <span className="text-[10px] text-[var(--taomni-code-muted)] mx-0.5">or</span>
+                        <span className="text-ui-caption text-[var(--taomni-code-muted)] mx-0.5">or</span>
                       )}
                       {(command.bindingConflicts?.length ?? 0) > 0 && (
                         <span
@@ -254,7 +254,7 @@ export function KeymapCheatSheetDialog({
                           onClose();
                           onExecuteCommand(command.id);
                         }}
-                        className="opacity-0 group-hover:opacity-100 rounded px-2 py-0.5 text-[10px] font-medium bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 transition-opacity"
+                        className="opacity-0 group-hover:opacity-100 rounded px-2 py-0.5 text-ui-caption font-medium bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 transition-opacity"
                       >
                         Run
                       </button>
@@ -267,7 +267,7 @@ export function KeymapCheatSheetDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/20 px-4 py-2.5 text-[11px] text-[var(--taomni-code-muted)]">
+        <div className="flex items-center justify-between border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/20 px-4 py-2.5 text-ui-small text-[var(--taomni-code-muted)]">
           <div className="flex items-center gap-1.5">
             <Sparkles className="h-3.5 w-3.5 text-amber-400" />
             <span>IntelliJ IDEA keymap & actions · Local / LSP provider-backed execution</span>

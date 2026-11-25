@@ -34,11 +34,11 @@ export function DocumentListPanel({
   });
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 text-[12px]" data-testid="notepad-doc-list">
+    <div className="flex flex-col flex-1 min-h-0 text-ui-body" data-testid="notepad-doc-list">
       <div className="flex items-center gap-1 px-2 py-1 border-b border-[var(--taomni-divider)]">
-        <span className="text-[10px] text-[var(--taomni-text-muted)]">{label("排序：", "Sort:")}</span>
+        <span className="text-ui-caption text-[var(--taomni-text-muted)]">{label("排序：", "Sort:")}</span>
         <select
-          className="np-input h-6 text-[11px] flex-1"
+          className="np-input h-6 text-ui-small flex-1"
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as "order" | "name" | "dirty")}
         >

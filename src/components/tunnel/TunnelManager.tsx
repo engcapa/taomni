@@ -321,17 +321,17 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
         <NetworkIcon className="w-4 h-4" style={{ color: "var(--taomni-accent)" }} />
-        <div className="text-[13px] font-semibold" style={{ color: "var(--taomni-accent)" }}>
+        <div className="text-ui-body font-semibold" style={{ color: "var(--taomni-accent)" }}>
           {t("tunnels.headerTitle")}
         </div>
-        <div className="text-[11px] ml-2" style={{ color: "var(--taomni-text-muted)" }}>
+        <div className="text-ui-small ml-2" style={{ color: "var(--taomni-text-muted)" }}>
           {t("tunnels.headerSubtitle")}
         </div>
       </div>
 
       {!tauri && (
         <div
-          className="px-4 py-1.5 text-[11px] border-b shrink-0 flex items-center gap-1.5"
+          className="px-4 py-1.5 text-ui-small border-b shrink-0 flex items-center gap-1.5"
           style={{
             background: "rgba(255,196,0,0.12)",
             borderColor: "var(--taomni-divider)",
@@ -349,7 +349,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
           className="rounded border overflow-hidden"
           style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}
         >
-          <table data-testid="tunnel-list" className="w-full text-[12px] border-collapse">
+          <table data-testid="tunnel-list" className="w-full text-ui-body border-collapse">
             <thead>
               <tr style={{ background: "var(--taomni-quick-bg)", color: "var(--taomni-text)" }}>
                 <Th>{t("tunnels.thOrder")}</Th>
@@ -459,7 +459,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
           </button>
         )}
         <div className="flex-1" />
-        <span className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
+        <span className="text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>
           {t("tunnels.countSummary", {
             count: tunnels.length,
             plural: tunnels.length === 1 ? "" : "s",

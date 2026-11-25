@@ -153,11 +153,11 @@ export function AnalysisPanel({
   const baselineEntries: InspectionBaselineEntry[] = profile.baseline.entries;
 
   return (
-    <section data-testid="code-workspace-analysis-panel" className="flex h-full min-h-0 flex-col text-[11px]">
+    <section data-testid="code-workspace-analysis-panel" className="flex h-full min-h-0 flex-col text-ui-small">
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-2">
         <Activity className="h-3.5 w-3.5 text-[var(--taomni-accent)]" />
         <span className="font-medium">Analysis</span>
-        <span className="ml-auto text-[10px] text-[var(--taomni-code-muted)]">
+        <span className="ml-auto text-ui-caption text-[var(--taomni-code-muted)]">
           {effectiveDiagnostics.length}/{diagnostics.length} visible
         </span>
       </div>
@@ -181,14 +181,14 @@ export function AnalysisPanel({
             )}
           </div>
           {!projectAnalysis && (
-            <div className="rounded border border-[var(--taomni-code-border)] p-2 text-[10px] text-[var(--taomni-code-muted)]">
+            <div className="rounded border border-[var(--taomni-code-border)] p-2 text-ui-caption text-[var(--taomni-code-muted)]">
               No project analysis facts yet — add a workspace root to query the provider.
             </div>
           )}
           {projectAnalysis && (
             <div
               data-testid="analysis-project-card"
-              className="space-y-1 rounded border border-[var(--taomni-code-border)] p-2 text-[10px]"
+              className="space-y-1 rounded border border-[var(--taomni-code-border)] p-2 text-ui-caption"
             >
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span
@@ -236,7 +236,7 @@ export function AnalysisPanel({
               )}
               <div
                 data-testid="analysis-project-fingerprint"
-                className="truncate font-mono text-[9px] text-[var(--taomni-code-muted)]"
+                className="truncate font-mono text-ui-caption text-[var(--taomni-code-muted)]"
                 title={`Project fingerprint ${projectAnalysis.projectFingerprint} (generation ${projectAnalysis.generation})`}
               >
                 fp {projectAnalysis.projectFingerprint.slice(0, 16)}… · gen {projectAnalysis.generation}
@@ -255,7 +255,7 @@ export function AnalysisPanel({
             {/* §8.20.3 W2 copy rule: this ledger is Provider freshness, never “Index ready”. */}
             <span>Provider freshness</span>
           </div>
-          <div className="space-y-1 rounded border border-[var(--taomni-code-border)] p-2 text-[10px]">
+          <div className="space-y-1 rounded border border-[var(--taomni-code-border)] p-2 text-ui-caption">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="font-medium">{workspaceSemanticIndexStatusLabel(semanticIndex)}</span>
               <span className="text-[var(--taomni-code-muted)]">
@@ -313,7 +313,7 @@ export function AnalysisPanel({
                   {status.active ? "active" : status.error ?? "inactive"}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-[var(--taomni-code-muted)]">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-ui-caption text-[var(--taomni-code-muted)]">
                 {capabilities.map(([label, enabled]) => (
                   <span key={label} className="inline-flex items-center gap-1">
                     {enabled ? <CheckCircle2 className="h-3 w-3 text-emerald-500" /> : <Circle className="h-3 w-3" />}
@@ -322,11 +322,11 @@ export function AnalysisPanel({
                 ))}
               </div>
               {status.capabilities?.codeActionKinds && status.capabilities.codeActionKinds.length > 0 && (
-                <div className="pt-1 text-[10px] text-[var(--taomni-code-muted)]">
+                <div className="pt-1 text-ui-caption text-[var(--taomni-code-muted)]">
                   Code action kinds: {status.capabilities.codeActionKinds.join(", ")}
                 </div>
               )}
-              <div className="pt-1 text-[10px] text-[var(--taomni-code-muted)]">
+              <div className="pt-1 text-ui-caption text-[var(--taomni-code-muted)]">
                 Semantic tokens received: {semanticTokenCount}
               </div>
             </div>
@@ -341,7 +341,7 @@ export function AnalysisPanel({
                 inspection engine. */}
             <span>Diagnostic presentation profile</span>
           </div>
-          <div className="text-[10px] text-[var(--taomni-code-muted)]">
+          <div className="text-ui-caption text-[var(--taomni-code-muted)]">
             Display/severity overrides only — analysis runs in the language server.
           </div>
           {ruleIds.length === 0 && (
@@ -370,7 +370,7 @@ export function AnalysisPanel({
                       : Number(event.target.value) as InspectionSeverity;
                     onUpdateRule(id, { severity: value });
                   }}
-                  className="h-6 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[10px]"
+                  className="h-6 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-ui-caption"
                 >
                   {SEVERITIES.map((severity) => (
                     <option key={String(severity.value)} value={severity.value}>{severity.label}</option>
@@ -382,28 +382,28 @@ export function AnalysisPanel({
           <div data-testid="analysis-inspection-baseline" className="space-y-1 rounded border border-[var(--taomni-code-border)] p-2">
             <div className="flex items-center gap-1">
               <span className="font-medium">Baseline</span>
-              <span className="text-[10px] text-[var(--taomni-code-muted)]">{baselineEntries.length} entries</span>
+              <span className="text-ui-caption text-[var(--taomni-code-muted)]">{baselineEntries.length} entries</span>
               <span className="ml-auto flex items-center gap-1">
-                <button type="button" data-testid="analysis-baseline-create" className="h-6 rounded px-1.5 text-[10px] hover:bg-[var(--taomni-code-active-line-bg)]" onClick={onCreateBaseline}>Create from scope</button>
+                <button type="button" data-testid="analysis-baseline-create" className="h-6 rounded px-1.5 text-ui-caption hover:bg-[var(--taomni-code-active-line-bg)]" onClick={onCreateBaseline}>Create from scope</button>
                 <button type="button" data-testid="analysis-baseline-import" aria-label="Import inspection baseline" title="Import inspection baseline" className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)]" onClick={onImportBaseline}><Upload className="h-3 w-3" /></button>
                 <button type="button" data-testid="analysis-baseline-export" aria-label="Export inspection baseline" title="Export inspection baseline" className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)]" onClick={onExportBaseline} disabled={baselineEntries.length === 0}><Download className="h-3 w-3" /></button>
                 <button type="button" data-testid="analysis-baseline-clear" aria-label="Clear inspection baseline" title="Clear inspection baseline" className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)]" onClick={onClearBaseline} disabled={baselineEntries.length === 0}><Trash2 className="h-3 w-3" /></button>
               </span>
             </div>
-            {baselineEntries.length === 0 && <div className="text-[10px] text-[var(--taomni-code-muted)]">No baseline entries. Add a provider diagnostic from Problems.</div>}
+            {baselineEntries.length === 0 && <div className="text-ui-caption text-[var(--taomni-code-muted)]">No baseline entries. Add a provider diagnostic from Problems.</div>}
             {baselineEntries.slice(0, 100).map((entry) => (
-              <div key={inspectionBaselineEntryKey(entry)} className="flex min-w-0 items-center gap-1 text-[10px]">
+              <div key={inspectionBaselineEntryKey(entry)} className="flex min-w-0 items-center gap-1 text-ui-caption">
                 <span className="min-w-0 flex-1 truncate" title={`${entry.path}: ${entry.message}`}>{entry.inspectionId} · {entry.path} · {entry.message}</span>
                 <button type="button" aria-label={`Remove baseline ${entry.inspectionId}`} title="Remove baseline entry" className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)]" onClick={() => onRemoveBaselineEntry(inspectionBaselineEntryKey(entry))}><Trash2 className="h-3 w-3" /></button>
               </div>
             ))}
-            <div className="text-[10px] text-[var(--taomni-code-muted)]">Baseline suppresses matching provider messages only; it is not a native inspection engine.</div>
+            <div className="text-ui-caption text-[var(--taomni-code-muted)]">Baseline suppresses matching provider messages only; it is not a native inspection engine.</div>
           </div>
           <div data-testid="analysis-inspection-suppressions" className="space-y-1 rounded border border-[var(--taomni-code-border)] p-2">
             <div className="font-medium">Suppressions · {profile.suppressions.length}</div>
-            {profile.suppressions.length === 0 && <div className="text-[10px] text-[var(--taomni-code-muted)]">No file or line suppressions.</div>}
+            {profile.suppressions.length === 0 && <div className="text-ui-caption text-[var(--taomni-code-muted)]">No file or line suppressions.</div>}
             {profile.suppressions.slice(0, 100).map((entry) => (
-              <div key={inspectionSuppressionKey(entry)} className="flex min-w-0 items-center gap-1 text-[10px]">
+              <div key={inspectionSuppressionKey(entry)} className="flex min-w-0 items-center gap-1 text-ui-caption">
                 <span className="min-w-0 flex-1 truncate" title={`${entry.path}:${entry.line == null ? "file" : entry.line + 1}`}>{entry.inspectionId} · {entry.path} · {entry.line == null ? "file" : `line ${entry.line + 1}`}</span>
                 <button type="button" aria-label={`Remove suppression ${entry.inspectionId}`} title="Remove suppression" className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)]" onClick={() => onRemoveSuppression(inspectionSuppressionKey(entry))}><Trash2 className="h-3 w-3" /></button>
               </div>
@@ -432,7 +432,7 @@ export function AnalysisPanel({
                 <span className="min-w-0 flex-1 break-words">{display.message}</span>
                 <ExternalLink className="h-3 w-3 shrink-0" />
               </button>
-              <div className="mt-1 flex items-center gap-2 text-[10px] text-[var(--taomni-code-muted)]">
+              <div className="mt-1 flex items-center gap-2 text-ui-caption text-[var(--taomni-code-muted)]">
                 <span data-testid={`analysis-evidence-kind-${evidence.kind}`}>{evidence.label}</span>
                 <span>{evidence.confidence} provider evidence</span>
                 <span data-testid="analysis-evidence-proof-level">
@@ -450,7 +450,7 @@ export function AnalysisPanel({
                         <button
                           key={`${label}:${stepIndex}`}
                           type="button"
-                          className="flex w-full items-start gap-1 text-left text-[10px] text-[var(--taomni-code-muted)] hover:text-[var(--taomni-accent)]"
+                          className="flex w-full items-start gap-1 text-left text-ui-caption text-[var(--taomni-code-muted)] hover:text-[var(--taomni-accent)]"
                           onClick={() => onOpenLocation(step.location!)}
                         >
                           <span className="min-w-0 flex-1 break-words">{step.message}</span>
@@ -458,7 +458,7 @@ export function AnalysisPanel({
                         </button>
                       )
                       : (
-                        <div key={`${label}:${stepIndex}`} className="text-[10px] text-[var(--taomni-code-muted)]">
+                        <div key={`${label}:${stepIndex}`} className="text-ui-caption text-[var(--taomni-code-muted)]">
                           {step.message} · {label}
                         </div>
                       );
@@ -470,7 +470,7 @@ export function AnalysisPanel({
                   <button
                     key={`${relatedLabel(related)}:${relatedIndex}`}
                     type="button"
-                    className="flex w-full items-start gap-1 text-left text-[10px] text-[var(--taomni-code-muted)] hover:text-[var(--taomni-accent)]"
+                    className="flex w-full items-start gap-1 text-left text-ui-caption text-[var(--taomni-code-muted)] hover:text-[var(--taomni-accent)]"
                     onClick={() => onOpenLocation(related.location)}
                   >
                     <span className="min-w-0 flex-1 break-words">{related.message}</span>

@@ -177,7 +177,7 @@ export function ObjectStorageBrowser({ sessionId, config, title }: ObjectStorage
   return (
     <div className="h-full w-full flex flex-col min-h-0">
       <div
-        className="h-7 flex items-center px-3 text-[11px] border-b shrink-0 gap-2"
+        className="h-7 flex items-center px-3 text-ui-small border-b shrink-0 gap-2"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
         <span className="font-semibold">{title ?? providerLabel}</span>

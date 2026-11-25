@@ -109,11 +109,11 @@ export function SettingsGroup({
           ) : (
             <ChevronRight className="h-4 w-4 shrink-0 text-[var(--taomni-text-muted)]" />
           )}
-          <span className="flex-1 text-[13px] font-semibold tracking-wide">{title}</span>
+          <span className="flex-1 text-ui-body font-semibold tracking-wide">{title}</span>
           {searching && hasMatch && (
             <span
               data-testid={`settings-group-match-count-${id}`}
-              className="tabular-nums text-[11px] font-medium text-[var(--taomni-accent)]"
+              className="tabular-nums text-ui-small font-medium text-[var(--taomni-accent)]"
             >
               {matchCount}
             </span>

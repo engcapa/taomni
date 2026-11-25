@@ -113,19 +113,19 @@ export function SessionImportPreview({
         >
           <div className="text-sm font-semibold">{t("importPreviewExt.titleSource", { source })}</div>
           <div
-            className="text-[12px] text-[var(--taomni-text-muted)] mt-1"
+            className="text-ui-body text-[var(--taomni-text-muted)] mt-1"
             data-testid="session-import-preview-summary"
           >
             {selectedCount} of {total} session{total === 1 ? "" : "s"} will be imported into {target}
             {result.skipped ? `, ${result.skipped} skipped` : ""}.
           </div>
           {sessionPasswordCount > 0 && (
-            <div className="text-[12px] text-[var(--taomni-text-muted)] mt-1">
+            <div className="text-ui-body text-[var(--taomni-text-muted)] mt-1">
               {sessionPasswordCount} saved password{sessionPasswordCount === 1 ? "" : "s"} will be stored in the Taomni credential vault.
             </div>
           )}
           {standaloneSecretCount > 0 && (
-            <div className="text-[12px] text-[var(--taomni-text-muted)] mt-1">
+            <div className="text-ui-body text-[var(--taomni-text-muted)] mt-1">
               + {standaloneSecretCount} standalone secret{standaloneSecretCount === 1 ? "" : "s"} (e.g. private-key passphrases) will be saved as separate vault entries.
             </div>
           )}
@@ -134,7 +134,7 @@ export function SessionImportPreview({
         {result.warnings.length > 0 && (
           <div
             data-testid="session-import-preview-warnings"
-            className="mx-4 mt-3 rounded border p-2 text-[12px]"
+            className="mx-4 mt-3 rounded border p-2 text-ui-body"
             style={{ borderColor: "#c78b2d", background: "rgba(199,139,45,0.12)" }}
           >
             <div className="font-semibold mb-1">{t("importPreviewExt.warningsHeading")}</div>
@@ -155,7 +155,7 @@ export function SessionImportPreview({
           {previewRows.length > 0 ? (
             <table
               data-testid="session-import-preview-table"
-              className="w-full border-collapse text-[12px]"
+              className="w-full border-collapse text-ui-body"
             >
               <thead>
                 <tr style={{ background: "var(--taomni-hover)" }}>
@@ -210,12 +210,12 @@ export function SessionImportPreview({
               </tbody>
             </table>
           ) : (
-            <div className="text-[12px] text-[var(--taomni-text-muted)]">
+            <div className="text-ui-body text-[var(--taomni-text-muted)]">
               {t("importPreviewExt.noImportable")}
             </div>
           )}
           {remaining > 0 && (
-            <div className="mt-2 text-[12px] text-[var(--taomni-text-muted)]">
+            <div className="mt-2 text-ui-body text-[var(--taomni-text-muted)]">
               {t("importPreviewExt.moreNotShown", { count: remaining, plural: remaining === 1 ? "" : "s" })}
             </div>
           )}

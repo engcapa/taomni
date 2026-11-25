@@ -101,7 +101,7 @@ export function BranchFilterSelect({
         className="taomni-input h-7 w-full px-2 text-left inline-flex items-center gap-1"
         onClick={() => setOpen((current) => !current)}
       >
-        <span className="min-w-0 flex-1 truncate text-[12px]">{selectedLabel}</span>
+        <span className="min-w-0 flex-1 truncate text-ui-body">{selectedLabel}</span>
         <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
       </button>
       {open && (
@@ -116,7 +116,7 @@ export function BranchFilterSelect({
               <input
                 ref={inputRef}
                 type="search"
-                className="taomni-input h-7 w-full pl-7 text-[12px]"
+                className="taomni-input h-7 w-full pl-7 text-ui-body"
                 placeholder="Filter branches"
                 aria-label="Filter branches"
                 value={query}
@@ -132,7 +132,7 @@ export function BranchFilterSelect({
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-0.5">
             {filtered.length === 0 ? (
-              <div className="px-2 py-3 text-center text-[11px] text-[var(--taomni-text-muted)]">
+              <div className="px-2 py-3 text-center text-ui-small text-[var(--taomni-text-muted)]">
                 No matching branches
               </div>
             ) : (
@@ -147,7 +147,7 @@ export function BranchFilterSelect({
                     aria-selected={isSelected}
                     data-testid={`${testId}-option`}
                     data-value={item.value}
-                    className={`w-full h-7 px-2 text-left text-[12px] rounded flex items-center gap-1 cursor-pointer outline-none ${
+                    className={`w-full h-7 px-2 text-left text-ui-body rounded flex items-center gap-1 cursor-pointer outline-none ${
                       isSelected
                         ? "bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)]"
                         : "hover:bg-[var(--taomni-hover)]"

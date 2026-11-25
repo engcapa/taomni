@@ -49,7 +49,7 @@ export function GitDiffPeek({
       }}
       className="absolute left-10 top-3 z-20 max-h-[70%] w-[min(640px,calc(100%-4rem))] overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-2xl"
     >
-      <div className="flex h-8 items-center gap-1 border-b border-[var(--taomni-code-border)] px-2 text-[10px] text-[var(--taomni-code-muted)]">
+      <div className="flex h-8 items-center gap-1 border-b border-[var(--taomni-code-border)] px-2 text-ui-caption text-[var(--taomni-code-muted)]">
         {onPrevious && (
           <button
             type="button"
@@ -133,7 +133,7 @@ export function GitDiffPeek({
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="max-h-[360px] overflow-auto font-mono text-[11px] leading-5">
+      <div className="max-h-[360px] overflow-auto font-mono text-ui-small leading-5">
         {change.oldText && change.oldText.split("\n").map((line, lineIndex) => (
           <div key={`old:${lineIndex}`} data-testid="git-diff-peek-old-line" className="flex bg-red-500/10 text-red-400">
             <span className="w-7 shrink-0 select-none text-center opacity-60">−</span>

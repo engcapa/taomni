@@ -147,7 +147,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
 
       {!state.scrollResult && toolbar}
 
-      {state.phase === "select" && state.displays.length > 1 && <label data-testid="screenshot-display-picker" className="fixed top-4 left-4 z-50 rounded-lg p-2 text-[13px]" style={panelStyle}>
+      {state.phase === "select" && state.displays.length > 1 && <label data-testid="screenshot-display-picker" className="fixed top-4 left-4 z-50 rounded-lg p-2 text-ui-body" style={panelStyle}>
         {state.t("screenshot.selectDisplay")}
         <select data-testid="screenshot-display-select" aria-label={state.t("screenshot.selectDisplay")} disabled={state.busy} value={state.init?.displayId ?? ""} onChange={(e) => void actions.changeDisplay(e.target.value)} className="ml-2 rounded p-1 bg-[var(--taomni-panel-bg)]">
           {state.displays.map((display, i) => <option key={display.id} value={display.id}>{i + 1}. {display.name} · {display.width} × {display.height}</option>)}
@@ -156,7 +156,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
 
       {state.pinDoneOpen && <div data-testid="screenshot-pin-done-dialog" role="dialog" aria-modal="true" aria-label={state.t("screenshot.pinDoneTitle")}
         className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 90, background: "rgba(0,0,0,0.45)" }}>
-        <div className="rounded-xl shadow-2xl p-5 max-w-md text-[13px]" style={panelStyle}>
+        <div className="rounded-xl shadow-2xl p-5 max-w-md text-ui-body" style={panelStyle}>
           <p className="font-medium mb-2">{state.t("screenshot.pinDoneTitle")}</p>
           <p className="mb-4">{state.t("screenshot.pinDoneHint")}</p>
           <div className="flex flex-wrap gap-2">
@@ -175,7 +175,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
       {/* Busy state (scroll capture / recording start). */}
       {state.scrollConfirm && <div data-testid="screenshot-scroll-confirm" role="dialog" aria-label={state.t("screenshot.scrollCapture")}
         className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 80, background: "rgba(0,0,0,0.25)" }}>
-        <div className="rounded-xl shadow-2xl p-5 w-96 text-[13px]" style={panelStyle}>
+        <div className="rounded-xl shadow-2xl p-5 w-96 text-ui-body" style={panelStyle}>
           <p className="font-medium mb-2">{state.t("screenshot.scrollCapture")}</p>
           <fieldset className="flex gap-4 mb-3">
             <legend className="sr-only">{state.t("screenshot.scrollMode")}</legend>
@@ -196,7 +196,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
       {state.phase === "busy" && (
         <div
           data-testid="screenshot-scroll-busy"
-          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-xl px-5 py-3 text-[13px] shadow-2xl"
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-xl px-5 py-3 text-ui-body shadow-2xl"
           style={{ zIndex: 60, ...panelStyle }}
         >
           {state.t("screenshot.scrollCapturing")}
@@ -206,7 +206,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
       {/* Bottom hint bar while selecting. */}
       {state.phase === "select" && !state.dragging && (
         <div
-          className="fixed left-1/2 -translate-x-1/2 bottom-8 flex items-center gap-3 rounded-full px-4 py-2 shadow-2xl text-[13px]"
+          className="fixed left-1/2 -translate-x-1/2 bottom-8 flex items-center gap-3 rounded-full px-4 py-2 shadow-2xl text-ui-body"
           style={{ zIndex: 50, ...panelStyle }}
         >
           <span data-testid="screenshot-hint">{state.t(state.selectionMode === "freehand" ? "screenshot.freehandHint" : "screenshot.selectHint")}</span>
@@ -220,7 +220,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
             type="button"
             data-testid="screenshot-fullscreen"
             onClick={selection.fullscreenSelect}
-            className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[12px]"
+            className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-ui-body"
             style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
           >
             <Maximize size={13} />
@@ -275,7 +275,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[13px] font-medium">{state.t("screenshot.ocrTitle")}</span>
+            <span className="text-ui-body font-medium">{state.t("screenshot.ocrTitle")}</span>
             <button
               type="button"
               data-testid="screenshot-ocr-close"
@@ -287,7 +287,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
             </button>
           </div>
           {state.ocrLoading ? (
-            <div className="text-[13px] opacity-70 py-4 text-center">{state.t("screenshot.ocrLoading")}</div>
+            <div className="text-ui-body opacity-70 py-4 text-center">{state.t("screenshot.ocrLoading")}</div>
           ) : (
             <>
               <textarea
@@ -296,7 +296,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
                 value={state.ocrText}
                 rows={8}
                 aria-label={state.t("screenshot.ocrTitle")}
-                className="taomni-input w-full px-2 py-1.5 text-[13px] font-mono resize-y mb-2"
+                className="taomni-input w-full px-2 py-1.5 text-ui-body font-mono resize-y mb-2"
               />
               <button
                 type="button"
@@ -307,7 +307,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
                     .then(() => state.showToast(state.t("screenshot.ocrCopied")))
                     .catch(() => state.showToast(state.t("screenshot.ocrCopyFailed")));
                 }}
-                className="w-full rounded px-2 py-1.5 text-[13px]"
+                className="w-full rounded px-2 py-1.5 text-ui-body"
                 style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
               >
                 {state.t("screenshot.ocrCopy")}
@@ -321,7 +321,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
         <div
           data-testid="screenshot-scroll-error"
           role="alert"
-          className="fixed left-1/2 -translate-x-1/2 bottom-20 w-[min(640px,90vw)] rounded-lg px-4 py-3 text-[13px] shadow-2xl"
+          className="fixed left-1/2 -translate-x-1/2 bottom-20 w-[min(640px,90vw)] rounded-lg px-4 py-3 text-ui-body shadow-2xl"
           style={{ zIndex: 70, ...panelStyle }}
         >
           <p className="break-words">{state.t("screenshot.scrollFailed", { error: state.scrollError })}</p>
@@ -336,7 +336,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
         <div
           data-testid="screenshot-toast"
           role="status"
-          className="fixed left-1/2 -translate-x-1/2 bottom-20 rounded-full px-4 py-2 text-[13px] shadow-2xl"
+          className="fixed left-1/2 -translate-x-1/2 bottom-20 rounded-full px-4 py-2 text-ui-body shadow-2xl"
           style={{ zIndex: 90, background: "rgba(20, 20, 20, 0.92)", color: "#ffffff" }}
         >
           {state.toast}

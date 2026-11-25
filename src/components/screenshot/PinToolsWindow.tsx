@@ -156,7 +156,7 @@ export function PinToolsWindow() {
       <h1 className="text-sm font-medium">{t("screenshot.pinOptions")}</h1>
       <button data-testid="screenshot-pin-tools-close" onClick={close} aria-label={t("screenshot.cancel")}>×</button>
     </header>
-      {target ? <div data-pin-controls data-testid="screenshot-pin-menu" className="flex-1 flex min-h-0 flex-col rounded-lg bg-black/90 text-white text-[12px] cursor-default">
+      {target ? <div data-pin-controls data-testid="screenshot-pin-menu" className="flex-1 flex min-h-0 flex-col rounded-lg bg-black/90 text-white text-ui-body cursor-default">
         <div role="tablist" aria-label={t("screenshot.pinOptions")} className="flex gap-1 p-2">
           <button role="tab" data-testid="screenshot-pin-tab-pin" aria-selected={menuTab === "pin"} onClick={() => setMenuTab("pin")}
             className={`flex-1 h-8 rounded ${menuTab === "pin" ? "bg-white/25 font-medium" : "bg-white/10 hover:bg-white/20"}`}>{t("screenshot.pinTabPin")}</button>
@@ -210,6 +210,6 @@ export function PinToolsWindow() {
           </div>
         </div>}
       </div> : <p role="status" className="p-3 text-sm">{t("common.loading")}</p>}
-    {(localError || view.error || view.notice) && <p role={localError || view.error ? "alert" : "status"} className="p-3 text-[12px]">{localError ?? view.error ?? view.notice}</p>}
+    {(localError || view.error || view.notice) && <p role={localError || view.error ? "alert" : "status"} className="p-3 text-ui-body">{localError ?? view.error ?? view.notice}</p>}
   </section>;
 }

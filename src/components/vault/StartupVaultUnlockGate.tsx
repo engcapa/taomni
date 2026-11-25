@@ -76,7 +76,7 @@ function StartupVaultCheckOverlay({ onCancel }: { onCancel: () => void }) {
         zIndex: 10001,
       }}
     >
-      <div className="flex flex-col items-center gap-3 text-[12px]">
+      <div className="flex flex-col items-center gap-3 text-ui-body">
         <span>{t("common.loading")}</span>
         <button type="button" data-testid="startup-vault-check-cancel" className="rounded border px-3 py-1" onClick={onCancel}>
           {t("common.cancel")}

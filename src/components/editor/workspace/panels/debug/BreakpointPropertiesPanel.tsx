@@ -17,7 +17,7 @@ export interface BreakpointPropertiesPanelProps {
   testIdPrefix: string;
 }
 
-const inputClass = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none focus:border-[var(--taomni-accent)] disabled:opacity-50";
+const inputClass = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none focus:border-[var(--taomni-accent)] disabled:opacity-50";
 
 /**
  * A text field that commits on blur/Enter and keeps its draft while the
@@ -140,7 +140,7 @@ export function BreakpointPropertiesPanel({
   const masters = otherBreakpoints.filter((ref) => !(ref.path === path && ref.line === breakpoint.line));
 
   return (
-    <div data-testid={id("properties")} className="space-y-1.5 text-[11px] text-[var(--taomni-text)]">
+    <div data-testid={id("properties")} className="space-y-1.5 text-ui-small text-[var(--taomni-text)]">
       <Check testId={id("enabled")} checked={enabled} onChange={(checked) => onChange({ enabled: checked })}>
         Enabled
       </Check>
@@ -238,7 +238,7 @@ export function BreakpointPropertiesPanel({
             <select
               data-testid={id("depends-on")}
               aria-label="Disable until hitting the following breakpoint"
-              className="h-6 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1 text-[11px]"
+              className="h-6 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1 text-ui-small"
               value={masterKey}
               onChange={(event) => {
                 const target = masters.find((ref) => breakpointRefKey(ref.path, ref.line) === event.target.value);

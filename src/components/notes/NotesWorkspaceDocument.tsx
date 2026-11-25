@@ -103,7 +103,7 @@ export function NotesWorkspaceDocument({ tab, visible, onCommandsChange }: { tab
     {doc && file && <div data-testid="notes-workspace-editor" className="fv min-h-0 flex-1">
       <MarkdownEditor document={file} owner={markdownOwner} requestedMode={markdownMode} onModeChange={onMarkdownMode} onError={report} />
     </div>}
-    <div data-testid="notes-workspace-status" className="flex shrink-0 gap-3 border-t border-[var(--taomni-divider)] px-2 py-1 text-[11px] text-[var(--taomni-text-muted)]">
+    <div data-testid="notes-workspace-status" className="flex shrink-0 gap-3 border-t border-[var(--taomni-divider)] px-2 py-1 text-ui-small text-[var(--taomni-text-muted)]">
       <span>Markdown</span><span>{t(doc?.saving ? "notes.savingContent" : doc?.dirty ? "notes.modifiedContent" : "notes.savedContent")}</span>
       <span>{t("notes.sharedContent")}</span>
     </div>

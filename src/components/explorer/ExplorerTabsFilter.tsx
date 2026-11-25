@@ -110,7 +110,7 @@ export function ExplorerTabsFilter() {
           {categoryLabel(category)}<span className="ml-1 opacity-60">{category === "all" ? tabs.length : counts.get(category) ?? 0}</span>
         </button>)}
       </div>
-      <div className="border-t px-3 py-1 text-[10px] text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
+      <div className="border-t px-3 py-1 text-ui-caption text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
         {label(`当前可见 ${matches.length} / 全部 ${tabs.length}`, `${matches.length} visible / ${tabs.length} total`)}
       </div>
       <div id="explorer-filter-tab-list" role="listbox" aria-label={label("已打开的标签", "Open tabs")} className="min-h-0 overflow-y-auto p-1">
@@ -120,7 +120,7 @@ export function ExplorerTabsFilter() {
           aria-selected={tab.id === activeTabId} data-highlighted={highlightedId === tab.id || undefined}
           title={explorerTabPath(tab) || tab.title} onClick={() => pick(tab.id)}
           className="flex w-full min-w-0 items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-[var(--taomni-hover)] aria-selected:text-[var(--taomni-accent)] data-[highlighted=true]:bg-[var(--taomni-selected)]">
-          <span className="w-12 shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{categoryLabel(explorerTabCategory(tab))}</span>
+          <span className="w-12 shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">{categoryLabel(explorerTabCategory(tab))}</span>
           <span className="min-w-0 truncate">{tab.title}</span>
         </button>)}
       </div>

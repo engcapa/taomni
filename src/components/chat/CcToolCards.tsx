@@ -51,7 +51,7 @@ function UsageFooter({
   if (usage.duration_ms != null) parts.push(`${(usage.duration_ms / 1000).toFixed(1)}s`);
   if (parts.length === 0) return null;
   return (
-    <div className="text-[9px] text-[var(--taomni-text-muted)] tabular-nums">
+    <div className="text-ui-caption text-[var(--taomni-text-muted)] tabular-nums">
       {parts.join(" · ")}
     </div>
   );

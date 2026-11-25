@@ -31,11 +31,11 @@ export function DocumentationPane({
     return (
       <div
         data-testid="code-workspace-documentation-pane"
-        className="flex h-full min-h-0 flex-col items-center justify-center gap-2 px-4 text-center text-[11px] text-[var(--taomni-code-muted)]"
+        className="flex h-full min-h-0 flex-col items-center justify-center gap-2 px-4 text-center text-ui-small text-[var(--taomni-code-muted)]"
       >
         <BookOpen className="h-5 w-5 opacity-60" />
         <p>No pinned documentation.</p>
-        <p className="text-[10px] opacity-80">
+        <p className="text-ui-caption opacity-80">
           Press Ctrl+Q (or F1) on a symbol, then pin the quick doc here.
         </p>
       </div>
@@ -47,7 +47,7 @@ export function DocumentationPane({
   return (
     <div
       data-testid="code-workspace-documentation-pane"
-      className="flex h-full min-h-0 flex-col text-[12px]"
+      className="flex h-full min-h-0 flex-col text-ui-body"
     >
       <div className="flex h-8 shrink-0 items-center gap-1 border-b border-[var(--taomni-code-border)] px-2">
         <button
@@ -89,7 +89,7 @@ export function DocumentationPane({
           <button
             type="button"
             aria-label="Clear documentation"
-            className="h-6 rounded px-1.5 text-[10px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            className="h-6 rounded px-1.5 text-ui-caption text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={onClear}
           >
             Clear
@@ -101,7 +101,7 @@ export function DocumentationPane({
         onClick={onBodyClick}
         dangerouslySetInnerHTML={{ __html: html }}
       />
-      {linkError && <div role="status" className="px-2 pb-1 text-[10px] text-red-400">{linkError}</div>}
+      {linkError && <div role="status" className="px-2 pb-1 text-ui-caption text-red-400">{linkError}</div>}
       <ReferenceContentFooter content={content} onOpenSource={onOpenSource} />
     </div>
   );

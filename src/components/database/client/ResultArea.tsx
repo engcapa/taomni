@@ -50,7 +50,7 @@ export function ResultArea({
   const sheetMenu = useContextMenu();
   const showingLog = panel.logActive && panel.log.length > 0;
   const sheet = showingLog ? null : activeSheet(panel);
-  const tab = "h-6 px-3 text-[11px] inline-flex items-center";
+  const tab = "h-6 px-3 text-ui-small inline-flex items-center";
   const latestRun = panel.log[0] ?? null;
   const latestRunHasFailure = !!latestRun?.entries.some((entry) => entry.status === "failed" || entry.status === "cancelled");
   const waitingForFirstResult =
@@ -119,7 +119,7 @@ export function ResultArea({
             type="button"
             data-testid="result-log-tab"
             data-active={showingLog ? "true" : "false"}
-            className="h-6 shrink-0 px-2 inline-flex items-center gap-1 text-[11px]"
+            className="h-6 shrink-0 px-2 inline-flex items-center gap-1 text-ui-small"
             style={{
               background: showingLog ? "var(--taomni-tab-active)" : "var(--taomni-tab-inactive)",
               color: showingLog ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
@@ -133,12 +133,12 @@ export function ResultArea({
           >
             <ScrollText className="w-3 h-3" />
             Log
-            {latestRunHasFailure && <span className="text-[10px]" style={{ color: "#d9534f" }}>●</span>}
+            {latestRunHasFailure && <span className="text-ui-caption" style={{ color: "#d9534f" }}>●</span>}
           </button>
         )}
         {panel.sheets.length === 0 ? (
           panel.log.length === 0 && (
-            <span className="px-2 pb-1 text-[11px] text-[var(--taomni-text-muted)]">Result sheets</span>
+            <span className="px-2 pb-1 text-ui-small text-[var(--taomni-text-muted)]">Result sheets</span>
           )
         ) : (
           panel.sheets.map((resultSheet) => {
@@ -149,7 +149,7 @@ export function ResultArea({
                 type="button"
                 data-testid="result-sheet-tab"
                 data-sheet-id={resultSheet.id}
-                className="h-6 max-w-[220px] min-w-0 px-2 inline-flex items-center gap-1 overflow-hidden text-[11px]"
+                className="h-6 max-w-[220px] min-w-0 px-2 inline-flex items-center gap-1 overflow-hidden text-ui-small"
                 style={{
                   background: active ? "var(--taomni-tab-active)" : "var(--taomni-tab-inactive)",
                   color: active ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
@@ -163,12 +163,12 @@ export function ResultArea({
                 title={resultSheetTimingTitle(resultSheet)}
               >
                 <span className="truncate">{resultSheet.title}</span>
-                <span className="shrink-0 font-mono text-[10px] opacity-80">
+                <span className="shrink-0 font-mono text-ui-caption opacity-80">
                   {formatClockTime(resultSheet.createdAt)}
                 </span>
                 {resultSheet.running && <Loader2 className="w-3 h-3 shrink-0 animate-spin" />}
                 {(resultSheet.error || resultSheet.warnings.length > 0) && (
-                  <span className="text-[10px] shrink-0">●</span>
+                  <span className="text-ui-caption shrink-0">●</span>
                 )}
                 <X
                   className="w-3 h-3 shrink-0 hover:text-[var(--taomni-text)]"
@@ -201,7 +201,7 @@ export function ResultArea({
             Messages{(sheet.error || sheet.warnings.length > 0) ? " ●" : ""}
           </button>
           <span
-            className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-1.5 text-[10px] text-[var(--taomni-text-muted)] font-mono"
+            className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-1.5 text-ui-caption text-[var(--taomni-text-muted)] font-mono"
             title={resultSheetTimingTitle(sheet)}
           >
             <Clock className="w-3 h-3" />
@@ -212,7 +212,7 @@ export function ResultArea({
                 ? ` | ${formatDurationMs(sheet.result.durationMs) ?? "0 ms"}`
                 : ""}
           </span>
-          <span className="ml-auto truncate px-2 text-[10px] text-[var(--taomni-text-muted)] font-mono" title={sheet.sql}>
+          <span className="ml-auto truncate px-2 text-ui-caption text-[var(--taomni-text-muted)] font-mono" title={sheet.sql}>
             {sheet.sql.replace(/\s+/g, " ")}
           </span>
         </div>
@@ -221,12 +221,12 @@ export function ResultArea({
         {showingLog ? (
           <ExecutionLogView runs={panel.log} onSelectSheet={onSheetSelect} />
         ) : !sheet ? (
-          <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="flex-1 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
             Run a query to create a result sheet.
           </div>
         ) : sheet.resultTab === "results" ? (
           waitingForFirstResult ? (
-            <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+            <div className="flex-1 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
               {sheet.cancelling ? "Cancelling…" : "Running…"}
             </div>
           ) : sheet.result ? (
@@ -248,13 +248,13 @@ export function ResultArea({
               />
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+            <div className="flex-1 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
               {sheet.running ? "Running…" : "Run a query to see results."}
             </div>
           )
         ) : (
           <div
-            className="flex-1 overflow-auto taomni-scroll-y p-2 text-[12px] font-mono"
+            className="flex-1 overflow-auto taomni-scroll-y p-2 text-ui-body font-mono"
             style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
           >
             {sheet.error && <div style={{ color: "#d9534f" }}>{sheet.error}</div>}

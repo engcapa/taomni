@@ -328,7 +328,7 @@ export function KeymapSettingsDialog({
       >
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm">{item.title}</div>
-          <div className="truncate text-[11px] opacity-60">
+          <div className="truncate text-ui-small opacity-60">
             {item.category} · {item.id}
             {row?.source === "user" ? " · modified" : ""}
             {item.state.availability !== "available" && !disabled
@@ -339,19 +339,19 @@ export function KeymapSettingsDialog({
         </div>
         <div className="flex items-center gap-1">
           {shortcuts.length === 0 && (
-            <span data-testid={`keymap-no-shortcut-${item.id}`} className="text-[11px] opacity-50">no shortcut</span>
+            <span data-testid={`keymap-no-shortcut-${item.id}`} className="text-ui-small opacity-50">no shortcut</span>
           )}
           {shortcuts.map((shortcut, index) => renderChip(item, shortcut, index, conflicts, capturing))}
           <button
             type="button"
             data-testid={`keymap-add-${item.id}`}
             aria-label={capturing ? `Recording shortcut for ${item.title}` : `Add shortcut to ${item.title}`}
-            className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[11px] hover:bg-[var(--taomni-code-hover)]"
+            className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-ui-small hover:bg-[var(--taomni-code-hover)]"
             onClick={() => startKeyboardCapture(item.id, null)}
           >
             {capturing ? "recording…" : "+ Add"}
           </button>
-          <label className="ml-1 flex items-center gap-1 text-[11px]">
+          <label className="ml-1 flex items-center gap-1 text-ui-small">
             <input
               type="checkbox"
               aria-label={`Action ${item.title} enabled`}
@@ -383,7 +383,7 @@ export function KeymapSettingsDialog({
     return (
       <span
         key={`${item.id}-${label}-${index}`}
-        className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1 py-0.5 text-[11px]"
+        className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1 py-0.5 text-ui-small"
         title={conflicts.length
           ? `Also used by: ${conflicts.map((entry) => `${entry.title} (${entry.actionId})`).join(", ")}`
           : undefined}

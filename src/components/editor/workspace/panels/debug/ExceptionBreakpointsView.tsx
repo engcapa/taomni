@@ -30,7 +30,7 @@ export function ExceptionBreakpointsView({ debug }: ExceptionBreakpointsViewProp
     .map((breakpoint) => [breakpoint.filterId, breakpoint]));
   const supportsFilterOptions = debug.capabilities.supportsExceptionFilterOptions === true;
   const exceptionModes = breakpointModesFor(parseBreakpointModes(debug.capabilities), "exception");
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none";
   return (
     <div data-testid="debug-exception-breakpoints">
       {debug.availableExceptionFilters.map((filter, index) => {
@@ -98,7 +98,7 @@ export function ExceptionBreakpointsView({ debug }: ExceptionBreakpointsViewProp
                       data-testid={`debug-exception-breakpoint-mode-${index}`}
                       aria-label={`Breakpoint mode for ${filter.label}`}
                       title={exceptionModes.find((entry) => entry.mode === mode)?.description}
-                      className="h-5 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-[11px] outline-none"
+                      className="h-5 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-ui-small outline-none"
                       value={mode ?? exceptionModes[0].mode}
                       onChange={(event) => debug.setExceptionBreakpointOptions(
                         filter.filter,
@@ -154,7 +154,7 @@ export function ExceptionBreakpointRulesView({
     setNewRule("");
     setEditingRuleId(id);
   };
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none";
   return (
     <div data-testid="debug-exception-rules" className="border-t border-[var(--taomni-code-border)]/60 pt-1">
       {supported ? (
@@ -184,7 +184,7 @@ export function ExceptionBreakpointRulesView({
       ) : (
         <div
           data-testid="debug-exception-rule-unsupported"
-          className="px-3 py-1 text-[10px] text-[var(--taomni-text-muted)]"
+          className="px-3 py-1 text-ui-caption text-[var(--taomni-text-muted)]"
         >
           This adapter does not support class or package exception rules.
         </div>
@@ -235,7 +235,7 @@ export function ExceptionBreakpointRulesView({
               <select
                 data-testid={`debug-exception-rule-mode-${index}`}
                 aria-label={`Break mode for ${exceptionBreakpointRuleLabel(rule)}`}
-                className="h-5 max-w-32 shrink-0 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[10px]"
+                className="h-5 max-w-32 shrink-0 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-ui-caption"
                 value={rule.breakMode}
                 onChange={(event) => debug.setExceptionBreakpointRuleOptions(rule.id, {
                   breakMode: event.target.value as DebugExceptionBreakMode,
@@ -291,7 +291,7 @@ export function ExceptionBreakpointRuleEditor({
   onChange: (options: Partial<DebugExceptionBreakpointRule>) => void;
 }) {
   const [newSegment, setNewSegment] = useState("");
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none";
   const setSegment = (segmentIndex: number, names: string[]) => {
     const path = names.length > 0
       ? rule.path.map((segment, index) => (index === segmentIndex ? { ...segment, names } : segment))
@@ -320,7 +320,7 @@ export function ExceptionBreakpointRuleEditor({
             />
           </div>
           <label
-            className="inline-flex h-5 shrink-0 items-center gap-1 text-[10px] text-[var(--taomni-text-muted)]"
+            className="inline-flex h-5 shrink-0 items-center gap-1 text-ui-caption text-[var(--taomni-text-muted)]"
             title="Exclude these names from this path segment"
           >
             <input

@@ -319,7 +319,7 @@ export function HierarchyPanel({
           <span className="text-[var(--taomni-code-muted)]"> — {displayPath(node.item)}:{node.item.selectionRange.start.line + 1}</span>
           {node.cycle && <span className="ml-1 text-amber-500">↻</span>}
         </button>
-        <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">
+        <span className="shrink-0 text-ui-caption text-[var(--taomni-code-muted)]">
           {symbolKindLabel(node.item.kind)}
         </span>
         <button
@@ -335,7 +335,7 @@ export function HierarchyPanel({
         <button
           key={`${node.id}:call:${index}`}
           type="button"
-          className="flex h-6 w-full items-center gap-1 text-left text-[10px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+          className="flex h-6 w-full items-center gap-1 text-left text-ui-caption text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
           style={{ paddingLeft: `${28 + node.depth * 14}px` }}
           onClick={() => onOpenLocation(itemLocation(node.callSiteItem, range))}
         >
@@ -355,14 +355,14 @@ export function HierarchyPanel({
     <section
       data-testid={`code-workspace-${mode}-hierarchy-panel`}
       data-active={active || undefined}
-      className="flex h-full min-h-0 flex-col text-[11px]"
+      className="flex h-full min-h-0 flex-col text-ui-small"
     >
       {/* §8.20.5 W4: provider restart / fingerprint change stale banner with
           an explicit Rerun affordance — never silently trust old expansions. */}
       {staleReason && root && (
         <div
           data-testid="hierarchy-stale-banner"
-          className="flex shrink-0 items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-500"
+          className="flex shrink-0 items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-2 py-1 text-ui-caption text-amber-500"
         >
           <RotateCcw className="h-3 w-3 shrink-0" />
           <span className="min-w-0 flex-1 truncate" title={staleReason}>{staleReason}</span>

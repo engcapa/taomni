@@ -38,7 +38,7 @@ export function MfaCountdown({ remaining, period }: { remaining: number; period:
       </svg>
       <span
         aria-hidden="true"
-        className="relative text-[11px] font-bold tabular-nums"
+        className="relative text-ui-small font-bold tabular-nums"
         style={{ color: warning ? color : "var(--taomni-text-muted)" }}
       >
         {remaining}

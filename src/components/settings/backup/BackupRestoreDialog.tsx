@@ -84,7 +84,7 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
 
                 <div
                   data-testid="backup-restore-files"
-                  className="max-h-36 overflow-y-auto space-y-1 rounded border p-2 font-mono text-[11px] text-[var(--taomni-text-muted)]"
+                  className="max-h-36 overflow-y-auto space-y-1 rounded border p-2 font-mono text-ui-small text-[var(--taomni-text-muted)]"
                   style={{
                     background: "var(--taomni-panel-bg)",
                     borderColor: "var(--taomni-divider)",
@@ -123,13 +123,13 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
                         borderColor: "var(--taomni-input-border)",
                       }}
                     />
-                    <p className="text-[11px] text-[var(--taomni-text-muted)]">
+                    <p className="text-ui-small text-[var(--taomni-text-muted)]">
                       {t("backupSettings.restoreVaultPasswordHint")}
                     </p>
                   </div>
                 ) : (
                   <div
-                    className="border-t pt-2 text-[11px] italic text-[var(--taomni-text-muted)]"
+                    className="border-t pt-2 text-ui-small italic text-[var(--taomni-text-muted)]"
                     style={{ borderColor: "var(--taomni-divider)" }}
                   >
                     {t("backupSettings.vaultEmptyNotice")}

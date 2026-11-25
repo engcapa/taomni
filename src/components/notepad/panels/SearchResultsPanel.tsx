@@ -24,8 +24,8 @@ export function SearchResultsPanel({
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 text-[12px]" data-testid="notepad-search-results">
-      <div className="flex items-center justify-between px-2 py-1 border-b border-[var(--taomni-divider)] text-[11px]">
+    <div className="flex flex-col flex-1 min-h-0 text-ui-body" data-testid="notepad-search-results">
+      <div className="flex items-center justify-between px-2 py-1 border-b border-[var(--taomni-divider)] text-ui-small">
         <span className="font-medium truncate">
           {title || label("搜索结果", "Search Results")} — {hits.length} {label("条匹配", "hit(s)")}
         </span>
@@ -39,7 +39,7 @@ export function SearchResultsPanel({
           {label("清空", "Clear")}
         </button>
       </div>
-      <div className="flex-1 overflow-auto font-mono text-[11px]">
+      <div className="flex-1 overflow-auto font-mono text-ui-small">
         {hits.length === 0 ? (
           <div className="p-3 text-[var(--taomni-text-muted)] font-sans">
             {label("暂无搜索结果。使用“查找所有”或“在文件中查找”。", "No results yet. Use Find All or Find in Files.")}
@@ -47,7 +47,7 @@ export function SearchResultsPanel({
         ) : (
           Array.from(grouped.entries()).map(([groupKey, items]) => (
             <div key={groupKey} className="border-b border-[var(--taomni-divider)]">
-              <div className="px-2 py-1 bg-[var(--taomni-panel-bg)] font-sans font-semibold text-[11px] truncate">
+              <div className="px-2 py-1 bg-[var(--taomni-panel-bg)] font-sans font-semibold text-ui-small truncate">
                 {items[0]?.name} ({items.length}) <span className="font-normal opacity-65">{groupKey}</span>
               </div>
               {items.map((hit, idx) => (

@@ -168,7 +168,7 @@ export function QuickDocPopup({
         >
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
-        <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--taomni-code-text)]">
+        <span className="min-w-0 flex-1 truncate text-ui-small font-medium text-[var(--taomni-code-text)]">
           {content.title}
         </span>
         <button
@@ -192,11 +192,11 @@ export function QuickDocPopup({
         </button>
       </div>
       <div
-        className="taomni-chat-md min-h-0 flex-1 overflow-auto px-3 py-2 text-[12px] leading-relaxed text-[var(--taomni-code-text)]"
+        className="taomni-chat-md min-h-0 flex-1 overflow-auto px-3 py-2 text-ui-body leading-relaxed text-[var(--taomni-code-text)]"
         onClick={onBodyClick}
         dangerouslySetInnerHTML={{ __html: html }}
       />
-      {linkError && <div role="status" className="px-2 pb-1 text-[10px] text-red-400">{linkError}</div>}
+      {linkError && <div role="status" className="px-2 pb-1 text-ui-caption text-red-400">{linkError}</div>}
       <ReferenceContentFooter content={content} onOpenSource={onOpenSource} />
       <div className="absolute top-0 left-0 z-10 h-4 w-4 cursor-nw-resize select-none" onMouseDown={handleResizeMouseDown("nw")} />
       <div className="absolute top-0 right-0 z-10 h-4 w-4 cursor-ne-resize select-none" onMouseDown={handleResizeMouseDown("ne")} />

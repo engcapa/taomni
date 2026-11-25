@@ -68,18 +68,18 @@ export function CharPanel({ onInsertChar }: { onInsertChar: (ch: string) => void
   }, [query]);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 text-[11px]" data-testid="notepad-char-panel">
+    <div className="flex flex-col flex-1 min-h-0 text-ui-small" data-testid="notepad-char-panel">
       <div className="p-1.5 border-b border-[var(--taomni-divider)]">
         <input
           type="text"
-          className="np-input w-full h-6 text-[11px]"
+          className="np-input w-full h-6 text-ui-small"
           placeholder={label("筛选 ASCII / Unicode...", "Filter char / hex...")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
       <div className="flex-1 overflow-auto font-mono">
-        <div className="grid grid-cols-4 px-2 py-1 text-[10px] font-sans text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)]">
+        <div className="grid grid-cols-4 px-2 py-1 text-ui-caption font-sans text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)]">
           <span>Dec</span><span>Hex</span><span>Char</span><span>Note</span>
         </div>
         {rows.map((r) => (

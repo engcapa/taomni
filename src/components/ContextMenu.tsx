@@ -206,7 +206,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
       data-testid={testId ?? "context-menu"}
       data-taomni-context-menu=""
       data-appearance={appearance}
-      className={`min-w-[220px] ${appearance === "code-candidates" ? "py-0" : "py-1"} rounded shadow-lg border text-[12px] outline-none`}
+      className={`min-w-[220px] ${appearance === "code-candidates" ? "py-0" : "py-1"} rounded shadow-lg border text-ui-body outline-none`}
       style={{
         background: appearance === "code-candidates" ? "var(--taomni-code-tooltip-bg)" : "var(--taomni-panel-bg)",
         borderColor: appearance === "code-candidates" ? "var(--taomni-code-border)" : "var(--taomni-divider)",
@@ -361,7 +361,7 @@ function MenuRow({
       <span className="w-4 flex-shrink-0 text-center">{item.checked ? "✓" : item.icon}</span>
       <span className="flex-1 truncate">{item.label}</span>
       {item.shortcut && (
-        <span className="ml-6 flex-shrink-0 text-[11px] text-[var(--taomni-text-muted)]">{item.shortcut}</span>
+        <span className="ml-6 flex-shrink-0 text-ui-small text-[var(--taomni-text-muted)]">{item.shortcut}</span>
       )}
       {hasChildren && <ChevronRight className="w-3 h-3 text-[var(--taomni-text-muted)]" />}
     </>

@@ -155,7 +155,7 @@ export function CodeStyleSettingsDialog({
         aria-modal="true"
         aria-label="Workspace code style settings"
         data-testid="workspace-code-style-dialog"
-        className="flex max-h-[80vh] w-[640px] max-w-[calc(100vw-32px)] flex-col rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[12px] shadow-xl"
+        className="flex max-h-[80vh] w-[640px] max-w-[calc(100vw-32px)] flex-col rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body shadow-xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3">
@@ -209,7 +209,7 @@ export function CodeStyleSettingsDialog({
                   >
                     <span className="min-w-0 flex-1 truncate">{scheme.name}</span>
                     {scheme.id === BUILT_IN_SCHEME_ID && (
-                      <span className="shrink-0 rounded bg-[var(--taomni-code-active-line-bg)] px-1 text-[9px]">
+                      <span className="shrink-0 rounded bg-[var(--taomni-code-active-line-bg)] px-1 text-ui-caption">
                         built-in
                       </span>
                     )}
@@ -298,7 +298,7 @@ export function CodeStyleSettingsDialog({
               <div
                 role="alert"
                 data-testid="code-style-error"
-                className="mb-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-[11px]"
+                className="mb-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-ui-small"
               >
                 {error}
               </div>
@@ -356,13 +356,13 @@ export function CodeStyleSettingsDialog({
             )}
 
             {isBuiltIn ? (
-              <p className="mb-3 text-[11px] text-[var(--taomni-code-muted)]">
+              <p className="mb-3 text-ui-small text-[var(--taomni-code-muted)]">
                 The built-in Default scheme resolves every field from EditorConfig, the
                 language defaults or detection. Copy it to define explicit overrides.
               </p>
             ) : (
               <>
-                <p className="mb-2 text-[11px] text-[var(--taomni-code-muted)]">
+                <p className="mb-2 text-ui-small text-[var(--taomni-code-muted)]">
                   Empty fields inherit EditorConfig → language defaults → detection
                   (scheme sits below EditorConfig).
                 </p>
@@ -376,7 +376,7 @@ export function CodeStyleSettingsDialog({
                     ["trimTrailingWhitespace", "Trim trailing whitespace", "bool"],
                     ["insertFinalNewline", "Insert final newline", "bool"],
                   ] as const).map(([key, label, kind]) => (
-                    <label key={key} className="flex items-center gap-2 text-[11px]">
+                    <label key={key} className="flex items-center gap-2 text-ui-small">
                       <span className="w-32 shrink-0 truncate" title={label}>{label}</span>
                       {kind === "bool" ? (
                         <input
@@ -410,7 +410,7 @@ export function CodeStyleSettingsDialog({
                       )}
                       <span
                         data-testid={`code-style-field-provenance-${key}`}
-                        className="ml-auto rounded border border-[var(--taomni-code-border)] px-1 py-0.5 text-[9px] text-[var(--taomni-code-muted)]"
+                        className="ml-auto rounded border border-[var(--taomni-code-border)] px-1 py-0.5 text-ui-caption text-[var(--taomni-code-muted)]"
                       >
                         {selected.values[key]?.value !== undefined
                           ? "scheme"
@@ -421,8 +421,8 @@ export function CodeStyleSettingsDialog({
                 </div>
 
                 <div className="mt-4 border-t border-[var(--taomni-code-border)] pt-3">
-                  <div className="mb-2 font-medium text-[11px]">Save Actions</div>
-                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="mb-2 font-medium text-ui-small">Save Actions</div>
+                  <div className="grid grid-cols-2 gap-2 text-ui-small">
                     <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -465,8 +465,8 @@ export function CodeStyleSettingsDialog({
                 </div>
 
                 <div className="mt-4 border-t border-[var(--taomni-code-border)] pt-3">
-                  <div className="mb-2 font-medium text-[11px]">Exclusions & Formatter Markers</div>
-                  <label className="mb-2 flex items-center gap-2 text-[11px]">
+                  <div className="mb-2 font-medium text-ui-small">Exclusions & Formatter Markers</div>
+                  <label className="mb-2 flex items-center gap-2 text-ui-small">
                     <input
                       type="checkbox"
                       data-testid="code-style-formatter-markers"
@@ -476,7 +476,7 @@ export function CodeStyleSettingsDialog({
                     />
                     <span>Honor @formatter:off / on markers</span>
                   </label>
-                  <div className="text-[11px] font-medium text-[var(--taomni-code-muted)]">Exclude Glob Patterns</div>
+                  <div className="text-ui-small font-medium text-[var(--taomni-code-muted)]">Exclude Glob Patterns</div>
                   <div className="mt-1 flex items-center gap-1">
                     <input
                       data-testid="code-style-add-exclusion-input"
@@ -503,7 +503,7 @@ export function CodeStyleSettingsDialog({
                   </div>
                   <div data-testid="code-style-exclusions-list" className="mt-2 space-y-1">
                     {(selected.exclusions?.patterns ?? []).map((pat, idx) => (
-                      <div key={pat} className="flex items-center justify-between rounded bg-[var(--taomni-code-active-line-bg)] px-2 py-0.5 text-[11px]">
+                      <div key={pat} className="flex items-center justify-between rounded bg-[var(--taomni-code-active-line-bg)] px-2 py-0.5 text-ui-small">
                         <span className="font-mono">{pat}</span>
                         {!isBuiltIn && (
                           <button
@@ -523,7 +523,7 @@ export function CodeStyleSettingsDialog({
                   </div>
                 </div>
 
-                <div className="mt-3 text-[10px] text-[var(--taomni-code-muted)]">
+                <div className="mt-3 text-ui-caption text-[var(--taomni-code-muted)]">
                   Format scopes: Selection and File supported. Directory and Module scopes disabled (requires directory provider owner).
                 </div>
               </>
@@ -532,7 +532,7 @@ export function CodeStyleSettingsDialog({
             {provenance && (
               <div
                 data-testid="code-style-provenance"
-                className="mt-4 rounded border border-[var(--taomni-code-border)] p-2 text-[11px]"
+                className="mt-4 rounded border border-[var(--taomni-code-border)] p-2 text-ui-small"
               >
                 <div className="mb-1 font-medium">Effective style · provenance</div>
                 <div className="text-[var(--taomni-code-muted)]">{provenance.filePath}</div>

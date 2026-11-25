@@ -53,7 +53,7 @@ export function LanguageSwitcher({ variant = "titlebar", showLabel = true }: { v
       >
         {variant === "rail" ? <Globe className="w-[16px] h-[16px]" /> : <Languages className="w-[16px] h-[16px]" />}
         {showLabel && <span
-          className="text-[10px] font-semibold uppercase tracking-wide"
+          className="text-ui-caption font-semibold uppercase tracking-wide"
           aria-hidden="true"
         >
           {locale === "en" ? "EN" : "中"}

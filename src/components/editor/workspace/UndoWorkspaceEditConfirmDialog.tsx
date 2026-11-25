@@ -65,9 +65,9 @@ export function UndoWorkspaceEditConfirmDialog({
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4"
       onKeyDown={handleKeyDown}
     >
-      <div className="w-[360px] max-w-[90vw] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-4 text-[12px] text-[var(--taomni-code-text)] shadow-xl">
+      <div className="w-[360px] max-w-[90vw] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-4 text-ui-body text-[var(--taomni-code-text)] shadow-xl">
         <div id="code-workspace-undo-confirm-title" className="font-medium">Undo</div>
-        <div className="mt-2 text-[11px] text-[var(--taomni-code-muted)]">
+        <div className="mt-2 text-ui-small text-[var(--taomni-code-muted)]">
           Undo {label ?? "workspace edit"}?
         </div>
         <div className="mt-4 flex justify-end gap-2">

@@ -74,7 +74,7 @@ export function EncodingDialog({
           <button type="button" className="np-btn" onClick={onClose}><X size={14} /></button>
         </div>
 
-        <div className="flex gap-4 text-[12px]">
+        <div className="flex gap-4 text-ui-body">
           <label className="inline-flex items-center gap-1.5">
             <input
               type="radio"
@@ -96,10 +96,10 @@ export function EncodingDialog({
           </label>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[12px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-ui-body">
           {groups.map((grp) => (
             <div key={grp.group} className="border border-[var(--taomni-divider)] rounded p-2">
-              <div className="font-semibold mb-1.5 text-[11px] text-[var(--taomni-text-muted)]">{grp.group}</div>
+              <div className="font-semibold mb-1.5 text-ui-small text-[var(--taomni-text-muted)]">{grp.group}</div>
               <div className="flex flex-wrap gap-1.5">
                 {grp.encodings.map((enc) => (
                   <button
@@ -119,7 +119,7 @@ export function EncodingDialog({
 
         {actionMode === "convert" && loss && loss.unrepresentableCount > 0 && (
           <div
-            className="flex items-start gap-2 p-2.5 rounded border border-amber-500/60 bg-amber-500/10 text-[12px]"
+            className="flex items-start gap-2 p-2.5 rounded border border-amber-500/60 bg-amber-500/10 text-ui-body"
             data-testid="notepad-encoding-loss-warning"
           >
             <AlertTriangle size={16} className="shrink-0 text-amber-500 mt-0.5" />
@@ -131,7 +131,7 @@ export function EncodingDialog({
                 )}
               </div>
               {loss.samples.length > 0 && (
-                <div className="font-mono text-[11px] mt-1">
+                <div className="font-mono text-ui-small mt-1">
                   {label("示例字符：", "Sample chars: ")}
                   {loss.samples.join(" , ")}
                 </div>

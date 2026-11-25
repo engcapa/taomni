@@ -116,7 +116,7 @@ export function SftpFloatingButton({ onOpen }: { onOpen: () => void }) {
       }}
     >
       <FolderOpen size={13} aria-hidden="true" />
-      <span className="text-[9px] leading-3">SFTP</span>
+      <span className="text-ui-caption leading-3">SFTP</span>
     </button>
   );
 }

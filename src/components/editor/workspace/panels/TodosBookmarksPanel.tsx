@@ -58,7 +58,7 @@ export function TodosBookmarksPanel({
   };
 
   return (
-    <div data-testid="code-workspace-todos-panel" className="h-full min-h-0 overflow-auto text-[11px]">
+    <div data-testid="code-workspace-todos-panel" className="h-full min-h-0 overflow-auto text-ui-small">
       <section className="border-b border-[var(--taomni-code-border)]">
         <header className="flex h-8 items-center gap-1.5 px-2 text-[var(--taomni-code-muted)]">
           <ListTodo className="h-3.5 w-3.5" />
@@ -76,12 +76,12 @@ export function TodosBookmarksPanel({
                   className="flex w-full items-start gap-2 px-3 py-1.5 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
                   onClick={() => onOpenTodo(item)}
                 >
-                  <span className="shrink-0 rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--taomni-accent)]">
+                  <span className="shrink-0 rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 text-ui-caption font-semibold text-[var(--taomni-accent)]">
                     {item.kind}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[var(--taomni-code-text)]">{item.text}</span>
-                    <span className="block truncate text-[10px] text-[var(--taomni-code-muted)]">
+                    <span className="block truncate text-ui-caption text-[var(--taomni-code-muted)]">
                       {item.pathLabel}:{item.line + 1}
                     </span>
                   </span>
@@ -121,7 +121,7 @@ export function TodosBookmarksPanel({
                 aria-label={`Bookmark group ${groupName}`}
                 className="mb-2"
               >
-                <div className="flex min-h-7 items-center gap-1 bg-[var(--taomni-code-gutter-bg)] px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--taomni-code-muted)]">
+                <div className="flex min-h-7 items-center gap-1 bg-[var(--taomni-code-gutter-bg)] px-3 py-1 text-ui-caption font-semibold uppercase tracking-wider text-[var(--taomni-code-muted)]">
                   {editingGroup === groupName ? (
                     <input
                       data-testid="code-workspace-bookmark-group-input"
@@ -193,20 +193,20 @@ export function TodosBookmarksPanel({
                         {item.mnemonic && (
                           <span
                             data-testid="code-workspace-bookmark-mnemonic"
-                            className="shrink-0 rounded border border-[var(--taomni-accent)] bg-[var(--taomni-code-active-line-bg)] px-1 py-0.2 text-[9px] font-bold text-[var(--taomni-accent)]"
+                            className="shrink-0 rounded border border-[var(--taomni-accent)] bg-[var(--taomni-code-active-line-bg)] px-1 py-0.2 text-ui-caption font-bold text-[var(--taomni-accent)]"
                           >
                             {item.mnemonic}
                           </span>
                         )}
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[var(--taomni-code-text)]">{item.label}</span>
-                          <span className="block truncate text-[10px] text-[var(--taomni-code-muted)]">
+                          <span className="block truncate text-ui-caption text-[var(--taomni-code-muted)]">
                             {item.pathLabel}:{item.line + 1}
                           </span>
                           {item.state === "missing" && (
                             <span
                               data-testid="code-workspace-bookmark-missing"
-                              className="block truncate text-[10px] text-amber-400"
+                              className="block truncate text-ui-caption text-amber-400"
                             >
                               Missing target
                             </span>
@@ -217,7 +217,7 @@ export function TodosBookmarksPanel({
                         type="button"
                         data-testid="code-workspace-bookmark-remove"
                         aria-label={`Remove bookmark ${item.label}`}
-                        className="shrink-0 px-2 text-[10px] text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
+                        className="shrink-0 px-2 text-ui-caption text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
                         onClick={() => onRemoveBookmark(item.id)}
                       >
                         Remove

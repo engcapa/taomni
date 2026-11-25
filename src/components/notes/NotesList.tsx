@@ -67,7 +67,7 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete, pre
                 <div className="flex items-center gap-1">
                   {note.pinned && <Pin className="w-3 h-3 shrink-0 text-[var(--taomni-accent)]" />}
                   <span
-                    className={`text-[12px] truncate ${
+                    className={`text-ui-body truncate ${
                       done ? "line-through text-[var(--taomni-text-muted)]" : ""
                     }`}
                   >
@@ -75,11 +75,11 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete, pre
                   </span>
                 </div>
                 {note.body.trim() && (
-                  <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+                  <div className="text-ui-small text-[var(--taomni-text-muted)] truncate">
                     {renderLinkedNoteText(note.body.trim())}
                   </div>
                 )}
-                <div className="flex flex-wrap items-center gap-x-2 text-[10px] text-[var(--taomni-text-muted)]">
+                <div className="flex flex-wrap items-center gap-x-2 text-ui-caption text-[var(--taomni-text-muted)]">
                   {note.priority > 0 && <span data-testid={`${prefix}-list-priority`}>{t(`notes.priority_${note.priority}`)}</span>}
                   {note.due_at !== null && Number.isFinite(new Date(note.due_at * 1000).getTime()) && <time data-testid={`${prefix}-list-due`} dateTime={new Date(note.due_at * 1000).toISOString()}>
                     {t("notes.dueAt")}: {new Date(note.due_at * 1000).toLocaleString()}</time>}
@@ -87,7 +87,7 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete, pre
                   {note.tags.map((tag) => <span key={tag.id}>#{tag.name}</span>)}
                 </div>
                 {stepTotal > 0 && (
-                  <div className="text-[10px] text-[var(--taomni-text-muted)]">
+                  <div className="text-ui-caption text-[var(--taomni-text-muted)]">
                     {t("notes.stepProgress", { done: stepDone, total: stepTotal })}
                   </div>
                 )}

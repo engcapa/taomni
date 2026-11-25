@@ -21,7 +21,7 @@ export function StatementDropdown({
   onAskAi: (action: EditorStatementAction) => void;
   onClose: () => void;
 }) {
-  const iconButton = "h-6 px-1.5 inline-flex items-center gap-1 rounded text-[10px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
+  const iconButton = "h-6 px-1.5 inline-flex items-center gap-1 rounded text-ui-caption hover:bg-[var(--taomni-hover)] disabled:opacity-40";
   const compactSql = action.range.sql.replace(/\s+/g, " ").trim();
   return (
     <>
@@ -36,14 +36,14 @@ export function StatementDropdown({
           style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
         >
           <SquareDashedMousePointer className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
-          <span className="text-[12px] font-semibold">Current statement</span>
-          <span className="text-[10px] text-[var(--taomni-text-muted)]">
+          <span className="text-ui-body font-semibold">Current statement</span>
+          <span className="text-ui-caption text-[var(--taomni-text-muted)]">
             {action.range.from}-{action.range.to}
           </span>
         </div>
         <div className="px-2 py-2">
           <div
-            className="truncate font-mono text-[11px] text-[var(--taomni-text)]"
+            className="truncate font-mono text-ui-small text-[var(--taomni-text)]"
             title={action.range.sql}
           >
             {compactSql}

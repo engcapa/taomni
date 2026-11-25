@@ -247,7 +247,7 @@ export const WelcomePanel = memo(function WelcomePanel({
           )}
         />
 
-        <details className="text-[11px] text-[var(--taomni-text-muted)]">
+        <details className="text-ui-small text-[var(--taomni-text-muted)]">
           <summary className="cursor-pointer font-semibold text-[var(--taomni-text)]">{t("welcome.tipsHeading")}</summary>
           <ul className="list-disc pl-5 space-y-0.5">
             <li
@@ -264,7 +264,7 @@ export const WelcomePanel = memo(function WelcomePanel({
 
         <div
           data-testid="welcome-version-footer"
-          className="flex items-center justify-between gap-2 text-[11px] taomni-mono"
+          className="flex items-center justify-between gap-2 text-ui-small taomni-mono"
           style={{
 
             color: "var(--taomni-text-muted)",

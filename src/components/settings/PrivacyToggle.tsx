@@ -47,10 +47,10 @@ export function PrivacyToggle() {
         <ShieldOff className="w-5 h-5 text-[var(--taomni-text-muted)] shrink-0" />
       )}
       <div className="flex-1">
-        <div className="text-[13px] font-semibold">
+        <div className="text-ui-body font-semibold">
           {t("aiSettings.fullLocal")} {isLocalMode ? t("aiSettings.disabledSuffix") : ""}
         </div>
-        <div className="text-[11px] text-[var(--taomni-text-muted)]">
+        <div className="text-ui-small text-[var(--taomni-text-muted)]">
           {isLocalMode
             ? t("aiSettings.fullLocalEnabledDesc")
             : t("aiSettings.fullLocalDisabledDesc")}

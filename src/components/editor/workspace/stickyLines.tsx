@@ -76,7 +76,7 @@ export function StickyLinesOverlay({
           onClick={() => onSelectLine(item.line)}
           title={`Line ${item.line + 1}: ${item.text}`}
         >
-          <span className="w-8 shrink-0 text-right pr-2 text-[10px] text-[var(--taomni-code-muted)] group-hover:text-[var(--taomni-accent)]">
+          <span className="w-8 shrink-0 text-right pr-2 text-ui-caption text-[var(--taomni-code-muted)] group-hover:text-[var(--taomni-accent)]">
             {item.line + 1}
           </span>
           <Hash className="w-3 h-3 shrink-0 mr-1.5 text-[var(--taomni-accent)] opacity-75" />

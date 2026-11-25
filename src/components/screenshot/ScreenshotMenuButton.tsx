@@ -108,7 +108,7 @@ export function ScreenshotMenuButton({ variant = "titlebar" }: { variant?: "titl
             : "h-6 w-7 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50 self-center"}
         >
           {screenshotCountdown !== null ? (
-            <span className="text-[12px] font-semibold tabular-nums" data-testid="system-screenshot-countdown">
+            <span className="text-ui-body font-semibold tabular-nums" data-testid="system-screenshot-countdown">
               {screenshotCountdown}
             </span>
           ) : (
@@ -139,8 +139,8 @@ export function ScreenshotMenuButton({ variant = "titlebar" }: { variant?: "titl
             : "absolute right-0 top-7 z-50 min-w-48 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] py-1 shadow-xl"}
           >
             <button type="button" data-testid="system-screenshot-current-window" role="menuitem" onClick={() => void handleScreenshot(true)}
-              className="block w-full px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]">{t("screenshot.currentWindow")} ({CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL})</button>
-            <p data-testid="system-screenshot-default-hint" className="px-3 pb-1 text-[11px] text-[var(--taomni-text-muted)]">{t("screenshot.defaultHide")}</p>
+              className="block w-full px-3 py-1.5 text-left text-ui-body hover:bg-[var(--taomni-hover)]">{t("screenshot.currentWindow")} ({CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL})</button>
+            <p data-testid="system-screenshot-default-hint" className="px-3 pb-1 text-ui-small text-[var(--taomni-text-muted)]">{t("screenshot.defaultHide")}</p>
             {[3, 5, 10].map((s) => (
               <button
                 key={s}
@@ -148,13 +148,13 @@ export function ScreenshotMenuButton({ variant = "titlebar" }: { variant?: "titl
                 data-testid={`system-screenshot-delay-${s}`}
                 role="menuitem"
                 onClick={() => handleDelayedScreenshot(s)}
-                className="block w-full px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]"
+                className="block w-full px-3 py-1.5 text-left text-ui-body hover:bg-[var(--taomni-hover)]"
               >
                 {t("screenshot.delaySeconds", { count: s })}
               </button>
             ))}
             <button type="button" data-testid="system-screenshot-favorites" role="menuitem" onClick={() => { setScreenshotDelayMenu(false); setFavoritesOpen(true); }}
-              className="block w-full border-t border-[var(--taomni-divider)] px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]">{t("screenshot.favorites")}</button>
+              className="block w-full border-t border-[var(--taomni-divider)] px-3 py-1.5 text-left text-ui-body hover:bg-[var(--taomni-hover)]">{t("screenshot.favorites")}</button>
           </div>
         )}
         {favoritesOpen && <ScreenshotFavorites onClose={() => setFavoritesOpen(false)} />}

@@ -51,11 +51,11 @@ export function MfaScreenPane({ onTexts }: { onTexts: (texts: string[], decoder:
 
   return (
     <div className="space-y-3">
-      <p className="text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>{t("mfa.screenHint")}</p>
+      <p className="text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>{t("mfa.screenHint")}</p>
       <button
         type="button"
         data-testid="mfa-screen-scan"
-        className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-[12px] text-white disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-ui-body text-white disabled:opacity-50"
         style={{ background: "var(--taomni-accent)" }}
         disabled={state.kind === "busy"}
         onClick={() => void scan()}
@@ -69,7 +69,7 @@ export function MfaScreenPane({ onTexts }: { onTexts: (texts: string[], decoder:
         data-state={state.kind}
         role="status"
         aria-live="polite"
-        className="min-h-[18px] text-[12px]"
+        className="min-h-[18px] text-ui-body"
         style={{ color: state.kind === "error" ? "var(--taomni-error, #c33)" : "var(--taomni-text-muted)" }}
       >
         {state.kind === "busy" ? t("mfa.screenScanning") : state.kind === "error" ? state.message : ""}

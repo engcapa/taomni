@@ -58,10 +58,10 @@ export function DbObjectDetailDialog({ detail, onClose, onStatus }: Props) {
           className="h-9 shrink-0 flex items-center gap-2 px-3"
           style={{ borderBottom: "1px solid var(--taomni-divider)" }}
         >
-          <span className="text-[12px] font-semibold truncate flex-1">{detail.title}</span>
+          <span className="text-ui-body font-semibold truncate flex-1">{detail.title}</span>
           <button
             type="button"
-            className="h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)]"
+            className="h-6 px-2 inline-flex items-center gap-1 rounded text-ui-small hover:bg-[var(--taomni-hover)]"
             onClick={() => void copyAll()}
             title={t("dbObjects.copy")}
           >
@@ -80,7 +80,7 @@ export function DbObjectDetailDialog({ detail, onClose, onStatus }: Props) {
         <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-3">
           {detail.kind === "ddl" ? (
             <pre
-              className="text-[12px] font-mono whitespace-pre-wrap break-words m-0"
+              className="text-ui-body font-mono whitespace-pre-wrap break-words m-0"
               style={{ color: "var(--taomni-text)" }}
             >
               {detail.sql}
@@ -96,10 +96,10 @@ export function DbObjectDetailDialog({ detail, onClose, onStatus }: Props) {
 
 function StatsTable({ result, empty }: { result: DbQueryResult; empty: string }) {
   if (result.rows.length === 0) {
-    return <div className="text-[12px] text-[var(--taomni-text-muted)]">{empty}</div>;
+    return <div className="text-ui-body text-[var(--taomni-text-muted)]">{empty}</div>;
   }
   return (
-    <table className="w-full text-[12px] border-collapse">
+    <table className="w-full text-ui-body border-collapse">
       <thead>
         <tr>
           {result.columns.map((c) => (

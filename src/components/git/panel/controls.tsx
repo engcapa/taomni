@@ -10,7 +10,7 @@ export function DiffPane({ diff,loading }: { diff: string; loading: boolean; }) 
           <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading diff
         </div>
       ):diff? (
-        <pre className="taomni-mono text-[12px] leading-5 p-3 whitespace-pre-wrap break-words text-slate-100">{diff}</pre>
+        <pre className="taomni-mono text-ui-body leading-5 p-3 whitespace-pre-wrap break-words text-slate-100">{diff}</pre>
       ):(
         <EmptyState title="Select an item to preview its diff" />
       )}
@@ -20,9 +20,9 @@ export function DiffPane({ diff,loading }: { diff: string; loading: boolean; }) 
 
 
 export function BranchBadge({ snapshot }: { snapshot: GitSnapshot|null; }) {
-  if(!snapshot) return <span className="text-[11px] text-[var(--taomni-text-muted)]">No repo state</span>;
+  if(!snapshot) return <span className="text-ui-small text-[var(--taomni-text-muted)]">No repo state</span>;
   return (
-    <span className="inline-flex items-center gap-1 h-6 px-2 rounded bg-[var(--taomni-hover)] text-[12px]">
+    <span className="inline-flex items-center gap-1 h-6 px-2 rounded bg-[var(--taomni-hover)] text-ui-body">
       <GitCommitHorizontal className="w-3.5 h-3.5" />
       {snapshot.detached? `detached ${snapshot.headOid??""}`:snapshot.currentBranch??"(no branch)"}
     </span>
@@ -41,5 +41,5 @@ export function IconButton({ label,icon,disabled,onClick }: { label: string; ico
 
 
 export function EmptyState({ title }: { title: string; }) {
-  return <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">{title}</div>;
+  return <div className="h-full min-h-24 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">{title}</div>;
 }

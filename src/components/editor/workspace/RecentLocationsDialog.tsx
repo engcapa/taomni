@@ -112,16 +112,16 @@ export function RecentLocationsDialog({
       onKeyDown={handleKeyDown}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
     >
-      <div className="flex h-[75vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-[12px] text-[var(--taomni-code-fg)]">
+      <div className="flex h-[75vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-fg)]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-3">
           <div className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-sky-400" />
             <div>
-              <h2 id="recent-locations-title" className="text-[14px] font-semibold">
+              <h2 id="recent-locations-title" className="text-ui-title font-semibold">
                 Recent Locations
               </h2>
-              <p className="text-[11px] text-[var(--taomni-code-muted)] mt-0.5">
+              <p className="text-ui-small text-[var(--taomni-code-muted)] mt-0.5">
                 Navigate to recently visited and edited code positions with context preview
               </p>
             </div>
@@ -131,7 +131,7 @@ export function RecentLocationsDialog({
               type="button"
               data-testid="recent-locations-toggle-changed"
               onClick={() => setChangedOnly((v) => !v)}
-              className={`flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-medium border transition-colors ${
+              className={`flex items-center gap-1 rounded px-2.5 py-1 text-ui-small font-medium border transition-colors ${
                 changedOnly
                   ? "bg-sky-500/20 text-sky-400 border-sky-500/40 font-semibold"
                   : "border-[var(--taomni-code-border)] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
@@ -163,7 +163,7 @@ export function RecentLocationsDialog({
               placeholder="Search in recent locations and code snippets..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-9 pr-3 text-[12px] text-[var(--taomni-code-fg)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-sky-500"
+              className="h-8 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-9 pr-3 text-ui-body text-[var(--taomni-code-fg)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-sky-500"
             />
           </div>
         </div>
@@ -195,47 +195,47 @@ export function RecentLocationsDialog({
                   <div className="flex items-center justify-between pb-1.5 border-b border-[var(--taomni-code-border)]/40 mb-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <Code2 className="h-4 w-4 text-sky-400 shrink-0" />
-                      <span className="font-medium text-[12px] text-[var(--taomni-code-fg)]">
+                      <span className="font-medium text-ui-body text-[var(--taomni-code-fg)]">
                         {loc.title}
                       </span>
-                      <span className="font-mono text-[11px] text-[var(--taomni-code-muted)]">
+                      <span className="font-mono text-ui-small text-[var(--taomni-code-muted)]">
                         :{loc.line + 1}
                       </span>
                       {loc.symbolName && (
-                        <span className="rounded bg-sky-500/20 text-sky-300 px-1.5 py-0.2 text-[10px] font-mono">
+                        <span className="rounded bg-sky-500/20 text-sky-300 px-1.5 py-0.2 text-ui-caption font-mono">
                           {loc.symbolName}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {loc.state === "relocated" && (
-                        <span className="rounded bg-blue-500/20 text-blue-300 px-1.5 py-0.2 text-[10px] font-medium border border-blue-500/30" title="File moved or renamed">
+                        <span className="rounded bg-blue-500/20 text-blue-300 px-1.5 py-0.2 text-ui-caption font-medium border border-blue-500/30" title="File moved or renamed">
                           Relocated
                         </span>
                       )}
                       {loc.state === "stale" && (
-                        <span className="rounded bg-orange-500/20 text-orange-300 px-1.5 py-0.2 text-[10px] font-medium border border-orange-500/30" title={loc.staleReason ?? "Content modified externally"}>
+                        <span className="rounded bg-orange-500/20 text-orange-300 px-1.5 py-0.2 text-ui-caption font-medium border border-orange-500/30" title={loc.staleReason ?? "Content modified externally"}>
                           Stale
                         </span>
                       )}
                       {loc.state === "missing" && (
-                        <span className="rounded bg-red-500/20 text-red-300 px-1.5 py-0.2 text-[10px] font-medium border border-red-500/30" title="File no longer exists on disk">
+                        <span className="rounded bg-red-500/20 text-red-300 px-1.5 py-0.2 text-ui-caption font-medium border border-red-500/30" title="File no longer exists on disk">
                           Missing
                         </span>
                       )}
                       {loc.isEditLocation && (
-                        <span className="rounded bg-amber-500/20 text-amber-300 px-1.5 py-0.2 text-[10px] font-medium border border-amber-500/30">
+                        <span className="rounded bg-amber-500/20 text-amber-300 px-1.5 py-0.2 text-ui-caption font-medium border border-amber-500/30">
                           Edited
                         </span>
                       )}
-                      <span className="text-[10px] text-[var(--taomni-code-muted)] truncate max-w-[200px]">
+                      <span className="text-ui-caption text-[var(--taomni-code-muted)] truncate max-w-[200px]">
                         {loc.filePath}
                       </span>
                     </div>
                   </div>
 
                   {/* Code snippet preview */}
-                  <div className="rounded bg-[var(--taomni-code-bg)] p-2 border border-[var(--taomni-code-border)]/40 font-mono text-[11px] text-[var(--taomni-code-fg)] whitespace-pre overflow-x-auto leading-relaxed">
+                  <div className="rounded bg-[var(--taomni-code-bg)] p-2 border border-[var(--taomni-code-border)]/40 font-mono text-ui-small text-[var(--taomni-code-fg)] whitespace-pre overflow-x-auto leading-relaxed">
                     {loc.contextSnippet || loc.lineText}
                   </div>
                 </div>
@@ -245,7 +245,7 @@ export function RecentLocationsDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/20 px-4 py-2 text-[11px] text-[var(--taomni-code-muted)]">
+        <div className="flex items-center justify-between border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/20 px-4 py-2 text-ui-small text-[var(--taomni-code-muted)]">
           <div className="flex items-center gap-3">
             <span>↑↓ Navigate</span>
             <span>↵ Select</span>

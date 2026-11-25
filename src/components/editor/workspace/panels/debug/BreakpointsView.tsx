@@ -88,7 +88,7 @@ export function BreakpointsView({
               <button
                 type="button"
                 data-testid={`debug-breakpoint-edit-${bp.line}`}
-                className="shrink-0 text-[10px] text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100"
+                className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100"
                 onClick={() => setEditing(open ? null : { path, line: bp.line })}
               >
                 {open ? "Done" : "Edit"}

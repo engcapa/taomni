@@ -101,14 +101,14 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
       {lens === "project" && (
         <>
         <section data-testid="workspace-linked-sessions" className="shrink-0 border-t p-1.5" style={{ borderColor: "var(--taomni-chrome-border)" }}>
-          <div className="flex items-center justify-between gap-1 text-[10.5px] text-[var(--taomni-text-muted)]">
+          <div className="flex items-center justify-between gap-1 text-ui-caption text-[var(--taomni-text-muted)]">
             <button type="button" data-testid="workspace-linked-sessions-toggle" aria-expanded={linkedOpen} className="inline-flex min-w-0 items-center gap-1 py-1 font-semibold" onClick={() => setLinkedOpenByWorkspace((current) => ({ ...current, [workspace.id]: !linkedOpen }))}><ChevronDown className={`h-3 w-3 ${linkedOpen ? "" : "-rotate-90"}`} />{t("platform.frequentSessions")} ({workspace.pinnedSessionIds.length})</button>
             <button type="button" data-testid="workspace-link-session" className="inline-flex shrink-0 items-center gap-0.5 rounded p-1 hover:bg-[var(--taomni-hover)]" title={t("platform.openAnySession")} onClick={onOpenSessionPicker}><Plus className="h-3 w-3" /></button>
           </div>
           {linkedOpen && <div className="max-h-[180px] overflow-auto">
-            <p className="px-1 pb-1 text-[10.5px] text-[var(--taomni-text-muted)]">{t("platform.isolatedSessionHint")}</p>
+            <p className="px-1 pb-1 text-ui-caption text-[var(--taomni-text-muted)]">{t("platform.isolatedSessionHint")}</p>
             {sessions.filter((session) => workspace.pinnedSessionIds.includes(session.id)).map((session) => (
-              <button key={session.id} type="button" data-testid="workspace-linked-session" data-session-id={session.id} className="flex h-[24px] w-full items-center gap-1.5 rounded px-1 text-left text-[11.5px] hover:bg-[var(--taomni-hover)]" onClick={() => store().openSessionInWorkspace(workspace.id, session)}><span className="rounded bg-[var(--taomni-selected)] px-1 text-[9px] font-bold text-[var(--taomni-accent)]">{session.session_type.slice(0, 4).toUpperCase()}</span><span className="min-w-0 flex-1 truncate">{session.name}</span><span className="max-w-[90px] truncate font-mono text-[9px] text-[var(--taomni-text-muted)]">{session.host}</span></button>
+              <button key={session.id} type="button" data-testid="workspace-linked-session" data-session-id={session.id} className="flex h-[24px] w-full items-center gap-1.5 rounded px-1 text-left text-ui-small hover:bg-[var(--taomni-hover)]" onClick={() => store().openSessionInWorkspace(workspace.id, session)}><span className="rounded bg-[var(--taomni-selected)] px-1 text-ui-caption font-bold text-[var(--taomni-accent)]">{session.session_type.slice(0, 4).toUpperCase()}</span><span className="min-w-0 flex-1 truncate">{session.name}</span><span className="max-w-[90px] truncate font-mono text-ui-caption text-[var(--taomni-text-muted)]">{session.host}</span></button>
             ))}
           </div>}
         </section>
@@ -138,16 +138,16 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
           setActiveSideTab("workspaces");
         }}
       >
-        <span className="inline-flex min-w-0 items-center gap-1 text-[10.5px]">
+        <span className="inline-flex min-w-0 items-center gap-1 text-ui-caption">
           <GitBranch className="h-3 w-3 shrink-0" />
           <span className="truncate">{gitBar.branch ?? t("platform.noChanges")}</span>
           {gitBar.changeCount > 0 && (
-            <span className="shrink-0 rounded px-1 text-[9.5px]" style={{ background: "var(--taomni-selected)", color: "var(--taomni-accent)" }}>
+            <span className="shrink-0 rounded px-1 text-ui-caption" style={{ background: "var(--taomni-selected)", color: "var(--taomni-accent)" }}>
               {gitBar.changeCount}
             </span>
           )}
         </span>
-        <span className="shrink-0 text-[10px]" style={{ color: "var(--taomni-accent)" }}>→</span>
+        <span className="shrink-0 text-ui-caption" style={{ color: "var(--taomni-accent)" }}>→</span>
       </button>
     </div>
   );

@@ -54,7 +54,7 @@ export function CommonSettings({ def, config, onChange }: Props) {
             value={config.autoStopSeconds}
             onChange={(autoStopSeconds) => onChange({ autoStopSeconds })}
           />
-          <span className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
+          <span className="text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>
             {t("servers.fields.autoStopSeconds")}
           </span>
         </FormRow>

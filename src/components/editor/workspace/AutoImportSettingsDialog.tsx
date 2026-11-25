@@ -96,7 +96,7 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
         <div className="flex flex-col gap-4 text-xs">
           {/* On-the-fly section */}
           <div className="flex flex-col gap-2 rounded-lg border border-[var(--taomni-code-border)] p-3 bg-neutral-900/30">
-            <span className="font-semibold text-[13px] text-neutral-300">Java / On The Fly</span>
+            <span className="font-semibold text-ui-body text-neutral-300">Java / On The Fly</span>
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -132,7 +132,7 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
 
           {/* Paste section */}
           <div className="flex flex-col gap-2 rounded-lg border border-[var(--taomni-code-border)] p-3 bg-neutral-900/30">
-            <span className="font-semibold text-[13px] text-neutral-300">Paste</span>
+            <span className="font-semibold text-ui-body text-neutral-300">Paste</span>
             <div className="flex items-center justify-between gap-4">
               <label htmlFor="auto-import-paste-mode" className="text-neutral-400">
                 Insert imports on paste:
@@ -154,7 +154,7 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
                 <option value="none">None</option>
               </select>
             </div>
-            <p className="text-[11px] text-[var(--taomni-code-muted)]">
+            <p className="text-ui-small text-[var(--taomni-code-muted)]">
               {settings.pasteImportMode === "all"
                 ? "Unambiguous imports will be inserted automatically with the paste."
                 : settings.pasteImportMode === "ask"
@@ -176,7 +176,7 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
               className="w-full rounded-md border border-[var(--taomni-code-border)] bg-neutral-900 p-2 font-mono text-xs text-neutral-200 focus:outline-hidden focus:border-[var(--taomni-accent)] resize-none"
               data-testid="auto-import-excluded-packages-input"
             />
-            <span className="text-[11px] text-[var(--taomni-code-muted)]">
+            <span className="text-ui-small text-[var(--taomni-code-muted)]">
               Packages matching wildcards (e.g. <code>sun.*</code>) will never be auto-imported.
             </span>
           </div>

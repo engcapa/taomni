@@ -153,12 +153,12 @@ export function RefactoringPreviewDialog({
       data-testid="refactoring-preview-dialog"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
     >
-      <div className="flex h-[80vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-[12px] text-[var(--taomni-code-fg)]">
+      <div className="flex h-[80vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-fg)]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-3">
           <div>
             <div className="flex items-center gap-2">
-              <h2 id="refactoring-preview-dialog-title" className="text-[14px] font-semibold">
+              <h2 id="refactoring-preview-dialog-title" className="text-ui-title font-semibold">
                 {title}
               </h2>
               {plan && (() => {
@@ -173,7 +173,7 @@ export function RefactoringPreviewDialog({
                   <span
                     data-testid="refactoring-preview-completeness"
                     title={source ? `Completeness source: ${source}` : undefined}
-                    className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                    className={`rounded px-1.5 py-0.5 text-ui-caption font-medium ${
                       isComplete
                         ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                         : isPartial
@@ -190,7 +190,7 @@ export function RefactoringPreviewDialog({
                 );
               })()}
             </div>
-            <p className="text-[11px] text-[var(--taomni-code-muted)] mt-0.5">
+            <p className="text-ui-small text-[var(--taomni-code-muted)] mt-0.5">
               {preview.affectedFileCount} file(s) affected · {includedCount} of {totalUsages} change(s) selected
               {preview.resourceOperationCount > 0 && ` · ${preview.resourceOperationCount} resource operation(s)`}
             </p>
@@ -210,7 +210,7 @@ export function RefactoringPreviewDialog({
         {errorConflicts.length > 0 && (
           <div
             data-testid="refactoring-preview-error-conflicts"
-            className="mx-4 mt-2 flex items-start gap-2 rounded border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300"
+            className="mx-4 mt-2 flex items-start gap-2 rounded border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-ui-small text-rose-300"
           >
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
             <div>
@@ -226,7 +226,7 @@ export function RefactoringPreviewDialog({
         {warningConflicts.length > 0 && errorConflicts.length === 0 && (
           <div
             data-testid="refactoring-preview-warning-conflicts"
-            className="mx-4 mt-2 flex items-start gap-2 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300"
+            className="mx-4 mt-2 flex items-start gap-2 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-ui-small text-amber-300"
           >
             <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
             <div>
@@ -242,14 +242,14 @@ export function RefactoringPreviewDialog({
         {errorConflicts.length === 0 && warningConflicts.length === 0 && plan && (
           <div
             data-testid="refactoring-preview-conflict-status"
-            className="mx-4 mt-2 flex items-center gap-1.5 px-1 text-[11px] text-[var(--taomni-code-muted)]"
+            className="mx-4 mt-2 flex items-center gap-1.5 px-1 text-ui-small text-[var(--taomni-code-muted)]"
           >
             <span>Conflict analysis unavailable from provider</span>
           </div>
         )}
 
         {/* Toolbar */}
-        <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/40 px-4 py-2 text-[11px]">
+        <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/40 px-4 py-2 text-ui-small">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -276,7 +276,7 @@ export function RefactoringPreviewDialog({
             placeholder="Filter files or text..."
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            className="h-6 w-52 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 text-[11px]"
+            className="h-6 w-52 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 text-ui-small"
           />
         </div>
 
@@ -327,8 +327,8 @@ export function RefactoringPreviewDialog({
                     className="rounded border-[var(--taomni-code-border)]"
                   />
                   <FileCode className="h-3.5 w-3.5 text-[var(--taomni-code-muted)] shrink-0" />
-                  <span className="font-mono text-[11px] font-medium truncate flex-1">{path}</span>
-                  <span className="text-[10px] text-[var(--taomni-code-muted)] shrink-0">
+                  <span className="font-mono text-ui-small font-medium truncate flex-1">{path}</span>
+                  <span className="text-ui-caption text-[var(--taomni-code-muted)] shrink-0">
                     {usages.length} change(s)
                   </span>
                 </div>
@@ -344,7 +344,7 @@ export function RefactoringPreviewDialog({
                       return (
                         <div key={usage.id} data-testid="refactoring-preview-row" data-path={usage.path}>
                         <label
-                          className={`flex items-center gap-2 rounded px-2 py-1 hover:bg-[var(--taomni-code-active-line-bg)] font-mono text-[11px] ${
+                          className={`flex items-center gap-2 rounded px-2 py-1 hover:bg-[var(--taomni-code-active-line-bg)] font-mono text-ui-small ${
                             isRequired ? "cursor-not-allowed opacity-80" : "cursor-pointer"
                           }`}
                         >
@@ -364,18 +364,18 @@ export function RefactoringPreviewDialog({
                             → {usage.newText || "(empty)"}
                           </span>
                           {usage.annotationLabel && (
-                            <span className="rounded bg-sky-500/10 px-1.5 py-0.2 text-[9px] text-sky-400">
+                            <span className="rounded bg-sky-500/10 px-1.5 py-0.2 text-ui-caption text-sky-400">
                               {usage.annotationLabel}
                             </span>
                           )}
                           {isRequired && (
-                            <span className="rounded bg-amber-500/10 px-1.5 py-0.2 text-[9px] text-amber-400 font-sans">
+                            <span className="rounded bg-amber-500/10 px-1.5 py-0.2 text-ui-caption text-amber-400 font-sans">
                               required
                             </span>
                           )}
                         </label>
                         {sourceTexts && (images ? (
-                          <div className="ml-6 mb-1 rounded border border-[var(--taomni-code-border)] font-mono text-[11px]">
+                          <div className="ml-6 mb-1 rounded border border-[var(--taomni-code-border)] font-mono text-ui-small">
                             <pre
                               data-testid="refactoring-preview-before"
                               aria-label="Before"
@@ -390,7 +390,7 @@ export function RefactoringPreviewDialog({
                         ) : (
                           <div
                             data-testid="refactoring-preview-source-unavailable"
-                            className="ml-6 mb-1 text-[11px] text-[var(--taomni-code-muted)]"
+                            className="ml-6 mb-1 text-ui-small text-[var(--taomni-code-muted)]"
                           >
                             Source unavailable: the current file text could not be read for this change
                           </div>

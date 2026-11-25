@@ -52,7 +52,7 @@ export function ExecutionLogView({
   const cell = "px-2 py-0.5 align-top whitespace-nowrap";
   if (runs.length === 0) {
     return (
-      <div data-testid="db-execution-log" className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+      <div data-testid="db-execution-log" className="flex-1 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
         No statements executed yet.
       </div>
     );
@@ -60,7 +60,7 @@ export function ExecutionLogView({
   return (
     <div
       data-testid="db-execution-log"
-      className="flex-1 min-h-0 overflow-auto taomni-scroll-y text-[11px] font-mono"
+      className="flex-1 min-h-0 overflow-auto taomni-scroll-y text-ui-small font-mono"
       style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
     >
       <table className="w-full border-collapse">

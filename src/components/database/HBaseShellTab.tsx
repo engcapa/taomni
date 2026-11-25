@@ -272,7 +272,7 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
   }
 
   const panelRunning = workspace.activePanel.sheets.some((s) => s.running);
-  const btn = "h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
+  const btn = "h-6 px-2 inline-flex items-center gap-1 rounded text-ui-small hover:bg-[var(--taomni-hover)] disabled:opacity-40";
 
   return <HBaseWorkspaceView
     rootRef={rootRef}

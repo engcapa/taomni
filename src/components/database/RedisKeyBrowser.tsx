@@ -164,7 +164,7 @@ export function RedisKeyBrowser({
                 {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 <Folder className="w-3.5 h-3.5" style={{ color: "#e6a817" }} />
                 <span className="flex-1 truncate">{child.name}</span>
-                <span className="text-[10px] text-[var(--taomni-text-muted)]">{totalKeys}</span>
+                <span className="text-ui-caption text-[var(--taomni-text-muted)]">{totalKeys}</span>
               </button>
               {isOpen && renderNode(child, depth + 1)}
             </div>
@@ -187,13 +187,13 @@ export function RedisKeyBrowser({
                 title={entry.key}
               >
                 <span
-                  className="text-[9px] px-1 rounded shrink-0 uppercase"
+                  className="text-ui-caption px-1 rounded shrink-0 uppercase"
                   style={{ background: TYPE_COLORS[entry.type] ?? "var(--taomni-divider)", color: "#fff" }}
                 >
                   {entry.type.slice(0, 3)}
                 </span>
                 <span className="flex-1 truncate">{leaf}</span>
-                <span className="text-[10px] shrink-0" style={{ color: ttlColor(entry.ttl) }}>
+                <span className="text-ui-caption shrink-0" style={{ color: ttlColor(entry.ttl) }}>
                   {ttlLabel(entry.ttl)}
                 </span>
               </button>
@@ -231,12 +231,12 @@ export function RedisKeyBrowser({
           </button>
         </div>
         <div className="flex items-center gap-1 mt-1">
-          <button type="button" className="taomni-btn px-1.5 py-0.5 text-[11px] flex items-center gap-1" onClick={onAddKey}>
+          <button type="button" className="taomni-btn px-1.5 py-0.5 text-ui-small flex items-center gap-1" onClick={onAddKey}>
             <Plus className="w-3 h-3" /> Add
           </button>
           <button
             type="button"
-            className="taomni-btn px-1.5 py-0.5 text-[11px] flex items-center gap-1"
+            className="taomni-btn px-1.5 py-0.5 text-ui-small flex items-center gap-1"
             disabled={!selectedKey}
             onClick={() => selectedKey && onDeleteKey(selectedKey)}
           >
@@ -244,26 +244,26 @@ export function RedisKeyBrowser({
           </button>
           <button
             type="button"
-            className="taomni-btn px-1.5 py-0.5 text-[11px] flex items-center gap-1"
+            className="taomni-btn px-1.5 py-0.5 text-ui-small flex items-center gap-1"
             disabled={!selectedKey}
             onClick={() => selectedKey && onSetTtl(selectedKey)}
           >
             <Timer className="w-3 h-3" /> TTL
           </button>
-          <span className="ml-auto text-[10px] text-[var(--taomni-text-muted)]">{keys.length} keys</span>
+          <span className="ml-auto text-ui-caption text-[var(--taomni-text-muted)]">{keys.length} keys</span>
         </div>
       </div>
 
       <div
-        className="flex-1 min-h-0 overflow-auto taomni-scroll-y py-1 text-[12px]"
+        className="flex-1 min-h-0 overflow-auto taomni-scroll-y py-1 text-ui-body"
         style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
       >
-        {error && <div className="px-2 py-1 text-[11px]" style={{ color: "#d9534f" }}>{error}</div>}
+        {error && <div className="px-2 py-1 text-ui-small" style={{ color: "#d9534f" }}>{error}</div>}
         {renderNode(tree, 0)}
         {cursor !== "0" && (
           <button
             type="button"
-            className="w-full text-center py-1 text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
+            className="w-full text-center py-1 text-ui-small text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
             onClick={() => void scan(false)}
           >
             Load more…

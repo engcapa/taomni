@@ -36,10 +36,10 @@ export function AiMasterSwitch() {
         className={`w-5 h-5 shrink-0 ${disabled ? "text-yellow-300" : "text-[var(--taomni-text-muted)]"}`}
       />
       <div className="flex-1">
-        <div className="text-[13px] font-semibold">
+        <div className="text-ui-body font-semibold">
           {t("aiSettings.disableAi")} {disabled ? t("aiSettings.disabledSuffix") : ""}
         </div>
-        <div className="text-[11px] text-[var(--taomni-text-muted)]">
+        <div className="text-ui-small text-[var(--taomni-text-muted)]">
           {disabled
             ? t("aiSettings.disabledOnDesc")
             : t("aiSettings.disabledOffDesc")}

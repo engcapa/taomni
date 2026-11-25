@@ -59,7 +59,7 @@ export function ToolActivityBlock({
     >
       <button
         type="button"
-        className="w-full flex items-center gap-1.5 px-2 py-1 text-left text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]/40 rounded"
+        className="w-full flex items-center gap-1.5 px-2 py-1 text-left text-ui-small text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]/40 rounded"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         title={summary}
@@ -100,7 +100,7 @@ function ToolActivityRow({ entry }: { entry: ToolActivityEntry }) {
     && !/^(completed|failed|ok|success|done)$/i.test(result);
   return (
     <div
-      className="rounded border border-[var(--taomni-divider)]/60 bg-[var(--taomni-bg)] px-1.5 py-0.5 text-[10px] font-mono"
+      className="rounded border border-[var(--taomni-divider)]/60 bg-[var(--taomni-bg)] px-1.5 py-0.5 text-ui-caption font-mono"
       data-testid="chat-tool-activity-row"
     >
       <div className="flex items-start gap-1 min-w-0">

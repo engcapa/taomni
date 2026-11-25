@@ -65,11 +65,11 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
         onClick={(event) => event.stopPropagation()}
       >
         <div className="text-sm font-semibold mb-1">{t("vault.setupTitleSet")}</div>
-        <div className="text-[12px] mb-3" style={{ color: "var(--taomni-text-muted)" }}>
+        <div className="text-ui-body mb-3" style={{ color: "var(--taomni-text-muted)" }}>
           {t("vault.setupDescription")}
         </div>
 
-        <label className="block text-[12px] mb-1" style={{ color: "var(--taomni-text-muted)" }}>
+        <label className="block text-ui-body mb-1" style={{ color: "var(--taomni-text-muted)" }}>
           {t("vault.masterPasswordHint")}
         </label>
         <input
@@ -83,7 +83,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
           aria-invalid={tooShort ? true : undefined}
         />
 
-        <label className="block text-[12px] mb-1" style={{ color: "var(--taomni-text-muted)" }}>
+        <label className="block text-ui-body mb-1" style={{ color: "var(--taomni-text-muted)" }}>
           {t("vault.confirmLabel")}
         </label>
         <input
@@ -98,7 +98,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
 
         {tooShort && (
           <div
-            className="mt-2 text-[12px]"
+            className="mt-2 text-ui-body"
             style={{ color: "var(--taomni-error, #c33)" }}
             data-testid="vault-setup-too-short"
           >
@@ -107,7 +107,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
         )}
         {mismatch && (
           <div
-            className="mt-2 text-[12px]"
+            className="mt-2 text-ui-body"
             style={{ color: "var(--taomni-error, #c33)" }}
             data-testid="vault-setup-mismatch"
           >
@@ -116,7 +116,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
         )}
         {error && (
           <div
-            className="mt-2 text-[12px]"
+            className="mt-2 text-ui-body"
             style={{ color: "var(--taomni-error, #c33)" }}
             data-testid="vault-setup-error"
           >
@@ -128,7 +128,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
           <button
             type="button"
             data-testid="vault-setup-cancel"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+            className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]"
             onClick={onCancel}
             disabled={busy}
           >
@@ -137,7 +137,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
           <button
             type="button"
             data-testid="vault-setup-confirm"
-            className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
+            className="px-3 py-1 text-ui-body rounded text-white disabled:opacity-50"
             style={{ background: "var(--taomni-accent)" }}
             onClick={() => void handleSubmit()}
             disabled={!valid || busy}

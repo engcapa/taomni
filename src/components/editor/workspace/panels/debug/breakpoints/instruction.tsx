@@ -66,13 +66,13 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
     >
       <div className="space-y-1 px-3 py-1">
         <div className="flex items-center gap-1">
-          <span className="w-24 shrink-0 text-[10px] font-medium text-[var(--taomni-text-muted)]">
+          <span className="w-24 shrink-0 text-ui-caption font-medium text-[var(--taomni-text-muted)]">
             Instruction
           </span>
           <input
             data-testid="debug-instruction-breakpoint-reference"
             aria-label="Instruction reference"
-            className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none disabled:opacity-40"
+            className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none disabled:opacity-40"
             placeholder="Address or instruction reference"
             maxLength={4096}
             value={reference}
@@ -95,12 +95,12 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
         <div className="grid grid-cols-[6rem_minmax(0,1fr)] items-start gap-1">
           <span aria-hidden="true" />
           <div className="flex min-w-0 flex-wrap items-center gap-1">
-            <label className="flex min-w-0 flex-1 basis-24 items-center gap-1 text-[10px] text-[var(--taomni-text-muted)]">
+            <label className="flex min-w-0 flex-1 basis-24 items-center gap-1 text-ui-caption text-[var(--taomni-text-muted)]">
               <span className="shrink-0">Offset</span>
               <input
                 data-testid="debug-instruction-breakpoint-offset"
                 aria-label="Instruction breakpoint offset"
-                className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none disabled:opacity-40"
+                className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none disabled:opacity-40"
                 inputMode="numeric"
                 placeholder="optional"
                 value={offset}
@@ -114,7 +114,7 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
                 data-testid="debug-instruction-breakpoint-mode"
                 aria-label="Instruction breakpoint mode"
                 title={modes.find((entry) => entry.mode === mode)?.description}
-                className="h-5 min-w-0 max-w-full flex-1 basis-24 truncate rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1 text-[10px]"
+                className="h-5 min-w-0 max-w-full flex-1 basis-24 truncate rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1 text-ui-caption"
                 value={mode ?? modes[0].mode}
                 disabled={!canAdd}
                 onChange={(event) => setPreferredMode(event.target.value)}
@@ -128,12 +128,12 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
         </div>
       </div>
       {active && !supported && (
-        <div data-testid="debug-instruction-breakpoint-unsupported" className="px-3 pb-1 text-[10px] text-amber-500">
+        <div data-testid="debug-instruction-breakpoint-unsupported" className="px-3 pb-1 text-ui-caption text-amber-500">
           The active debug adapter does not support instruction breakpoints.
         </div>
       )}
       {notice && (
-        <div data-testid="debug-instruction-breakpoint-notice" role="status" className="px-3 pb-1 text-[10px] text-rose-500">
+        <div data-testid="debug-instruction-breakpoint-notice" role="status" className="px-3 pb-1 text-ui-caption text-rose-500">
           {notice}
         </div>
       )}
@@ -177,7 +177,7 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
                     {breakpoint.offset >= 0 ? "+" : ""}{breakpoint.offset}
                   </span>
                 )}
-                <span className="ml-2 text-[10px] text-[var(--taomni-text-muted)]">{breakpoint.adapterId}</span>
+                <span className="ml-2 text-ui-caption text-[var(--taomni-text-muted)]">{breakpoint.adapterId}</span>
                 {breakpoint.condition && <span className="ml-2 text-amber-500">if {breakpoint.condition}</span>}
                 {breakpoint.hitCondition && <span className="ml-2 text-amber-500">hit {breakpoint.hitCondition}</span>}
                 {rowModeLabel && <span className="ml-2 text-emerald-600 dark:text-emerald-400">{rowModeLabel}</span>}
@@ -194,7 +194,7 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
               <button
                 type="button"
                 data-testid={`debug-instruction-breakpoint-edit-${index}`}
-                className="shrink-0 text-[10px] text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100"
+                className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100"
                 onClick={() => setEditingKey(open ? null : key)}
               >
                 {open ? "Done" : "Edit"}
@@ -237,7 +237,7 @@ export function InstructionBreakpointEditor({
     options: Partial<Pick<DebugInstructionBreakpoint, "condition" | "hitCondition" | "mode">>,
   ) => void;
 }) {
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none";
   const mode = resolveBreakpointMode(breakpoint.mode, modes, "instruction");
   return (
     <div className="space-y-1 bg-[var(--taomni-code-bg)] px-3 pb-1.5 pt-1">
@@ -260,7 +260,7 @@ export function InstructionBreakpointEditor({
         onCommit={(value) => onChange({ hitCondition: value.trim() || undefined })}
       />
       {modes.length > 0 && (
-        <label className="flex items-center gap-2 text-[10px] text-[var(--taomni-text-muted)]">
+        <label className="flex items-center gap-2 text-ui-caption text-[var(--taomni-text-muted)]">
           <span className="w-20 shrink-0">Mode</span>
           <select
             data-testid={`debug-instruction-breakpoint-row-mode-${index}`}

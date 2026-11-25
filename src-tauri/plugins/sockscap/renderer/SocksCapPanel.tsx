@@ -465,7 +465,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
 
   if (!cfg) {
     return (
-      <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+      <div className="h-full flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
         <Loader2 className="w-4 h-4 animate-spin mr-2" />
         {t("sockscap.loading")}
       </div>

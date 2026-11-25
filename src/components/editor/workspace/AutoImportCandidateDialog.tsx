@@ -98,12 +98,12 @@ export function AutoImportCandidateDialog({
               >
                 <div className="flex flex-col min-w-0">
                   <span className="font-mono truncate">{cand.fullyQualifiedName}</span>
-                  <span className="text-[10px] text-[var(--taomni-code-muted)] truncate">
+                  <span className="text-ui-caption text-[var(--taomni-code-muted)] truncate">
                     package {cand.sourcePackage}
                   </span>
                 </div>
                 {cand.priority !== undefined && cand.priority > 0 && (
-                  <span className="text-[10px] text-neutral-500 font-mono shrink-0 ml-2">
+                  <span className="text-ui-caption text-neutral-500 font-mono shrink-0 ml-2">
                     prio {cand.priority}
                   </span>
                 )}
@@ -114,7 +114,7 @@ export function AutoImportCandidateDialog({
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-2 border-t border-[var(--taomni-code-border)] text-xs">
-          <span className="text-[10px] text-[var(--taomni-code-muted)]">
+          <span className="text-ui-caption text-[var(--taomni-code-muted)]">
             Use ↑↓ to navigate, Enter to select
           </span>
           <div className="flex gap-2">

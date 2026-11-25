@@ -51,7 +51,7 @@ export function GitCloneFields({
     <div className="space-y-4">
       <section data-testid="git-clone-section-repository" className="space-y-3">
         <div>
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]" htmlFor="git-clone-url">
+          <label className="mb-1 block text-ui-small font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]" htmlFor="git-clone-url">
             {t("gitClone.url")}
           </label>
           <input
@@ -68,9 +68,9 @@ export function GitCloneFields({
             onChange={(event) => onChange({ url: event.target.value })}
             onBlur={() => { if (form.url.trim() && !errors.url) onDetect(); }}
           />
-          <p className="mt-1 text-[11px] text-[var(--taomni-text-muted)]">{t("gitClone.urlHint")}</p>
+          <p className="mt-1 text-ui-small text-[var(--taomni-text-muted)]">{t("gitClone.urlHint")}</p>
           {errorText(t, errors.url, "gitClone.urlErrors") && (
-            <p data-testid="workspace-git-clone-url-error" role="alert" className="mt-1 text-[11.5px] text-red-500">
+            <p data-testid="workspace-git-clone-url-error" role="alert" className="mt-1 text-ui-small text-red-500">
               {errorText(t, errors.url, "gitClone.urlErrors")}
             </p>
           )}
@@ -78,7 +78,7 @@ export function GitCloneFields({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-[11px] text-[var(--taomni-text-muted)]" htmlFor="git-clone-name">
+            <label className="mb-1 block text-ui-small text-[var(--taomni-text-muted)]" htmlFor="git-clone-name">
               {t("gitClone.name")}
             </label>
             <input
@@ -92,13 +92,13 @@ export function GitCloneFields({
               onChange={(event) => onChange({ name: event.target.value, nameTouched: true })}
             />
             {errorText(t, errors.name, "gitClone.nameErrors") && (
-              <p data-testid="workspace-git-clone-name-error" role="alert" className="mt-1 text-[11.5px] text-red-500">
+              <p data-testid="workspace-git-clone-name-error" role="alert" className="mt-1 text-ui-small text-red-500">
                 {errorText(t, errors.name, "gitClone.nameErrors")}
               </p>
             )}
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-[var(--taomni-text-muted)]" htmlFor="git-clone-branch">
+            <label className="mb-1 block text-ui-small text-[var(--taomni-text-muted)]" htmlFor="git-clone-branch">
               {t("gitClone.branch")}
             </label>
             <div className="flex items-center gap-1">
@@ -132,12 +132,12 @@ export function GitCloneFields({
               </button>
             </div>
             {errorText(t, errors.branch, "gitClone.branchErrors") && (
-              <p data-testid="workspace-git-clone-branch-error" role="alert" className="mt-1 text-[11.5px] text-red-500">
+              <p data-testid="workspace-git-clone-branch-error" role="alert" className="mt-1 text-ui-small text-red-500">
                 {errorText(t, errors.branch, "gitClone.branchErrors")}
               </p>
             )}
             {probeError && (
-              <p data-testid="workspace-git-clone-probe-error" className="mt-1 text-[11.5px]" style={{ color: "var(--taomni-warning, #d97706)" }}>
+              <p data-testid="workspace-git-clone-probe-error" className="mt-1 text-ui-small" style={{ color: "var(--taomni-warning, #d97706)" }}>
                 {t("gitClone.branchCheckFailed", { error: probeError })}
               </p>
             )}
@@ -145,7 +145,7 @@ export function GitCloneFields({
         </div>
 
         <div>
-          <label className="mb-1 block text-[11px] text-[var(--taomni-text-muted)]" htmlFor="git-clone-location">
+          <label className="mb-1 block text-ui-small text-[var(--taomni-text-muted)]" htmlFor="git-clone-location">
             {t("gitClone.location")}
           </label>
           <div className="flex items-center gap-2">
@@ -171,13 +171,13 @@ export function GitCloneFields({
               {t("gitClone.browse")}
             </button>
           </div>
-          <p className="mt-1 text-[11px] text-[var(--taomni-text-muted)]">{t("gitClone.locationHint")}</p>
+          <p className="mt-1 text-ui-small text-[var(--taomni-text-muted)]">{t("gitClone.locationHint")}</p>
           {errorText(t, errors.location, "gitClone.locationErrors") && (
-            <p data-testid="workspace-git-clone-location-error" role="alert" className="mt-1 text-[11.5px] text-red-500">
+            <p data-testid="workspace-git-clone-location-error" role="alert" className="mt-1 text-ui-small text-red-500">
               {errorText(t, errors.location, "gitClone.locationErrors")}
             </p>
           )}
-          <p className="mt-1 truncate text-[11px]" title={cloneDestination(form)}>
+          <p className="mt-1 truncate text-ui-small" title={cloneDestination(form)}>
             <span className="text-[var(--taomni-text-muted)]">{t("gitClone.destination")}: </span>
             <code data-testid="workspace-git-clone-destination" className="taomni-mono text-[var(--taomni-accent)]">
               {cloneDestination(form)}
@@ -187,12 +187,12 @@ export function GitCloneFields({
       </section>
 
       <section data-testid="git-clone-section-identity">
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
+        <h3 className="mb-2 text-ui-small font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
           {t("gitClone.identity")}
         </h3>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-[11px] text-[var(--taomni-text-muted)]" htmlFor="git-clone-user-name">user.name</label>
+            <label className="mb-1 block text-ui-small text-[var(--taomni-text-muted)]" htmlFor="git-clone-user-name">user.name</label>
             <input
               id="git-clone-user-name"
               data-testid="workspace-git-clone-user-name"
@@ -204,7 +204,7 @@ export function GitCloneFields({
             />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-[var(--taomni-text-muted)]" htmlFor="git-clone-user-email">user.email</label>
+            <label className="mb-1 block text-ui-small text-[var(--taomni-text-muted)]" htmlFor="git-clone-user-email">user.email</label>
             <input
               id="git-clone-user-email"
               data-testid="workspace-git-clone-user-email"
@@ -216,14 +216,14 @@ export function GitCloneFields({
             />
           </div>
         </div>
-        <p className="mt-1 text-[11px] text-[var(--taomni-text-muted)]">{t("gitClone.identityHint")}</p>
+        <p className="mt-1 text-ui-small text-[var(--taomni-text-muted)]">{t("gitClone.identityHint")}</p>
       </section>
 
       <section data-testid="git-clone-section-proxy">
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
+        <h3 className="mb-2 text-ui-small font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
           {t("gitClone.proxy")}
         </h3>
-        <div className="flex flex-wrap items-center gap-4 text-[12px]" role="radiogroup" aria-label={t("gitClone.proxy")}>
+        <div className="flex flex-wrap items-center gap-4 text-ui-body" role="radiogroup" aria-label={t("gitClone.proxy")}>
           {(["app", "custom", "none"] as const).map((mode) => (
             <label key={mode} className="inline-flex items-center gap-1.5">
               <input
@@ -241,7 +241,7 @@ export function GitCloneFields({
         </div>
         <div className="mt-2 grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-[11px] text-[var(--taomni-text-muted)]" htmlFor="git-clone-http-proxy">http.proxy</label>
+            <label className="mb-1 block text-ui-small text-[var(--taomni-text-muted)]" htmlFor="git-clone-http-proxy">http.proxy</label>
             <input
               id="git-clone-http-proxy"
               data-testid="workspace-git-clone-http-proxy"
@@ -254,7 +254,7 @@ export function GitCloneFields({
             />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-[var(--taomni-text-muted)]" htmlFor="git-clone-https-proxy">https.proxy</label>
+            <label className="mb-1 block text-ui-small text-[var(--taomni-text-muted)]" htmlFor="git-clone-https-proxy">https.proxy</label>
             <input
               id="git-clone-https-proxy"
               data-testid="workspace-git-clone-https-proxy"
@@ -267,28 +267,28 @@ export function GitCloneFields({
             />
           </div>
         </div>
-        <p data-testid="workspace-git-clone-proxy-hint" className="mt-1 text-[11px] text-[var(--taomni-text-muted)]">
+        <p data-testid="workspace-git-clone-proxy-hint" className="mt-1 text-ui-small text-[var(--taomni-text-muted)]">
           {form.proxyMode === "app" ? t("gitClone.proxyHintApp") : form.proxyMode === "none" ? t("gitClone.proxyHintNone") : t("gitClone.proxyHintCustom")}
         </p>
         {appProxyError && (
-          <p data-testid="workspace-git-clone-proxy-error" className="mt-1 text-[11.5px]" style={{ color: "var(--taomni-warning, #d97706)" }}>
+          <p data-testid="workspace-git-clone-proxy-error" className="mt-1 text-ui-small" style={{ color: "var(--taomni-warning, #d97706)" }}>
             {t("gitClone.appProxyUnavailable", { error: appProxyError })}
           </p>
         )}
         {form.proxyMode === "custom" && errorText(t, errors.proxy, "gitClone.proxyErrors") && (
-          <p data-testid="workspace-git-clone-proxy-invalid" role="alert" className="mt-1 text-[11.5px] text-red-500">
+          <p data-testid="workspace-git-clone-proxy-invalid" role="alert" className="mt-1 text-ui-small text-red-500">
             {errorText(t, errors.proxy, "gitClone.proxyErrors")}
           </p>
         )}
       </section>
 
       <section data-testid="git-clone-section-auth">
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
+        <h3 className="mb-2 text-ui-small font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
           {t("gitClone.authentication")}
         </h3>
         <div className="grid grid-cols-[1fr_auto_180px] items-end gap-2">
           <div>
-            <label className="mb-1 block text-[11px] text-[var(--taomni-text-muted)]" htmlFor="git-clone-token">{t("gitClone.token")}</label>
+            <label className="mb-1 block text-ui-small text-[var(--taomni-text-muted)]" htmlFor="git-clone-token">{t("gitClone.token")}</label>
             <input
               id="git-clone-token"
               data-testid="workspace-git-clone-token"
@@ -316,7 +316,7 @@ export function GitCloneFields({
             {form.showToken ? t("gitClone.hideToken") : t("gitClone.showToken")}
           </button>
           <div>
-            <label className="mb-1 block text-[11px] text-[var(--taomni-text-muted)]" htmlFor="git-clone-token-username">{t("gitClone.tokenUsername")}</label>
+            <label className="mb-1 block text-ui-small text-[var(--taomni-text-muted)]" htmlFor="git-clone-token-username">{t("gitClone.tokenUsername")}</label>
             <input
               id="git-clone-token-username"
               data-testid="workspace-git-clone-token-username"
@@ -328,8 +328,8 @@ export function GitCloneFields({
             />
           </div>
         </div>
-        <p className="mt-1 text-[11px] text-[var(--taomni-text-muted)]">{t("gitClone.tokenHint")}</p>
-        <div className="mt-2 space-y-1 text-[12px]">
+        <p className="mt-1 text-ui-small text-[var(--taomni-text-muted)]">{t("gitClone.tokenHint")}</p>
+        <div className="mt-2 space-y-1 text-ui-body">
           {defaults?.savedTokenAvailable && (
             <label className="flex items-center gap-2">
               <input
@@ -353,7 +353,7 @@ export function GitCloneFields({
             {t("gitClone.rememberToken")}
           </label>
           {!vaultUnlocked && (
-            <p data-testid="workspace-git-clone-vault-hint" className="text-[11px] text-[var(--taomni-text-muted)]">
+            <p data-testid="workspace-git-clone-vault-hint" className="text-ui-small text-[var(--taomni-text-muted)]">
               {t("gitClone.vaultLocked")}
             </p>
           )}

@@ -300,7 +300,7 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
         <CalendarDays className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)] pointer-events-none" />
         <input
           type="text"
-          className="taomni-input h-6 w-full pl-6 pr-1.5 text-[11px] text-left"
+          className="taomni-input h-6 w-full pl-6 pr-1.5 text-ui-small text-left"
           value={inputText}
           onChange={handleInputChange}
           onBlur={handleInputBlur}
@@ -362,7 +362,7 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
-            <div className="flex-1 text-center text-[11px] font-semibold">{monthLabel}</div>
+            <div className="flex-1 text-center text-ui-small font-semibold">{monthLabel}</div>
             <button
               type="button"
               className="taomni-btn h-6 w-6 p-0"
@@ -374,7 +374,7 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
             </button>
           </div>
 
-          <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] text-[var(--taomni-text-muted)]">
+          <div className="grid grid-cols-7 gap-0.5 text-center text-ui-caption text-[var(--taomni-text-muted)]">
             {weekdays.map((day) => (
               <div key={day} className="h-5 leading-5">
                 {day}
@@ -386,7 +386,7 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
                 <button
                   key={cell.key}
                   type="button"
-                  className={`h-6 rounded text-[11px] transition-colors ${
+                  className={`h-6 rounded text-ui-small transition-colors ${
                     selected
                       ? "bg-[var(--taomni-selected)] text-[var(--taomni-accent)] ring-1 ring-[var(--taomni-selected-border)]"
                       : cell.inMonth
@@ -408,11 +408,11 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
             <Clock className="mt-4 w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
             <div className="flex-1 min-w-0">
               <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="text-[10px] text-[var(--taomni-text-muted)]">{t("notes.dateTimeTime")}</span>
-                <span className="taomni-mono text-[11px] tabular-nums">{draftTime}</span>
+                <span className="text-ui-caption text-[var(--taomni-text-muted)]">{t("notes.dateTimeTime")}</span>
+                <span className="taomni-mono text-ui-small tabular-nums">{draftTime}</span>
               </div>
               <label className="flex h-5 items-center gap-1.5">
-                <span className="w-6 shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{t("notes.dateTimeHour")}</span>
+                <span className="w-6 shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">{t("notes.dateTimeHour")}</span>
                 <input
                   type="range"
                   min="0"
@@ -427,7 +427,7 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
                 />
               </label>
               <label className="flex h-5 items-center gap-1.5">
-                <span className="w-6 shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{t("notes.dateTimeMinute")}</span>
+                <span className="w-6 shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">{t("notes.dateTimeMinute")}</span>
                 <input
                   type="range"
                   min="0"
@@ -445,12 +445,12 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
           </div>
 
           <div className="mt-2 flex items-center justify-between gap-1">
-            <button type="button" className="taomni-btn h-6 px-2 text-[11px]" onClick={commitToday}>
+            <button type="button" className="taomni-btn h-6 px-2 text-ui-small" onClick={commitToday}>
               {t("notes.dateTimeToday")}
             </button>
             <button
               type="button"
-              className="taomni-btn h-6 px-2 text-[11px]"
+              className="taomni-btn h-6 px-2 text-ui-small"
               onClick={commitDone}
               data-testid={`${testId}-done`}
             >

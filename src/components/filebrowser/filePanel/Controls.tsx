@@ -110,7 +110,7 @@ export function DrivesPicker({ onSelect }: { onSelect: (path: string) => void; }
       <button
         type="button"
         title={t("fileBrowser.drivesSwitchTitle")}
-        className="h-5 px-1 inline-flex items-center gap-0.5 rounded hover:bg-[var(--taomni-hover)] text-[11px]"
+        className="h-5 px-1 inline-flex items-center gap-0.5 rounded hover:bg-[var(--taomni-hover)] text-ui-small"
         onClick={() => setOpen((v) => !v)}
         style={{ color: "var(--taomni-text-muted)" }}
       >
@@ -119,7 +119,7 @@ export function DrivesPicker({ onSelect }: { onSelect: (path: string) => void; }
       </button>
       {open && (
         <div
-          className="absolute top-full left-0 mt-0.5 z-50 min-w-[160px] py-1 text-[12px] shadow-lg rounded"
+          className="absolute top-full left-0 mt-0.5 z-50 min-w-[160px] py-1 text-ui-body shadow-lg rounded"
           style={{
             background: "var(--taomni-bg)",
             border: "1px solid var(--taomni-divider)",
@@ -149,7 +149,7 @@ export function DrivesPicker({ onSelect }: { onSelect: (path: string) => void; }
                 <HardDrive className="w-3 h-3 shrink-0" />
                 <span className="truncate">{d.label}</span>
                 <span
-                  className="ml-auto text-[10px]"
+                  className="ml-auto text-ui-caption"
                   style={{ color: "var(--taomni-text-muted)" }}
                 >
                   {d.path}

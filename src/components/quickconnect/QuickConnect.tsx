@@ -51,7 +51,7 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
   return (
     <div
       data-testid="quick-connect"
-      className="h-7 flex items-center gap-1 px-2 text-[12px]"
+      className="h-7 flex items-center gap-1 px-2 text-ui-body"
       style={{
         background: "var(--taomni-quick-bg)",
         borderBottom: "1px solid var(--taomni-divider)",

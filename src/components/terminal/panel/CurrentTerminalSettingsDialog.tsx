@@ -36,7 +36,7 @@ export function CurrentTerminalSettingsDialog({
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex h-10 items-center gap-3 border-b border-[var(--taomni-divider)] px-3">
-          <div className="text-[13px] font-semibold">{t("terminal.currentSettingsTitle")}</div>
+          <div className="text-ui-body font-semibold">{t("terminal.currentSettingsTitle")}</div>
           <button
             type="button"
             className="taomni-btn ml-auto h-7 w-7 p-0 inline-flex items-center justify-center"

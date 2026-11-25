@@ -101,7 +101,7 @@ export function MfaAddDialog({
                   role="tab"
                   aria-selected={mode === entry}
                   data-testid={`mfa-add-mode-${entry}`}
-                  className="inline-flex items-center gap-1 rounded-t px-2.5 py-1.5 text-[12px] hover:bg-[var(--taomni-hover)]"
+                  className="inline-flex items-center gap-1 rounded-t px-2.5 py-1.5 text-ui-body hover:bg-[var(--taomni-hover)]"
                   style={mode === entry ? { boxShadow: "inset 0 -2px 0 var(--taomni-accent)", fontWeight: 600 } : undefined}
                   onClick={() => setMode(entry)}
                 >

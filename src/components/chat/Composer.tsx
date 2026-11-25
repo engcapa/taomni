@@ -404,13 +404,13 @@ export function Composer({
         </div>
       )}
       {attachmentError && (
-        <div className="mb-1.5 text-[10px] text-red-400" data-testid="ai-chat-attachment-error">
+        <div className="mb-1.5 text-ui-caption text-red-400" data-testid="ai-chat-attachment-error">
           {attachmentError}
         </div>
       )}
       {queueDepth > 0 && (
         <div className="mb-1.5 space-y-1" data-testid="ai-chat-queue">
-          <div className="text-[10px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-caption text-[var(--taomni-text-muted)]">
             {t("chat.queuedHint", { count: queueDepth, limit: queueLimit ?? queueDepth })}
           </div>
           {queue.map((item, index) => (
@@ -419,8 +419,8 @@ export function Composer({
               className="flex items-center gap-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]/50 px-1.5 py-1"
               data-testid="ai-chat-queue-item"
             >
-              <span className="shrink-0 text-[10px] text-[var(--taomni-accent)]">{index + 1}</span>
-              <span className="flex-1 truncate text-[10px] text-[var(--taomni-text-muted)]" title={item.content}>
+              <span className="shrink-0 text-ui-caption text-[var(--taomni-accent)]">{index + 1}</span>
+              <span className="flex-1 truncate text-ui-caption text-[var(--taomni-text-muted)]" title={item.content}>
                 {item.content.replace(/\s+/g, " ").trim()}
               </span>
               {onRemoveQueued && (
@@ -462,7 +462,7 @@ export function Composer({
           ref={textareaRef}
           data-testid="chat-composer-textarea"
           id="chat-composer-textarea"
-          className="taomni-input flex-1 text-[12px] resize-none py-1.5"
+          className="taomni-input flex-1 text-ui-body resize-none py-1.5"
           placeholder={placeholder ?? t("chat.inputPlaceholder", { shortcut: sendShortcutLabel })}
           value={text}
           disabled={draftDisabled}

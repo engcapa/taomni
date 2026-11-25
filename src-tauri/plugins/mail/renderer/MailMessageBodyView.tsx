@@ -97,7 +97,7 @@ export function MailMessageBodyView({
 
   if (loading) {
     return (
-      <div className="h-32 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]" data-testid="mail-reader-loading">
+      <div className="h-32 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]" data-testid="mail-reader-loading">
         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
         Loading message body
       </div>
@@ -106,7 +106,7 @@ export function MailMessageBodyView({
 
   if (!hasHtml && !hasText) {
     return (
-      <div className="text-[12px] text-[var(--taomni-text-muted)]" data-testid="mail-reader-empty">
+      <div className="text-ui-body text-[var(--taomni-text-muted)]" data-testid="mail-reader-empty">
         {emptyHint}
       </div>
     );
@@ -138,7 +138,7 @@ export function MailMessageBodyView({
               type="button"
               role="tab"
               aria-selected={activeMode === "html"}
-              className={`h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] ${
+              className={`h-6 px-2 inline-flex items-center gap-1 rounded text-ui-small ${
                 activeMode === "html"
                   ? "bg-[var(--taomni-bg)] text-[var(--taomni-accent)] shadow-sm"
                   : "text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
@@ -153,7 +153,7 @@ export function MailMessageBodyView({
               type="button"
               role="tab"
               aria-selected={activeMode === "plain"}
-              className={`h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] ${
+              className={`h-6 px-2 inline-flex items-center gap-1 rounded text-ui-small ${
                 activeMode === "plain"
                   ? "bg-[var(--taomni-bg)] text-[var(--taomni-accent)] shadow-sm"
                   : "text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
@@ -184,7 +184,7 @@ export function MailMessageBodyView({
           </button>
           <button
             type="button"
-            className="h-6 min-w-[3rem] px-1 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] rounded"
+            className="h-6 min-w-[3rem] px-1 text-ui-small text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] rounded"
             title="Reset zoom"
             data-testid="mail-body-zoom-reset"
             onClick={() => setBodyZoom(1)}
@@ -206,7 +206,7 @@ export function MailMessageBodyView({
 
         <button
           type="button"
-          className={`h-7 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] ${
+          className={`h-7 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-ui-small ${
             findOpen
               ? "bg-[var(--taomni-bg)] text-[var(--taomni-accent)]"
               : "bg-[var(--taomni-sidebar-bg)] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
@@ -238,7 +238,7 @@ export function MailMessageBodyView({
           <input
             ref={findInputRef}
             type="search"
-            className="taomni-input h-7 flex-1 min-w-[140px] text-[12px]"
+            className="taomni-input h-7 flex-1 min-w-[140px] text-ui-body"
             placeholder="Find in message…"
             value={findQuery}
             data-testid="mail-body-find-input"
@@ -260,7 +260,7 @@ export function MailMessageBodyView({
           />
           <button
             type="button"
-            className="taomni-btn h-7 px-2 text-[11px]"
+            className="taomni-btn h-7 px-2 text-ui-small"
             data-testid="mail-body-find-prev"
             onClick={() => runFind(true)}
           >
@@ -268,14 +268,14 @@ export function MailMessageBodyView({
           </button>
           <button
             type="button"
-            className="taomni-btn h-7 px-2 text-[11px]"
+            className="taomni-btn h-7 px-2 text-ui-small"
             data-testid="mail-body-find-next"
             onClick={() => runFind(false)}
           >
             Next
           </button>
           {findStatus && (
-            <span className="text-[11px] text-[var(--taomni-text-muted)]" data-testid="mail-body-find-status">
+            <span className="text-ui-small text-[var(--taomni-text-muted)]" data-testid="mail-body-find-status">
               {findStatus}
             </span>
           )}

@@ -92,17 +92,17 @@ export function ClipboardHistoryPopup({
       onKeyDown={handleKeyDown}
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-[10vh]"
     >
-      <div className="flex w-full max-w-xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[12px] text-[var(--taomni-code-fg)] shadow-2xl">
+      <div className="flex w-full max-w-xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-fg)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-3 py-2">
           <div className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4 text-sky-400" />
-            <h2 id="clipboard-history-title" className="text-[13px] font-semibold">Paste from History</h2>
-            <span className="text-[10px] text-[var(--taomni-code-muted)]">session only</span>
+            <h2 id="clipboard-history-title" className="text-ui-body font-semibold">Paste from History</h2>
+            <span className="text-ui-caption text-[var(--taomni-code-muted)]">session only</span>
           </div>
           <div className="flex items-center gap-1">
             {confirmingClear ? (
               <>
-                <span className="px-1 text-[10px] text-[var(--taomni-code-muted)]">Clear all?</span>
+                <span className="px-1 text-ui-caption text-[var(--taomni-code-muted)]">Clear all?</span>
                 <button
                   type="button"
                   data-testid="clipboard-history-clear-confirm"
@@ -110,7 +110,7 @@ export function ClipboardHistoryPopup({
                     onClear();
                     setConfirmingClear(false);
                   }}
-                  className="rounded border border-red-500/40 px-2 py-0.5 text-[10px] text-red-400 hover:bg-red-500/10"
+                  className="rounded border border-red-500/40 px-2 py-0.5 text-ui-caption text-red-400 hover:bg-red-500/10"
                 >
                   Clear
                 </button>
@@ -118,7 +118,7 @@ export function ClipboardHistoryPopup({
                   type="button"
                   data-testid="clipboard-history-clear-abort"
                   onClick={() => setConfirmingClear(false)}
-                  className="rounded border border-[var(--taomni-code-border)] px-2 py-0.5 text-[10px]"
+                  className="rounded border border-[var(--taomni-code-border)] px-2 py-0.5 text-ui-caption"
                 >
                   Keep
                 </button>
@@ -159,7 +159,7 @@ export function ClipboardHistoryPopup({
             placeholder="Filter history…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-7 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 text-[11px] focus:outline-none focus:border-sky-500"
+            className="h-7 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 text-ui-small focus:outline-none focus:border-sky-500"
           />
         </div>
 
@@ -171,7 +171,7 @@ export function ClipboardHistoryPopup({
           className="max-h-72 overflow-y-auto p-1"
         >
           {filtered.length === 0 ? (
-            <div data-testid="clipboard-history-empty" className="px-3 py-6 text-center text-[11px] text-[var(--taomni-code-muted)]">
+            <div data-testid="clipboard-history-empty" className="px-3 py-6 text-center text-ui-small text-[var(--taomni-code-muted)]">
               {entries.length === 0 ? "Clipboard history is empty." : "No entries match the filter."}
             </div>
           ) : (
@@ -191,10 +191,10 @@ export function ClipboardHistoryPopup({
                   position === selectedIndex ? "bg-sky-500/15" : "hover:bg-[var(--taomni-code-active-line-bg)]"
                 }`}
               >
-                <span className="min-w-0 flex-1 truncate font-mono text-[11px]">
+                <span className="min-w-0 flex-1 truncate font-mono text-ui-small">
                   {entry.plainText.split("\n")[0]?.slice(0, 120) || "(empty)"}
                 </span>
-                <span className="shrink-0 rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 text-[9px] text-[var(--taomni-code-muted)]">
+                <span className="shrink-0 rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 text-ui-caption text-[var(--taomni-code-muted)]">
                   {entry.segments?.length ?? 1} seg · {relativeTime(entry.createdAt)}
                 </span>
                 <button
@@ -213,7 +213,7 @@ export function ClipboardHistoryPopup({
           )}
         </div>
 
-        <div className="border-t border-[var(--taomni-code-border)] px-3 py-1.5 text-[10px] text-[var(--taomni-code-muted)]">
+        <div className="border-t border-[var(--taomni-code-border)] px-3 py-1.5 text-ui-caption text-[var(--taomni-code-muted)]">
           ↑↓ Navigate · ↵ Paste at caret · Del Remove · Esc Close — never persisted, never polled from the system clipboard
         </div>
       </div>

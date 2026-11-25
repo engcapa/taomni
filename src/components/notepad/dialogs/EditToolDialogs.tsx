@@ -52,7 +52,7 @@ export function EditToolDialogs({
             <span>{label("转到行 / 偏移量", "Go To Line / Offset")}</span>
             <button type="button" className="np-btn" onClick={onClose}><X size={14} /></button>
           </div>
-          <div className="flex gap-4 text-[12px]">
+          <div className="flex gap-4 text-ui-body">
             <label className="inline-flex items-center gap-1.5">
               <input type="radio" checked={goMode === "line"} onChange={() => { setGoMode("line"); setGoVal(String(currentLine)); }} />
               {label(`行号 (1–${totalLines})`, `Line (1–${totalLines})`)}
@@ -103,7 +103,7 @@ export function EditToolDialogs({
           <button type="button" className="np-btn" onClick={onClose}><X size={14} /></button>
         </div>
 
-        <div className="flex gap-4 text-[12px]">
+        <div className="flex gap-4 text-ui-body">
           <label className="inline-flex items-center gap-1.5">
             <input type="radio" checked={colMode === "text"} onChange={() => setColMode("text")} />
             {label("插入文本", "Text to Insert")}
@@ -124,7 +124,7 @@ export function EditToolDialogs({
             onChange={(e) => setColText(e.target.value)}
           />
         ) : (
-          <div className="grid grid-cols-2 gap-2 text-[12px]">
+          <div className="grid grid-cols-2 gap-2 text-ui-body">
             <label className="flex flex-col gap-1">
               <span>{label("起始数字", "Initial number")}</span>
               <input type="number" className="np-input" data-testid="notepad-col-initial" value={initial} onChange={(e) => setInitial(Number(e.target.value))} />
@@ -153,7 +153,7 @@ export function EditToolDialogs({
           </div>
         )}
 
-        <div className="text-[11px] bg-[var(--taomni-bg)] border border-[var(--taomni-divider)] rounded p-2 font-mono">
+        <div className="text-ui-small bg-[var(--taomni-bg)] border border-[var(--taomni-divider)] rounded p-2 font-mono">
           <div className="text-[var(--taomni-text-muted)] mb-1">{label("预览（前 4 行）", "Preview (first 4 rows)")}</div>
           {preview.map((item, idx) => <div key={idx}>{item || "(empty)"}</div>)}
         </div>

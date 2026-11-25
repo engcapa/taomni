@@ -51,7 +51,7 @@ export function ModuleReleaseNotice({ openSettings }: { openSettings(): void }) 
   const legacyPending = (plan?.legacyPending.length ?? 0) - waitingForRestart - importFailed;
   if (!showMfaNotice && !newModules.length && !legacyPending && !waitingForRestart && !importFailed && !plan?.legacyWaiting) return null;
 
-  return <aside data-testid="module-release-notice" className="max-h-40 overflow-y-auto border-t border-[var(--taomni-divider)] px-3 py-2 text-[12px]">
+  return <aside data-testid="module-release-notice" className="max-h-40 overflow-y-auto border-t border-[var(--taomni-divider)] px-3 py-2 text-ui-body">
     {showMfaNotice && <p data-testid="module-release-mfa" role={mfaNotice instanceof Error ? "alert" : "status"}>
       {mfaNotice instanceof Error ? mfaNotice.message : t("plugins.marketMfaMigrationRequired")}
     </p>}

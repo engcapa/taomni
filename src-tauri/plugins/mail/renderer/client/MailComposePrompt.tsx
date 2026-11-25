@@ -32,7 +32,7 @@ export function MailComposePrompt({
           <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${attachmentPrompt ? "text-amber-500" : "text-red-500"}`} />
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold">{prompt.title}</div>
-            <div className="mt-2 whitespace-pre-line text-[12px]" data-testid="mail-compose-prompt-message">
+            <div className="mt-2 whitespace-pre-line text-ui-body" data-testid="mail-compose-prompt-message">
               {prompt.message}
             </div>
           </div>
@@ -42,7 +42,7 @@ export function MailComposePrompt({
             <>
               <button
                 type="button"
-                className="taomni-btn h-7 px-2.5 text-[12px]"
+                className="taomni-btn h-7 px-2.5 text-ui-body"
                 data-testid="mail-attach-reminder-cancel"
                 onClick={onClose}
               >
@@ -50,7 +50,7 @@ export function MailComposePrompt({
               </button>
               <button
                 type="button"
-                className="taomni-btn h-7 px-2.5 text-[12px]"
+                className="taomni-btn h-7 px-2.5 text-ui-body"
                 data-testid="mail-attach-reminder-attach"
                 onClick={onAttach}
               >
@@ -58,7 +58,7 @@ export function MailComposePrompt({
               </button>
               <button
                 type="button"
-                className="taomni-btn h-7 px-2.5 text-[12px]"
+                className="taomni-btn h-7 px-2.5 text-ui-body"
                 data-primary="true"
                 data-testid="mail-attach-reminder-send"
                 onClick={onSendAnyway}
@@ -69,7 +69,7 @@ export function MailComposePrompt({
           ) : (
             <button
               type="button"
-              className="taomni-btn h-7 px-3 text-[12px]"
+              className="taomni-btn h-7 px-3 text-ui-body"
               data-primary="true"
               data-testid="mail-compose-error-ok"
               onClick={onClose}

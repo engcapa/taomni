@@ -151,39 +151,39 @@ export function UpdateDialog() {
         </div>
 
         {s.status === "checking" && (
-          <div className="text-[13px] mb-4 flex items-center gap-2" style={{ color: "var(--taomni-text-muted)" }}>
+          <div className="text-ui-body mb-4 flex items-center gap-2" style={{ color: "var(--taomni-text-muted)" }}>
             <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-[var(--taomni-text-muted)] border-t-transparent inline-block" />
             {t("update.statusChecking")}
           </div>
         )}
 
         {s.status === "uptodate" && (
-          <div className="text-[13px] mb-4" style={{ color: "var(--taomni-text-muted)" }}>
+          <div className="text-ui-body mb-4" style={{ color: "var(--taomni-text-muted)" }}>
             {t("update.statusUpToDate")}
           </div>
         )}
 
         {s.status === "error" && (
-          <div data-testid="update-error" className="text-[13px] mb-4" style={{ color: DANGER }}>
+          <div data-testid="update-error" className="text-ui-body mb-4" style={{ color: DANGER }}>
             {s.error}
           </div>
         )}
 
         {s.status === "ready" && (
-          <div className="text-[13px] mb-4" style={{ color: "var(--taomni-text-muted)" }}>
+          <div className="text-ui-body mb-4" style={{ color: "var(--taomni-text-muted)" }}>
             {t("update.readyBody", { version: s.availableVersion ?? "" })}
           </div>
         )}
 
         {(s.status === "available" || updating) && (
           <>
-            <div className="text-[12px] taomni-mono mb-1" style={{ color: "var(--taomni-text-muted)" }}>
+            <div className="text-ui-body taomni-mono mb-1" style={{ color: "var(--taomni-text-muted)" }}>
               {t("update.currentVersion", { version: s.currentVersion ?? "" })} →{" "}
               {t("update.newVersion", { version: s.availableVersion ?? "" })}
             </div>
-            <div className="text-[13px] font-medium mt-3 mb-1">{t("update.notesTitle")}</div>
+            <div className="text-ui-body font-medium mt-3 mb-1">{t("update.notesTitle")}</div>
             <div
-              className="text-[12px] mb-3 max-h-40 overflow-auto whitespace-pre-wrap"
+              className="text-ui-body mb-3 max-h-40 overflow-auto whitespace-pre-wrap"
               style={{ color: "var(--taomni-text-muted)" }}
             >
               {s.notes || t("update.noNotes")}
@@ -191,7 +191,7 @@ export function UpdateDialog() {
 
             {showArch && (
               <div className="mb-3">
-                <div className="text-[13px] font-medium mb-1">{t("update.archTitle")}</div>
+                <div className="text-ui-body font-medium mb-1">{t("update.archTitle")}</div>
                 <div className="flex flex-wrap gap-2">
                   {s.candidates.map((target) => {
                     const selected = s.selectedTarget === target;
@@ -205,7 +205,7 @@ export function UpdateDialog() {
                         type="button"
                         disabled={updating}
                         onClick={() => void s.setSelectedTarget(target)}
-                        className="taomni-btn h-8 px-3 text-[12px]"
+                        className="taomni-btn h-8 px-3 text-ui-body"
                         data-primary={selected ? "true" : undefined}
                         data-testid={`update-arch-${target}`}
                         aria-pressed={selected}
@@ -217,17 +217,17 @@ export function UpdateDialog() {
                   })}
                 </div>
                 {s.targetStatus === "checking" && (
-                  <div className="text-[12px] mt-1" style={{ color: "var(--taomni-text-muted)" }}>
+                  <div className="text-ui-body mt-1" style={{ color: "var(--taomni-text-muted)" }}>
                     {t("update.archChecking")}
                   </div>
                 )}
                 {s.targetStatus === "unavailable" && (
-                  <div className="text-[12px] mt-1" style={{ color: DANGER }}>
+                  <div className="text-ui-body mt-1" style={{ color: DANGER }}>
                     {t("update.archUnavailable")}
                   </div>
                 )}
                 {s.isRosetta && (
-                  <div className="text-[12px] mt-1" style={{ color: "var(--taomni-warning-text)" }}>
+                  <div className="text-ui-body mt-1" style={{ color: "var(--taomni-warning-text)" }}>
                     {t("update.rosettaHint")}
                   </div>
                 )}
@@ -246,7 +246,7 @@ export function UpdateDialog() {
                     }}
                   />
                 </div>
-                <div className="text-[12px] mt-1" style={{ color: "var(--taomni-text-muted)" }}>
+                <div className="text-ui-body mt-1" style={{ color: "var(--taomni-text-muted)" }}>
                   {installing
                     ? t("update.installing")
                     : percent === null

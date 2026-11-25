@@ -52,7 +52,7 @@ export function MailFoldersPane(viewProps: MailFoldersPaneProps) {
           >
             {!mailboxCollapsed && (
               <aside className="h-full min-w-0 bg-[var(--taomni-sidebar-bg)] flex flex-col">
-                <div className="h-8 shrink-0 flex items-center px-3 text-[12px] font-semibold border-b border-[var(--taomni-divider)]">
+                <div className="h-8 shrink-0 flex items-center px-3 text-ui-body font-semibold border-b border-[var(--taomni-divider)]">
                   Mailbox
                   {loadingFolders && <Loader2 className="w-3.5 h-3.5 ml-auto animate-spin text-[var(--taomni-text-muted)]" />}
                   <button
@@ -116,7 +116,7 @@ export function MailFoldersPane(viewProps: MailFoldersPaneProps) {
                       <button
                         key={folder.name}
                         type="button"
-                        className={`w-full h-7 pr-3 flex items-center gap-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)] font-semibold" : ""} ${dropFolder === folder.name ? "outline outline-1 outline-[var(--taomni-accent)] -outline-offset-1" : ""}`}
+                        className={`w-full h-7 pr-3 flex items-center gap-2 text-left text-ui-body hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)] font-semibold" : ""} ${dropFolder === folder.name ? "outline outline-1 outline-[var(--taomni-accent)] -outline-offset-1" : ""}`}
                         style={{ paddingLeft: `${12 + Math.min(folderDepth(folder), 6) * 14}px` }}
                         data-active={active || undefined}
                         data-testid="mail-folder-row"
@@ -161,16 +161,16 @@ export function MailFoldersPane(viewProps: MailFoldersPaneProps) {
                           </span>
                         )}
                         {folder.unread !== null && folder.unread !== undefined && folder.unread > 0 && (
-                          <span className="text-[11px] text-[var(--taomni-accent)]">{folder.unread}</span>
+                          <span className="text-ui-small text-[var(--taomni-accent)]">{folder.unread}</span>
                         )}
                         {folder.total !== null && folder.total !== undefined && (
-                          <span className="text-[11px] text-[var(--taomni-text-muted)]">{folder.total}</span>
+                          <span className="text-ui-small text-[var(--taomni-text-muted)]">{folder.total}</span>
                         )}
                       </button>
                     );
                   })}
                 </div>
-                <div className="shrink-0 border-t border-[var(--taomni-divider)] px-3 py-2 text-[11px] text-[var(--taomni-text-muted)] leading-5">
+                <div className="shrink-0 border-t border-[var(--taomni-divider)] px-3 py-2 text-ui-small text-[var(--taomni-text-muted)] leading-5">
                   <div className="truncate" title={`${info.imap.host}:${info.imap.port}`}>
                     {info.incoming === "pop3" ? "POP3" : "IMAP"} {info.imap.host}:{info.imap.port}
                   </div>

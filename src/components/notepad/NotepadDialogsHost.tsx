@@ -297,7 +297,7 @@ export function NotepadDialogsHost({
               <span>Taomni Notepad</span>
               <button type="button" className="np-btn" onClick={() => setAboutOpen(false)}>×</button>
             </div>
-            <p className="text-[12px]">
+            <p className="text-ui-body">
               {label(
                 "Taomni 原生多文档记事本工作台：支持列块编辑、宏录制、定期磁盘备份与多编码无损转换。",
                 "Taomni native Notepad workbench: column selection, recorded macros, disk backups, and safe multi-encoding editing.",

@@ -92,7 +92,7 @@ export function HighlightingWidget({
       data-diagnostic-generation={diagnosticScope ? diagnosticScope.providerGeneration : undefined}
       data-diagnostics-ready={diagnosticsReady ? "true" : "false"}
       data-diagnostics-state={diagnosticsError ? "failed" : diagnosticsReady ? "ready" : "pending"}
-      className="relative shrink-0 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-code-text)]"
+      className="relative shrink-0 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-1.5 py-0.5 text-ui-small text-[var(--taomni-code-text)]"
     >
       {/* Problems count badge */}
       {diagnosticsReady && errors > 0 ? (
@@ -190,9 +190,9 @@ export function HighlightingWidget({
             role="menu"
             aria-label="Highlighting level options"
             data-testid="highlighting-widget-menu"
-            className="absolute right-0 top-full z-50 mt-1 min-w-[200px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-1.5 shadow-lg text-[11px]"
+            className="absolute right-0 top-full z-50 mt-1 min-w-[200px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-1.5 shadow-lg text-ui-small"
           >
-            <div className="px-2 py-1 font-semibold text-[var(--taomni-code-muted)] uppercase tracking-wider text-[9px]">
+            <div className="px-2 py-1 font-semibold text-[var(--taomni-code-muted)] uppercase tracking-wider text-ui-caption">
               Highlighting Level
             </div>
             {levels.map((lvl) => (
@@ -239,7 +239,7 @@ export function HighlightingWidget({
 
             <div className="my-1 border-t border-[var(--taomni-code-border)]" />
 
-            <div className="px-2 py-1 text-[10px] text-[var(--taomni-code-muted)]">
+            <div className="px-2 py-1 text-ui-caption text-[var(--taomni-code-muted)]">
               <span className="block font-medium text-[var(--taomni-code-text)]">
                 <span data-testid="highlighting-widget-provider">Scope: {providerLabel}</span>
               </span>

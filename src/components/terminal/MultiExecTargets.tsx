@@ -40,7 +40,7 @@ export function MultiExecTargets({ selectedCount, totalCount }: { selectedCount:
   }, [open]);
   const matches = tabs.filter((tab) => tab.type === "terminal" && tabSearchText(tab).includes(query.trim().toLowerCase()));
   return <>
-    <button ref={button} type="button" data-testid="multiexec-targets" className="taomni-pill inline-flex shrink-0 items-center gap-1 text-[11px]"
+    <button ref={button} type="button" data-testid="multiexec-targets" className="taomni-pill inline-flex shrink-0 items-center gap-1 text-ui-small"
       title={t("multiExec.targets")} aria-label={t("multiExec.targets")} aria-haspopup="dialog" aria-expanded={open}
       onClick={() => { setQuery(""); setOpen((value) => !value); }}>
       {selectedCount} / {totalCount}<ChevronDown className="h-3 w-3" />

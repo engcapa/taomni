@@ -99,8 +99,8 @@ export function FileEncodingDialog({
         <header className="flex min-h-11 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3">
           <HardDrive className="h-4 w-4 shrink-0 text-[var(--taomni-accent)]" />
           <div className="min-w-0 flex-1">
-            <div className="text-[12px] font-semibold text-[var(--taomni-code-text)]">File encoding</div>
-            <div className="truncate text-[10px] text-[var(--taomni-code-muted)]" title={path}>{path}</div>
+            <div className="text-ui-body font-semibold text-[var(--taomni-code-text)]">File encoding</div>
+            <div className="truncate text-ui-caption text-[var(--taomni-code-muted)]" title={path}>{path}</div>
           </div>
           <button
             type="button"
@@ -114,7 +114,7 @@ export function FileEncodingDialog({
         </header>
 
         <div className="space-y-4 p-4">
-          <label className="block text-[11px] text-[var(--taomni-code-muted)]">
+          <label className="block text-ui-small text-[var(--taomni-code-muted)]">
             Encoding
             <select
               ref={selectRef}
@@ -122,7 +122,7 @@ export function FileEncodingDialog({
               aria-label="Encoding"
               value={encoding}
               disabled={busy}
-              className="mt-1 h-8 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 text-[12px] text-[var(--taomni-code-text)] outline-none focus:border-[var(--taomni-accent)]"
+              className="mt-1 h-8 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 text-ui-body text-[var(--taomni-code-text)] outline-none focus:border-[var(--taomni-accent)]"
               onChange={(event) => {
                 const next = event.target.value;
                 setEncoding(next);
@@ -136,7 +136,7 @@ export function FileEncodingDialog({
             </select>
           </label>
 
-          <label className={`flex items-center gap-2 text-[11px] ${bomEnabled ? "text-[var(--taomni-code-text)]" : "text-[var(--taomni-code-muted)]"}`}>
+          <label className={`flex items-center gap-2 text-ui-small ${bomEnabled ? "text-[var(--taomni-code-text)]" : "text-[var(--taomni-code-muted)]"}`}>
             <input
               ref={bomRef}
               data-testid="file-encoding-bom"
@@ -150,7 +150,7 @@ export function FileEncodingDialog({
           </label>
 
           {dirty && (
-            <p className="text-[10px] leading-4 text-amber-500">
+            <p className="text-ui-caption leading-4 text-amber-500">
               Reload discards unsaved changes. Convert on save keeps the current buffer and marks it dirty.
             </p>
           )}
@@ -160,7 +160,7 @@ export function FileEncodingDialog({
           <button
             type="button"
             data-testid="file-encoding-reload"
-            className="inline-flex h-8 items-center gap-1.5 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+            className="inline-flex h-8 items-center gap-1.5 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
             disabled={busy}
             onClick={() => void reload()}
           >
@@ -170,7 +170,7 @@ export function FileEncodingDialog({
           <button
             type="button"
             data-testid="file-encoding-convert"
-            className="inline-flex h-8 items-center gap-1.5 rounded bg-[var(--taomni-accent)] px-3 text-[11px] text-white hover:brightness-110 disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded bg-[var(--taomni-accent)] px-3 text-ui-small text-white hover:brightness-110 disabled:opacity-50"
             disabled={busy}
             onClick={() => {
               onConvert(encoding, bomEnabled && (bomRef.current?.checked ?? bom));

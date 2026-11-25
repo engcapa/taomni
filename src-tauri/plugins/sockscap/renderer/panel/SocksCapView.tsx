@@ -252,7 +252,7 @@ export function SocksCapView(props: SocksCapViewProps) {
       />
 
       {runtime.status?.phase === "recoveryRequired" && caps?.platform === "macos" && (
-        <div className="px-4 py-3 bg-red-500/10 border-b border-red-500/30 text-[11px] text-red-700 dark:text-red-300">
+        <div className="px-4 py-3 bg-red-500/10 border-b border-red-500/30 text-ui-small text-red-700 dark:text-red-300">
           <div className="font-semibold">{t("sockscap.manualRecoveryTitle")}</div>
           <div className="mt-1">{runtime.status.message}</div>
           <ol className="mt-2 ml-4 list-decimal space-y-1">
@@ -272,7 +272,7 @@ export function SocksCapView(props: SocksCapViewProps) {
       )}
 
       {caps?.platform === "macos" && runtime.redirectorInstall?.state !== "ready" && (
-        <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 text-[11px] flex flex-wrap items-center justify-between gap-2 text-amber-800 dark:text-amber-300">
+        <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 text-ui-small flex flex-wrap items-center justify-between gap-2 text-amber-800 dark:text-amber-300">
           <span>{runtime.redirectorInstall?.message || t("sockscap.redirectorMissing")}</span>
           <button
             type="button"
@@ -307,7 +307,7 @@ export function SocksCapView(props: SocksCapViewProps) {
       {linuxLaunchOnly && (
         <div
           data-testid="sockscap-launch-only-banner"
-          className="px-4 py-2 bg-sky-500/10 border-b border-sky-500/30 text-[11px] text-sky-800 dark:text-sky-300"
+          className="px-4 py-2 bg-sky-500/10 border-b border-sky-500/30 text-ui-small text-sky-800 dark:text-sky-300"
           title={caps?.linux?.transparentUnavailableReason || undefined}
         >
           <div className="flex items-start gap-2">
@@ -422,14 +422,14 @@ export function SocksCapView(props: SocksCapViewProps) {
               data-testid="sockscap-rootless-mode"
               className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3"
             >
-              <div className="text-[13px] font-semibold">
+              <div className="text-ui-body font-semibold">
                 {t("sockscap.rootlessModeTitle")}
               </div>
-              <p className="mt-1 text-[11px] leading-5 text-[var(--taomni-text-muted)]">
+              <p className="mt-1 text-ui-small leading-5 text-[var(--taomni-text-muted)]">
                 {t("sockscap.rootlessModeDescription")}
               </p>
               {caps?.linux?.containerized && (
-                <p className="mt-1 text-[11px] text-sky-700 dark:text-sky-300">
+                <p className="mt-1 text-ui-small text-sky-700 dark:text-sky-300">
                   {t("sockscap.launchOnlyContainer")}
                 </p>
               )}
@@ -442,7 +442,7 @@ export function SocksCapView(props: SocksCapViewProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Field label={t("sockscap.profileNameLabel")}>
                   <input
-                    className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full text-ui-body px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
                     value={selectedProf.name}
                     disabled={locked}
                     title={locked ? t("sockscap.lockedTooltip") : undefined}
@@ -457,7 +457,7 @@ export function SocksCapView(props: SocksCapViewProps) {
                         type="button"
                         disabled={locked}
                         title={locked ? t("sockscap.lockedTooltip") : undefined}
-                        className={`px-2 py-1 rounded text-[13px] border disabled:opacity-50 disabled:cursor-not-allowed ${selectedProf.icon === ic
+                        className={`px-2 py-1 rounded text-ui-body border disabled:opacity-50 disabled:cursor-not-allowed ${selectedProf.icon === ic
                           ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/20"
                           : "border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
                           }`}
@@ -543,14 +543,14 @@ export function SocksCapView(props: SocksCapViewProps) {
               <div className="flex gap-2 items-center">
                 <input
                   data-testid="sockscap-test-host"
-                  className="flex-1 text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                  className="flex-1 text-ui-body px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
                   value={testHost}
                   onChange={(e) => setTestHost(e.target.value)}
                 />
                 <button
                   type="button"
                   data-testid="sockscap-test-target"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-60 disabled:cursor-not-allowed"
                   onClick={() => void onTestTarget()}
                   disabled={busy || testing}
                 >
@@ -559,7 +559,7 @@ export function SocksCapView(props: SocksCapViewProps) {
                 </button>
               </div>
               {testResult && (
-                <div className="mt-2 p-2 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)] text-[11px]">
+                <div className="mt-2 p-2 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)] text-ui-small">
                   <span className="font-semibold">{testResult.host}: </span>
                   <span className="uppercase font-medium text-[var(--taomni-accent)]">
                     {testResult.decision}
@@ -577,7 +577,7 @@ export function SocksCapView(props: SocksCapViewProps) {
             defaultExpanded={linuxLaunchOnly}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[11px] text-[var(--taomni-text-muted)]">
+              <div className="text-ui-small text-[var(--taomni-text-muted)]">
                 {runtime.gfw?.loaded
                   ? t("sockscap.gfwStatus", {
                     count: String(runtime.gfw.ruleCount),
@@ -592,7 +592,7 @@ export function SocksCapView(props: SocksCapViewProps) {
                 <button
                   type="button"
                   data-testid="sockscap-refresh-gfw"
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-ui-small border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => void onRefreshGfw()}
                   disabled={busy || locked}
                   title={locked ? t("sockscap.lockedTooltip") : undefined}
@@ -603,7 +603,7 @@ export function SocksCapView(props: SocksCapViewProps) {
                 <button
                   type="button"
                   data-testid="sockscap-import-gfw"
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-ui-small border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => void onImportGfw()}
                   disabled={busy || locked}
                   title={locked ? t("sockscap.lockedTooltip") : undefined}
@@ -615,7 +615,7 @@ export function SocksCapView(props: SocksCapViewProps) {
 
             {/* Session-level QUIC blocking (forces QUIC→TCP so capture can proxy it). */}
             <label
-              className="mt-3 flex items-start gap-2 text-[12px] cursor-pointer select-none"
+              className="mt-3 flex items-start gap-2 text-ui-body cursor-pointer select-none"
               title={locked ? t("sockscap.lockedTooltip") : undefined}
             >
               <input
@@ -633,7 +633,7 @@ export function SocksCapView(props: SocksCapViewProps) {
                 <span className="font-medium text-[var(--taomni-text)]">
                   {t("sockscap.blockQuic")}
                 </span>
-                <span className="block text-[11px] text-[var(--taomni-text-muted)]">
+                <span className="block text-ui-small text-[var(--taomni-text-muted)]">
                   {t("sockscap.blockQuicHint")}
                 </span>
               </span>
@@ -662,7 +662,7 @@ export function SocksCapView(props: SocksCapViewProps) {
 
           {msg && (
             <div
-              className={`mt-2 text-[11px] flex gap-1 items-start ${msg.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"
+              className={`mt-2 text-ui-small flex gap-1 items-start ${msg.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"
                 }`}
             >
               {msg.ok ? (

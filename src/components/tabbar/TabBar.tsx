@@ -465,7 +465,7 @@ export function TabBar({
           data-testid="tab-filter-chip"
           onClick={() => setTabFilter(tabFilter.kind !== "protocol" && tabFilter.protocol && tabFilter.protocol !== "all" ? { kind: "protocol", protocol: tabFilter.protocol } : null)}
           title={t("tabs.filterClear")}
-          className="flex items-center gap-1 mb-0.5 mr-1 px-2 h-6 rounded text-[11px] max-w-[112px] shrink-0"
+          className="flex items-center gap-1 mb-0.5 mr-1 px-2 h-6 rounded text-ui-small max-w-[112px] shrink-0"
           style={{ background: "var(--taomni-hover)", color: "var(--taomni-text)" }}
         >
           {tabFilter.kind === "group" || tabFilter.kind === "multi" ? (
@@ -526,7 +526,7 @@ export function TabBar({
         {tabFilter && visibleTabs.length === 0 && (
           <div
             data-testid="tab-filter-empty"
-            className="self-center px-3 text-[12px] whitespace-nowrap"
+            className="self-center px-3 text-ui-body whitespace-nowrap"
             style={{ color: "var(--taomni-text-muted)" }}
           >
             {t("tabs.filterNoMatch")}

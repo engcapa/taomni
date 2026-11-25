@@ -91,8 +91,8 @@ export function LocalHistoryDialog({
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3">
           <History className="h-4 w-4 text-[var(--taomni-code-muted)]" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-semibold text-[var(--taomni-code-text)]">Local History</div>
-            <div className="truncate text-[10px] text-[var(--taomni-code-muted)]">{path}</div>
+            <div className="truncate text-ui-body font-semibold text-[var(--taomni-code-text)]">Local History</div>
+            <div className="truncate text-ui-caption text-[var(--taomni-code-muted)]">{path}</div>
           </div>
           <button
             type="button"
@@ -107,12 +107,12 @@ export function LocalHistoryDialog({
         <div className="min-h-0 flex-1 grid grid-cols-[240px_1fr]">
           <aside className="min-h-0 overflow-auto border-r border-[var(--taomni-code-border)]">
             {loading ? (
-              <div className="flex items-center gap-2 p-3 text-[11px] text-[var(--taomni-code-muted)]">
+              <div className="flex items-center gap-2 p-3 text-ui-small text-[var(--taomni-code-muted)]">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Loading history…
               </div>
             ) : entries.length === 0 ? (
-              <div className="p-3 text-[11px] text-[var(--taomni-code-muted)]">No snapshots yet for this file.</div>
+              <div className="p-3 text-ui-small text-[var(--taomni-code-muted)]">No snapshots yet for this file.</div>
             ) : (
               <ul className="py-1">
                 {entries.map((entry) => (
@@ -123,10 +123,10 @@ export function LocalHistoryDialog({
                       className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-selection-match-bg)]"
                       onClick={() => setSelectedId(entry.id)}
                     >
-                      <span className="text-[11px] text-[var(--taomni-code-text)]">
+                      <span className="text-ui-small text-[var(--taomni-code-text)]">
                         {formatLocalHistoryTime(entry.createdAt)}
                       </span>
-                      <span className="text-[10px] text-[var(--taomni-code-muted)]">
+                      <span className="text-ui-caption text-[var(--taomni-code-muted)]">
                         {entry.reason} · {entry.byteLen} B
                       </span>
                     </button>
@@ -137,12 +137,12 @@ export function LocalHistoryDialog({
           </aside>
 
           <section className="min-h-0 flex flex-col">
-            <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2 text-[11px] text-[var(--taomni-code-muted)]">
+            <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2 text-ui-small text-[var(--taomni-code-muted)]">
               {selected
                 ? `Snapshot vs current buffer · ${formatLocalHistoryTime(selected.createdAt)} · ${selected.reason}`
                 : "Select a snapshot"}
             </div>
-            <div className="min-h-0 flex-1 overflow-auto font-mono text-[11px] leading-5">
+            <div className="min-h-0 flex-1 overflow-auto font-mono text-ui-small leading-5">
               {previewLoading ? (
                 <div className="flex items-center gap-2 p-3 text-[var(--taomni-code-muted)]">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -157,14 +157,14 @@ export function LocalHistoryDialog({
               )}
             </div>
             {error && (
-              <div className="shrink-0 border-t border-[var(--taomni-code-border)] px-3 py-2 text-[11px] text-amber-500">
+              <div className="shrink-0 border-t border-[var(--taomni-code-border)] px-3 py-2 text-ui-small text-amber-500">
                 {error}
               </div>
             )}
             <div className="shrink-0 flex items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-3 py-2">
               <button
                 type="button"
-                className="h-7 rounded px-2 text-[11px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                className="h-7 rounded px-2 text-ui-small text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
                 onClick={onClose}
               >
                 Cancel
@@ -173,7 +173,7 @@ export function LocalHistoryDialog({
                 type="button"
                 data-testid="code-workspace-local-history-compare"
                 disabled={previewText == null || selected == null || !onCompare}
-                className="h-7 rounded bg-[var(--taomni-accent)] px-2 text-[11px] text-white disabled:opacity-40"
+                className="h-7 rounded bg-[var(--taomni-accent)] px-2 text-ui-small text-white disabled:opacity-40"
                 onClick={() => {
                   if (previewText == null || selected == null || !onCompare) return;
                   onCompare(selected, previewText);
@@ -186,7 +186,7 @@ export function LocalHistoryDialog({
                 type="button"
                 data-testid="code-workspace-local-history-restore"
                 disabled={previewText == null}
-                className="h-7 rounded bg-[var(--taomni-accent)] px-2 text-[11px] text-white disabled:opacity-40"
+                className="h-7 rounded bg-[var(--taomni-accent)] px-2 text-ui-small text-white disabled:opacity-40"
                 onClick={() => {
                   if (previewText == null) return;
                   onRestore(previewText);

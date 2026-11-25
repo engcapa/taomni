@@ -257,7 +257,7 @@ export function TabItem(props: TabItemProps) {
             }}
             onFocus={(e) => e.currentTarget.select()}
             onBlur={onCommitRename}
-            className="bg-transparent border-b border-[var(--taomni-accent)] outline-none text-[12px] leading-none w-[160px] px-0"
+            className="bg-transparent border-b border-[var(--taomni-accent)] outline-none text-ui-body leading-none w-[160px] px-0"
             style={{ color: "inherit", font: "inherit" }}
           />
         ) : (

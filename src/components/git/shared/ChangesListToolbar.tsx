@@ -308,7 +308,7 @@ export function ChangesListToolbar({
         ) : null}
       </div>
 
-      <span className="shrink-0 min-w-10 text-center text-[11px] text-[var(--taomni-text-muted)]">
+      <span className="shrink-0 min-w-10 text-center text-ui-small text-[var(--taomni-text-muted)]">
         {checkedCount}/{totalCount}
       </span>
     </div>
@@ -374,7 +374,7 @@ function FilterMenuItem({
       type="button"
       role="menuitemcheckbox"
       aria-checked={active}
-      className={`flex h-7 w-full items-center gap-2 rounded px-2 text-left text-[11px] ${
+      className={`flex h-7 w-full items-center gap-2 rounded px-2 text-left text-ui-small ${
         active ? "bg-[var(--taomni-selected)] text-[var(--taomni-accent)]" : "hover:bg-[var(--taomni-hover)]"
       }`}
       title={label}
@@ -402,7 +402,7 @@ function MenuActionItem({
     <button
       type="button"
       role="menuitem"
-      className="flex h-7 w-full items-center gap-2 rounded px-2 text-left text-[11px] hover:bg-[var(--taomni-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex h-7 w-full items-center gap-2 rounded px-2 text-left text-ui-small hover:bg-[var(--taomni-hover)] disabled:cursor-not-allowed disabled:opacity-50"
       title={label}
       disabled={disabled}
       onClick={onClick}
@@ -415,7 +415,7 @@ function MenuActionItem({
 
 function MenuSectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="px-2 py-1 text-[10px] font-semibold uppercase text-[var(--taomni-text-muted)]">
+    <div className="px-2 py-1 text-ui-caption font-semibold uppercase text-[var(--taomni-text-muted)]">
       {children}
     </div>
   );

@@ -42,7 +42,7 @@ export function JavaMainClassPicker({ open, candidates, onClose, onPick }: JavaM
           <span className="shrink-0 text-[var(--taomni-code-text)]">
             {item.mainClass.split(".").pop() ?? item.mainClass}
           </span>
-          <span className="min-w-0 flex-1 truncate text-[10px] text-[var(--taomni-code-muted)]">
+          <span className="min-w-0 flex-1 truncate text-ui-caption text-[var(--taomni-code-muted)]">
             {item.mainClass}{item.projectName ? ` · ${item.projectName}` : ""}
           </span>
         </>

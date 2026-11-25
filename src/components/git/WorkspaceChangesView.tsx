@@ -152,8 +152,8 @@ export function WorkspaceChangesView({
       <Panel id="workspace-changes-list" defaultSize="38%" minSize="26%" className="min-w-0 min-h-0 flex flex-col border-r border-[var(--taomni-divider)]">
         <div className="h-8 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
           <GitBranch className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
-          <span className="font-semibold text-[12px]">{t("git.workspaceChanges.title")}</span>
-          <span className="min-w-0 truncate text-[11px] text-[var(--taomni-text-muted)]">{scopeSummary}</span>
+          <span className="font-semibold text-ui-body">{t("git.workspaceChanges.title")}</span>
+          <span className="min-w-0 truncate text-ui-small text-[var(--taomni-text-muted)]">{scopeSummary}</span>
         </div>
         <ChangesListToolbar
           busy={busy}
@@ -177,7 +177,7 @@ export function WorkspaceChangesView({
 
         <div className="flex-1 min-h-0 overflow-auto">
           {!hasVisibleGroups ? (
-            <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+            <div className="h-full min-h-24 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
               {normalizedFilter || hasActiveFilters
                 ? t("git.workspaceChanges.noMatchingChanges")
                 : t("git.workspaceChanges.noLocalChanges")}

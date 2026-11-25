@@ -186,7 +186,7 @@ export function ExplorerTabStrip() {
         data-tab-style="session"
         data-active={activeTabId === tab.id}
         title={tab.fileBrowser?.initialPath ?? tab.fileViewer?.path ?? tab.title}
-        className="taomni-tab group flex max-w-[190px] shrink-0 items-center gap-1 px-2 text-[12px]"
+        className="taomni-tab group flex max-w-[190px] shrink-0 items-center gap-1 px-2 text-ui-body"
         onClick={() => { if (editingTabId !== tab.id) activate(tab.id); }}
         onAuxClick={(event) => { if (event.button === 1) closeTab(tab.id); }}
         onContextMenu={(event) => { event.preventDefault(); setMenu({ tab, x: event.clientX, y: event.clientY }); }}
@@ -233,7 +233,7 @@ export function ExplorerTabStrip() {
               }}
               onFocus={(event) => event.currentTarget.select()}
               onBlur={commitRename}
-              className="bg-transparent border-b border-[var(--taomni-accent)] outline-none text-[12px] leading-none w-[160px] px-0"
+              className="bg-transparent border-b border-[var(--taomni-accent)] outline-none text-ui-body leading-none w-[160px] px-0"
               style={{ color: "inherit", font: "inherit" }}
             />
           ) : tab.title}
@@ -247,7 +247,7 @@ export function ExplorerTabStrip() {
           onPointerDown={(event) => event.stopPropagation()}
         />
       </div>)}
-      {!visibleTabs.length && tabs.length > 0 && <span data-testid="explorer-tab-filter-empty" className="truncate px-2 text-[11px] text-[var(--taomni-text-muted)]">{label("没有匹配的标签", "No matching tabs")}</span>}
+      {!visibleTabs.length && tabs.length > 0 && <span data-testid="explorer-tab-filter-empty" className="truncate px-2 text-ui-small text-[var(--taomni-text-muted)]">{label("没有匹配的标签", "No matching tabs")}</span>}
     </div>
     {scroll.scrollState.overflow && <IconBtn
       testId="explorer-tab-scroll-right"

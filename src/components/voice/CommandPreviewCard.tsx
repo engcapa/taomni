@@ -89,8 +89,8 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
         <AlertTriangle className={`w-4 h-4 ${risk.color} shrink-0`} />
-        <span className="text-[13px] font-semibold flex-1">{t("voice.cardTitle")}</span>
-        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${risk.border} ${risk.color}`}>
+        <span className="text-ui-body font-semibold flex-1">{t("voice.cardTitle")}</span>
+        <span className={`text-ui-small font-medium px-2 py-0.5 rounded-full border ${risk.border} ${risk.color}`}>
           {risk.label}
         </span>
         <button
@@ -105,10 +105,10 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
 
       {/* Blocked warning */}
       {preview.blocked && (
-        <div className="mb-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-[12px] text-red-400">
+        <div className="mb-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-ui-body text-red-400">
           {t("voice.cardBlockedPrefix", { reason: preview.blocked_reason ?? "" })}
           <br />
-          <span className="text-[11px] text-[var(--taomni-text-muted)]">{t("voice.cardBlockedHint")}</span>
+          <span className="text-ui-small text-[var(--taomni-text-muted)]">{t("voice.cardBlockedHint")}</span>
         </div>
       )}
 
@@ -117,33 +117,33 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
         {editing ? (
           <textarea
             ref={textareaRef}
-            className="taomni-input w-full font-mono text-[12px] p-2 resize-none min-h-[80px]"
+            className="taomni-input w-full font-mono text-ui-body p-2 resize-none min-h-[80px]"
             value={editedCommand}
             onChange={(e) => { setEditedCommand(e.target.value); setEdited(true); }}
             spellCheck={false}
           />
         ) : (
-          <pre className="font-mono text-[12px] bg-[var(--taomni-bg)] rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">
+          <pre className="font-mono text-ui-body bg-[var(--taomni-bg)] rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">
             {preview.command}
           </pre>
         )}
       </div>
 
       {/* Explanation */}
-      <div className="mb-3 text-[12px] text-[var(--taomni-text-muted)]">
+      <div className="mb-3 text-ui-body text-[var(--taomni-text-muted)]">
         {preview.explanation}
       </div>
 
       {/* Unfilled placeholders */}
       {preview.needs_inputs.length > 0 && (
-        <div className="mb-3 text-[11px] text-yellow-400">
+        <div className="mb-3 text-ui-small text-yellow-400">
           {t("voice.cardNeedsInputs", { inputs: preview.needs_inputs.join("、") })}
         </div>
       )}
 
       {/* High-risk second confirmation */}
       {preview.risk === "high" && !preview.blocked && (
-        <div className="mb-3 flex items-center gap-2 text-[11px] text-red-400">
+        <div className="mb-3 flex items-center gap-2 text-ui-small text-red-400">
           <input
             type="checkbox"
             id="high-risk-confirm"
@@ -163,7 +163,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
         {!preview.blocked && (
           <button
             type="button"
-            className={`taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 transition-opacity ${
+            className={`taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5 transition-opacity ${
               executeReady ? "" : "opacity-40 cursor-not-allowed"
             }`}
             onClick={() => executeReady && onExecute(command, preview.audit_id, edited)}
@@ -178,7 +178,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
         {!editing ? (
           <button
             type="button"
-            className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+            className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5"
             onClick={() => setEditing(true)}
             title={t("voice.cardEditTitle")}
           >
@@ -188,7 +188,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
         ) : (
           <button
             type="button"
-            className="taomni-btn h-7 px-3 text-[12px]"
+            className="taomni-btn h-7 px-3 text-ui-body"
             onClick={() => setEditing(false)}
           >
             {t("voice.cardEditDone")}
@@ -197,7 +197,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
 
         <button
           type="button"
-          className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+          className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5"
           onClick={handleCopy}
         >
           <Copy className="w-3.5 h-3.5" />
@@ -206,7 +206,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
 
         <button
           type="button"
-          className="taomni-btn h-7 px-3 text-[12px] text-[var(--taomni-text-muted)]"
+          className="taomni-btn h-7 px-3 text-ui-body text-[var(--taomni-text-muted)]"
           onClick={() => onCancel(preview.audit_id)}
           title={t("voice.cardCancelTitle")}
         >

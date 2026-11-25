@@ -15,7 +15,7 @@ interface ReferenceContentFooterProps {
 export function ReferenceContentFooter({ content, onOpenSource }: ReferenceContentFooterProps) {
   const [openError, setOpenError] = useState<string | null>(null);
   return (
-    <div className="flex min-h-7 shrink-0 items-center gap-2 border-t border-[var(--taomni-code-border)] px-2 py-1 text-[10px] text-[var(--taomni-code-muted)]">
+    <div className="flex min-h-7 shrink-0 items-center gap-2 border-t border-[var(--taomni-code-border)] px-2 py-1 text-ui-caption text-[var(--taomni-code-muted)]">
       <span className="min-w-0 flex-1 truncate" title={content.uri ?? content.source}>
         {content.source}
       </span>

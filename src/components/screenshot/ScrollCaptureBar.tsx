@@ -76,7 +76,7 @@ export function ScrollCaptureBar() {
     catch (e) { setError(formatUnknownError(e)); }
     finally { setChangingMode(false); }
   };
-  return <div data-testid="screenshot-scroll-controller" className="fixed left-0 right-0 bottom-0 px-3 py-2 text-[12px] select-none overflow-auto"
+  return <div data-testid="screenshot-scroll-controller" className="fixed left-0 right-0 bottom-0 px-3 py-2 text-ui-body select-none overflow-auto"
     style={{ height: fullscreenSurface ? 200 : "100%", background: "var(--taomni-panel-bg)", color: "var(--taomni-text)", border: "1px solid var(--taomni-divider)" }}>
     <p data-testid="screenshot-scroll-progress" role="status" className="mb-1 font-medium">{t("screenshot.scrollProgress", { count: frames })}</p>
     <p data-testid="screenshot-scroll-mode-hint" className="text-[var(--taomni-text-muted)] mb-2">{t(finishing ? "screenshot.scrollFinishing" : needsOverlap ? "screenshot.scrollOverlapHint" : waitingForContent ? "screenshot.scrollWaitingHint" : mode === "manual" ? "screenshot.scrollManualHint" : "screenshot.scrollRunningHint")}</p>

@@ -297,6 +297,7 @@ cases:
 - TC-EXPLORER-012
 - TC-UIC-001-folder-dialog
 - TC-UIC-002-primary-contrast
+- TC-UIC-003-explorer-font-navigation
 - TC-MOBILE-001
 - TC-MOBILE-002
 - TC-MOBILE-003

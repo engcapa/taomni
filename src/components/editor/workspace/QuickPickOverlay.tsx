@@ -308,7 +308,7 @@ export function QuickPickOverlay<T>({
             value={query}
             placeholder={placeholder}
             aria-label={inputLabel}
-            className="h-6 min-w-0 flex-1 bg-transparent text-[12px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            className="h-6 min-w-0 flex-1 bg-transparent text-ui-body text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => {
               const next = event.target.value;
               setQuery(next);
@@ -322,11 +322,11 @@ export function QuickPickOverlay<T>({
         </div>
         <div className="min-h-0 flex-1 flex">
         {aside && (
-          <div className="w-[190px] shrink-0 overflow-auto border-r border-[var(--taomni-code-border)] py-1 text-[11px]">
+          <div className="w-[190px] shrink-0 overflow-auto border-r border-[var(--taomni-code-border)] py-1 text-ui-small">
             {typeof aside === "function" ? aside({ selectedIndex: asideActive ? asideIndex : null }) : aside}
           </div>
         )}
-        <div ref={listRef} className="min-h-0 min-w-0 flex-1 overflow-auto py-1 text-[11px]">
+        <div ref={listRef} className="min-h-0 min-w-0 flex-1 overflow-auto py-1 text-ui-small">
           {results.length === 0 && (
             <div className="px-3 py-2 text-[var(--taomni-code-muted)]">{emptyText(query)}</div>
           )}
@@ -348,7 +348,7 @@ export function QuickPickOverlay<T>({
         </div>
         </div>
         {footer && (
-          <div className="shrink-0 flex min-w-0 items-center gap-3 border-t border-[var(--taomni-code-border)] px-3 py-1 text-[10px] text-[var(--taomni-code-muted)]">
+          <div className="shrink-0 flex min-w-0 items-center gap-3 border-t border-[var(--taomni-code-border)] px-3 py-1 text-ui-caption text-[var(--taomni-code-muted)]">
             {typeof footer === "function" ? footer(results[selected] ?? null) : footer}
           </div>
         )}

@@ -137,7 +137,7 @@ export function ServersPanel({ onClose }: { onClose?: () => void }) {
     >
       {/* Visually quiet page header — OS window title carries the real name */}
       <div
-        className="h-8 flex items-center px-3 shrink-0 border-b text-[12px] font-semibold"
+        className="h-8 flex items-center px-3 shrink-0 border-b text-ui-body font-semibold"
         style={{
           background: "var(--taomni-quick-bg)",
           borderColor: "var(--taomni-divider)",

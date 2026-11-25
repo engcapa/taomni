@@ -31,7 +31,7 @@ export function OrientationToggle({
       ) : (
         <Rows className="w-3 h-3" />
       )}
-      <span className="text-[10px]">
+      <span className="text-ui-caption">
         {orientation === "horizontal" ? t("fileBrowser.orientationSide") : t("fileBrowser.orientationStack")}
       </span>
     </button>
@@ -64,28 +64,28 @@ export function DownloadPrompt({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-sm font-semibold mb-2">{t("fileBrowser.downloadPromptTitle")}</div>
-        <div className="text-[12px] mb-3 break-all" style={{ color: "var(--taomni-text-muted)" }}>
+        <div className="text-ui-body mb-3 break-all" style={{ color: "var(--taomni-text-muted)" }}>
           {t("fileBrowser.downloadPromptDescription", { name: entry.name })}
-          <div className="mt-1 font-mono text-[11px]">{joinPath(localDir, entry.name)}</div>
+          <div className="mt-1 font-mono text-ui-small">{joinPath(localDir, entry.name)}</div>
         </div>
         <div className="flex gap-2 justify-end">
           <button
             type="button"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+            className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]"
             onClick={onCancel}
           >
             {t("fileBrowser.chmodCancel")}
           </button>
           <button
             type="button"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+            className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]"
             onClick={() => onDownload(false)}
           >
             {t("fileBrowser.downloadPromptDownloadOnly")}
           </button>
           <button
             type="button"
-            className="px-3 py-1 text-[12px] rounded text-white"
+            className="px-3 py-1 text-ui-body rounded text-white"
             style={{ background: "var(--taomni-accent)" }}
             onClick={() => onDownload(true)}
           >
@@ -122,7 +122,7 @@ export function PreviewModal({
         style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-3 py-1.5 text-[12px] flex items-center border-b"
+        <div className="px-3 py-1.5 text-ui-body flex items-center border-b"
           style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
           <span className="font-semibold">{name}</span>
           <span className="ml-2 text-[var(--taomni-text-muted)]">{path}</span>
@@ -131,7 +131,7 @@ export function PreviewModal({
             {t("fileBrowser.previewClose")}
           </button>
         </div>
-        <pre className="flex-1 overflow-auto px-3 py-2 text-[12px] font-mono whitespace-pre-wrap break-all"
+        <pre className="flex-1 overflow-auto px-3 py-2 text-ui-body font-mono whitespace-pre-wrap break-all"
           style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
           {text}
         </pre>

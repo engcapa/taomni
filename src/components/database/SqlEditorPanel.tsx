@@ -627,7 +627,7 @@ export function SqlEditorPanel({
       <div ref={hostRef} className="h-full w-full overflow-hidden" />
       {(metadataLoadingVisible || metadataHint) && (
         <div
-          className="absolute right-2 bottom-2 max-w-[min(420px,calc(100%-1rem))] rounded px-2 py-1 text-[11px] pointer-events-none"
+          className="absolute right-2 bottom-2 max-w-[min(420px,calc(100%-1rem))] rounded px-2 py-1 text-ui-small pointer-events-none"
           style={{
             color: metadataHint ? "var(--taomni-warning, #b45309)" : "var(--taomni-text-muted)",
             background: "var(--taomni-panel-bg)",

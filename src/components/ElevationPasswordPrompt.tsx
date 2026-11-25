@@ -55,7 +55,7 @@ export function ElevationPasswordPrompt({
           }}
         >
           <ShieldAlert className="w-3.5 h-3.5 mr-1.5" />
-          <span className="text-[12px] font-semibold">
+          <span className="text-ui-body font-semibold">
             {t("sockscap.rootPromptTitle")}
           </span>
           <div className="flex-1" />
@@ -71,11 +71,11 @@ export function ElevationPasswordPrompt({
         </div>
 
         <div className="min-h-0 overflow-y-auto p-4">
-          <div className="text-[12px] mb-3 text-[var(--taomni-text-muted)]">
+          <div className="text-ui-body mb-3 text-[var(--taomni-text-muted)]">
             {subtitle}
           </div>
 
-          <label className="block text-[12px] mb-1 font-medium text-[var(--taomni-text)]">
+          <label className="block text-ui-body mb-1 font-medium text-[var(--taomni-text)]">
             {t("sockscap.rootPasswordLabel")}
           </label>
           <input
@@ -85,7 +85,7 @@ export function ElevationPasswordPrompt({
             autoFocus
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="taomni-input w-full h-8 text-[13px]"
+            className="taomni-input w-full h-8 text-ui-body"
             placeholder={t("sockscap.rootPasswordPlaceholder")}
             disabled={busy}
           />
@@ -93,7 +93,7 @@ export function ElevationPasswordPrompt({
           {error && (
             <div
               data-testid="sockscap-root-prompt-error"
-              className="mt-2 text-[12px]"
+              className="mt-2 text-ui-body"
               style={{ color: "var(--taomni-error, #c33)" }}
             >
               {error}

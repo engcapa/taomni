@@ -72,7 +72,7 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
       onKeyDown={handleKeyDown}
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[10vh]"
     >
-      <div className="flex w-full max-w-2xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[12px] text-[var(--taomni-code-fg)] shadow-2xl">
+      <div className="flex w-full max-w-2xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-fg)] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
           <div className="flex items-center gap-2 font-medium">
@@ -97,7 +97,7 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
               type="button"
               onClick={() => setActiveKind(tab.kind)}
               data-testid={`file-template-tab-${tab.kind}`}
-              className={`border-b-2 px-3 py-2 text-[12px] font-medium transition-colors ${
+              className={`border-b-2 px-3 py-2 text-ui-body font-medium transition-colors ${
                 activeKind === tab.kind
                   ? "border-blue-500 text-[var(--taomni-code-fg)]"
                   : "border-transparent text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-fg)]"
@@ -113,7 +113,7 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
           <div className="flex flex-col gap-1">
             <label
               htmlFor="file-template-editor-textarea"
-              className="text-[11px] font-semibold text-[var(--taomni-code-muted)]"
+              className="text-ui-small font-semibold text-[var(--taomni-code-muted)]"
             >
               Template Text ({activeKind}):
             </label>
@@ -128,16 +128,16 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
               }
               rows={10}
               data-testid="file-template-editor-textarea"
-              className="w-full font-mono rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] p-2.5 text-[12px] text-[var(--taomni-code-fg)] outline-none focus:border-blue-500"
+              className="w-full font-mono rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] p-2.5 text-ui-body text-[var(--taomni-code-fg)] outline-none focus:border-blue-500"
             />
           </div>
 
           {/* Allowed Variables Info */}
-          <div className="rounded bg-[var(--taomni-code-hover)]/40 p-2.5 text-[11px]">
+          <div className="rounded bg-[var(--taomni-code-hover)]/40 p-2.5 text-ui-small">
             <div className="font-semibold text-[var(--taomni-code-muted)] mb-1">
               Available Variables:
             </div>
-            <div className="flex flex-wrap gap-1.5 font-mono text-[10px]">
+            <div className="flex flex-wrap gap-1.5 font-mono text-ui-caption">
               {ALLOWED_TEMPLATE_VARIABLES.map((v) => (
                 <span
                   key={v}
@@ -156,7 +156,7 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
             type="button"
             onClick={handleReset}
             data-testid="file-template-reset-button"
-            className="flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-hover)] hover:text-[var(--taomni-code-fg)]"
+            className="flex items-center gap-1.5 rounded px-2.5 py-1 text-ui-small text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-hover)] hover:text-[var(--taomni-code-fg)]"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             <span>Reset to Default</span>
@@ -164,12 +164,12 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
 
           <div className="flex items-center gap-2">
             {savedNotice && (
-              <span className="text-[11px] text-green-400 font-medium">Saved!</span>
+              <span className="text-ui-small text-green-400 font-medium">Saved!</span>
             )}
             <button
               type="button"
               onClick={onClose}
-              className="rounded px-3 py-1 text-[11px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-hover)] hover:text-[var(--taomni-code-fg)]"
+              className="rounded px-3 py-1 text-ui-small text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-hover)] hover:text-[var(--taomni-code-fg)]"
             >
               Close
             </button>
@@ -177,7 +177,7 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
               type="button"
               onClick={handleSave}
               data-testid="file-template-save-button"
-              className="flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1 font-medium text-[11px] text-white hover:bg-blue-500"
+              className="flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1 font-medium text-ui-small text-white hover:bg-blue-500"
             >
               <Save className="h-3.5 w-3.5" />
               <span>Save</span>

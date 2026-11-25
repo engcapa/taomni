@@ -129,16 +129,16 @@ export function AcpPermissionCard({
       data-testid="ai-chat-acp-permission-card"
     >
       <div className="mb-2 flex items-center gap-2">
-        <span className="text-[12px] font-semibold">本地 Agent 请求执行操作</span>
-        <span className="rounded border border-yellow-500/40 px-1.5 py-0.5 text-[10px] text-yellow-400">
+        <span className="text-ui-body font-semibold">本地 Agent 请求执行操作</span>
+        <span className="rounded border border-yellow-500/40 px-1.5 py-0.5 text-ui-caption text-yellow-400">
           需要确认
         </span>
       </div>
-      <div className="mb-1 text-[10px] text-[var(--taomni-text-muted)]">
+      <div className="mb-1 text-ui-caption text-[var(--taomni-text-muted)]">
         来源：本地 {prompt.sourceLabel}{isActiveThread ? "" : " · 后台对话"}
       </div>
-      <div className="mb-1 text-[11px] text-[var(--taomni-text-muted)]">{prompt.title}</div>
-      <div className="mb-2 text-[10px] text-[var(--taomni-text-muted)]">
+      <div className="mb-1 text-ui-small text-[var(--taomni-text-muted)]">{prompt.title}</div>
+      <div className="mb-2 text-ui-caption text-[var(--taomni-text-muted)]">
         操作类型：{prompt.kind}
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -148,7 +148,7 @@ export function AcpPermissionCard({
             <button
               key={option.optionId}
               type="button"
-              className={`taomni-btn h-7 px-3 text-[12px] disabled:cursor-wait disabled:opacity-60 ${presentation.className}`}
+              className={`taomni-btn h-7 px-3 text-ui-body disabled:cursor-wait disabled:opacity-60 ${presentation.className}`}
               disabled={executing}
               data-testid={`ai-chat-acp-permission-option-${option.kind}`}
               onClick={() => onSelect(option.optionId)}
@@ -159,7 +159,7 @@ export function AcpPermissionCard({
         })}
         <button
           type="button"
-          className="taomni-btn h-7 px-3 text-[12px] text-[var(--taomni-text-muted)] disabled:cursor-wait disabled:opacity-60"
+          className="taomni-btn h-7 px-3 text-ui-body text-[var(--taomni-text-muted)] disabled:cursor-wait disabled:opacity-60"
           disabled={executing}
           data-testid="ai-chat-acp-permission-cancel"
           onClick={onCancel}

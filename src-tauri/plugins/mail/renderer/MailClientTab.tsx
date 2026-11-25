@@ -1,4 +1,4 @@
-import { t } from "../../../../src/lib/i18n";
+import { useT } from "../../../../src/lib/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import { selectUploadFile } from "../../../../src/lib/ipc";
 import {
@@ -61,6 +61,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   });
   const attachmentMenu = useContextMenu();
   const mailMenu = useContextMenu();
+  const t = useT();
   const confirmDialog = useConfirmDialog();
   const textInputDialog = useTextInputDialog();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -525,7 +526,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     return (
       <button
         type="button"
-        className="taomni-btn h-5 px-2 text-[10px]"
+        className="taomni-btn h-5 px-2 text-ui-caption"
         data-testid="mail-unsubscribe"
         data-armed={armed ? "true" : undefined}
         title={message.listUnsubscribe.uris.join("\n")}

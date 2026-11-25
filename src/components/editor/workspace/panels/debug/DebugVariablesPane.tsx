@@ -191,14 +191,14 @@ export function DebugVariablesPane({
   return (
     <div
       data-testid="debug-variables-pane"
-      className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)] text-[11px]"
+      className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)] text-ui-small"
     >
       <div className="h-7 shrink-0 flex items-center gap-1 border-b border-[var(--taomni-code-border)] px-1.5">
         <input
           ref={inputRef}
           data-testid="debug-watch-input"
           aria-label="Evaluate expression or add a watch"
-          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none focus:border-[var(--taomni-accent)]"
+          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none focus:border-[var(--taomni-accent)]"
           placeholder="Evaluate expression (Enter) or add a watch (Ctrl+Shift+Enter)"
           value={watchInput}
           onChange={(e) => onWatchInputChange(e.target.value)}
@@ -224,7 +224,7 @@ export function DebugVariablesPane({
               <input
                 data-testid="debug-variables-search"
                 aria-label="Filter variables"
-                className="w-16 sm:w-24 bg-transparent text-[10px] outline-none"
+                className="w-16 sm:w-24 bg-transparent text-ui-caption outline-none"
                 placeholder="Filter..."
                 value={filterQuery}
                 autoFocus={filterOpen && !filterQuery}
@@ -339,7 +339,7 @@ export function DebugVariablesPane({
           <div
             data-testid="debug-data-breakpoint-notice"
             role="status"
-            className={`px-3 py-1 text-[10px] ${
+            className={`px-3 py-1 text-ui-caption ${
               dataBreakpointNotice.added ? "text-emerald-500" : "text-rose-500"
             }`}
           >

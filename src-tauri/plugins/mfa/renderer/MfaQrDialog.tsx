@@ -174,8 +174,8 @@ export function MfaQrDialog({
           void reveal();
         }}
       >
-        <div className="text-[15px] font-semibold tracking-tight">{t("mfa.qrTitle", { name })}</div>
-        <div className="flex gap-2 rounded-md p-2.5 text-[12px]" style={{ background: "rgba(234, 179, 8, 0.08)", color: "var(--taomni-warning-text, #b7791f)", border: "1px solid rgba(234, 179, 8, 0.2)" }}>
+        <div className="text-ui-title font-semibold tracking-tight">{t("mfa.qrTitle", { name })}</div>
+        <div className="flex gap-2 rounded-md p-2.5 text-ui-body" style={{ background: "rgba(234, 179, 8, 0.08)", color: "var(--taomni-warning-text, #b7791f)", border: "1px solid rgba(234, 179, 8, 0.2)" }}>
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{t("mfa.qrWarning")}</span>
         </div>
@@ -197,14 +197,14 @@ export function MfaQrDialog({
                 <path d={qr.path} fill="#000000" />
               </svg>
             </div>
-            <div className="text-[12px] text-center" style={labelStyle}>
+            <div className="text-ui-body text-center" style={labelStyle}>
               {account.kind === "hotp" ? t("mfa.qrHotpHint") : t("mfa.qrScanHint")}
             </div>
 
             {secret ? (
               <div className="w-full space-y-1.5 rounded-lg border p-3" style={{ background: "var(--taomni-card-bg)", borderColor: "var(--taomni-card-border)" }}>
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium uppercase tracking-wider" style={labelStyle}>
+                  <span className="text-ui-small font-medium uppercase tracking-wider" style={labelStyle}>
                     {t("mfa.secretKey")}
                   </span>
                   <button
@@ -220,7 +220,7 @@ export function MfaQrDialog({
                 </div>
                 <div
                   data-testid="mfa-qr-secret"
-                  className="font-mono text-[13px] font-bold tracking-wider select-all break-all px-2 py-1.5 rounded"
+                  className="font-mono text-ui-body font-bold tracking-wider select-all break-all px-2 py-1.5 rounded"
                   style={{ background: "var(--taomni-hover)", color: "var(--taomni-accent)" }}
                 >
                   {masked ? "•••• •••• •••• ••••" : formatSecretKey(secret)}
@@ -229,7 +229,7 @@ export function MfaQrDialog({
                   <button
                     type="button"
                     data-testid="mfa-qr-copy-secret"
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded border px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-[var(--taomni-hover)]"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded border px-2.5 py-1.5 text-ui-body font-medium transition-colors hover:bg-[var(--taomni-hover)]"
                     style={{ borderColor: "var(--taomni-input-border)" }}
                     onClick={() => void copySecretValue(secret)}
                   >
@@ -240,7 +240,7 @@ export function MfaQrDialog({
                     <button
                       type="button"
                       data-testid="mfa-qr-copy-uri"
-                      className="inline-flex items-center justify-center gap-1.5 rounded border px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-[var(--taomni-hover)]"
+                      className="inline-flex items-center justify-center gap-1.5 rounded border px-2.5 py-1.5 text-ui-body font-medium transition-colors hover:bg-[var(--taomni-hover)]"
                       style={{ borderColor: "var(--taomni-input-border)" }}
                       title={t("mfa.copyUri")}
                       onClick={() => void copyUriValue(uri)}
@@ -254,13 +254,13 @@ export function MfaQrDialog({
             ) : null}
           </div>
         ) : (
-          <label className="block text-[12px]" style={labelStyle}>
+          <label className="block text-ui-body" style={labelStyle}>
             {t("mfa.qrPassword")}
             <input
               ref={passwordRef}
               type="password"
               data-testid="mfa-qr-password"
-              className="taomni-input mt-1.5 w-full h-8 text-[13px]"
+              className="taomni-input mt-1.5 w-full h-8 text-ui-body"
               value={password}
               autoComplete="current-password"
               onChange={(event) => {
@@ -270,13 +270,13 @@ export function MfaQrDialog({
             />
           </label>
         )}
-        {error ? <div data-testid="mfa-qr-error" role="alert" className="text-[12px]" style={{ color: "var(--taomni-error, #c33)" }}>{error}</div> : null}
+        {error ? <div data-testid="mfa-qr-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-error, #c33)" }}>{error}</div> : null}
         <div className="flex justify-end gap-2 pt-1">
-          <button ref={closeRef} type="button" data-testid="mfa-qr-close" className="px-3.5 py-1.5 text-[12px] rounded-md border font-medium hover:bg-[var(--taomni-hover)] transition-colors" style={{ borderColor: "var(--taomni-input-border)" }} onClick={close}>
+          <button ref={closeRef} type="button" data-testid="mfa-qr-close" className="px-3.5 py-1.5 text-ui-body rounded-md border font-medium hover:bg-[var(--taomni-hover)] transition-colors" style={{ borderColor: "var(--taomni-input-border)" }} onClick={close}>
             {t("mfa.close")}
           </button>
           {qr ? null : (
-            <button type="submit" data-testid="mfa-qr-reveal" className="px-3.5 py-1.5 text-[12px] rounded-md text-white font-medium disabled:opacity-50 transition-colors" style={{ background: "var(--taomni-accent)" }} disabled={busy}>
+            <button type="submit" data-testid="mfa-qr-reveal" className="px-3.5 py-1.5 text-ui-body rounded-md text-white font-medium disabled:opacity-50 transition-colors" style={{ background: "var(--taomni-accent)" }} disabled={busy}>
               {t("mfa.qrReveal")}
             </button>
           )}

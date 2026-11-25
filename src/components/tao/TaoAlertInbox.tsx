@@ -125,7 +125,7 @@ export function TaoAlertInbox({
     >
       <div className="flex items-center gap-2 px-2 h-7 border-b border-[var(--taomni-divider)] shrink-0">
         <Bell className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
-        <span className="text-[12px] font-semibold flex-1">{t("tao.alertInboxTitle")}</span>
+        <span className="text-ui-body font-semibold flex-1">{t("tao.alertInboxTitle")}</span>
         {onClose && (
           <button
             type="button"
@@ -139,7 +139,7 @@ export function TaoAlertInbox({
         )}
       </div>
       {alerts.length === 0 ? (
-        <div className="px-3 py-4 text-center text-[11px] text-[var(--taomni-text-muted)]">
+        <div className="px-3 py-4 text-center text-ui-small text-[var(--taomni-text-muted)]">
           {t("tao.alertInboxEmpty")}
         </div>
       ) : (
@@ -162,8 +162,8 @@ export function TaoAlertInbox({
                     onClick={() => onJump(alert)}
                     data-testid="tao-alert-jump"
                   >
-                    <div className="text-[11px] truncate">{alert.title}</div>
-                    <div className="text-[10px] text-[var(--taomni-text-muted)]">{alertSubtitle(alert, t)}</div>
+                    <div className="text-ui-small truncate">{alert.title}</div>
+                    <div className="text-ui-caption text-[var(--taomni-text-muted)]">{alertSubtitle(alert, t)}</div>
                   </button>
                   <button
                     type="button"
@@ -187,7 +187,7 @@ export function TaoAlertInbox({
             <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
             <input
               type="search"
-              className="taomni-input h-7 w-full pl-7 pr-2 text-[11px]"
+              className="taomni-input h-7 w-full pl-7 pr-2 text-ui-small"
               value={historyQuery}
               onChange={(event) => setHistoryQuery(event.currentTarget.value)}
               placeholder={t("tao.alertHistorySearchPlaceholder")}
@@ -203,7 +203,7 @@ export function TaoAlertInbox({
               <button
                 key={limit}
                 type="button"
-                className={`w-8 text-[10px] ${
+                className={`w-8 text-ui-caption ${
                   historyLimit === limit
                     ? "bg-[var(--taomni-selected)] text-[var(--taomni-accent)]"
                     : "hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
@@ -231,7 +231,7 @@ export function TaoAlertInbox({
         </div>
         {normalizedHistoryQuery ? (
           historyResults.length === 0 ? (
-            <div className="py-2 text-center text-[10.5px] text-[var(--taomni-text-muted)]">
+            <div className="py-2 text-center text-ui-caption text-[var(--taomni-text-muted)]">
               {t("tao.alertHistoryEmpty")}
             </div>
           ) : (
@@ -246,8 +246,8 @@ export function TaoAlertInbox({
                   >
                     <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[11px]">{entry.title}</div>
-                      <div className="truncate text-[10px] text-[var(--taomni-text-muted)]">
+                      <div className="truncate text-ui-small">{entry.title}</div>
+                      <div className="truncate text-ui-caption text-[var(--taomni-text-muted)]">
                         {alertSubtitle(entry, t)} - {sourceLabel(entry, t)} - {formatHistoryTime(entry.lastSeenAt)}
                       </div>
                     </div>
@@ -257,7 +257,7 @@ export function TaoAlertInbox({
             </ul>
           )
         ) : (
-          <div className="text-[10px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-caption text-[var(--taomni-text-muted)]">
             {t("tao.alertHistoryHiddenHint", { count: history.length, limit: historyLimit })}
           </div>
         )}

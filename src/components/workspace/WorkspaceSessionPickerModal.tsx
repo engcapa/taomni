@@ -130,7 +130,7 @@ export function WorkspaceSessionPickerModal({ open, workspaceId, onClose }: Work
               type="button"
               data-testid={`workspace-session-picker-filter-${entry.id}`}
               aria-pressed={filter === entry.id}
-              className="rounded px-2 py-0.5 text-[11px] font-semibold"
+              className="rounded px-2 py-0.5 text-ui-small font-semibold"
               style={{
                 border: "1px solid var(--taomni-divider)",
                 background: filter === entry.id ? "var(--taomni-selected)" : "transparent",
@@ -144,7 +144,7 @@ export function WorkspaceSessionPickerModal({ open, workspaceId, onClose }: Work
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-1.5" data-testid="workspace-session-picker-list">
           {visible.length === 0 && (
-            <div className="px-2 py-3 text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.globalSearchEmpty")}</div>
+            <div className="px-2 py-3 text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.globalSearchEmpty")}</div>
           )}
           {visible.map((session) => (
             <button
@@ -156,22 +156,22 @@ export function WorkspaceSessionPickerModal({ open, workspaceId, onClose }: Work
               className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-[var(--taomni-hover)]"
               onClick={() => pick(session)}
             >
-              <span className="shrink-0 rounded px-1 text-[9px] uppercase" style={{ border: "1px solid var(--taomni-divider)", color: "var(--taomni-text-muted)" }}>
+              <span className="shrink-0 rounded px-1 text-ui-caption uppercase" style={{ border: "1px solid var(--taomni-divider)", color: "var(--taomni-text-muted)" }}>
                 {session.session_type.slice(0, 4)}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12px]">{session.name || session.host}</span>
-                <span className="block truncate text-[10.5px]" style={{ color: "var(--taomni-text-muted)" }}>
+                <span className="block truncate text-ui-body">{session.name || session.host}</span>
+                <span className="block truncate text-ui-caption" style={{ color: "var(--taomni-text-muted)" }}>
                   {session.username ? `${session.username}@` : ""}{session.host}:{session.port}
                 </span>
               </span>
-              <span className="shrink-0 text-[10px]" style={{ color: "var(--taomni-text-muted)" }}>
+              <span className="shrink-0 text-ui-caption" style={{ color: "var(--taomni-text-muted)" }}>
                 {session.group_path ?? ""}
               </span>
             </button>
           ))}
         </div>
-        <label className="flex shrink-0 items-center gap-2 border-t px-3 py-2 text-[11.5px]" style={{ borderColor: "var(--taomni-divider)" }}>
+        <label className="flex shrink-0 items-center gap-2 border-t px-3 py-2 text-ui-small" style={{ borderColor: "var(--taomni-divider)" }}>
           <input
             type="checkbox"
             data-testid="workspace-session-picker-pin"

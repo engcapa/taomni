@@ -81,14 +81,14 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
       <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-20">
         <div className="w-[min(520px,90vw)] max-h-[70vh] flex flex-col rounded-lg bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-xl">
           <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--taomni-divider)]">
-            <div className="text-[13px] font-semibold">{t("sockscap.pickProcess")}</div>
+            <div className="text-ui-body font-semibold">{t("sockscap.pickProcess")}</div>
             <button type="button" className="p-1" onClick={() => setShowProcPicker(false)}>
               <X className="w-4 h-4" />
             </button>
           </div>
           <div className="flex-1 overflow-auto p-2">
             {processes.length === 0 ? (
-              <div className="text-[11px] text-[var(--taomni-text-muted)] p-2">
+              <div className="text-ui-small text-[var(--taomni-text-muted)] p-2">
                 {t("sockscap.processesEmpty")}
               </div>
             ) : (
@@ -96,7 +96,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
                 <button
                   key={`${p.pid}-${p.path}`}
                   type="button"
-                  className="w-full text-left px-2 py-1.5 rounded text-[11px] hover:bg-[var(--taomni-hover)]"
+                  className="w-full text-left px-2 py-1.5 rounded text-ui-small hover:bg-[var(--taomni-hover)]"
                   onClick={() => {
                     void addAppPath(p.path || p.name, p.name);
                     setShowProcPicker(false);
@@ -127,7 +127,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
         >
           <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--taomni-divider)]">
             <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
-            <h2 id="sockscap-tun-warning-title" className="flex-1 text-[13px] font-semibold">
+            <h2 id="sockscap-tun-warning-title" className="flex-1 text-ui-body font-semibold">
               {t("sockscap.tunConflictTitle")}
             </h2>
             <button
@@ -140,7 +140,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
               <X className="w-4 h-4" />
             </button>
           </div>
-          <p className="px-4 py-3 text-[12px] leading-5 text-[var(--taomni-text-muted)]">
+          <p className="px-4 py-3 text-ui-body leading-5 text-[var(--taomni-text-muted)]">
             {t("sockscap.tunConflictWarning", { adapters: runtime.tunConflicts.join(", ") })}
           </p>
         </div>
@@ -176,11 +176,11 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
         <div className="w-[min(480px,92vw)] flex flex-col rounded-lg bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-xl">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--taomni-divider)]">
             <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-            <div className="text-[13px] font-semibold">
+            <div className="text-ui-body font-semibold">
               {t("sockscap.configIssueTitle")}
             </div>
           </div>
-          <div className="px-4 py-3 space-y-2 text-[12px]">
+          <div className="px-4 py-3 space-y-2 text-ui-body">
             <div className="text-[var(--taomni-text-muted)]">
               {t("sockscap.configIssueIntro")}
             </div>
@@ -204,7 +204,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
             <button
               type="button"
               data-testid="sockscap-config-issue-ok"
-              className="px-3 py-1.5 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90"
+              className="px-3 py-1.5 rounded text-ui-body bg-[var(--taomni-accent)] text-white hover:opacity-90"
               onClick={() => setConfigIssues(null)}
             >
               {t("common.ok")}
@@ -223,11 +223,11 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
         <div className="w-[min(560px,92vw)] max-h-[75vh] flex flex-col rounded-lg bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-xl">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--taomni-divider)]">
             <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
-            <div className="text-[13px] font-semibold">
+            <div className="text-ui-body font-semibold">
               {t("sockscap.probeFailTitle")}
             </div>
           </div>
-          <div className="px-4 py-3 space-y-2 text-[12px] overflow-auto">
+          <div className="px-4 py-3 space-y-2 text-ui-body overflow-auto">
             <div className="text-[var(--taomni-text-muted)]">
               {t("sockscap.probeFailIntro")}
             </div>
@@ -239,17 +239,17 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
                 >
                   <div className="font-semibold flex items-center gap-1.5">
                     <span>{f.profileName}</span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] uppercase bg-[var(--taomni-hover)] font-mono">
+                    <span className="px-1.5 py-0.5 rounded text-ui-caption uppercase bg-[var(--taomni-hover)] font-mono">
                       {f.kind}
                     </span>
                   </div>
-                  <div className="mt-1 font-mono text-[11px] text-red-500 break-words whitespace-pre-wrap">
+                  <div className="mt-1 font-mono text-ui-small text-red-500 break-words whitespace-pre-wrap">
                     {f.error}
                   </div>
                 </li>
               ))}
             </ul>
-            <div className="text-[11px] text-[var(--taomni-text-muted)]">
+            <div className="text-ui-small text-[var(--taomni-text-muted)]">
               {t("sockscap.probeFailHint")}
             </div>
           </div>
@@ -257,7 +257,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
             <button
               type="button"
               data-testid="sockscap-probe-fail-cancel"
-              className="px-3 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+              className="px-3 py-1.5 rounded text-ui-body border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
               onClick={() => setProbeFailures(null)}
             >
               {t("common.cancel")}
@@ -265,7 +265,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
             <button
               type="button"
               data-testid="sockscap-probe-fail-force"
-              className="px-3 py-1.5 rounded text-[12px] bg-amber-600 text-white hover:bg-amber-500"
+              className="px-3 py-1.5 rounded text-ui-body bg-amber-600 text-white hover:bg-amber-500"
               onClick={() => {
                 setProbeFailures(null);
                 void onStart();
@@ -287,7 +287,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
       >
         <div className="w-[min(620px,92vw)] max-h-[75vh] flex flex-col rounded-lg bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-xl">
           <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--taomni-divider)]">
-            <div className="text-[13px] font-semibold truncate">{testDetail.title}</div>
+            <div className="text-ui-body font-semibold truncate">{testDetail.title}</div>
             <button
               type="button"
               className="p-1 rounded hover:bg-[var(--taomni-hover)]"
@@ -300,7 +300,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
           <div className="flex-1 overflow-auto p-3">
             <pre
               data-testid="sockscap-test-detail-body"
-              className="whitespace-pre-wrap break-words text-[11px] font-mono text-[var(--taomni-text)] leading-relaxed"
+              className="whitespace-pre-wrap break-words text-ui-small font-mono text-[var(--taomni-text)] leading-relaxed"
             >
               {testDetail.body}
             </pre>
@@ -309,7 +309,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
             <button
               type="button"
               data-testid="sockscap-test-detail-copy"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
               onClick={() => void copyTestDetail()}
             >
               {testCopied ? (
@@ -322,7 +322,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
             <button
               type="button"
               data-testid="sockscap-test-detail-close"
-              className="px-3 py-1.5 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90"
+              className="px-3 py-1.5 rounded text-ui-body bg-[var(--taomni-accent)] text-white hover:opacity-90"
               onClick={() => setTestDetail(null)}
             >
               {t("common.close")}

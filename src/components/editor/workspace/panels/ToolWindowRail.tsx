@@ -310,10 +310,10 @@ const ToolWindowRailButtonView = memo(function ToolWindowRailButtonView({
     >
       <span aria-hidden="true" className="flex h-[20px] w-[20px] items-center justify-center [&>svg]:h-[16px] [&>svg]:w-[16px]">{item.icon}</span>
       {showNames && (
-        <span className="w-full truncate px-0.5 text-center text-[10px] leading-[12px]">{item.label}</span>
+        <span className="w-full truncate px-0.5 text-center text-ui-caption leading-[12px]">{item.label}</span>
       )}
       {showBadge && (
-        <span className="absolute right-0.5 top-0.5 rounded bg-[var(--taomni-code-active-line-bg)] px-0.5 text-[8px] leading-3 tabular-nums text-[var(--taomni-code-text)]">
+        <span className="absolute right-0.5 top-0.5 rounded bg-[var(--taomni-code-active-line-bg)] px-0.5 text-ui-caption leading-3 tabular-nums text-[var(--taomni-code-text)]">
           {item.badge}
         </span>
       )}

@@ -96,7 +96,7 @@ export function MacroDialogs({
             <span>{label("多次运行宏", "Run Macro Multiple Times")}</span>
             <button type="button" className="np-btn" onClick={onClose}><X size={14} /></button>
           </div>
-          <div className="flex flex-col gap-2 text-[12px]">
+          <div className="flex flex-col gap-2 text-ui-body">
             <label className="inline-flex items-center gap-2">
               <input type="radio" checked={runMode === "times"} onChange={() => setRunMode("times")} />
               <span>{label("运行指定次数：", "Run N times:")}</span>
@@ -145,14 +145,14 @@ export function MacroDialogs({
             </span>
             <button type="button" className="np-btn" onClick={onClose}><X size={14} /></button>
           </div>
-          <p className="text-[12px]">
+          <p className="text-ui-body">
             {label(
               "macros.json 的 SHA-256 与记录的 macros.sha256 不匹配，可能被外部修改。",
               "macros.json SHA-256 does not match macros.sha256 and may have been modified externally.",
             )}
           </p>
           {tamperInfo && (
-            <div className="text-[11px] font-mono bg-[var(--taomni-bg)] p-2 rounded border border-[var(--taomni-divider)] break-all">
+            <div className="text-ui-small font-mono bg-[var(--taomni-bg)] p-2 rounded border border-[var(--taomni-divider)] break-all">
               <div>Expected: {tamperInfo.expectedHash || "(missing)"}</div>
               <div>Actual: {tamperInfo.actualHash}</div>
             </div>
@@ -194,11 +194,11 @@ export function MacroDialogs({
           <button type="button" className="np-btn" onClick={onClose}><X size={14} /></button>
         </div>
         {macros.length === 0 ? (
-          <div className="text-[12px] text-[var(--taomni-text-muted)]">{label("暂无已保存的宏。", "No saved macros yet.")}</div>
+          <div className="text-ui-body text-[var(--taomni-text-muted)]">{label("暂无已保存的宏。", "No saved macros yet.")}</div>
         ) : (
           <div className="flex flex-col gap-1.5 max-h-72 overflow-auto">
             {macros.map((m) => (
-              <div key={m.name} className="flex items-center gap-2 border border-[var(--taomni-divider)] rounded px-2 py-1 text-[12px]">
+              <div key={m.name} className="flex items-center gap-2 border border-[var(--taomni-divider)] rounded px-2 py-1 text-ui-body">
                 {renaming?.old === m.name ? (
                   <>
                     <input
@@ -221,7 +221,7 @@ export function MacroDialogs({
                 ) : (
                   <>
                     <span className="flex-1 font-medium">{m.name}</span>
-                    <span className="text-[11px] text-[var(--taomni-text-muted)]">{m.steps.length} steps</span>
+                    <span className="text-ui-small text-[var(--taomni-text-muted)]">{m.steps.length} steps</span>
                     <button type="button" className="np-btn" onClick={() => void onRunSavedMacro(m)} title={label("运行", "Run")}><Play size={12} /></button>
                     <button type="button" className="np-btn" onClick={() => setRenaming({ old: m.name, next: m.name })}>{label("重命名", "Rename")}</button>
                     <button type="button" className="np-btn" data-testid={`notepad-macro-del-${m.name}`} onClick={() => void onDeleteMacro(m.name)}><Trash2 size={12} /></button>

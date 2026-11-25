@@ -10,7 +10,7 @@ export function TerminalSettings({
   onProfileChange: (profile: TerminalProfile) => void;
 }) {
   return (
-    <div data-testid="terminal-settings" className="text-[12px]">
+    <div data-testid="terminal-settings" className="text-ui-body">
       <TerminalAppearanceSettings
         profile={profile}
         onProfileChange={onProfileChange}

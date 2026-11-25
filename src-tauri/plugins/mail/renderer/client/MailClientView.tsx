@@ -275,7 +275,7 @@ export function MailClientView(props: MailClientViewProps) {
         <div className="h-8 shrink-0 flex items-end gap-1 px-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] overflow-x-auto">
           <button
             type="button"
-            className={`h-7 max-w-[220px] px-2 rounded-t border border-b-0 inline-flex items-center gap-1.5 text-[12px] ${selectionOwner.mailViewKey === "mailbox" ? "bg-[var(--taomni-bg)] text-[var(--taomni-accent)]" : "bg-[var(--taomni-chrome-bg)] text-[var(--taomni-text-muted)]"}`}
+            className={`h-7 max-w-[220px] px-2 rounded-t border border-b-0 inline-flex items-center gap-1.5 text-ui-body ${selectionOwner.mailViewKey === "mailbox" ? "bg-[var(--taomni-bg)] text-[var(--taomni-accent)]" : "bg-[var(--taomni-chrome-bg)] text-[var(--taomni-text-muted)]"}`}
             style={{ borderColor: "var(--taomni-divider)" }}
             onClick={() => selectionOwner.setMailViewKey("mailbox")}
           >
@@ -286,7 +286,7 @@ export function MailClientView(props: MailClientViewProps) {
             <button
               key={tab.key}
               type="button"
-              className={`h-7 max-w-[280px] px-2 rounded-t border border-b-0 inline-flex items-center gap-1.5 text-[12px] ${selectionOwner.mailViewKey === tab.key ? "bg-[var(--taomni-bg)] text-[var(--taomni-accent)]" : "bg-[var(--taomni-chrome-bg)] text-[var(--taomni-text-muted)]"}`}
+              className={`h-7 max-w-[280px] px-2 rounded-t border border-b-0 inline-flex items-center gap-1.5 text-ui-body ${selectionOwner.mailViewKey === tab.key ? "bg-[var(--taomni-bg)] text-[var(--taomni-accent)]" : "bg-[var(--taomni-chrome-bg)] text-[var(--taomni-text-muted)]"}`}
               style={{ borderColor: "var(--taomni-divider)" }}
               title={tab.message.subject || "(no subject)"}
               onClick={() => messageTabsOwner.selectMessage(tab.message, tab.key)}
@@ -307,14 +307,14 @@ export function MailClientView(props: MailClientViewProps) {
       )}
 
       {composerOwner.sentCopyNotice && (
-        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-[var(--taomni-divider)] text-[12px]" data-testid="mail-sent-copy-status" role="status">
+        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-[var(--taomni-divider)] text-ui-body" data-testid="mail-sent-copy-status" role="status">
           {composerOwner.sentCopyNotice.error ? <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />}
           <span className={`min-w-0 flex-1 break-words ${composerOwner.sentCopyNotice.error ? "text-red-500" : "text-[var(--taomni-text-muted)]"}`}>{composerOwner.sentCopyNotice.text}</span>
           <button type="button" className="taomni-btn h-6 w-6 p-0 shrink-0 inline-flex items-center justify-center" aria-label="Dismiss Sent copy status" onClick={() => composerOwner.setSentCopyNotice(null)}><X className="w-3 h-3" /></button>
         </div>
       )}
       {/* Reserve the status strip so transient progress never moves the toolbar or message rows. */}
-      <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[11px] bg-[var(--taomni-sidebar-bg)]">
+      <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-ui-small bg-[var(--taomni-sidebar-bg)]">
         {(mutationFailure?.message || error || status) && (
           <>
             {(mutationFailure?.message || error) ? <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />}
@@ -332,7 +332,7 @@ export function MailClientView(props: MailClientViewProps) {
           )}
           {syncOwner.syncProgress && (
             <span
-              className="h-5 shrink-0 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
+              className="h-5 shrink-0 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-ui-small text-[var(--taomni-text-muted)]"
               data-testid="mail-sync-progress"
               data-folder={syncOwner.syncProgress.folder}
               title={`Catching up ${syncOwner.syncProgress.folder}`}
@@ -344,7 +344,7 @@ export function MailClientView(props: MailClientViewProps) {
           )}
           {syncOwner.backfillProgress && (
             <span
-              className="h-5 shrink-0 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
+              className="h-5 shrink-0 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-ui-small text-[var(--taomni-text-muted)]"
               data-testid="mail-backfill-progress"
               data-folder={syncOwner.backfillProgress.folder}
               title={`Downloading older headers of ${syncOwner.backfillProgress.folder}`}
@@ -355,7 +355,7 @@ export function MailClientView(props: MailClientViewProps) {
           )}
           {cacheOwner.bodyWarming.active && (
             <span
-              className="h-5 shrink-0 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
+              className="h-5 shrink-0 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-ui-small text-[var(--taomni-text-muted)]"
               data-testid="mail-body-warming-progress"
               title={cacheOwner.bodyWarming.folder ? `Warming ${cacheOwner.bodyWarming.folder}` : "Warming recent message bodies"}
             >
@@ -380,7 +380,7 @@ export function MailClientView(props: MailClientViewProps) {
         {error && isMailCertificateError(error) && (
           <button
             type="button"
-            className="h-5 shrink-0 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
+            className="h-5 shrink-0 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-ui-small text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
             data-testid="mail-cert-review"
             onClick={() => void openCertReview(/smtp/i.test(error) ? "smtp" : "imap")}
           >
@@ -391,7 +391,7 @@ export function MailClientView(props: MailClientViewProps) {
         {error && oauthReauthRequired && onEditSession && (
           <button
             type="button"
-            className="h-5 shrink-0 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
+            className="h-5 shrink-0 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-ui-small text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
             onClick={() => onEditSession(info.sessionId)}
           >
             <ShieldCheck className="w-3 h-3" />
@@ -415,7 +415,7 @@ export function MailClientView(props: MailClientViewProps) {
             onClick={appearanceOwner.expandMailboxPanel}
           >
             <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
-            <span className="text-[10px] leading-none" style={{ writingMode: "vertical-rl" }}>
+            <span className="text-ui-caption leading-none" style={{ writingMode: "vertical-rl" }}>
               Mailbox
             </span>
           </button>
@@ -552,7 +552,7 @@ export function MailClientView(props: MailClientViewProps) {
 
       {composerOwner.undoSend && (
         <div
-          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[160] h-9 px-3 rounded shadow-lg border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] flex items-center gap-3 text-[12px]"
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[160] h-9 px-3 rounded shadow-lg border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] flex items-center gap-3 text-ui-body"
           role="status"
           data-testid="mail-undo-send"
         >

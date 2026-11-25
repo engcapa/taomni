@@ -23,7 +23,7 @@ export function MailSourceDialog(context: MailSourceDialogContext) {
         headerActions={(
           <button
             type="button"
-            className="taomni-btn h-6 px-2 text-[11px]"
+            className="taomni-btn h-6 px-2 text-ui-small"
             onClick={() => copyText("message source", sourceView.content)}
           >
             Copy all
@@ -31,7 +31,7 @@ export function MailSourceDialog(context: MailSourceDialogContext) {
         )}
       >
         <div className="flex-1 min-h-0 overflow-auto bg-[var(--taomni-bg)]">
-          <pre className="p-3 text-[12px] leading-5 whitespace-pre-wrap break-words taomni-mono">
+          <pre className="p-3 text-ui-body leading-5 whitespace-pre-wrap break-words taomni-mono">
             {sourceView.content}
           </pre>
         </div>

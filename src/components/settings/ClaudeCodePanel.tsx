@@ -134,8 +134,8 @@ export function ClaudeCodePanel() {
   return (
     <div className="space-y-3">
       <div>
-        <div className="text-[13px] font-semibold">{t("aiSettings.ccTitle")}</div>
-        <div className="text-[11px] text-[var(--taomni-text-muted)]">
+        <div className="text-ui-body font-semibold">{t("aiSettings.ccTitle")}</div>
+        <div className="text-ui-small text-[var(--taomni-text-muted)]">
           {t("aiSettings.ccSubtitle")}
         </div>
       </div>
@@ -151,10 +151,10 @@ export function ClaudeCodePanel() {
       >
         <StatusIcon />
         <div className="flex-1">
-          <div className="text-[13px] font-semibold">
+          <div className="text-ui-body font-semibold">
             {t("aiSettings.ccTitle")} {cc.enabled ? t("aiSettings.ccEnabledSuffix") : ""}
           </div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">
             {status?.message ?? t("aiSettings.ccDefaultMessage")}
           </div>
         </div>
@@ -166,7 +166,7 @@ export function ClaudeCodePanel() {
       {/* Detect button */}
       <button
         type="button"
-        className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+        className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5"
         onClick={handleDetect}
         disabled={detecting}
       >
@@ -177,12 +177,12 @@ export function ClaudeCodePanel() {
       {/* Install instructions (shown when not found) */}
       {isNotFound && (
         <div className="rounded border border-[var(--taomni-divider)] p-3 space-y-2">
-          <div className="text-[12px] font-semibold">{t("aiSettings.ccInstallTitle")}</div>
+          <div className="text-ui-body font-semibold">{t("aiSettings.ccInstallTitle")}</div>
           {INSTALL_COMMANDS.map(({ platform, cmd }) => (
             <div key={platform}>
-              <div className="text-[10px] text-[var(--taomni-text-muted)] mb-0.5">{platform}</div>
+              <div className="text-ui-caption text-[var(--taomni-text-muted)] mb-0.5">{platform}</div>
               <div className="flex items-center gap-2">
-                <code className="flex-1 font-mono text-[11px] bg-[var(--taomni-bg)] rounded px-2 py-1 truncate">
+                <code className="flex-1 font-mono text-ui-small bg-[var(--taomni-bg)] rounded px-2 py-1 truncate">
                   {cmd}
                 </code>
                 <CopyButton text={cmd} />
@@ -192,12 +192,12 @@ export function ClaudeCodePanel() {
 
           {/* Manual binary path — fallback when claude isn't on the GUI PATH */}
           <div className="pt-2 mt-1 border-t border-[var(--taomni-divider)]">
-            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">
+            <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">
               {t("aiSettings.ccManualPathLabel")}
             </label>
             <input
               type="text"
-              className="taomni-input h-7 w-full text-[12px] font-mono"
+              className="taomni-input h-7 w-full text-ui-body font-mono"
               placeholder={t("aiSettings.ccManualPathPlaceholder")}
               defaultValue={cc.binary === "auto" ? "" : cc.binary}
               onBlur={(e) => {
@@ -208,7 +208,7 @@ export function ClaudeCodePanel() {
                 }
               }}
             />
-            <div className="text-[10px] text-[var(--taomni-text-muted)] mt-1">
+            <div className="text-ui-caption text-[var(--taomni-text-muted)] mt-1">
               {t("aiSettings.ccManualPathHint")}
             </div>
           </div>
@@ -217,14 +217,14 @@ export function ClaudeCodePanel() {
 
       {/* Version too low */}
       {isVersionLow && status?.status.type === "version_too_low" && (
-        <div className="text-[11px] text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
+        <div className="text-ui-small text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
           {t("aiSettings.ccVersionLow", { found: status.status.found, required: status.status.required, cmd: "npm update -g @anthropic-ai/claude-code" })}
         </div>
       )}
 
       {/* Not authenticated */}
       {isNotAuth && (
-        <div className="flex items-center gap-2 text-[11px] text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
+        <div className="flex items-center gap-2 text-ui-small text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
           <span>{t("aiSettings.ccNotAuthenticated", { cmd: "claude login" })}</span>
         </div>
@@ -235,10 +235,10 @@ export function ClaudeCodePanel() {
         <div className="space-y-2 pt-2 border-t border-[var(--taomni-divider)]">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.ccDefaultModel")}</label>
+              <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.ccDefaultModel")}</label>
               <input
                 type="text"
-                className="taomni-input h-7 w-full text-[12px] font-mono"
+                className="taomni-input h-7 w-full text-ui-body font-mono"
                 value={defaultModelDraft}
                 placeholder={DEFAULT_CLAUDE_CODE_MODEL}
                 spellCheck={false}
@@ -255,10 +255,10 @@ export function ClaudeCodePanel() {
               />
             </div>
             <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.ccMaxTurns")}</label>
+              <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.ccMaxTurns")}</label>
               <input
                 type="number"
-                className="taomni-input h-7 w-full text-[12px]"
+                className="taomni-input h-7 w-full text-ui-body"
                 min={1}
                 max={50}
                 value={cc.max_turns}
@@ -267,7 +267,7 @@ export function ClaudeCodePanel() {
             </div>
           </div>
           <div>
-            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
+            <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
             <CodexProxyFields
               mode={cc.proxy_mode}
               sessionId={cc.proxy_session_id}
@@ -275,10 +275,10 @@ export function ClaudeCodePanel() {
               onChange={(patch) => saveConfig({ ...config, cc_bridge: { ...cc, ...patch } })}
             />
           </div>
-          <div className="text-[10px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-caption text-[var(--taomni-text-muted)]">
             {t("aiSettings.ccLocalModeNote")}
           </div>
-          <label className="flex items-start gap-2 text-[11px] cursor-pointer">
+          <label className="flex items-start gap-2 text-ui-small cursor-pointer">
             <input
               type="checkbox"
               className="mt-0.5"
@@ -289,7 +289,7 @@ export function ClaudeCodePanel() {
             />
             <span>
               <span className="block">{t("aiSettings.ccConfirmReadonly")}</span>
-              <span className="block text-[10px] text-[var(--taomni-text-muted)]">
+              <span className="block text-ui-caption text-[var(--taomni-text-muted)]">
                 {t("aiSettings.ccConfirmReadonlyHint")}
               </span>
             </span>
@@ -301,14 +301,14 @@ export function ClaudeCodePanel() {
       {cc.enabled && (
         <div className="space-y-3 pt-2 border-t border-[var(--taomni-divider)]">
           <div>
-            <div className="text-[12px] font-semibold">{t("aiSettings.ccCustomTitle")}</div>
-            <div className="text-[11px] text-[var(--taomni-text-muted)]">
+            <div className="text-ui-body font-semibold">{t("aiSettings.ccCustomTitle")}</div>
+            <div className="text-ui-small text-[var(--taomni-text-muted)]">
               {t("aiSettings.ccCustomSubtitle")}
             </div>
           </div>
 
           <div className="rounded border border-[var(--taomni-divider)] p-3 bg-[var(--taomni-panel-bg)]/50 flex flex-col gap-2">
-            <div className="flex items-center justify-between text-[11.5px]">
+            <div className="flex items-center justify-between text-ui-small">
               <div className="flex items-center gap-1.5 min-w-0">
                 <Shield className="w-3.5 h-3.5 text-green-400 shrink-0" />
                 <span className="font-medium">
@@ -319,7 +319,7 @@ export function ClaudeCodePanel() {
               </div>
               <button
                 type="button"
-                className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1 shrink-0"
+                className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1 shrink-0"
                 onClick={() => void openCustomDialog()}
                 disabled={openingCustomDialog}
               >
@@ -329,8 +329,8 @@ export function ClaudeCodePanel() {
             </div>
 
             {hasProfiles && activeProfileName && (
-              <div className="text-[10.5px] text-[var(--taomni-text-muted)] flex items-center gap-1">
-                <span className="px-1 text-[8px] bg-green-500/15 text-green-400 border border-green-500/35 rounded uppercase shrink-0 font-medium">
+              <div className="text-ui-caption text-[var(--taomni-text-muted)] flex items-center gap-1">
+                <span className="px-1 text-ui-caption bg-green-500/15 text-green-400 border border-green-500/35 rounded uppercase shrink-0 font-medium">
                   {t("aiSettings.ccCustomActiveLabel")}
                 </span>
                 <span className="truncate">{activeProfileName}</span>
@@ -338,7 +338,7 @@ export function ClaudeCodePanel() {
             )}
           </div>
 
-          <div className="text-[10px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-caption text-[var(--taomni-text-muted)]">
             {t("aiSettings.ccCustomNote")}
           </div>
         </div>

@@ -111,8 +111,8 @@ export function CodexCodePanel() {
   return (
     <div className="space-y-3">
       <div>
-        <div className="text-[13px] font-semibold">{t("aiSettings.codexTitle")}</div>
-        <div className="text-[11px] text-[var(--taomni-text-muted)]">{t("aiSettings.codexSubtitle")}</div>
+        <div className="text-ui-body font-semibold">{t("aiSettings.codexTitle")}</div>
+        <div className="text-ui-small text-[var(--taomni-text-muted)]">{t("aiSettings.codexSubtitle")}</div>
       </div>
 
       <div
@@ -125,10 +125,10 @@ export function CodexCodePanel() {
       >
         <StatusIcon />
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold">
+          <div className="text-ui-body font-semibold">
             Codex {codex.enabled ? t("aiSettings.ccEnabledSuffix") : ""}
           </div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+          <div className="text-ui-small text-[var(--taomni-text-muted)] truncate">
             {status?.message ?? t("aiSettings.codexDefaultMessage")}
           </div>
         </div>
@@ -137,30 +137,30 @@ export function CodexCodePanel() {
         </div>
       </div>
 
-      <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5" onClick={detect} disabled={detecting}>
+      <button type="button" className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5" onClick={detect} disabled={detecting}>
         {detecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Terminal className="w-3.5 h-3.5" />}
         {t("aiSettings.codexDetect")}
       </button>
 
       {notFound && (
         <div className="rounded border border-[var(--taomni-divider)] p-3 space-y-2">
-          <div className="text-[12px] font-semibold">{t("aiSettings.codexInstallTitle")}</div>
+          <div className="text-ui-body font-semibold">{t("aiSettings.codexInstallTitle")}</div>
           {INSTALL_COMMANDS.map(({ platform, cmd }) => (
             <div key={platform}>
-              <div className="text-[10px] text-[var(--taomni-text-muted)] mb-0.5">{platform}</div>
+              <div className="text-ui-caption text-[var(--taomni-text-muted)] mb-0.5">{platform}</div>
               <div className="flex items-center gap-2">
-                <code className="flex-1 font-mono text-[11px] bg-[var(--taomni-bg)] rounded px-2 py-1 truncate">{cmd}</code>
+                <code className="flex-1 font-mono text-ui-small bg-[var(--taomni-bg)] rounded px-2 py-1 truncate">{cmd}</code>
                 <CopyButton text={cmd} />
               </div>
             </div>
           ))}
           <div className="pt-2 mt-1 border-t border-[var(--taomni-divider)]">
-            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">
+            <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">
               {t("aiSettings.codexManualPathLabel")}
             </label>
             <input
               type="text"
-              className="taomni-input h-7 w-full text-[12px] font-mono"
+              className="taomni-input h-7 w-full text-ui-body font-mono"
               placeholder={t("aiSettings.codexManualPathPlaceholder")}
               defaultValue={codex.binary === "auto" ? "" : codex.binary}
               onBlur={(e) => {
@@ -175,12 +175,12 @@ export function CodexCodePanel() {
       )}
 
       {versionLow && status?.status.type === "version_too_low" && (
-        <div className="text-[11px] text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
+        <div className="text-ui-small text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
           {t("aiSettings.codexVersionLow", { found: status.status.found, required: status.status.required })}
         </div>
       )}
       {notAuth && (
-        <div className="flex items-center gap-2 text-[11px] text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
+        <div className="flex items-center gap-2 text-ui-small text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
           <span>{t("aiSettings.codexNotAuthenticated", { cmd: "codex login" })}</span>
         </div>
@@ -190,10 +190,10 @@ export function CodexCodePanel() {
         <div className="space-y-3 pt-2 border-t border-[var(--taomni-divider)]">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.ccDefaultModel")}</label>
+              <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.ccDefaultModel")}</label>
               <input
                 type="text"
-                className="taomni-input h-7 w-full text-[12px] font-mono"
+                className="taomni-input h-7 w-full text-ui-body font-mono"
                 value={modelDraft}
                 placeholder={DEFAULT_CODEX_MODEL}
                 spellCheck={false}
@@ -209,7 +209,7 @@ export function CodexCodePanel() {
               />
             </div>
             <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
+              <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
               <CodexProxyFields
                 mode={codex.proxy_mode}
                 sessionId={codex.proxy_session_id}
@@ -221,9 +221,9 @@ export function CodexCodePanel() {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">Sandbox</label>
+              <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">Sandbox</label>
               <select
-                className="taomni-input h-7 w-full text-[12px]"
+                className="taomni-input h-7 w-full text-ui-body"
                 value={codex.sandbox}
                 onChange={(e) => saveConfig({ ...config, codex_bridge: { ...codex, sandbox: e.target.value } })}
               >
@@ -233,9 +233,9 @@ export function CodexCodePanel() {
               </select>
             </div>
             <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">Approval</label>
+              <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">Approval</label>
               <select
-                className="taomni-input h-7 w-full text-[12px]"
+                className="taomni-input h-7 w-full text-ui-body"
                 value={codex.approval_policy}
                 onChange={(e) => saveConfig({ ...config, codex_bridge: { ...codex, approval_policy: e.target.value } })}
               >
@@ -245,7 +245,7 @@ export function CodexCodePanel() {
                 <option value="untrusted">untrusted</option>
               </select>
             </div>
-            <label className="flex items-end gap-2 text-[11px] cursor-pointer pb-1">
+            <label className="flex items-end gap-2 text-ui-small cursor-pointer pb-1">
               <input
                 type="checkbox"
                 checked={codex.network_access ?? false}
@@ -255,7 +255,7 @@ export function CodexCodePanel() {
             </label>
           </div>
 
-          <label className="flex items-start gap-2 text-[11px] cursor-pointer">
+          <label className="flex items-start gap-2 text-ui-small cursor-pointer">
             <input
               type="checkbox"
               className="mt-0.5"
@@ -264,7 +264,7 @@ export function CodexCodePanel() {
             />
             <span>
               <span className="block">{t("aiSettings.ccConfirmReadonly")}</span>
-              <span className="block text-[10px] text-[var(--taomni-text-muted)]">
+              <span className="block text-ui-caption text-[var(--taomni-text-muted)]">
                 {t("aiSettings.codexConfirmReadonlyHint")}
               </span>
             </span>
@@ -272,8 +272,8 @@ export function CodexCodePanel() {
 
           <div className="rounded border border-[var(--taomni-divider)] p-3 bg-[var(--taomni-panel-bg)]/50 flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <div className="text-[12px] font-semibold">{t("aiSettings.codexCustomTitle")}</div>
-              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+              <div className="text-ui-body font-semibold">{t("aiSettings.codexCustomTitle")}</div>
+              <div className="text-ui-small text-[var(--taomni-text-muted)] truncate">
                 {profiles.length > 0
                   ? t("aiSettings.codexCustomProfilesSummary", {
                       count: profiles.length,
@@ -284,7 +284,7 @@ export function CodexCodePanel() {
             </div>
             <button
               type="button"
-              className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1 shrink-0"
+              className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1 shrink-0"
               onClick={() => void openConfigDialog()}
               disabled={openingDialog}
             >
@@ -292,7 +292,7 @@ export function CodexCodePanel() {
               {t("aiSettings.ccCustomManage")}
             </button>
           </div>
-          <div className="text-[10px] text-[var(--taomni-text-muted)]">{t("aiSettings.codexProxyPriorityNote")}</div>
+          <div className="text-ui-caption text-[var(--taomni-text-muted)]">{t("aiSettings.codexProxyPriorityNote")}</div>
         </div>
       )}
 

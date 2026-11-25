@@ -204,7 +204,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
             data-testid="mfa-search"
             aria-label={t("mfa.searchLabel")}
             placeholder={t("mfa.searchPlaceholder")}
-            className="taomni-input h-7 w-full text-[12px]"
+            className="taomni-input h-7 w-full text-ui-body"
             style={{ paddingLeft: 28 }}
             value={query}
             onChange={(event) => store().setQuery(event.target.value)}
@@ -219,11 +219,11 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
             }}
           />
         </div>
-        <label className="flex items-center gap-1 text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
+        <label className="flex items-center gap-1 text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>
           {t("mfa.groupFilterLabel")}
           <select
             data-testid="mfa-group-filter"
-            className="taomni-input h-7 text-[12px]"
+            className="taomni-input h-7 text-ui-body"
             value={prefs.groupFilter}
             onChange={(event) => void store().setGroupFilter(event.target.value).catch(() => undefined)}
           >
@@ -234,11 +234,11 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
             <option value={MFA_UNGROUPED}>{t("mfa.groupNone")}</option>
           </select>
         </label>
-        <label className="flex items-center gap-1 text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
+        <label className="flex items-center gap-1 text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>
           {t("mfa.sortLabel")}
           <select
             data-testid="mfa-sort-mode"
-            className="taomni-input h-7 text-[12px]"
+            className="taomni-input h-7 text-ui-body"
             value={prefs.sortMode}
             onChange={(event) => void store().setSortMode(event.target.value as MfaSortMode).catch(() => undefined)}
           >
@@ -251,7 +251,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
           type="button"
           data-testid="mfa-add"
           aria-label={t("mfa.addLabel")}
-          className="inline-flex h-7 items-center gap-1 rounded px-3 text-[12px] text-white"
+          className="inline-flex h-7 items-center gap-1 rounded px-3 text-ui-body text-white"
           style={{ background: "var(--taomni-accent)" }}
           onClick={() => openAdd("secret")}
         >
@@ -260,7 +260,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
         </button>
       </div>
       {status === "ready" && error ? (
-        <div data-testid="mfa-error" role="alert" className="flex items-center gap-2 border-b px-3 py-1.5 text-[12px]" style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-error, #c33)" }}>
+        <div data-testid="mfa-error" role="alert" className="flex items-center gap-2 border-b px-3 py-1.5 text-ui-body" style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-error, #c33)" }}>
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
           <span className="flex-1 truncate">{t("mfa.errorPrefix", { error })}</span>
           <button type="button" className="rounded px-2 hover:bg-[var(--taomni-hover)]" onClick={() => store().clearError()}>
@@ -270,16 +270,16 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
       ) : null}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {keyError ? (
-          <div data-testid="mfa-key-error" role="alert" className="mx-auto mt-10 max-w-[520px] space-y-3 px-6 text-center text-[12px]">
+          <div data-testid="mfa-key-error" role="alert" className="mx-auto mt-10 max-w-[520px] space-y-3 px-6 text-center text-ui-body">
             <AlertTriangle className="mx-auto h-8 w-8" style={{ color: "var(--taomni-error, #c33)" }} />
-            <div className="text-[14px] font-semibold">{t("mfa.keyErrorTitle")}</div>
+            <div className="text-ui-title font-semibold">{t("mfa.keyErrorTitle")}</div>
             <div style={{ color: "var(--taomni-text-muted)" }}>{errorCode === "MFA_KEY_MISSING" ? t("mfa.keyMissing") : t("mfa.keyMismatch")}</div>
             <button type="button" data-testid="mfa-reset-store" className="rounded px-3 py-1.5 text-white" style={{ background: "var(--taomni-error, #c33)" }} onClick={() => void resetStore()}>
               {t("mfa.resetStore")}
             </button>
           </div>
         ) : status === "error" ? (
-          <div data-testid="mfa-load-error" data-code={errorCode} role="alert" className="mx-auto mt-10 max-w-[520px] space-y-3 px-6 text-center text-[12px]">
+          <div data-testid="mfa-load-error" data-code={errorCode} role="alert" className="mx-auto mt-10 max-w-[520px] space-y-3 px-6 text-center text-ui-body">
             {errorCode === "MFA_LEGACY_MIGRATION_REQUIRED" ? (
               <div>{t("mfa.legacyMigrationRequired")}</div>
             ) : (
@@ -292,14 +292,14 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
             )}
           </div>
         ) : status !== "ready" && accounts.length === 0 ? (
-          <div data-testid="mfa-loading" className="mt-10 text-center text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
+          <div data-testid="mfa-loading" className="mt-10 text-center text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>
             {t("mfa.loading")}
           </div>
         ) : accounts.length === 0 ? (
           <div data-testid="mfa-empty" className="mx-auto mt-10 max-w-[520px] space-y-3 px-6 text-center">
             <KeyRound className="mx-auto h-8 w-8" style={{ color: "var(--taomni-text-muted)" }} />
-            <div className="text-[14px] font-semibold">{t("mfa.emptyTitle")}</div>
-            <div className="text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>{t("mfa.emptyHint")}</div>
+            <div className="text-ui-title font-semibold">{t("mfa.emptyTitle")}</div>
+            <div className="text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>{t("mfa.emptyHint")}</div>
             <div className="flex flex-wrap justify-center gap-2">
               {([
                 ["secret", KeyRound, "mfa.modeSecret"],
@@ -311,7 +311,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
                   key={mode}
                   type="button"
                   data-testid={`mfa-empty-add-${mode}`}
-                  className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-[12px] hover:bg-[var(--taomni-hover)]"
+                  className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-ui-body hover:bg-[var(--taomni-hover)]"
                   style={{ borderColor: "var(--taomni-input-border)" }}
                   onClick={() => openAdd(mode)}
                 >
@@ -322,7 +322,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
             </div>
           </div>
         ) : visible.length === 0 ? (
-          <div data-testid="mfa-no-results" className="mt-10 text-center text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
+          <div data-testid="mfa-no-results" className="mt-10 text-center text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>
             {t("mfa.noResults")}
           </div>
         ) : (
@@ -360,7 +360,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
         data-testid="mfa-status"
         role="status"
         aria-live="polite"
-        className="min-h-[26px] border-t px-3 py-1 text-[12px]"
+        className="min-h-[26px] border-t px-3 py-1 text-ui-body"
         style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}
       >
         {announcement}

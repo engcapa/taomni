@@ -45,7 +45,7 @@ export function SessionBackupDialogs({
             <span>{isSave ? label("保存会话文件", "Save Session") : label("加载会话文件", "Load Session")}</span>
             <button type="button" className="np-btn" onClick={onClose}><X size={14} /></button>
           </div>
-          <p className="text-[11px] text-[var(--taomni-text-muted)]">
+          <p className="text-ui-small text-[var(--taomni-text-muted)]">
             {label("留空将使用默认应用数据会话文件。", "Leave blank to use default appData last-session.taomni-session.json.")}
           </p>
           <input
@@ -56,8 +56,8 @@ export function SessionBackupDialogs({
             value={sessionPath}
             onChange={(e) => setSessionPath(e.target.value)}
           />
-          {status && <div className="text-[12px] text-emerald-600">{status}</div>}
-          {err && <div className="text-[12px] text-red-500">{err}</div>}
+          {status && <div className="text-ui-body text-emerald-600">{status}</div>}
+          {err && <div className="text-ui-body text-red-500">{err}</div>}
           <div className="flex justify-end gap-2">
             <button type="button" className="np-btn" onClick={onClose}>{label("关闭", "Close")}</button>
             <button
@@ -94,18 +94,18 @@ export function SessionBackupDialogs({
           <span className="inline-flex items-center gap-1.5"><ArchiveRestore size={14} />{label("崩溃恢复与定期备份快照", "Backup & Recovery Snapshots")}</span>
           <button type="button" className="np-btn" onClick={onClose}><X size={14} /></button>
         </div>
-        {err && <div className="text-[12px] text-red-500">{err}</div>}
+        {err && <div className="text-ui-body text-red-500">{err}</div>}
         {entries.length === 0 ? (
-          <div className="text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-body text-[var(--taomni-text-muted)]">
             {label("没有待恢复的未保存备份快照。", "No pending unsaved backup snapshots.")}
           </div>
         ) : (
-          <div className="flex flex-col gap-2 max-h-72 overflow-auto text-[12px]">
+          <div className="flex flex-col gap-2 max-h-72 overflow-auto text-ui-body">
             {entries.map((item) => (
               <div key={item.id} className="flex items-center gap-2 border border-[var(--taomni-divider)] rounded p-2">
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{item.name}</div>
-                  <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+                  <div className="text-ui-small text-[var(--taomni-text-muted)] truncate">
                     {item.path ?? label("未命名文档", "Untitled")} · {item.size} chars
                   </div>
                 </div>

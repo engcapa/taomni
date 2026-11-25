@@ -124,7 +124,7 @@ export function WorkspaceTabPolicySettingsDialog({
             <label className="grid grid-cols-[1fr_240px] items-center gap-3">
               <div>
                 <span className="block font-medium">Tab limit per editor split</span>
-                <span className="text-[11px] text-[var(--taomni-code-muted)]">
+                <span className="text-ui-small text-[var(--taomni-code-muted)]">
                   Maximum open tabs before evicting clean tabs (1–50)
                 </span>
               </div>
@@ -147,7 +147,7 @@ export function WorkspaceTabPolicySettingsDialog({
             {evictionPreview?.kind === "evicted" && (
               <div
                 data-testid="workspace-tab-policy-eviction-preview"
-                className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-200"
+                className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-ui-small text-amber-200"
               >
                 <div className="font-semibold">Candidate Evictions Preview</div>
                 <div className="mt-1">
@@ -172,7 +172,7 @@ export function WorkspaceTabPolicySettingsDialog({
             {evictionPreview?.kind === "over-limit-protected" && (
               <div
                 data-testid="workspace-tab-policy-over-limit-warning"
-                className="rounded border border-blue-500/30 bg-blue-500/10 p-2.5 text-[11px] text-blue-200"
+                className="rounded border border-blue-500/30 bg-blue-500/10 p-2.5 text-ui-small text-blue-200"
               >
                 <div className="font-semibold">Protected Over-Limit</div>
                 <div className="mt-1">{evictionPreview.reason}</div>
@@ -185,7 +185,7 @@ export function WorkspaceTabPolicySettingsDialog({
             <label className="grid grid-cols-[1fr_240px] items-center gap-3">
               <div>
                 <span className="block font-medium">Tab display order</span>
-                <span className="text-[11px] text-[var(--taomni-code-muted)]">
+                <span className="text-ui-small text-[var(--taomni-code-muted)]">
                   Controls tab projection in the tab bar
                 </span>
               </div>
@@ -209,7 +209,7 @@ export function WorkspaceTabPolicySettingsDialog({
             <label className="grid grid-cols-[1fr_240px] items-center gap-3">
               <div>
                 <span className="block font-medium">Open new tab position</span>
-                <span className="text-[11px] text-[var(--taomni-code-muted)]">
+                <span className="text-ui-small text-[var(--taomni-code-muted)]">
                   Where newly opened tabs appear
                 </span>
               </div>
@@ -235,7 +235,7 @@ export function WorkspaceTabPolicySettingsDialog({
                 <span className="block font-medium">
                   Activate after closing tab
                 </span>
-                <span className="text-[11px] text-[var(--taomni-code-muted)]">
+                <span className="text-ui-small text-[var(--taomni-code-muted)]">
                   Which neighbor becomes active when active tab closes
                 </span>
               </div>
@@ -261,7 +261,7 @@ export function WorkspaceTabPolicySettingsDialog({
             <label className="grid grid-cols-[1fr_240px] items-center gap-3">
               <div>
                 <span className="block font-medium">Pinned tabs layout</span>
-                <span className="text-[11px] text-[var(--taomni-code-muted)]">
+                <span className="text-ui-small text-[var(--taomni-code-muted)]">
                   Display pinned tabs separately or inline
                 </span>
               </div>

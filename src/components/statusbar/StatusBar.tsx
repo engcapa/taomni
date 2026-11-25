@@ -135,7 +135,7 @@ function WorkspaceNavigationBar({ segments }: { segments: readonly CodeWorkspace
             title={segment.label}
           >
             {segment.kind === "symbol" && segment.symbolKind !== undefined && SYMBOL_KIND_BADGE[segment.symbolKind] && (
-              <span className="shrink-0 rounded-full border border-current px-0.5 text-[8px] leading-3 opacity-70">
+              <span className="shrink-0 rounded-full border border-current px-0.5 text-ui-caption leading-3 opacity-70">
                 {SYMBOL_KIND_BADGE[segment.symbolKind]}
               </span>
             )}
@@ -403,7 +403,7 @@ export function StatusBar() {
           <Loader2 className="w-3 h-3 shrink-0 animate-spin" />
           <span className="truncate">{workspaceStatus.lspProgress.label}</span>
           {workspaceStatus.lspProgress.percentage !== null && (
-            <span className="taomni-mono shrink-0 text-[10px]">
+            <span className="taomni-mono shrink-0 text-ui-caption">
               {workspaceStatus.lspProgress.percentage}%
             </span>
           )}
@@ -499,7 +499,7 @@ export function StatusBar() {
               <GitBranch className="w-3 h-3 shrink-0" />
               <span className="truncate">{workspaceStatus.gitBranch}</span>
               {(workspaceStatus.gitAhead > 0 || workspaceStatus.gitBehind > 0) && (
-                <span className="taomni-mono shrink-0 text-[10px] opacity-80">
+                <span className="taomni-mono shrink-0 text-ui-caption opacity-80">
                   {workspaceStatus.gitAhead > 0 ? `↑${workspaceStatus.gitAhead}` : ""}
                   {workspaceStatus.gitBehind > 0 ? `↓${workspaceStatus.gitBehind}` : ""}
                 </span>

@@ -118,11 +118,11 @@ export function OutlinePane({
             aria-label="Filter outline"
             value={query}
             placeholder="Filter symbols"
-            className="min-w-0 flex-1 bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none"
+            className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none"
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        <div className="flex items-center gap-1 text-[10px] text-[var(--taomni-code-muted)]">
+        <div className="flex items-center gap-1 text-ui-caption text-[var(--taomni-code-muted)]">
           <label className="inline-flex items-center gap-1">
             <span>Sort</span>
             <select
@@ -157,7 +157,7 @@ export function OutlinePane({
               role="treeitem"
               aria-current={key === currentSymbolKey ? "location" : undefined}
               aria-expanded={hasChildren ? !isCollapsed : undefined}
-              className="group flex h-6 items-center pr-2 text-[11px] text-[var(--taomni-code-muted)] aria-[current=location]:bg-[var(--taomni-code-selection-match-bg)] aria-[current=location]:text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
+              className="group flex h-6 items-center pr-2 text-ui-small text-[var(--taomni-code-muted)] aria-[current=location]:bg-[var(--taomni-code-selection-match-bg)] aria-[current=location]:text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
               style={{ paddingLeft: `${6 + depth * 14}px` }}
             >
               <button
@@ -185,26 +185,26 @@ export function OutlinePane({
                 title={`${symbol.name} · line ${symbol.selectionRange.start.line + 1}`}
                 onClick={() => onPick(symbol)}
               >
-                <span aria-hidden="true" className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold ${badge.className}`}>
+                <span aria-hidden="true" className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-ui-caption font-bold ${badge.className}`}>
                   {badge.label}
                 </span>
                 <span className="min-w-0 flex-1 truncate">{symbol.name}</span>
-                <span className="shrink-0 font-mono text-[9px] opacity-70">:{symbol.selectionRange.start.line + 1}</span>
+                <span className="shrink-0 font-mono text-ui-caption opacity-70">:{symbol.selectionRange.start.line + 1}</span>
               </button>
             </div>
           );
         })}
         {!loading && rows.length === 0 && (
-          <div className="flex h-full min-h-24 flex-col items-center justify-center gap-2 px-4 text-center text-[11px] text-[var(--taomni-code-muted)]">
+          <div className="flex h-full min-h-24 flex-col items-center justify-center gap-2 px-4 text-center text-ui-small text-[var(--taomni-code-muted)]">
             <ListTree className="h-5 w-5 opacity-60" />
             <span>{unavailableReason ?? (query ? "No matching symbols" : "No symbols in this file")}</span>
           </div>
         )}
         {loading && rows.length === 0 && (
-          <div className="p-4 text-center text-[11px] text-[var(--taomni-code-muted)]">Loading symbols...</div>
+          <div className="p-4 text-center text-ui-small text-[var(--taomni-code-muted)]">Loading symbols...</div>
         )}
       </div>
-      <div className="shrink-0 border-t border-[var(--taomni-code-border)] px-2 py-1 text-[9px] text-[var(--taomni-code-muted)]">
+      <div className="shrink-0 border-t border-[var(--taomni-code-border)] px-2 py-1 text-ui-caption text-[var(--taomni-code-muted)]">
         {rows.length} / {symbols.length} symbols
       </div>
     </section>

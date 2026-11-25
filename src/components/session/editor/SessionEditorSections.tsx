@@ -33,7 +33,7 @@ export function SessionEditorSections(props: SessionEditorSectionsProps) {
   >
     {navigation.activeSection === "mappings" && form.proto === "SFTP" && (
       <div data-testid="session-sftp-mappings-section" className="flex flex-col gap-3">
-        <div className="text-[12px] text-[var(--taomni-text-muted)]">
+        <div className="text-ui-body text-[var(--taomni-text-muted)]">
           {form.t("pathMappings.sectionDescription")}
         </div>
         <PathMappingsEditor
@@ -100,7 +100,7 @@ export function SessionEditorSections(props: SessionEditorSectionsProps) {
       </div>
     )}
     {navigation.activeSection === "vnc" && form.proto === "VNC" && (
-      <div data-testid="session-vnc-policies" className="grid grid-cols-12 gap-x-3 gap-y-3 text-[12px]">
+      <div data-testid="session-vnc-policies" className="grid grid-cols-12 gap-x-3 gap-y-3 text-ui-body">
         <Field label={form.t("sessionEditor2.vncSecurityPolicy")}>
           <select data-testid="session-vnc-security-policy" className="taomni-input w-64" value={form.vncSecurityPolicy} onChange={(event) => form.setVncSecurityPolicy(event.target.value as typeof form.vncSecurityPolicy)}>
             <option value="prefer-encryption">{form.t("sessionEditor2.vncSecurityPrefer")}</option>
@@ -191,7 +191,7 @@ export function SessionEditorSections(props: SessionEditorSectionsProps) {
             </label>
           </div>
         </Field>
-        <div className="col-span-12 rounded border px-3 py-2 text-[11px] text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
+        <div className="col-span-12 rounded border px-3 py-2 text-ui-small text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
           {form.t("sessionEditor2.vncSecurityNote")}
         </div>
       </div>
@@ -325,7 +325,7 @@ export function SessionEditorSections(props: SessionEditorSectionsProps) {
       </div>
     )}
     {navigation.activeSection === "proxy" && form.isProxy && (
-      <div data-testid="session-proxy-section" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+      <div data-testid="session-proxy-section" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-ui-body">
         <Field label={form.t("sessionEditor2.proxyKindLabel")}>
           <Select
             value={form.proxyKind === "http" ? form.t("sessionEditor2.proxyHttp") : form.t("sessionEditor2.proxySocks5")}

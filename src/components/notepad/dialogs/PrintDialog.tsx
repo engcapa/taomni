@@ -39,7 +39,7 @@ export function PrintDialog({
           <button type="button" className="np-btn" onClick={onClose}><X size={14} /></button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-[12px]">
+        <div className="grid grid-cols-2 gap-2 text-ui-body">
           <label className="flex flex-col gap-1">
             <span>{label("打印范围", "Range")}</span>
             <select

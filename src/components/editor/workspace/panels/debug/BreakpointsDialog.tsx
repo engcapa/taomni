@@ -100,7 +100,7 @@ export function BreakpointsDialog({ debug, initial = null, onOpenBreakpoint, onC
         aria-modal="true"
         aria-label="Breakpoints"
         data-testid="debug-breakpoints-dialog"
-        className="flex h-[520px] max-h-[90vh] w-[820px] max-w-[95vw] flex-col rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[11px] shadow-xl"
+        className="flex h-[520px] max-h-[90vh] w-[820px] max-w-[95vw] flex-col rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-small shadow-xl"
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             event.preventDefault();
@@ -129,7 +129,7 @@ export function BreakpointsDialog({ debug, initial = null, onOpenBreakpoint, onC
               >
                 <Minus className="h-3.5 w-3.5" />
               </button>
-              <span className="ml-auto pr-1 text-[10px] text-[var(--taomni-text-muted)]">
+              <span className="ml-auto pr-1 text-ui-caption text-[var(--taomni-text-muted)]">
                 {debug.breakpointsMuted ? "Muted" : ""}
               </span>
             </div>
@@ -175,7 +175,7 @@ export function BreakpointsDialog({ debug, initial = null, onOpenBreakpoint, onC
                       onClick={() => setSelection(row)}
                     >
                       <span className="truncate">{GROUP_LABELS[row.group]}</span>
-                      <span className="ml-auto text-[10px] tabular-nums text-[var(--taomni-text-muted)]">{count(row.group)}</span>
+                      <span className="ml-auto text-ui-caption tabular-nums text-[var(--taomni-text-muted)]">{count(row.group)}</span>
                     </div>
                   );
                 }
@@ -215,7 +215,7 @@ export function BreakpointsDialog({ debug, initial = null, onOpenBreakpoint, onC
                     <span className={`truncate ${disabled ? "text-[var(--taomni-text-muted)]" : ""}`}>
                       {breakpointDisplayName(row.path, row.line)}
                     </span>
-                    {entry.bp.condition && <span className="truncate text-[10px] text-amber-500">{entry.bp.condition}</span>}
+                    {entry.bp.condition && <span className="truncate text-ui-caption text-amber-500">{entry.bp.condition}</span>}
                   </div>
                 );
               })}
@@ -272,7 +272,7 @@ export function BreakpointsDialog({ debug, initial = null, onOpenBreakpoint, onC
           <button
             type="button"
             data-testid="debug-breakpoints-dialog-done"
-            className="h-6 rounded bg-[var(--taomni-accent)] px-4 text-[11px] font-medium text-white hover:opacity-90"
+            className="h-6 rounded bg-[var(--taomni-accent)] px-4 text-ui-small font-medium text-white hover:opacity-90"
             onClick={onClose}
           >
             Done

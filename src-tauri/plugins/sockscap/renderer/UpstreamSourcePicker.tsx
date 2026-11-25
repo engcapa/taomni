@@ -452,7 +452,7 @@ export function UpstreamSourcePicker({
         data-testid={testId}
         disabled={disabled}
         title={disabled ? lockedTooltip : undefined}
-        className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-left inline-flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full text-ui-body px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-left inline-flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
         onClick={() => setOpen((v) => !v)}
       >
         <span className="min-w-0 flex-1 truncate">{selectedLabel}</span>
@@ -475,7 +475,7 @@ export function UpstreamSourcePicker({
                 ref={inputRef}
                 type="search"
                 data-testid={`${testId}-filter`}
-                className="w-full text-[12px] pl-7 pr-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                className="w-full text-ui-body pl-7 pr-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
                 placeholder={t("sockscap.picker.filterPh")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -485,7 +485,7 @@ export function UpstreamSourcePicker({
             <button
               type="button"
               data-testid={`${testId}-rescan`}
-              className="px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0 inline-flex items-center gap-1"
+              className="px-2 py-1.5 rounded text-ui-small border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0 inline-flex items-center gap-1"
               onClick={() => void doRescan()}
               disabled={busy || rescanning}
               title={t("sockscap.picker.rescan")}
@@ -495,7 +495,7 @@ export function UpstreamSourcePicker({
           </div>
           <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto p-0.5">
             {rows.length === 0 ? (
-              <div className="px-2 py-3 text-center text-[11px] text-[var(--taomni-text-muted)]">
+              <div className="px-2 py-3 text-center text-ui-small text-[var(--taomni-text-muted)]">
                 {t("sockscap.picker.noMatch")}
               </div>
             ) : (
@@ -520,7 +520,7 @@ export function UpstreamSourcePicker({
                     <ChevronRight
                       className={`w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)] transition-transform ${row.expanded ? "rotate-90" : ""}`}
                     />
-                    <span className="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
+                    <span className="min-w-0 flex-1 truncate text-ui-small font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
                       {row.label}
                     </span>
                   </div>
@@ -540,9 +540,9 @@ export function UpstreamSourcePicker({
                     onMouseEnter={() => setActiveIdx(idx)}
                     onClick={() => commit(row)}
                   >
-                    <span className="min-w-0 flex-1 truncate text-[12px]">{row.label}</span>
+                    <span className="min-w-0 flex-1 truncate text-ui-body">{row.label}</span>
                     {row.sub && (
-                      <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)] truncate max-w-[55%]">
+                      <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)] truncate max-w-[55%]">
                         {row.sub}
                       </span>
                     )}

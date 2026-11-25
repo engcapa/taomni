@@ -67,15 +67,15 @@ export function SqlCompletionSettings() {
       <div className="mb-3 flex items-center gap-3">
         <Database className="h-4 w-4 text-[var(--taomni-accent)]" />
         <div>
-          <div className="text-[14px] font-semibold">{t("settings.sqlCompletionTitle")}</div>
-          <div className="text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-title font-semibold">{t("settings.sqlCompletionTitle")}</div>
+          <div className="text-ui-body text-[var(--taomni-text-muted)]">
             {t("settings.sqlCompletionSubtitle")}
           </div>
         </div>
         <button
           type="button"
           data-testid="sql-completion-reset"
-          className="taomni-btn ml-auto h-7 px-2.5 inline-flex items-center gap-1 text-[11px]"
+          className="taomni-btn ml-auto h-7 px-2.5 inline-flex items-center gap-1 text-ui-small"
           onClick={() => {
             setShortcutError(null);
             setPreferences(DEFAULT_SQL_COMPLETION_PREFERENCES);
@@ -90,7 +90,7 @@ export function SqlCompletionSettings() {
 
       <div className="grid grid-cols-1 gap-4 border-t border-[var(--taomni-divider)] pt-3 md:grid-cols-2">
         <div className="space-y-3">
-          <label className="flex items-start gap-2 text-[12px]">
+          <label className="flex items-start gap-2 text-ui-body">
             <input
               data-testid="sql-completion-activate-on-typing"
               className="taomni-checkbox mt-0.5"
@@ -100,7 +100,7 @@ export function SqlCompletionSettings() {
             />
             <span>
               <span className="block font-medium">{t("settings.sqlCompletionOnTyping")}</span>
-              <span className="block text-[11px] text-[var(--taomni-text-muted)]">
+              <span className="block text-ui-small text-[var(--taomni-text-muted)]">
                 {t("settings.sqlCompletionOnTypingHint")}
               </span>
             </span>
@@ -109,14 +109,14 @@ export function SqlCompletionSettings() {
           <div>
             <label
               htmlFor="sql-completion-trigger-shortcut"
-              className="mb-1 block text-[12px] font-medium"
+              className="mb-1 block text-ui-body font-medium"
             >
               {t("settings.sqlCompletionTriggerShortcut")}
             </label>
             <input
               id="sql-completion-trigger-shortcut"
               data-testid="sql-completion-trigger-shortcut"
-              className="taomni-input h-8 w-full max-w-56 font-mono text-[12px]"
+              className="taomni-input h-8 w-full max-w-56 font-mono text-ui-body"
               value={displaySqlShortcut(preferences.triggerShortcut)}
               readOnly
               aria-invalid={shortcutError ? "true" : undefined}
@@ -126,7 +126,7 @@ export function SqlCompletionSettings() {
             />
             <p
               id="sql-completion-shortcut-hint"
-              className={`mt-1 text-[11px] ${shortcutError ? "" : "text-[var(--taomni-text-muted)]"}`}
+              className={`mt-1 text-ui-small ${shortcutError ? "" : "text-[var(--taomni-text-muted)]"}`}
               style={shortcutError ? { color: "var(--taomni-warning, #b45309)" } : undefined}
               data-testid={shortcutError ? "sql-completion-shortcut-error" : undefined}
             >
@@ -138,9 +138,9 @@ export function SqlCompletionSettings() {
         </div>
 
         <div>
-          <div className="mb-2 text-[12px] font-medium">{t("settings.sqlCompletionAcceptHeading")}</div>
+          <div className="mb-2 text-ui-body font-medium">{t("settings.sqlCompletionAcceptHeading")}</div>
           <div className="space-y-2">
-            <label className="flex items-center gap-2 text-[12px]">
+            <label className="flex items-center gap-2 text-ui-body">
               <input
                 data-testid="sql-completion-accept-tab"
                 className="taomni-checkbox"
@@ -151,7 +151,7 @@ export function SqlCompletionSettings() {
               />
               <span>{t("settings.sqlCompletionAcceptTab")}</span>
             </label>
-            <label className="flex items-center gap-2 text-[12px]">
+            <label className="flex items-center gap-2 text-ui-body">
               <input
                 data-testid="sql-completion-accept-enter"
                 className="taomni-checkbox"
@@ -163,7 +163,7 @@ export function SqlCompletionSettings() {
               <span>{t("settings.sqlCompletionAcceptEnter")}</span>
             </label>
           </div>
-          <p className="mt-2 text-[11px] text-[var(--taomni-text-muted)]">
+          <p className="mt-2 text-ui-small text-[var(--taomni-text-muted)]">
             {t("settings.sqlCompletionCursorHint", {
               shortcut: displaySqlShortcut(preferences.triggerShortcut),
             })}

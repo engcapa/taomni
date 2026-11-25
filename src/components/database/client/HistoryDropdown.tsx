@@ -28,7 +28,7 @@ export function HistoryDropdown({
   onClear: () => void;
   onClose: () => void;
 }) {
-  const iconButton = "h-6 px-1.5 inline-flex items-center gap-1 rounded text-[10px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
+  const iconButton = "h-6 px-1.5 inline-flex items-center gap-1 rounded text-ui-caption hover:bg-[var(--taomni-hover)] disabled:opacity-40";
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
@@ -42,8 +42,8 @@ export function HistoryDropdown({
           style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
         >
           <Clock className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
-          <span className="text-[12px] font-semibold">Query history</span>
-          <span className="text-[10px] text-[var(--taomni-text-muted)]">{entries.length}</span>
+          <span className="text-ui-body font-semibold">Query history</span>
+          <span className="text-ui-caption text-[var(--taomni-text-muted)]">{entries.length}</span>
           <div className="flex-1" />
           <button type="button" data-testid="db-query-history-refresh" className={iconButton} onClick={onRefresh} title="Refresh query history">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
@@ -53,11 +53,11 @@ export function HistoryDropdown({
           </button>
         </div>
         {loading ? (
-          <div className="px-3 py-4 text-[11px] text-[var(--taomni-text-muted)] inline-flex items-center gap-2">
+          <div className="px-3 py-4 text-ui-small text-[var(--taomni-text-muted)] inline-flex items-center gap-2">
             <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading query history...
           </div>
         ) : entries.length === 0 ? (
-          <div className="px-3 py-4 text-[11px] text-[var(--taomni-text-muted)]">No query history yet.</div>
+          <div className="px-3 py-4 text-ui-small text-[var(--taomni-text-muted)]">No query history yet.</div>
         ) : (
           <div className="overflow-auto taomni-scroll-y">
             {entries.map((entry) => {
@@ -70,7 +70,7 @@ export function HistoryDropdown({
                   data-testid="db-query-history-entry"
                   className="px-2 py-2 border-b border-[var(--taomni-divider)] last:border-0 hover:bg-[var(--taomni-hover)]"
                 >
-                  <div className="flex items-center gap-2 text-[10px] text-[var(--taomni-text-muted)]">
+                  <div className="flex items-center gap-2 text-ui-caption text-[var(--taomni-text-muted)]">
                     <span className="font-mono">{formatFullDateTime(entry.startedAt)}</span>
                     {duration && <span>{duration}</span>}
                     {entry.hasResultSet ? <span>{entry.rowCount ?? 0} rows</span> : <span>{entry.rowsAffected ?? 0} affected</span>}
@@ -81,7 +81,7 @@ export function HistoryDropdown({
                     {entry.tabName && (
                       <span
                         data-testid="db-query-history-entry-name"
-                        className="shrink-0 max-w-[140px] truncate rounded px-1.5 py-0.5 text-[10px]"
+                        className="shrink-0 max-w-[140px] truncate rounded px-1.5 py-0.5 text-ui-caption"
                         style={{ background: "var(--taomni-selected)", color: "var(--taomni-accent)" }}
                         title={entry.tabName}
                       >
@@ -90,7 +90,7 @@ export function HistoryDropdown({
                     )}
                     <button
                       type="button"
-                      className="flex-1 min-w-0 text-left truncate font-mono text-[11px] text-[var(--taomni-text)]"
+                      className="flex-1 min-w-0 text-left truncate font-mono text-ui-small text-[var(--taomni-text)]"
                       title={entry.sqlContent}
                       onClick={() => onSelect(entry)}
                     >
@@ -98,7 +98,7 @@ export function HistoryDropdown({
                     </button>
                   </div>
                   {entry.error && (
-                    <div className="mt-1 truncate text-[10px] text-[#d9534f]" title={entry.error}>
+                    <div className="mt-1 truncate text-ui-caption text-[#d9534f]" title={entry.error}>
                       {entry.error}
                     </div>
                   )}

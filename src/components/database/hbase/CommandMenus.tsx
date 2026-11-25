@@ -25,7 +25,7 @@ export function CommandsMenu({
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
-        className="absolute left-2 top-9 z-50 w-[360px] max-w-[calc(100vw-24px)] max-h-[min(420px,calc(100vh-48px))] overflow-auto taomni-scroll-y rounded shadow-lg py-1 text-[12px]"
+        className="absolute left-2 top-9 z-50 w-[360px] max-w-[calc(100vw-24px)] max-h-[min(420px,calc(100vh-48px))] overflow-auto taomni-scroll-y rounded shadow-lg py-1 text-ui-body"
         style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)", color: "var(--taomni-text)" }}
       >
         {CATEGORY_ORDER.map((cat) => {
@@ -33,7 +33,7 @@ export function CommandsMenu({
           if (cmds.length === 0) return null;
           return (
             <div key={cat}>
-              <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide text-[var(--taomni-text-muted)]">{CATEGORY_LABEL[cat]}</div>
+              <div className="px-3 pt-2 pb-1 text-ui-caption uppercase tracking-wide text-[var(--taomni-text-muted)]">{CATEGORY_LABEL[cat]}</div>
               {cmds.map((c) => {
                 const supported = commandSupported(c.verb, transport);
                 return (
@@ -47,10 +47,10 @@ export function CommandsMenu({
                   >
                     <span className="flex items-center gap-1.5">
                       <span className="taomni-mono font-semibold">{c.verb}</span>
-                      {c.isWrite && <span className="text-[9px] rounded px-1" style={{ background: "var(--taomni-divider)", color: c.destructive ? "#d9534f" : "var(--taomni-text-muted)" }}>{c.destructive ? "destructive" : "write"}</span>}
-                      {!supported && <span className="text-[9px] text-[var(--taomni-text-muted)]">unsupported</span>}
+                      {c.isWrite && <span className="text-ui-caption rounded px-1" style={{ background: "var(--taomni-divider)", color: c.destructive ? "#d9534f" : "var(--taomni-text-muted)" }}>{c.destructive ? "destructive" : "write"}</span>}
+                      {!supported && <span className="text-ui-caption text-[var(--taomni-text-muted)]">unsupported</span>}
                     </span>
-                    <span className="taomni-mono text-[10px] text-[var(--taomni-text-muted)] truncate">{c.example}</span>
+                    <span className="taomni-mono text-ui-caption text-[var(--taomni-text-muted)] truncate">{c.example}</span>
                   </button>
                 );
               })}
@@ -68,10 +68,10 @@ export function HistoryDropdown({ history, onPick, onClose }: { history: string[
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div className="absolute right-2 top-9 z-50 w-[420px] max-w-[calc(100vw-24px)] max-h-[min(300px,calc(100vh-48px))] overflow-auto rounded shadow-lg taomni-scroll-y flex flex-col" style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}>
         {history.length === 0 ? (
-          <div className="px-3 py-2 text-[11px] text-[var(--taomni-text-muted)]">No command history yet.</div>
+          <div className="px-3 py-2 text-ui-small text-[var(--taomni-text-muted)]">No command history yet.</div>
         ) : (
           history.map((cmd, i) => (
-            <button key={i} type="button" className="text-left px-3 py-2 text-[11px] truncate font-mono hover:bg-[var(--taomni-hover)] border-b border-[var(--taomni-divider)] last:border-0" onClick={() => onPick(cmd)} title={cmd}>
+            <button key={i} type="button" className="text-left px-3 py-2 text-ui-small truncate font-mono hover:bg-[var(--taomni-hover)] border-b border-[var(--taomni-divider)] last:border-0" onClick={() => onPick(cmd)} title={cmd}>
               {cmd.replace(/\s+/g, " ")}
             </button>
           ))
@@ -104,18 +104,18 @@ export function HelpDialog({ transport, onClose }: { transport: HBaseTransport; 
           const cmds = HBASE_COMMANDS.filter((c) => c.category === cat);
           return (
             <div key={cat} className="mb-3">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--taomni-text-muted)] mb-1">{CATEGORY_LABEL[cat]}</div>
-              <table className="w-full text-[12px] border-collapse">
+              <div className="text-ui-caption uppercase tracking-wide text-[var(--taomni-text-muted)] mb-1">{CATEGORY_LABEL[cat]}</div>
+              <table className="w-full text-ui-body border-collapse">
                 <tbody>
                   {cmds.map((c) => {
                     const supported = commandSupported(c.verb, transport);
                     return (
                       <tr key={c.verb} className="border-b" style={{ borderColor: "var(--taomni-divider)", opacity: supported ? 1 : 0.55 }}>
                         <td className="py-1 pr-2 align-top taomni-mono font-semibold whitespace-nowrap">{c.verb}</td>
-                        <td className="py-1 pr-2 align-top taomni-mono text-[11px] text-[var(--taomni-text-muted)]">{c.syntax}</td>
-                        <td className="py-1 align-top text-[11px]">
+                        <td className="py-1 pr-2 align-top taomni-mono text-ui-small text-[var(--taomni-text-muted)]">{c.syntax}</td>
+                        <td className="py-1 align-top text-ui-small">
                           {c.description}
-                          {!supported && <div className="text-[10px]" style={{ color: "#d9534f" }}>{t("hbaseObjects.helpRestNote")}</div>}
+                          {!supported && <div className="text-ui-caption" style={{ color: "#d9534f" }}>{t("hbaseObjects.helpRestNote")}</div>}
                         </td>
                       </tr>
                     );

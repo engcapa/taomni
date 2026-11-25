@@ -28,14 +28,14 @@ export function ScreenshotOverlay() {
         style={{ background: "#141414", color: "#ffffff" }}
       >
         <div className="text-center px-6 max-w-xl">
-          <p data-testid="screenshot-overlay-error" className="mb-4 text-[14px] break-words">
+          <p data-testid="screenshot-overlay-error" className="mb-4 text-ui-title break-words">
             {state.t("screenshot.openFailed", { error: state.loadError })}
           </p>
           <button
             type="button"
             data-testid="screenshot-cancel"
             onClick={state.close}
-            className="rounded-lg px-4 py-1.5 text-[13px]"
+            className="rounded-lg px-4 py-1.5 text-ui-body"
             style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
           >
             {state.t("screenshot.cancel")}

@@ -76,10 +76,10 @@ export function ExternalFileConflictDialog({
         <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3">
           <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-semibold text-[var(--taomni-code-text)]">
+            <div className="truncate text-ui-body font-semibold text-[var(--taomni-code-text)]">
               File changed outside the editor
             </div>
-            <div className="truncate text-[10px] text-[var(--taomni-code-muted)]" title={path}>
+            <div className="truncate text-ui-caption text-[var(--taomni-code-muted)]" title={path}>
               {path}
             </div>
           </div>
@@ -98,43 +98,43 @@ export function ExternalFileConflictDialog({
           <>
             <div className="grid min-h-0 flex-1 grid-cols-1 overflow-auto md:grid-cols-3 md:overflow-hidden">
               <section className="flex min-h-[180px] flex-col border-b border-[var(--taomni-code-border)] md:min-h-0 md:border-b-0 md:border-r">
-                <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2 text-[11px] font-semibold">
+                <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2 text-ui-small font-semibold">
                   Local changes - {lineCount(localText)} lines
                 </div>
-                <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-[11px] leading-5 text-[var(--taomni-code-text)]">
+                <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-ui-small leading-5 text-[var(--taomni-code-text)]">
                   {localText}
                 </pre>
               </section>
               <section className="flex min-h-[180px] flex-col border-b border-[var(--taomni-code-border)] md:min-h-0 md:border-b-0 md:border-r">
-                <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2 text-[11px] font-semibold">
+                <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2 text-ui-small font-semibold">
                   Disk version - {lineCount(diskText)} lines
                 </div>
-                <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-[11px] leading-5 text-[var(--taomni-code-text)]">
+                <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-ui-small leading-5 text-[var(--taomni-code-text)]">
                   {diskText}
                 </pre>
               </section>
               <section className="flex min-h-[240px] flex-col md:min-h-0">
-                <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2 text-[11px] font-semibold">
+                <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2 text-ui-small font-semibold">
                   Merge result - {lineCount(mergeText)} lines
                 </div>
                 <textarea
                   aria-label="Merge result"
                   value={mergeText}
                   spellCheck={false}
-                  className="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-[11px] leading-5 text-[var(--taomni-code-text)] outline-none"
+                  className="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-ui-small leading-5 text-[var(--taomni-code-text)] outline-none"
                   onChange={(event) => setMergeText(event.target.value)}
                 />
               </section>
             </div>
             <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-3 py-2">
-              <div className="mr-auto min-w-0 text-[10px] text-[var(--taomni-code-muted)]">
+              <div className="mr-auto min-w-0 text-ui-caption text-[var(--taomni-code-muted)]">
                 {mergeText.includes("<<<<<<< LOCAL")
                   ? "Resolve the conflict markers before saving the merged result."
                   : "Review the merged result before applying it."}
               </div>
               <button
                 type="button"
-                className="inline-flex h-8 items-center gap-1.5 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+                className="inline-flex h-8 items-center gap-1.5 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
                 onClick={() => setMergeOpen(false)}
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
@@ -142,7 +142,7 @@ export function ExternalFileConflictDialog({
               </button>
               <button
                 type="button"
-                className="inline-flex h-8 items-center gap-1.5 rounded bg-[var(--taomni-accent)] px-3 text-[11px] font-medium text-white hover:brightness-110"
+                className="inline-flex h-8 items-center gap-1.5 rounded bg-[var(--taomni-accent)] px-3 text-ui-small font-medium text-white hover:brightness-110"
                 onClick={() => onApplyMerge(mergeText)}
               >
                 <GitMerge className="h-3.5 w-3.5" />
@@ -152,22 +152,22 @@ export function ExternalFileConflictDialog({
           </>
         ) : (
           <>
-            <div className="min-h-0 flex-1 overflow-auto px-4 py-4 text-[12px] leading-5 text-[var(--taomni-code-text)]">
+            <div className="min-h-0 flex-1 overflow-auto px-4 py-4 text-ui-body leading-5 text-[var(--taomni-code-text)]">
               {diskText == null
                 ? "The file was deleted on disk while this editor has unsaved changes."
                 : "The disk version and this editor buffer both changed since the last save."}
               <div className="mt-3 grid grid-cols-1 gap-px overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-border)] sm:grid-cols-3">
                 <div className="bg-[var(--taomni-code-bg)] px-3 py-2">
-                  <div className="text-[10px] text-[var(--taomni-code-muted)]">Saved baseline</div>
-                  <div className="mt-1 font-mono text-[11px]">{lineCount(baseText)} lines</div>
+                  <div className="text-ui-caption text-[var(--taomni-code-muted)]">Saved baseline</div>
+                  <div className="mt-1 font-mono text-ui-small">{lineCount(baseText)} lines</div>
                 </div>
                 <div className="bg-[var(--taomni-code-bg)] px-3 py-2">
-                  <div className="text-[10px] text-[var(--taomni-code-muted)]">Local buffer</div>
-                  <div className="mt-1 font-mono text-[11px]">{lineCount(localText)} lines</div>
+                  <div className="text-ui-caption text-[var(--taomni-code-muted)]">Local buffer</div>
+                  <div className="mt-1 font-mono text-ui-small">{lineCount(localText)} lines</div>
                 </div>
                 <div className="bg-[var(--taomni-code-bg)] px-3 py-2">
-                  <div className="text-[10px] text-[var(--taomni-code-muted)]">Disk</div>
-                  <div className="mt-1 font-mono text-[11px]">
+                  <div className="text-ui-caption text-[var(--taomni-code-muted)]">Disk</div>
+                  <div className="mt-1 font-mono text-ui-small">
                     {diskText == null ? "Deleted" : `${lineCount(diskText)} lines`}
                   </div>
                 </div>
@@ -176,14 +176,14 @@ export function ExternalFileConflictDialog({
             <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-3 py-2">
               <button
                 type="button"
-                className="h-8 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+                className="h-8 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
                 onClick={onCancel}
               >
                 Decide Later
               </button>
               <button
                 type="button"
-                className="inline-flex h-8 items-center gap-1.5 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+                className="inline-flex h-8 items-center gap-1.5 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
                 onClick={onLoadDisk}
               >
                 {diskText == null
@@ -194,7 +194,7 @@ export function ExternalFileConflictDialog({
               {diskText != null && (
                 <button
                   type="button"
-                  className="inline-flex h-8 items-center gap-1.5 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+                  className="inline-flex h-8 items-center gap-1.5 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
                   onClick={() => setMergeOpen(true)}
                 >
                   <GitMerge className="h-3.5 w-3.5" />
@@ -204,7 +204,7 @@ export function ExternalFileConflictDialog({
               <button
                 ref={primaryRef}
                 type="button"
-                className="h-8 rounded bg-[var(--taomni-accent)] px-3 text-[11px] font-medium text-white hover:brightness-110"
+                className="h-8 rounded bg-[var(--taomni-accent)] px-3 text-ui-small font-medium text-white hover:brightness-110"
                 onClick={onKeepLocal}
               >
                 Keep Local

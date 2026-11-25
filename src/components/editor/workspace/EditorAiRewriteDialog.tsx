@@ -57,8 +57,8 @@ export function EditorAiRewriteDialog({
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3">
           <Sparkles className="h-4 w-4 text-[var(--taomni-accent)]" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-semibold text-[var(--taomni-code-text)]">AI rewrite preview</div>
-            <div className="truncate text-[10px] text-[var(--taomni-code-muted)]">{path}</div>
+            <div className="truncate text-ui-body font-semibold text-[var(--taomni-code-text)]">AI rewrite preview</div>
+            <div className="truncate text-ui-caption text-[var(--taomni-code-muted)]">{path}</div>
           </div>
           <button
             type="button"
@@ -72,17 +72,17 @@ export function EditorAiRewriteDialog({
 
         <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2 space-y-2">
           <div>
-            <label className="mb-1 block text-[10px] text-[var(--taomni-code-muted)]">Instruction</label>
+            <label className="mb-1 block text-ui-caption text-[var(--taomni-code-muted)]">Instruction</label>
             <div className="flex gap-2">
               <input
                 value={instruction}
                 onChange={(event) => onInstructionChange(event.target.value)}
-                className="h-8 min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 text-[11px] text-[var(--taomni-code-text)] outline-none"
+                className="h-8 min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 text-ui-small text-[var(--taomni-code-text)] outline-none"
                 placeholder="e.g. simplify this function and keep behavior"
               />
               <button
                 type="button"
-                className="h-8 rounded px-2 text-[11px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
+                className="h-8 rounded px-2 text-ui-small text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                 disabled={busy}
                 onClick={onRegenerate}
               >
@@ -91,21 +91,21 @@ export function EditorAiRewriteDialog({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-[10px] text-[var(--taomni-code-muted)]">Proposal code (paste AI result)</label>
+            <label className="mb-1 block text-ui-caption text-[var(--taomni-code-muted)]">Proposal code (paste AI result)</label>
             <textarea
               data-testid="code-workspace-ai-rewrite-proposal"
               value={proposal}
               onChange={(event) => onProposalChange(event.target.value)}
               rows={5}
-              className="w-full resize-y rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 font-mono text-[11px] text-[var(--taomni-code-text)] outline-none"
+              className="w-full resize-y rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 font-mono text-ui-small text-[var(--taomni-code-text)] outline-none"
             />
           </div>
-          <p className="text-[10px] text-[var(--taomni-code-muted)]">
+          <p className="text-ui-caption text-[var(--taomni-code-muted)]">
             Stages a rewrite/fix prompt into AI chat with the selection context. Paste the returned code into the proposal box, review the diff, then apply.
           </p>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto font-mono text-[11px] leading-5">
+        <div className="min-h-0 flex-1 overflow-auto font-mono text-ui-small leading-5">
           {previewLines.map((line, index) => (
             <div
               key={`${line.kind}:${index}`}
@@ -128,7 +128,7 @@ export function EditorAiRewriteDialog({
         <div className="shrink-0 flex items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-3 py-2">
           <button
             type="button"
-            className="h-7 rounded px-2 text-[11px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            className="h-7 rounded px-2 text-ui-small text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={onClose}
           >
             Cancel
@@ -136,7 +136,7 @@ export function EditorAiRewriteDialog({
           <button
             type="button"
             data-testid="code-workspace-ai-rewrite-apply"
-            className="h-7 rounded bg-[var(--taomni-accent)] px-2 text-[11px] text-white disabled:opacity-40"
+            className="h-7 rounded bg-[var(--taomni-accent)] px-2 text-ui-small text-white disabled:opacity-40"
             disabled={busy || proposal === original}
             onClick={onApply}
           >

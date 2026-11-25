@@ -92,7 +92,7 @@ export function NotesSelect({
           return next;
         })}
       >
-        <span className="truncate text-[11px] font-medium leading-none">
+        <span className="truncate text-ui-small font-medium leading-none">
           {selected?.label}
         </span>
         <ChevronDown className="w-3 h-3 flex-shrink-0 opacity-70" style={{ color: selectColor }} />
@@ -111,7 +111,7 @@ export function NotesSelect({
           {groupedOptions.map((group, groupIdx) => (
             <div key={group.group ?? `__ungrouped_${groupIdx}`} className="flex flex-col gap-0.5">
               {group.group && (
-                <div className="px-2 pt-1 pb-0.5 text-[9px] font-semibold uppercase opacity-60 tracking-wider text-[var(--taomni-text-muted)]">
+                <div className="px-2 pt-1 pb-0.5 text-ui-caption font-semibold uppercase opacity-60 tracking-wider text-[var(--taomni-text-muted)]">
                   {group.group}
                 </div>
               )}
@@ -123,7 +123,7 @@ export function NotesSelect({
                     type="button"
                     role="option"
                     aria-selected={isSelected}
-                    className="w-full h-6 px-1.5 text-left text-[11px] rounded flex items-center select-none cursor-pointer hover:bg-[var(--taomni-hover)] focus:bg-[var(--taomni-hover)] outline-none"
+                    className="w-full h-6 px-1.5 text-left text-ui-small rounded flex items-center select-none cursor-pointer hover:bg-[var(--taomni-hover)] focus:bg-[var(--taomni-hover)] outline-none"
                     style={{
                       backgroundColor: isSelected ? "var(--taomni-selected)" : "transparent",
                       color: isSelected ? "var(--taomni-accent)" : selectColor,

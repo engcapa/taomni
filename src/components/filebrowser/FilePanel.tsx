@@ -217,7 +217,7 @@ export function FilePanel({
 
   if (!pane) {
     return (
-      <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+      <div className="flex-1 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
         {t("fileBrowser.paneNotInitialized")}
       </div>
     );

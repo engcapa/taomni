@@ -70,12 +70,12 @@ export function ScreenshotSettings() {
       <div className="mb-3 flex items-center gap-3">
         <Camera className="w-4 h-4 text-[var(--taomni-accent)]" />
         <div>
-          <div className="text-[14px] font-semibold">{t("settings.screenshotTitle")}</div>
-          <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("settings.screenshotSubtitle")}</div>
+          <div className="text-ui-title font-semibold">{t("settings.screenshotTitle")}</div>
+          <div className="text-ui-body text-[var(--taomni-text-muted)]">{t("settings.screenshotSubtitle")}</div>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span id="screenshot-shortcut-label" className="text-[12px] font-medium text-[var(--taomni-text-muted)]">
+        <span id="screenshot-shortcut-label" className="text-ui-body font-medium text-[var(--taomni-text-muted)]">
           {t("settings.screenshotShortcut")}
         </span>
         <button
@@ -90,7 +90,7 @@ export function ScreenshotSettings() {
           }}
           onKeyDown={onKeyDown}
           onBlur={() => setRecording(false)}
-          className="taomni-input h-8 min-w-40 px-3 text-left font-mono text-[13px]"
+          className="taomni-input h-8 min-w-40 px-3 text-left font-mono text-ui-body"
           style={recording ? { outline: "2px solid var(--taomni-accent)" } : undefined}
         >
           {recording ? t("settings.screenshotPressKeys") : label}
@@ -99,7 +99,7 @@ export function ScreenshotSettings() {
           type="button"
           data-testid="settings-screenshot-shortcut-reset"
           onClick={() => void apply(null)}
-          className="h-8 rounded px-3 text-[12px] hover:bg-[var(--taomni-hover)] border border-[var(--taomni-divider)]"
+          className="h-8 rounded px-3 text-ui-body hover:bg-[var(--taomni-hover)] border border-[var(--taomni-divider)]"
         >
           {t("settings.screenshotReset", { shortcut: formatAccelerator(status.defaultAccelerator, IS_MAC) })}
         </button>
@@ -108,12 +108,12 @@ export function ScreenshotSettings() {
           data-testid="settings-screenshot-shortcut-disable"
           onClick={() => void apply("")}
           disabled={!status.enabled}
-          className="h-8 rounded px-3 text-[12px] hover:bg-[var(--taomni-hover)] border border-[var(--taomni-divider)] disabled:opacity-40"
+          className="h-8 rounded px-3 text-ui-body hover:bg-[var(--taomni-hover)] border border-[var(--taomni-divider)] disabled:opacity-40"
         >
           {t("settings.screenshotDisable")}
         </button>
       </div>
-      <p data-testid="settings-screenshot-shortcut-status" className="mt-2 text-[12px] text-[var(--taomni-text-muted)]">
+      <p data-testid="settings-screenshot-shortcut-status" className="mt-2 text-ui-body text-[var(--taomni-text-muted)]">
         {!status.enabled
           ? t("settings.screenshotStatusDisabled")
           : !native
@@ -123,16 +123,16 @@ export function ScreenshotSettings() {
               : t("settings.screenshotStatusFallback", { error: status.error ?? "" })}
       </p>
       {error && (
-        <p data-testid="settings-screenshot-shortcut-error" role="alert" className="mt-1 text-[12px]" style={{ color: "#ff6b6b" }}>
+        <p data-testid="settings-screenshot-shortcut-error" role="alert" className="mt-1 text-ui-body" style={{ color: "#ff6b6b" }}>
           {error}
         </p>
       )}
       {probe && (
-        <p data-testid="settings-screenshot-probe" className="mt-2 text-[12px] text-[var(--taomni-text-muted)]">
+        <p data-testid="settings-screenshot-probe" className="mt-2 text-ui-body text-[var(--taomni-text-muted)]">
           {probe.summary}
         </p>
       )}
-      <p className="mt-2 text-[12px] text-[var(--taomni-text-muted)]">
+      <p className="mt-2 text-ui-body text-[var(--taomni-text-muted)]">
         {t("settings.screenshotCurrentWindowHint", { shortcut: CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL })}
       </p>
     </section>

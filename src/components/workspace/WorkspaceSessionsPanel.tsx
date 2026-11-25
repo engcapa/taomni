@@ -69,7 +69,7 @@ export function WorkspaceSessionsPanel({ workspace, onOpenSessionPicker, onOpenS
       }}
     >
       <span
-        className="shrink-0 rounded px-1 text-[9px] uppercase"
+        className="shrink-0 rounded px-1 text-ui-caption uppercase"
         style={{ border: "1px solid var(--taomni-divider)", color: "var(--taomni-text-muted)" }}
       >
         {session.session_type.slice(0, 4)}
@@ -77,7 +77,7 @@ export function WorkspaceSessionsPanel({ workspace, onOpenSessionPicker, onOpenS
       <span className="min-w-0 flex-1 truncate" style={{ fontSize: "var(--taomni-ui-font-size)" }}>
         {session.name || session.host}
       </span>
-      <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">
+      <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">
         {isOpen(session.id) ? "●" : session.host}
       </span>
       <button
@@ -132,7 +132,7 @@ export function WorkspaceSessionsPanel({ workspace, onOpenSessionPicker, onOpenS
             type="button"
             data-testid={`workspace-session-filter-${entry.toLowerCase()}`}
             aria-pressed={filter === entry}
-            className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+            className="rounded px-1.5 py-0.5 text-ui-caption font-semibold"
             style={{
               border: "1px solid var(--taomni-divider)",
               background: filter === entry ? "var(--taomni-selected)" : "transparent",
@@ -145,12 +145,12 @@ export function WorkspaceSessionsPanel({ workspace, onOpenSessionPicker, onOpenS
         ))}
       </div>
       <div className="min-h-0 flex-1 overflow-auto pb-2">
-        <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
+        <div className="px-2 py-1 text-ui-caption font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
           {t("platform.frequentSessions")} ({pinned.length})
         </div>
-        {pinned.length === 0 && <div className="px-2 text-[10.5px] text-[var(--taomni-text-muted)]">—</div>}
+        {pinned.length === 0 && <div className="px-2 text-ui-caption text-[var(--taomni-text-muted)]">—</div>}
         {pinned.map(row)}
-        <div className="mt-1 border-t px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
+        <div className="mt-1 border-t px-2 py-1 text-ui-caption font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
           {t("platform.allSessions")} ({all.length})
         </div>
         {all.map(row)}

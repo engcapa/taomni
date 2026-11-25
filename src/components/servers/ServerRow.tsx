@@ -71,7 +71,7 @@ export function ServerRow({
           flexShrink: 0,
         }}
       />
-      <span className="flex-1 min-w-0 truncate text-[12px]" title={name}>
+      <span className="flex-1 min-w-0 truncate text-ui-body" title={name}>
         {name}
       </span>
       <div className="flex items-center gap-0.5 shrink-0">
