@@ -1,0 +1,60 @@
+name: Paired modular terminal and installer measurements
+on:
+  push:
+    branches: ['qa/modular-io/*']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+      QA_OPERATION: run
+      QA_LINUX_PROFILE: ubuntu-24.04-xvfb
+      QA_CAPABILITIES: display,x11
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch the two official release installers and the candidate's signed workload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pair="${GITHUB_REF_NAME##*/}"
+          [[ "$pair" =~ ^([1-9][0-9]*)-([1-9][0-9]*)$ ]]
+          baseline_run="${BASH_REMATCH[1]}"
+          candidate_run="${BASH_REMATCH[2]}"
+          for group in baseline candidate; do
+            run="$baseline_run"
+            if [[ "$group" == candidate ]]; then run="$candidate_run"; fi
+            mkdir "$group"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" --jq '{id,head_sha,path,event,conclusion,repository:.repository.full_name}' > "$group/producer.json"
+            jq -e --arg repo "$GITHUB_REPOSITORY" '.repository == $repo and .path == ".github/workflows/release.yml" and .event == "workflow_dispatch" and .conclusion == "success"' "$group/producer.json"
+            gh run download "$run" --pattern 'taomni-*-ubuntu-22.04' --dir "$group/bundles"
+            mapfile -t packages < <(find "$group/bundles" -name '*.deb' -type f)
+            test "${#packages[@]}" = 1
+            mv "${packages[0]}" "$group/"
+          done
+          gh run download "$candidate_run" -n "module-signed-mfa-linux-x86_64-$candidate_run" -D module
+      - name: Prepare the production X11 adapter
+        run: |
+          python -m pip install -r .agents/skills/qa-ui-auto/requirements-ci.txt psutil==7.2.2
+          bash .agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh
+          cargo install tauri-driver --version 2.0.4 --locked
+      - name: Alternate the production DEBs on the same desktop
+        run: |
+          dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1080x24 -nolisten tcp -noreset' \
+            python .agents/skills/qa-ui-auto/scripts/modular_io_comparison.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: paired-terminal-install-${{ github.run_id }}
+          path: ac13-report/
+          if-no-files-found: warn
