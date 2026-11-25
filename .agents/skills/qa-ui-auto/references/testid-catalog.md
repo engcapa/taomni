@@ -4776,6 +4776,8 @@
 - `[data-testid="vnc-menu-send-f8"]` — interactive [optional] — F9.6.menu-send-f8
 - `[data-testid="vnc-session-info"]` — display [optional] — F9.6.session-info
 - `[data-testid="vnc-reconnect"]` — interactive [optional] — F9.6.reconnect
+  ↳ `[data-testid="vnc-overlay-disconnected"] [data-testid="vnc-reconnect"]` — alias
+- `[data-testid="vnc-connect-stop"]` — interactive [optional] — F9.6.connect-stop
 - `[data-testid="vnc-reconnect-stop"]` — interactive [optional] — F9.6.reconnect-stop
 - `[data-testid="vnc-unencrypted-continue"]` — interactive [optional] — F9.6.unencrypted-continue
 - `[data-testid="vnc-auth-password"]` — interactive [optional] — F9.6.vnc-auth-password
