@@ -90,7 +90,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(180px,1fr)_minmax(220px,1fr)] divide-x divide-[var(--taomni-code-border)]">
         <div className="min-h-0 min-w-0 overflow-auto p-2">
-          {configurations.error && <div className="mb-2 text-red-500">{configurations.error}</div>}
+          {configurations.error && <div className="mb-2 text-ui-danger">{configurations.error}</div>}
           {Object.values(configurations.executionDiagnostics).some((items) => items.length > 0) && (
             <div
               data-testid="run-panel-execution-diagnostics"

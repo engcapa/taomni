@@ -309,7 +309,7 @@ export function GitPanelView(inputs: GitPanelViewProps) {
           </button>
         ))}
         {(busy || loading) && <Loader2 className="w-3.5 h-3.5 animate-spin ml-1" />}
-        {error && <span className="ml-2 text-ui-small text-red-500 truncate">{error}</span>}
+        {error && <span className="ml-2 text-ui-small text-ui-danger truncate">{error}</span>}
       </nav>
 
       {(operation && operation.kind !== "none") || hasConflicts ? (

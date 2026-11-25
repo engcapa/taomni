@@ -411,7 +411,7 @@ export function HierarchyPanel({
         )}
       </div>
       <div className="min-h-0 flex-1 overflow-auto py-1">
-        {error && <div className="mx-2 rounded bg-red-500/10 p-2 text-red-500">{error}</div>}
+        {error && <div className="mx-2 rounded bg-ui-danger-surface p-2 text-ui-danger">{error}</div>}
         {!tree && !error && (
           <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
             Place the cursor on a supported symbol and open {mode} hierarchy.

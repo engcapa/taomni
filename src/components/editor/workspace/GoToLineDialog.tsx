@@ -79,7 +79,7 @@ export function GoToLineDialog({ current, lineCount, onGo, onCancel, restoreFocu
           }}
         />
         {!target && (
-          <div role="alert" data-testid="code-workspace-goto-line-error" className="mt-1 text-ui-small text-red-500">
+          <div role="alert" data-testid="code-workspace-goto-line-error" className="mt-1 text-ui-small text-ui-danger">
             Enter a line between 1 and {Math.max(1, lineCount)}, optionally followed by :column
           </div>
         )}

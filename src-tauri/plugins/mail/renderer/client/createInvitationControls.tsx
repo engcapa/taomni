@@ -63,7 +63,7 @@ export function createInvitationControls(context: CreateInvitationControlsContex
     const invite = view.invite;
     if (!invite) {
       return view.error ? (
-        <div className="mx-4 mt-3 text-ui-body text-red-500" data-testid="mail-invite-error">{view.error}</div>
+        <div className="mx-4 mt-3 text-ui-body text-ui-danger" data-testid="mail-invite-error">{view.error}</div>
       ) : null;
     }
     const cancelled = invite.method === "CANCEL" || invite.status === "CANCELLED";
@@ -171,8 +171,8 @@ export function createInvitationControls(context: CreateInvitationControlsContex
             <span className="text-[var(--taomni-text-muted)]" data-testid="mail-invite-in-calendar">In your calendar</span>
           )}
         </div>
-        {view.error && <div className="mt-1 text-red-500" data-testid="mail-invite-error">{view.error}</div>}
-        {view.calendarError && <div className="mt-1 text-red-500" data-testid="mail-invite-calendar-error">{view.calendarError}</div>}
+        {view.error && <div className="mt-1 text-ui-danger" data-testid="mail-invite-error">{view.error}</div>}
+        {view.calendarError && <div className="mt-1 text-ui-danger" data-testid="mail-invite-calendar-error">{view.calendarError}</div>}
       </div>
     );
   };

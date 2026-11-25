@@ -131,7 +131,7 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
                     </td>
                     <td className="py-1.5 px-2">
                       {rec.decision === "proxy" && (
-                        <span className="px-1.5 py-0.5 rounded text-ui-caption font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                        <span className="px-1.5 py-0.5 rounded text-ui-caption font-semibold bg-ui-info-surface text-ui-info  border border-ui-info-border">
                           PROXY
                         </span>
                       )}
@@ -141,7 +141,7 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
                         </span>
                       )}
                       {rec.decision === "block" && (
-                        <span className="px-1.5 py-0.5 rounded text-ui-caption font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                        <span className="px-1.5 py-0.5 rounded text-ui-caption font-semibold bg-ui-danger-surface text-ui-danger  border border-ui-danger-border">
                           BLOCK
                         </span>
                       )}

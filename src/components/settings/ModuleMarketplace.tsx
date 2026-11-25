@@ -50,7 +50,7 @@ export function ModuleMarketplace() {
         onChange={(event) => setSource(event.target.value)} className="taomni-input w-full text-ui-body" />
     </details>
     {state.loading && <p data-testid="module-marketplace-loading" className="my-2 text-ui-body">{t("plugins.marketLoading")}</p>}
-    {state.error && <p data-testid="module-marketplace-error" role="alert" className="my-2 text-ui-body text-red-500">{state.error}</p>}
+    {state.error && <p data-testid="module-marketplace-error" role="alert" className="my-2 text-ui-body text-ui-danger">{state.error}</p>}
     {state.catalog && <p data-testid="module-marketplace-checked" className="my-2 text-ui-small text-[var(--taomni-text-muted)]">
       {t("plugins.marketChecked", { date: state.catalog.catalog.updatedAt })}
       {state.catalogSource && <span className="block break-all">{t("plugins.marketCatalogSource", { source: state.catalogSource })}</span>}
@@ -86,7 +86,7 @@ export function ModuleMarketplace() {
             && <p>{t("plugins.marketMailRestartRequired")}</p>}
           {legacyPending && release?.legacyImportFailed?.includes(entry.id)
             && <p role="alert" data-testid="module-marketplace-mail-import-failed">{t("plugins.marketMailImportFailed")}</p>}
-          {state.errors[entry.id] && <p data-testid="module-marketplace-action-error" role="alert" className="my-2 text-red-500">{state.errors[entry.id]}</p>}
+          {state.errors[entry.id] && <p data-testid="module-marketplace-action-error" role="alert" className="my-2 text-ui-danger">{state.errors[entry.id]}</p>}
           <div className="mt-2 flex gap-2">
             {legacyPending && !installedVersion ? <button type="button" data-testid="module-marketplace-provision" className="taomni-btn"
               disabled={!!busy || !asset || !compatible} onClick={() => { void state.provision(entry.id, true); }}>

@@ -182,7 +182,7 @@ export function ObjectStorageBrowser({ sessionId, config, title }: ObjectStorage
       >
         <span className="font-semibold">{title ?? providerLabel}</span>
         <span style={{ color: "var(--taomni-text-muted)" }}>{providerLabel}</span>
-        {session?.error && <span className="text-red-500 truncate">{session.error}</span>}
+        {session?.error && <span className="text-ui-danger truncate">{session.error}</span>}
       </div>
       <div className="flex-1 min-h-0">
         <PanelGroup orientation="horizontal" id={`oss-browser-${sessionId}`}>

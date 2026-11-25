@@ -106,7 +106,7 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
                     <label className="flex items-center gap-1.5 text-xs font-medium text-[var(--taomni-text-muted)]">
                       <ShieldCheck className="h-3.5 w-3.5 text-[var(--taomni-accent)]" />
                       <span>{t("backupSettings.restoreVaultPasswordLabel")}</span>
-                      <span className="text-red-500">*</span>
+                      <span className="text-ui-danger">*</span>
                     </label>
                     <input
                       type="password"
@@ -137,7 +137,7 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
                 )}
 
                 {inspectError && (
-                  <div role="alert" data-testid="backup-restore-error" className="text-xs text-red-500 bg-red-500/10 p-2.5 rounded border border-red-500/20 flex items-center gap-2">
+                  <div role="alert" data-testid="backup-restore-error" className="text-xs text-ui-danger bg-ui-danger-surface p-2.5 rounded border border-ui-danger-border flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                     <span>{displayError}</span>
                   </div>
@@ -146,7 +146,7 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
             ) : (
               <div className="space-y-3">
                 {inspectError && (
-                  <div className="text-xs text-red-500 bg-red-500/10 p-2.5 rounded border border-red-500/20">
+                  <div className="text-xs text-ui-danger bg-ui-danger-surface p-2.5 rounded border border-ui-danger-border">
                     {displayError}
                   </div>
                 )}

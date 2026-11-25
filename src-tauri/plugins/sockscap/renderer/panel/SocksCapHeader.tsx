@@ -92,17 +92,17 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
           </span>
         )}
         {viewProps.helper?.running && (
-          <span className="hidden 2xl:inline shrink-0 font-mono text-emerald-600 dark:text-emerald-400">
+          <span className="hidden 2xl:inline shrink-0 font-mono text-ui-success">
             Helper {viewProps.helper.pid}
           </span>
         )}
         {viewProps.running && (
           <span className="hidden 2xl:inline-flex items-center gap-2 shrink-0 font-mono">
-            <span className="inline-flex items-center gap-0.5 text-emerald-500">
+            <span className="inline-flex items-center gap-0.5 text-ui-success">
               <ArrowUpRight className="w-3 h-3" />
               {formatSpeed(viewProps.upSpeed)}
             </span>
-            <span className="inline-flex items-center gap-0.5 text-sky-500">
+            <span className="inline-flex items-center gap-0.5 text-ui-info">
               <ArrowDownLeft className="w-3 h-3" />
               {formatSpeed(viewProps.downSpeed)}
             </span>
@@ -113,7 +113,7 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
     {viewProps.locked && (
       <div
         data-testid="sockscap-locked-banner"
-        className="min-w-0 max-w-[400px] flex items-center gap-1.5 text-ui-small text-sky-700 dark:text-sky-400"
+        className="min-w-0 max-w-[400px] flex items-center gap-1.5 text-ui-small text-ui-info"
         title={viewProps.t(
           viewProps.linuxLaunchOnly ? "sockscap.rootlessLockedHint" : "sockscap.lockedHint",
         )}
@@ -128,7 +128,7 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
       <button
         type="button"
         data-testid="sockscap-tun-warning"
-        className="p-1.5 rounded text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
+        className="p-1.5 rounded text-ui-warning bg-ui-warning-surface hover:bg-ui-warning-surface"
         title={viewProps.t("sockscap.tunConflictWarning", { adapters: viewProps.tunConflicts.join(", ") })}
         aria-label={viewProps.t("sockscap.tunConflictTitle")}
         onClick={() => viewProps.setTunWarningOpen(true)}

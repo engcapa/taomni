@@ -103,7 +103,7 @@ export function RulesSection(viewProps: RulesSectionProps) {
                 </span>
                 <IconButton labelKey="removeRule"
                   type="button"
-                  className="p-1 hover:text-red-500"
+                  className="p-1 hover:text-ui-danger"
                   onClick={() =>
                     void viewProps.patchSelectedProfile({
                       userRules: viewProps.selectedProf.userRules.filter((_, i) => i !== idx),

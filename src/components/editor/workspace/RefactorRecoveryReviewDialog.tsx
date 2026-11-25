@@ -222,7 +222,7 @@ export function RefactorRecoveryReviewDialog({
             </div>
           )}
           {error && (
-            <div className="mb-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-ui-small text-red-300" role="alert">
+            <div className="mb-2 rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1.5 text-ui-small text-ui-danger" role="alert">
               {error}
             </div>
           )}

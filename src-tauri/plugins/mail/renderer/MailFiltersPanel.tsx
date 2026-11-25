@@ -425,17 +425,17 @@ export function MailFiltersPanel({ accountId, folders, currentFolder, initialDra
           <Download className="w-3.5 h-3.5" />
         </button>
       </div>
-      {error && <div className="px-3 py-1.5 text-red-500 border-b border-[var(--taomni-divider)]" data-testid="mail-filters-error">{error}</div>}
+      {error && <div className="px-3 py-1.5 text-ui-danger border-b border-[var(--taomni-divider)]" data-testid="mail-filters-error">{error}</div>}
       {recentErrors.length > 0 && (
         <div className="px-3 py-1.5 border-b border-[var(--taomni-divider)]" data-testid="mail-filters-recent-errors">
           <div className="text-[var(--taomni-text-muted)]">Last run on new mail: these actions failed and the messages stayed where they were.</div>
-          {recentErrors.map((message) => <div key={message} className="text-red-500">{message}</div>)}
+          {recentErrors.map((message) => <div key={message} className="text-ui-danger">{message}</div>)}
         </div>
       )}
       {lastRun && (
         <div className="px-3 py-1.5 border-b border-[var(--taomni-divider)] text-[var(--taomni-text-muted)]" data-testid="mail-filters-last-run">
           {runSummary(lastRun)}
-          {lastRun.errors.map((message) => <div key={message} className="text-red-500">{message}</div>)}
+          {lastRun.errors.map((message) => <div key={message} className="text-ui-danger">{message}</div>)}
         </div>
       )}
       <div className="flex-1 min-h-0 overflow-auto p-2">

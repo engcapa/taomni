@@ -70,7 +70,7 @@ export function GitCloneFields({
           />
           <p className="mt-1 text-ui-small text-[var(--taomni-text-muted)]">{t("gitClone.urlHint")}</p>
           {errorText(t, errors.url, "gitClone.urlErrors") && (
-            <p data-testid="workspace-git-clone-url-error" role="alert" className="mt-1 text-ui-small text-red-500">
+            <p data-testid="workspace-git-clone-url-error" role="alert" className="mt-1 text-ui-small text-ui-danger">
               {errorText(t, errors.url, "gitClone.urlErrors")}
             </p>
           )}
@@ -92,7 +92,7 @@ export function GitCloneFields({
               onChange={(event) => onChange({ name: event.target.value, nameTouched: true })}
             />
             {errorText(t, errors.name, "gitClone.nameErrors") && (
-              <p data-testid="workspace-git-clone-name-error" role="alert" className="mt-1 text-ui-small text-red-500">
+              <p data-testid="workspace-git-clone-name-error" role="alert" className="mt-1 text-ui-small text-ui-danger">
                 {errorText(t, errors.name, "gitClone.nameErrors")}
               </p>
             )}
@@ -132,7 +132,7 @@ export function GitCloneFields({
               </button>
             </div>
             {errorText(t, errors.branch, "gitClone.branchErrors") && (
-              <p data-testid="workspace-git-clone-branch-error" role="alert" className="mt-1 text-ui-small text-red-500">
+              <p data-testid="workspace-git-clone-branch-error" role="alert" className="mt-1 text-ui-small text-ui-danger">
                 {errorText(t, errors.branch, "gitClone.branchErrors")}
               </p>
             )}
@@ -173,7 +173,7 @@ export function GitCloneFields({
           </div>
           <p className="mt-1 text-ui-small text-[var(--taomni-text-muted)]">{t("gitClone.locationHint")}</p>
           {errorText(t, errors.location, "gitClone.locationErrors") && (
-            <p data-testid="workspace-git-clone-location-error" role="alert" className="mt-1 text-ui-small text-red-500">
+            <p data-testid="workspace-git-clone-location-error" role="alert" className="mt-1 text-ui-small text-ui-danger">
               {errorText(t, errors.location, "gitClone.locationErrors")}
             </p>
           )}
@@ -276,7 +276,7 @@ export function GitCloneFields({
           </p>
         )}
         {form.proxyMode === "custom" && errorText(t, errors.proxy, "gitClone.proxyErrors") && (
-          <p data-testid="workspace-git-clone-proxy-invalid" role="alert" className="mt-1 text-ui-small text-red-500">
+          <p data-testid="workspace-git-clone-proxy-invalid" role="alert" className="mt-1 text-ui-small text-ui-danger">
             {errorText(t, errors.proxy, "gitClone.proxyErrors")}
           </p>
         )}

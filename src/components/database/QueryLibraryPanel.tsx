@@ -478,7 +478,7 @@ export function QueryLibraryPanel({
           </div>
         )}
         {error && filteredQueries.length > 0 && (
-          <div className="px-2 py-1 text-ui-caption text-red-500">{error}</div>
+          <div className="px-2 py-1 text-ui-caption text-ui-danger">{error}</div>
         )}
       </div>
 
@@ -560,7 +560,7 @@ export function QueryLibraryPanel({
                   onChange={(event) => setModalContent(event.target.value)}
                 />
               </label>
-              {error && <div className="text-ui-small text-red-500">{error}</div>}
+              {error && <div className="text-ui-small text-ui-danger">{error}</div>}
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--taomni-divider)] shrink-0">
                 <button type="button" className="taomni-btn h-8 px-4" onClick={() => setModalOpen(false)}>
                   Cancel

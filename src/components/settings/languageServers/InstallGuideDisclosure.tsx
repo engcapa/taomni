@@ -82,10 +82,10 @@ export function InstallGuideDisclosure({
                 </div>
                 {line.note && (
                   <div
-                    className="mb-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-ui-caption leading-snug text-[var(--taomni-text)]"
+                    className="mb-1 rounded border border-ui-warning-border bg-ui-warning-surface px-2 py-1.5 text-ui-caption leading-snug text-[var(--taomni-text)]"
                     data-testid={`language-servers-install-note-${rowKey}`}
                   >
-                    <span className="font-semibold text-amber-600">
+                    <span className="font-semibold text-ui-warning">
                       {t("settings.languageServersInstallNote")}:{" "}
                     </span>
                     {line.note}

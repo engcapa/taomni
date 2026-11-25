@@ -159,7 +159,7 @@ export function RecipientField({
             return (
               <span
                 key={`${recipient.email}-${index}`}
-                className={`max-w-full h-6 px-1.5 rounded border inline-flex items-center gap-1 text-ui-body leading-none ${valid ? "border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]" : "border-red-500/70 bg-red-500/10 text-red-200"}`}
+                className={`max-w-full h-6 px-1.5 rounded border inline-flex items-center gap-1 text-ui-body leading-none ${valid ? "border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]" : "border-ui-danger-border bg-ui-danger-surface text-ui-danger"}`}
                 title={formatRecipientForSend(recipient)}
                 data-testid="mail-recipient-chip"
                 data-invalid={!valid || undefined}

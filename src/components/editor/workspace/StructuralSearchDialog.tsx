@@ -321,7 +321,7 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
             <span className="min-w-0 truncate">{message ?? "Structural Search backend is not available"}</span>
           </div>
         ) : phase === "error" && message ? (
-          <div data-testid="structural-search-error" role="alert" className="mx-3 mb-1 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-400">
+          <div data-testid="structural-search-error" role="alert" className="mx-3 mb-1 rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1 text-ui-danger">
             {message}
           </div>
         ) : null}

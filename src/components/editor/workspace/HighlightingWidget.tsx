@@ -96,7 +96,7 @@ export function HighlightingWidget({
     >
       {/* Problems count badge */}
       {diagnosticsReady && errors > 0 ? (
-        <span className="inline-flex items-center gap-0.5 font-semibold text-red-400" title={`${errors} error(s)`}>
+        <span className="inline-flex items-center gap-0.5 font-semibold text-ui-danger" title={`${errors} error(s)`}>
           <AlertCircle className="h-3 w-3" />
           <span>{errors}</span>
         </span>

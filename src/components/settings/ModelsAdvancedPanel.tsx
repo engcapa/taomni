@@ -139,7 +139,7 @@ export function ModelsAdvancedPanel() {
             <Cpu className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
             <div className="text-ui-body font-semibold flex-1">{t("aiSettings.modelsCudaTitle")}</div>
             {pack && (
-              <span className={`text-ui-caption ${pack.installed ? "text-green-400" : "text-[var(--taomni-text-muted)]"}`}>
+              <span className={`text-ui-caption ${pack.installed ? "text-ui-success" : "text-[var(--taomni-text-muted)]"}`}>
                 {pack.installed ? t("aiSettings.modelsCudaInstalled", { size: pack.size_mb }) : t("aiSettings.modelsCudaNotInstalled")}
               </span>
             )}

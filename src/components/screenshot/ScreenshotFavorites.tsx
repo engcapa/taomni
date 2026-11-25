@@ -67,7 +67,7 @@ export function ScreenshotFavorites({ onClose }: { onClose: () => void }) {
         <button type="button" data-testid="screenshot-favorites-close" aria-label={t("screenshot.cancel")} onClick={onClose} className="p-1.5 rounded hover:bg-[var(--taomni-hover)]"><X size={16} /></button>
       </div>
       <p className="px-4 pt-3 text-ui-body text-[var(--taomni-text-muted)]">{t("screenshot.favoritesHint")}</p>
-      {error && <p data-testid="screenshot-favorites-error" role="alert" className="px-4 pt-3 text-ui-body text-red-500">{error}</p>}
+      {error && <p data-testid="screenshot-favorites-error" role="alert" className="px-4 pt-3 text-ui-body text-ui-danger">{error}</p>}
       <div className="overflow-auto p-4">
         {loading ? <p role="status" className="text-ui-body">{t("screenshot.favoritesLoading")}</p> : items.length === 0 ? <p data-testid="screenshot-favorites-empty" className="py-8 text-center text-ui-body text-[var(--taomni-text-muted)]">{t("screenshot.favoritesEmpty")}</p> : <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {items.map((item) => <div key={item.id} data-testid="screenshot-favorite-item" className="rounded-lg p-2 border border-[var(--taomni-divider)]">

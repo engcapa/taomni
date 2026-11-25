@@ -61,10 +61,10 @@ function kindLabel(kind: SdkKind): string {
 
 function statusTone(status: SdkInstallation["status"] | SdkProbe["status"]): string {
   return status === "ready"
-    ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+    ? "border-ui-success-border bg-ui-success-surface text-ui-success"
     : status === "missing"
-      ? "border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-      : "border-red-500/35 bg-red-500/10 text-red-600 dark:text-red-400";
+      ? "border-ui-warning-border bg-ui-warning-surface text-ui-warning"
+      : "border-ui-danger-border bg-ui-danger-surface text-ui-danger";
 }
 
 export function SdkSettings() {
@@ -258,7 +258,7 @@ export function SdkSettings() {
       </div>
 
       {error && (
-        <div data-testid="sdk-settings-error" className="mb-2 rounded border border-red-500/35 bg-red-500/10 px-2 py-1.5 text-ui-small text-red-600 dark:text-red-400">
+        <div data-testid="sdk-settings-error" className="mb-2 rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1.5 text-ui-small text-ui-danger">
           {error}
         </div>
       )}
@@ -426,7 +426,7 @@ export function SdkSettings() {
                       <button type="button" data-testid="sdk-installation-edit" aria-label={`${t("settings.sdkEdit")} ${installation.name}`} className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-control-hover)]" disabled={busy !== null} onClick={() => openEdit(installation)}>
                         <Pencil className="h-3 w-3" />
                       </button>
-                      <button type="button" data-testid="sdk-installation-remove" aria-label={`${t("settings.sdkRemove")} ${installation.name}`} className="inline-flex h-6 w-6 items-center justify-center rounded text-red-500 hover:bg-red-500/10" disabled={busy !== null} onClick={() => remove(installation)}>
+                      <button type="button" data-testid="sdk-installation-remove" aria-label={`${t("settings.sdkRemove")} ${installation.name}`} className="inline-flex h-6 w-6 items-center justify-center rounded text-ui-danger hover:bg-ui-danger-surface" disabled={busy !== null} onClick={() => remove(installation)}>
                         <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
@@ -437,7 +437,7 @@ export function SdkSettings() {
                       <span>{installation.origin}</span>
                     </div>
                     <div className="mt-0.5 truncate font-mono text-ui-caption text-[var(--taomni-text-muted)]" title={installation.location}>{installation.location}</div>
-                    {installation.lastError && <div className="mt-1 text-ui-caption text-red-500">{installation.lastError}</div>}
+                    {installation.lastError && <div className="mt-1 text-ui-caption text-ui-danger">{installation.lastError}</div>}
                   </div>
                 ))}
               </div>

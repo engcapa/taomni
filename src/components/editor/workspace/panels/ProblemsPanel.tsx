@@ -61,7 +61,7 @@ function severityKind(severity: number | null): SeverityKind {
 }
 
 function SeverityIcon({ kind }: { kind: SeverityKind }) {
-  if (kind === "error") return <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />;
+  if (kind === "error") return <AlertCircle className="h-3.5 w-3.5 shrink-0 text-ui-danger" />;
   if (kind === "warning") return <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />;
   return <Info className="h-3.5 w-3.5 shrink-0 text-sky-500" />;
 }

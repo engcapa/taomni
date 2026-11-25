@@ -284,7 +284,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
           {skippedEntryCount > 0 && (
             <span
               data-testid={`sftp-${side}-access-warning`}
-              className="inline-flex min-w-0 items-center gap-1 text-amber-700 dark:text-amber-400"
+              className="inline-flex min-w-0 items-center gap-1 text-ui-warning"
               title={diagnosticTitle || undefined}
             >
               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
@@ -414,7 +414,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
           <tbody>
             {pane.error && (
               <tr>
-                <td colSpan={4} className="px-2 py-2 text-red-500 text-ui-small">
+                <td colSpan={4} className="px-2 py-2 text-ui-danger text-ui-small">
                   {pane.error}
                 </td>
               </tr>

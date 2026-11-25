@@ -278,7 +278,7 @@ export function AnalysisPanel({
                 Pending invalidation: {semanticIndex.staleReasons.join(", ")}
               </div>
             )}
-            {semanticIndex.error && <div className="text-red-500">{semanticIndex.error}</div>}
+            {semanticIndex.error && <div className="text-ui-danger">{semanticIndex.error}</div>}
             {semanticIndex.lastQuery && (
               <div className="text-[var(--taomni-code-muted)]">
                 Last query: {semanticIndex.lastQuery.kind} · generation {semanticIndex.lastQuery.generation}

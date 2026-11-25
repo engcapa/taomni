@@ -107,7 +107,7 @@ function NotepadSaveAsDialog({
           <FolderOpen size={13} />
         </IconButton>
       </div>
-      {err && <div className="text-ui-body text-red-500" data-testid="notepad-dialog-error">{err}</div>}
+      {err && <div className="text-ui-body text-ui-danger" data-testid="notepad-dialog-error">{err}</div>}
     </NotepadDialog>
   );
 }

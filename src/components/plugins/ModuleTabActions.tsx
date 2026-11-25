@@ -18,6 +18,6 @@ export function ModuleTabActions({ slug, disabled }: { slug: string; disabled: b
           catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
         }}>{t("plugins.open", { title: tab.title })}</button>
     ))}
-    {error && <span role="alert" className="text-ui-body text-red-600">{error}</span>}
+    {error && <span role="alert" className="text-ui-body text-ui-danger">{error}</span>}
   </>;
 }

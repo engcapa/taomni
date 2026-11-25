@@ -255,7 +255,7 @@ export function LanguageServersSettings() {
       </div>
 
       {error && (
-        <div className="mb-2 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-ui-body text-red-500">
+        <div className="mb-2 rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1.5 text-ui-body text-ui-danger">
           {error}
         </div>
       )}
@@ -270,7 +270,7 @@ export function LanguageServersSettings() {
             })}
         </span>
         {missingCount > 0 && (
-          <span className="text-amber-500">
+          <span className="text-ui-warning">
             {t("settings.languageServersMissing", { count: missingCount })}
           </span>
         )}
@@ -371,7 +371,7 @@ export function LanguageServersSettings() {
                   data-ok={status.available && !status.error ? "true" : "false"}
                   className={`mt-1.5 rounded border px-2 py-1.5 text-ui-small leading-snug ${status.available && !status.error
                       ? "border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] text-[var(--taomni-text-muted)]"
-                      : "border-amber-500/35 bg-amber-500/10 text-[var(--taomni-text)]"
+                      : "border-ui-warning-border bg-ui-warning-surface text-[var(--taomni-text)]"
                     }`}
                 >
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -381,7 +381,7 @@ export function LanguageServersSettings() {
                     <span
                       className={`rounded px-1 text-ui-caption font-medium ${status.available && !status.error
                           ? "bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)]"
-                          : "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                          : "bg-ui-warning-surface text-ui-warning"
                         }`}
                     >
                       {status.available && !status.error
@@ -598,7 +598,7 @@ export function LanguageServersSettings() {
                                 {probe && (
                                   <span
                                     data-testid={`language-servers-bundle-status-${id}`}
-                                    className={probe.available ? "text-emerald-500" : "text-[var(--taomni-text-muted)]"}
+                                    className={probe.available ? "text-ui-success" : "text-[var(--taomni-text-muted)]"}
                                     title={probe.path ?? undefined}
                                   >
                                     {probe.available ? "● detected" : "○ not found"}
@@ -658,7 +658,7 @@ export function LanguageServersSettings() {
               {status.error && (
                 <div
                   data-testid={`language-server-error-${status.presetId}`}
-                  className="mt-1 text-ui-small text-red-500"
+                  className="mt-1 text-ui-small text-ui-danger"
                 >
                   {status.error}
                 </div>

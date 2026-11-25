@@ -253,7 +253,7 @@ export function AsrPanel() {
       const running = isRunning(job);
       const isCancelling = (streaming ? sherpaCancelling : cancelling) === job.job_id;
       const percentage = job.total > 0 ? Math.min(100, Math.floor(job.bytes * 100 / job.total)) : undefined;
-      return <section key={job.job_id} data-testid={streaming ? "asr-sherpa-installation-progress" : "asr-installation-progress"} role="status" className={`rounded-lg border p-3 space-y-2 ${job.phase === "failed" ? "border-red-400/40" : "border-[var(--taomni-accent)]/30 bg-[var(--taomni-accent)]/5"}`}>
+      return <section key={job.job_id} data-testid={streaming ? "asr-sherpa-installation-progress" : "asr-installation-progress"} role="status" className={`rounded-lg border p-3 space-y-2 ${job.phase === "failed" ? "border-ui-danger-border" : "border-[var(--taomni-accent)]/30 bg-[var(--taomni-accent)]/5"}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <strong>{modelTitle(job.model_id)} · {phaseLabel(job.phase)}</strong>
           {running && <button type="button" className="taomni-btn px-2 py-1" data-testid={streaming ? "asr-cancel-sherpa-download" : "asr-cancel-download"} disabled={isCancelling || job.phase === "verifying"} onClick={() => void (streaming ? cancelSherpa() : cancelInstallation())}>{isCancelling ? t("voice.cancellingDownload") : t("voice.cancelDownload")}</button>}
@@ -261,7 +261,7 @@ export function AsrPanel() {
         <div className="flex justify-between text-[var(--taomni-text-muted)] tabular-nums"><span>{megabytes(job.bytes)}{job.total > 0 ? ` / ${megabytes(job.total)}` : ""} MB</span>{percentage !== undefined && <span>{percentage}%</span>}</div>
         <progress aria-label={t("voice.downloadProgress")} className="block h-2 w-full accent-[var(--taomni-accent)]" max={100} value={percentage} />
         {running && <p className="text-[var(--taomni-text-muted)]">{t("voice.backgroundDownload")}</p>}
-        {job.error && <p className="text-red-400 break-words">{job.error}</p>}
+        {job.error && <p className="text-ui-danger break-words">{job.error}</p>}
       </section>;
     })}
     <label className="flex gap-3 items-center">Text cleanup
@@ -326,6 +326,6 @@ export function AsrPanel() {
       </section>; })}
     </div>
     <footer className="space-y-2 text-ui-small leading-relaxed text-[var(--taomni-text-muted)]"><p>{t("voice.browserDownloadHelp")}</p><p>{t("voice.updateHelp")}</p></footer>
-    {error && <p role="alert" className="text-red-400 break-words">{error}</p>}
+    {error && <p role="alert" className="text-ui-danger break-words">{error}</p>}
   </div>;
 }

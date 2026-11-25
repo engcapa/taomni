@@ -232,7 +232,7 @@ export function RepoSelector({
 
 export function RepoStatusIcon({ loading,error,changes }: { loading: boolean; error: string|null; changes: number; }) {
   if(loading) return <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-[var(--taomni-accent)]" />;
-  if(error) return <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" />;
+  if(error) return <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-ui-danger" />;
   if(changes) return <Circle className="w-2.5 h-2.5 shrink-0 fill-current text-[var(--taomni-accent)]" />;
   return <Check className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />;
 }

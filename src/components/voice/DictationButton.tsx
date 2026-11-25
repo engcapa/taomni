@@ -232,7 +232,7 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
         else setError("The draft has changed. Original transcript remains available above.");
       }}>Undo cleanup</button>}
     </details>}
-    {error && createPortal(<div role="alert" data-testid="voice-dictation-error" className="fixed top-14 right-4 z-[10001] w-80 rounded border bg-[var(--taomni-panel-bg)] p-3 text-xs text-red-400">
+    {error && createPortal(<div role="alert" data-testid="voice-dictation-error" className="fixed top-14 right-4 z-[10001] w-80 rounded border bg-[var(--taomni-panel-bg)] p-3 text-xs text-ui-danger">
       {moduleError ?? error}
       <button type="button" className="ml-2 underline" data-testid={moduleError ? "voice-open-module-store" : undefined}
         onClick={() => { setError(""); if (moduleError) openSettingsSection("module-store"); else setSetup(true); }}>

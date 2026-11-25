@@ -39,7 +39,7 @@ function CopyButton({ text }: { text: string }) {
       }}
       label={t("aiSettings.ccCopy")}
     >
-      <Copy className={`w-3 h-3 ${copied ? "text-green-400" : ""}`} />
+      <Copy className={`w-3 h-3 ${copied ? "text-ui-success" : ""}`} />
     </IconButton>
   );
 }
@@ -90,9 +90,9 @@ export function ClaudeCodePanel() {
 
   const StatusIcon = () => {
     if (!status) return <Terminal className="w-4 h-4 text-[var(--taomni-text-muted)]" />;
-    if (isReady) return <CheckCircle className="w-4 h-4 text-green-400" />;
-    if (isNotAuth) return <AlertTriangle className="w-4 h-4 text-yellow-400" />;
-    return <XCircle className="w-4 h-4 text-red-400" />;
+    if (isReady) return <CheckCircle className="w-4 h-4 text-ui-success" />;
+    if (isNotAuth) return <AlertTriangle className="w-4 h-4 text-ui-warning" />;
+    return <XCircle className="w-4 h-4 text-ui-danger" />;
   };
 
   const hasProfiles = cc.custom_settings_profiles && cc.custom_settings_profiles.length > 0;
@@ -218,14 +218,14 @@ export function ClaudeCodePanel() {
 
       {/* Version too low */}
       {isVersionLow && status?.status.type === "version_too_low" && (
-        <div className="text-ui-small text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
+        <div className="text-ui-small text-ui-warning rounded border border-ui-warning-border bg-ui-warning-surface px-2 py-1.5">
           {t("aiSettings.ccVersionLow", { found: status.status.found, required: status.status.required, cmd: "npm update -g @anthropic-ai/claude-code" })}
         </div>
       )}
 
       {/* Not authenticated */}
       {isNotAuth && (
-        <div className="flex items-center gap-2 text-ui-small text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
+        <div className="flex items-center gap-2 text-ui-small text-ui-warning rounded border border-ui-warning-border bg-ui-warning-surface px-2 py-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
           <span>{t("aiSettings.ccNotAuthenticated", { cmd: "claude login" })}</span>
         </div>
@@ -311,7 +311,7 @@ export function ClaudeCodePanel() {
           <div className="rounded border border-[var(--taomni-divider)] p-3 bg-[var(--taomni-panel-bg)]/50 flex flex-col gap-2">
             <div className="flex items-center justify-between text-ui-small">
               <div className="flex items-center gap-1.5 min-w-0">
-                <Shield className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                <Shield className="w-3.5 h-3.5 text-ui-success shrink-0" />
                 <span className="font-medium">
                   {hasProfiles
                     ? t("aiSettings.ccCustomProfilesSummary", { count: profileCount })
@@ -331,7 +331,7 @@ export function ClaudeCodePanel() {
 
             {hasProfiles && activeProfileName && (
               <div className="text-ui-caption text-[var(--taomni-text-muted)] flex items-center gap-1">
-                <span className="px-1 text-ui-caption bg-green-500/15 text-green-400 border border-green-500/35 rounded uppercase shrink-0 font-medium">
+                <span className="px-1 text-ui-caption bg-ui-success-surface text-ui-success border border-ui-success-border rounded uppercase shrink-0 font-medium">
                   {t("aiSettings.ccCustomActiveLabel")}
                 </span>
                 <span className="truncate">{activeProfileName}</span>

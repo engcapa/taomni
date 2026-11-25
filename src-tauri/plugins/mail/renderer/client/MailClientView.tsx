@@ -308,8 +308,8 @@ export function MailClientView(props: MailClientViewProps) {
 
       {composerOwner.sentCopyNotice && (
         <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-[var(--taomni-divider)] text-ui-body" data-testid="mail-sent-copy-status" role="status">
-          {composerOwner.sentCopyNotice.error ? <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />}
-          <span className={`min-w-0 flex-1 break-words ${composerOwner.sentCopyNotice.error ? "text-red-500" : "text-[var(--taomni-text-muted)]"}`}>{composerOwner.sentCopyNotice.text}</span>
+          {composerOwner.sentCopyNotice.error ? <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-ui-danger" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-ui-success" />}
+          <span className={`min-w-0 flex-1 break-words ${composerOwner.sentCopyNotice.error ? "text-ui-danger" : "text-[var(--taomni-text-muted)]"}`}>{composerOwner.sentCopyNotice.text}</span>
           <button type="button" className="taomni-btn h-6 w-6 p-0 shrink-0 inline-flex items-center justify-center" aria-label="Dismiss Sent copy status" onClick={() => composerOwner.setSentCopyNotice(null)}><X className="w-3 h-3" /></button>
         </div>
       )}
@@ -317,9 +317,9 @@ export function MailClientView(props: MailClientViewProps) {
       <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-ui-small bg-[var(--taomni-sidebar-bg)]">
         {(mutationFailure?.message || error || status) && (
           <>
-            {(mutationFailure?.message || error) ? <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />}
+            {(mutationFailure?.message || error) ? <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-ui-danger" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-ui-success" />}
             <span
-              className={`min-w-0 flex-1 truncate ${(mutationFailure?.message || error) ? "text-red-500" : "text-[var(--taomni-text-muted)]"}`}
+              className={`min-w-0 flex-1 truncate ${(mutationFailure?.message || error) ? "text-ui-danger" : "text-[var(--taomni-text-muted)]"}`}
               title={(mutationFailure?.message || error) ?? status ?? undefined}
             >
               {(mutationFailure?.message || error) ?? status}

@@ -21,7 +21,7 @@ export function BackupSettingsView(props: BackupSettingsViewProps) {
     <BackupManual {...props} />
     {props.actionError && <BackupError error={props.actionError} t={t} />}
     {props.error && <BackupError error={props.error} t={t} />}
-    {props.actionSuccess && <p role="status" data-testid="backup-action-success" className="text-xs text-green-600">{t(props.actionSuccess)}</p>}
+    {props.actionSuccess && <p role="status" data-testid="backup-action-success" className="text-xs text-ui-success">{t(props.actionSuccess)}</p>}
     <BackupCloudActivity onRestore={(path) => void props.openRestoreModal(path)} />
     <section className="space-y-3 rounded-lg border border-theme-border bg-theme-surface p-4">
       <h4 className="text-sm font-medium text-theme-text">{t("backupSettings.restoreTitle")}</h4>

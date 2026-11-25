@@ -147,7 +147,7 @@ export function ProfileSidebar(viewProps: ProfileSidebarProps) {
                   <IconButton
                     type="button"
                     data-testid={`sockscap-delete-profile-${p.id}`}
-                    className="p-1 text-[var(--taomni-text-muted)] hover:text-red-500 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="p-1 text-[var(--taomni-text-muted)] hover:text-ui-danger rounded disabled:opacity-40 disabled:cursor-not-allowed"
                     label={viewProps.t("sockscap.deleteProfileTooltip")} hint={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
                     onClick={() => void viewProps.deleteProfile(p.id)}
                     disabled={viewProps.locked}

@@ -233,7 +233,7 @@ export function MfaQrDialog({
                     style={{ borderColor: "var(--taomni-input-border)" }}
                     onClick={() => void copySecretValue(secret)}
                   >
-                    {copiedSecret ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedSecret ? <Check className="h-3.5 w-3.5 text-ui-success" /> : <Copy className="h-3.5 w-3.5" />}
                     <span>{copiedSecret ? t("mfa.copiedShort") : t("mfa.copySecret")}</span>
                   </button>
                   {uri ? (
@@ -245,7 +245,7 @@ export function MfaQrDialog({
                       title={t("mfa.copyUri")}
                       onClick={() => void copyUriValue(uri)}
                     >
-                      {copiedUri ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Link2 className="h-3.5 w-3.5" />}
+                      {copiedUri ? <Check className="h-3.5 w-3.5 text-ui-success" /> : <Link2 className="h-3.5 w-3.5" />}
                       <span>{copiedUri ? t("mfa.copiedShort") : t("mfa.copyUri")}</span>
                     </button>
                   ) : null}

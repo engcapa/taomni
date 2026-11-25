@@ -308,7 +308,7 @@ export function AcpAgentsPanel() {
           {saving ? t("aiSettings.llmSaving") : t("aiSettings.llmSave")}
         </button>
         {saved && !dirty && (
-          <span className="text-ui-small text-green-400">{t("aiSettings.llmSaved")}</span>
+          <span className="text-ui-small text-ui-success">{t("aiSettings.llmSaved")}</span>
         )}
       </div>
 
@@ -346,7 +346,7 @@ export function AcpAgentsPanel() {
                 {!isGrok && (
                   <IconButton
                     type="button"
-                    className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center text-red-400"
+                    className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center text-ui-danger"
                     onClick={() => removeProfile(profile.id)}
                     label={t("aiSettings.acpRemoveProfile")}
                     data-testid={`acp-profile-${profile.id}-remove`}
@@ -446,7 +446,7 @@ export function AcpAgentsPanel() {
                 </button>
                 {result && (
                   <div
-                    className={`flex items-start gap-1.5 text-ui-small ${result.ok ? "text-green-400" : "text-red-400"}`}
+                    className={`flex items-start gap-1.5 text-ui-small ${result.ok ? "text-ui-success" : "text-ui-danger"}`}
                     data-testid={`acp-profile-${profile.id}-probe-result`}
                   >
                     {result.ok

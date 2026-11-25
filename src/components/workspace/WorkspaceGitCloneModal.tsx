@@ -271,7 +271,7 @@ export function WorkspaceGitCloneModal() {
                 onBrowse={() => void browse()}
               />
               {formError && (
-                <p data-testid="workspace-git-clone-form-error" role="alert" className="mt-3 break-words text-ui-small text-red-500">{formError}</p>
+                <p data-testid="workspace-git-clone-form-error" role="alert" className="mt-3 break-words text-ui-small text-ui-danger">{formError}</p>
               )}
               <p data-testid="workspace-git-clone-destination-path" className="sr-only">{cloneDestination(form)}</p>
             </>

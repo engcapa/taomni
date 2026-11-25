@@ -404,7 +404,7 @@ export function Composer({
         </div>
       )}
       {attachmentError && (
-        <div className="mb-1.5 text-ui-caption text-red-400" data-testid="ai-chat-attachment-error">
+        <div className="mb-1.5 text-ui-caption text-ui-danger" data-testid="ai-chat-attachment-error">
           {attachmentError}
         </div>
       )}

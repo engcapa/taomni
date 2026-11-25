@@ -35,7 +35,7 @@ export function ModuleSocksCapRecovery() {
 
   if (!recovery) return null;
   return (
-    <div data-testid="module-sockscap-recovery" className="mb-3 rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs" role="alert">
+    <div data-testid="module-sockscap-recovery" className="mb-3 rounded border border-ui-warning-border bg-ui-warning-surface p-3 text-xs" role="alert">
       <p className="font-semibold">{t("settings.moduleStoreSocksCapRecovery")}</p>
       <p className="mt-1 break-words">{recovery.message}</p>
       {error && !requestPassword ? <p className="mt-1 break-words">{error}</p> : null}

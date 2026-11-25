@@ -44,7 +44,7 @@ export function NoteTaskStatus({ noteId }: { noteId: string }) {
   const error = useNotesTaskStore((state) => state.errors[noteId]);
   const pending = useNotesTaskStore((state) => (state.pending[noteId] ?? 0) > 0);
   if (!error) return null;
-  return <div role="alert" className="flex shrink-0 flex-wrap items-center gap-2 px-2 py-1 text-xs text-red-400">
+  return <div role="alert" className="flex shrink-0 flex-wrap items-center gap-2 px-2 py-1 text-xs text-ui-danger">
     <span title={error}>{t("notes.taskSaveFailed")}</span>
     <button type="button" className="taomni-btn px-2" disabled={pending}
       onClick={() => { void useNotesTaskStore.getState().retry(noteId); }}>{t("notes.retrySave")}</button>

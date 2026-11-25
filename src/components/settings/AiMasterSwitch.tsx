@@ -27,13 +27,13 @@ export function AiMasterSwitch() {
       data-testid="ai-master-switch"
       className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
         disabled
-          ? "border-yellow-500/50 bg-yellow-500/10"
+          ? "border-ui-warning-border bg-ui-warning-surface"
           : "border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
       }`}
       onClick={toggle}
     >
       <Power
-        className={`w-5 h-5 shrink-0 ${disabled ? "text-yellow-300" : "text-[var(--taomni-text-muted)]"}`}
+        className={`w-5 h-5 shrink-0 ${disabled ? "text-ui-warning" : "text-[var(--taomni-text-muted)]"}`}
       />
       <div className="flex-1">
         <div className="text-ui-body font-semibold">

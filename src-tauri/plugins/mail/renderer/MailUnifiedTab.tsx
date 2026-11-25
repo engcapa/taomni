@@ -254,10 +254,10 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
       </div>
       {(error || status || failed.length > 0) && (
         <div className="shrink-0 px-3 py-1 border-b border-[var(--taomni-divider)] text-ui-small">
-          {error && <div className="text-red-500">{error}</div>}
+          {error && <div className="text-ui-danger">{error}</div>}
           {!error && status && <div className="text-[var(--taomni-text-muted)]" data-testid="mail-unified-status">{status}</div>}
           {failed.map(([id, message]) => (
-            <div key={id} className="flex items-center gap-1 text-amber-600" data-testid="mail-unified-account-error">
+            <div key={id} className="flex items-center gap-1 text-ui-warning" data-testid="mail-unified-account-error">
               <AlertTriangle className="w-3 h-3" /> {accountLabel(byId.get(id) ?? { sessionId: id, emailAddress: id })}: {message}
             </div>
           ))}
@@ -290,7 +290,7 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
                 >
                   <div className="flex items-center gap-2">
                     <span className={`min-w-0 flex-1 truncate ${unread ? "font-semibold" : ""}`}>{sender(entry.message)}</span>
-                    {isStarred(entry.message) && <Star className="w-3 h-3 text-amber-500 fill-amber-500" />}
+                    {isStarred(entry.message) && <Star className="w-3 h-3 text-ui-warning fill-amber-500" />}
                     <span className="shrink-0 text-ui-small text-[var(--taomni-text-muted)]">{formatDate(entry.message.dateTs)}</span>
                   </div>
                   <div className={`truncate ${unread ? "font-semibold" : ""}`}>{entry.message.subject || "(no subject)"}</div>
@@ -372,7 +372,7 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
                 </div>
                 <div className="flex-1 min-h-0 overflow-auto p-3">
                   {body?.error ? (
-                    <div className="text-ui-body text-red-500">{body.error}</div>
+                    <div className="text-ui-body text-ui-danger">{body.error}</div>
                   ) : (
                     <MailMessageBodyView
                       html={body?.key === selectedKey ? body.body?.html : null}

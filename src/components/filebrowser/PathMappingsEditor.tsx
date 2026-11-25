@@ -118,7 +118,7 @@ export function PathMappingsEditor({
             {/* Local path */}
             <div className="flex items-center gap-1 min-w-0">
               <input
-                className={`${inputCls} ${localEmpty ? "border-amber-500" : ""}`}
+                className={`${inputCls} ${localEmpty ? "border-ui-warning-border" : ""}`}
                 value={mapping.localPath}
                 placeholder={t("pathMappings.localPlaceholder")}
                 aria-label={t("pathMappings.localPathAria", { index: String(index + 1) })}
@@ -144,12 +144,12 @@ export function PathMappingsEditor({
               {hasWarning && (
                 <span title={t("pathMappings.warningIncomplete")}>
                   <AlertTriangle
-                    className="w-3 h-3 shrink-0 text-amber-500"
+                    className="w-3 h-3 shrink-0 text-ui-warning"
                   />
                 </span>
               )}
               <input
-                className={`${inputCls} ${remoteEmpty ? "border-amber-500" : ""}`}
+                className={`${inputCls} ${remoteEmpty ? "border-ui-warning-border" : ""}`}
                 value={mapping.remotePath}
                 placeholder={t("pathMappings.remotePlaceholder")}
                 aria-label={t("pathMappings.remotePathAria", { index: String(index + 1) })}
@@ -161,7 +161,7 @@ export function PathMappingsEditor({
             {/* Remove button */}
             <IconButton
               type="button"
-              className="px-1 py-0.5 hover:bg-red-100 dark:hover:bg-red-900/20 hover:text-red-600 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0"
+              className="px-1 py-0.5 hover:bg-ui-danger-surface hover:text-ui-danger rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0"
               label={t("pathMappings.removeTitle")}
               onClick={() => handleRemove(index)}
               data-testid={`path-mapping-remove-${index}`}

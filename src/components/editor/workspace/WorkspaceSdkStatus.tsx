@@ -485,7 +485,7 @@ export const WorkspaceSdkStatus = memo(function WorkspaceSdkStatus({ roots, auto
 
             <div className="min-h-0 flex-1 overflow-auto p-3">
               {error && (
-                <div data-testid="workspace-sdk-error" className="mb-2 rounded border border-red-500/35 bg-red-500/10 px-2.5 py-2 text-ui-caption text-red-400">
+                <div data-testid="workspace-sdk-error" className="mb-2 rounded border border-ui-danger-border bg-ui-danger-surface px-2.5 py-2 text-ui-caption text-ui-danger">
                   {error}
                 </div>
               )}

@@ -179,7 +179,7 @@ export function WorkspaceFsModals({ request, initialPath, onCancel, onSubmit }: 
           <label className="flex items-center gap-2"><input type="radio" name="workspace-root-destination" data-testid="workspace-root-new" checked={createNew} onChange={() => setDestination("new")} />{t("platform.createWorkspaceFromFolder")}</label>
           {createNew && <label className="flex items-center gap-2">{t("platform.workspaceName")}<input data-testid="workspace-root-name" className="taomni-input h-7 min-w-0 flex-1" aria-label={t("platform.workspaceName")} value={name} onChange={(event) => setWorkspaceName(event.target.value)} /></label>}
         </fieldset>}
-        {error && <p data-testid="workspace-fs-modal-error" role="alert" className="mt-2 text-ui-small text-red-500">{error}</p>}
+        {error && <p data-testid="workspace-fs-modal-error" role="alert" className="mt-2 text-ui-small text-ui-danger">{error}</p>}
         <div className="mt-3 flex justify-end gap-2">
           <button type="button" data-testid="workspace-fs-modal-cancel" className="taomni-btn h-7 px-2" onClick={onCancel}>
             {t("platform.cancel")}

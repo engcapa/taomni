@@ -72,7 +72,7 @@ export function MailAgendaPanel({ info, revision = 0, onStatus, onChanged }: Mai
           {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Sync
         </button>
       </div>
-      {error && <div className="px-3 py-1.5 text-red-500 border-b border-[var(--taomni-divider)]" data-testid="mail-agenda-error">{error}</div>}
+      {error && <div className="px-3 py-1.5 text-ui-danger border-b border-[var(--taomni-divider)]" data-testid="mail-agenda-error">{error}</div>}
       <div className="flex-1 min-h-0 overflow-auto p-2">
         {loading ? (
           <div className="p-3 flex items-center gap-2 text-[var(--taomni-text-muted)]"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading agenda…</div>

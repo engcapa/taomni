@@ -59,7 +59,7 @@ export function BackupCloudActivity({ onRestore }: { onRestore: (path: string) =
       </div>)}
 
     </>}
-    {message && <p role="status" className="text-xs text-green-600">{t(`remoteBackup.${message.key}`)}</p>}
+    {message && <p role="status" className="text-xs text-ui-success">{t(`remoteBackup.${message.key}`)}</p>}
     {error && <BackupError error={error} t={t} />}
     {data?.cache && <div data-testid="backup-cache" className="space-y-2 text-xs text-theme-muted"><p>{t("remoteBackup.cacheUsage", { used: bytes(data.cache.usedBytes), limit: bytes(data.cache.limitBytes), days: data.cache.retentionDays })}</p><button type="button" data-testid="backup-cache-clean" className={button} disabled={busy} onClick={() => void action(async () => { await remoteBackup.cleanCache(); await refreshConfig(); setMessage({ key: "cacheCleaned" }); })}>{t("remoteBackup.cleanCache")}</button></div>}
     {jobs.length > 0 && <div className="space-y-2 border-t border-theme-border pt-3"><h5 className="text-xs font-medium text-theme-text">{t("remoteBackup.jobs")}</h5>{jobs.slice(0, 20).map((job) => <div key={job.id} data-testid="backup-cloud-job" data-job-id={job.id} data-phase={job.phase} data-operation={job.operation} className="space-y-2 rounded border border-theme-border p-2 text-xs text-theme-muted">

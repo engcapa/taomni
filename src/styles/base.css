@@ -237,6 +237,13 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
   border-color: var(--taomni-accent);
   box-shadow: 0 0 0 2px rgba(43, 93, 139, 0.18);
 }
+.taomni-input[aria-invalid="true"] {
+  border-color: var(--taomni-danger-border);
+}
+.taomni-input:focus-visible {
+  outline: 2px solid var(--taomni-focus-ring);
+  outline-offset: 1px;
+}
 .taomni-input:disabled {
   opacity: 0.62;
   background: var(--taomni-button-disabled);

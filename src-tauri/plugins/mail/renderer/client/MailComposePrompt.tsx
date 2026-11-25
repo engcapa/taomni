@@ -29,7 +29,7 @@ export function MailComposePrompt({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start gap-2">
-          <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${attachmentPrompt ? "text-amber-500" : "text-red-500"}`} />
+          <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${attachmentPrompt ? "text-ui-warning" : "text-ui-danger"}`} />
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold">{prompt.title}</div>
             <div className="mt-2 whitespace-pre-line text-ui-body" data-testid="mail-compose-prompt-message">

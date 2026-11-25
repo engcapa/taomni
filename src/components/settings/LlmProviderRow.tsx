@@ -75,7 +75,7 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
         </div>
 
         {testResult && (
-          <span className={`text-ui-small ${testResult.ok ? "text-green-400" : "text-red-400"}`}>
+          <span className={`text-ui-small ${testResult.ok ? "text-ui-success" : "text-ui-danger"}`}>
             {testResult.ok ? `✓ ${testResult.latency_ms}ms` : t("aiSettings.llmFailed")}
           </span>
         )}
@@ -238,7 +238,7 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
             {onRemove && <button type="button" className="taomni-btn h-7 w-7 inline-flex items-center justify-center"
               data-testid="llm-custom-remove" title={t("common.delete")} aria-label={t("common.delete")} onClick={onRemove}><Trash2 size={14} /></button>}
             {testResult && (
-              <span className={`text-ui-body flex items-center gap-1 ${testResult.ok ? "text-green-400" : "text-red-400"}`}>
+              <span className={`text-ui-body flex items-center gap-1 ${testResult.ok ? "text-ui-success" : "text-ui-danger"}`}>
                 {testResult.ok ? (
                   <><CheckCircle className="w-3.5 h-3.5" /> {t("aiSettings.llmConnected", { ms: testResult.latency_ms })}</>
                 ) : (

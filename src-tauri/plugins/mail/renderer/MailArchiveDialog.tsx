@@ -138,7 +138,7 @@ export function MailArchiveDialog({ accountId, onClose, onChanged }: { accountId
           </div>
         </details>
       </fieldset>
-      {(error || input.error) && <p role="alert" className="px-5 py-2 text-red-500">{input.error || error}</p>}
+      {(error || input.error) && <p role="alert" className="px-5 py-2 text-ui-danger">{input.error || error}</p>}
       {notice && <p role="status" data-testid="mail-archive-notice" className="px-5 py-2">{notice}</p>}
       <div className="flex flex-wrap items-center gap-2 border-b border-[var(--taomni-divider)] px-5 py-2">
         <label className="flex items-center gap-2"><input ref={pageCheckbox} type="checkbox" data-testid="mail-archive-select-page" checked={!!page.entries.length && pageSelected === page.entries.length} disabled={disabled || !!preview || !page.entries.length} onChange={(e) => select(page.entries, e.target.checked)} />Select page</label>
@@ -150,11 +150,11 @@ export function MailArchiveDialog({ accountId, onClose, onChanged }: { accountId
         <select data-testid="mail-archive-sort" aria-label="Sort archive" className="taomni-input text-xs" disabled={busy || !!preview} value={sort} onChange={(e) => { ++request.current; setLoading(true); setSort(e.target.value as MailArchiveQuery["sort"]); }}><option value="savedNewest">Saved: newest first</option><option value="savedOldest">Saved: oldest first</option><option value="dateNewest">Mail date: newest first</option><option value="dateOldest">Mail date: oldest first</option><option value="largest">Size: largest first</option><option value="smallest">Size: smallest first</option></select>
         <button type="button" className="taomni-btn" data-testid="mail-archive-refresh" disabled={disabled || !!preview} onClick={() => void load(applied.current, page.offset)}>Refresh</button>
       </div>
-      {preview && <section role="alertdialog" aria-label="Confirm local cleanup" data-testid="mail-archive-confirm" className="mx-5 my-3 rounded-lg border border-amber-500/50 bg-amber-500/10 p-4">
+      {preview && <section role="alertdialog" aria-label="Confirm local cleanup" data-testid="mail-archive-confirm" className="mx-5 my-3 rounded-lg border border-ui-warning-border bg-ui-warning-surface p-4">
         <h3 className="font-semibold">Remove {preview.count} local originals?</h3>
         <p data-testid="mail-archive-cleanup-estimate" className="my-2">Selected stored size: {archiveBytes(preview.storedBytes)} · Up to {archiveBytes(preview.reclaimableBytes)} reclaimable</p>
         <p className="text-xs text-[var(--taomni-text-muted)]">Shared originals are kept until their last copy is removed. Backups may retain disk space. This cannot be undone. Server messages are kept; full storage pauses and these originals will not download automatically again.</p>
-        <div className="mt-3 flex gap-2"><button type="button" className="taomni-btn" data-testid="mail-archive-confirm-cancel" disabled={busy} onClick={() => setPreview(null)}>Cancel</button><button type="button" className="taomni-btn text-red-600" data-testid="mail-archive-confirm-remove" disabled={busy} onClick={() => void action(async () => {
+        <div className="mt-3 flex gap-2"><button type="button" className="taomni-btn" data-testid="mail-archive-confirm-cancel" disabled={busy} onClick={() => setPreview(null)}>Cancel</button><button type="button" className="taomni-btn text-ui-danger" data-testid="mail-archive-confirm-remove" disabled={busy} onClick={() => void action(async () => {
           const removed = await mailArchiveCleanup(accountId, preview.token); clearSelection(); ++readVersion.current; setBody(null); setEntry(null); await load(applied.current, page.offset); await onChanged(); setNotice(`Removed ${removed} local originals. Server messages kept.`);
         })}>{busy ? "Cleaning up…" : "Remove local originals"}</button></div>
       </section>}
@@ -162,7 +162,7 @@ export function MailArchiveDialog({ accountId, onClose, onChanged }: { accountId
         <div data-testid="mail-archive-entries" aria-busy={loading} className="min-h-0 overflow-auto border-r border-[var(--taomni-divider)]" tabIndex={0}>
           {loading && <p role="status" className="p-5">Searching local archive…</p>}
           {!loading && !page.entries.length && <p className="p-5 text-[var(--taomni-text-muted)]">{Object.entries(filters).some(([k, v]) => v !== initialFilters[k as keyof Filters]) ? "No saved mail matches these filters. Try resetting them." : "No complete messages stored yet."}</p>}
-          {!loading && page.entries.map((value, index) => <div key={keyOf(value)} data-testid="mail-archive-row" className={`flex items-start gap-3 border-b border-[var(--taomni-divider)] px-4 py-3 ${entry && keyOf(entry) === keyOf(value) ? "bg-blue-500/10" : "hover:bg-black/5 dark:hover:bg-white/5"}`}>
+          {!loading && page.entries.map((value, index) => <div key={keyOf(value)} data-testid="mail-archive-row" className={`flex items-start gap-3 border-b border-[var(--taomni-divider)] px-4 py-3 ${entry && keyOf(entry) === keyOf(value) ? "bg-ui-info-surface" : "hover:bg-black/5 dark:hover:bg-white/5"}`}>
             <input type="checkbox" className="mt-1" aria-label={`Select ${value.subject}`} checked={isSelected(value)} disabled={busy || !!preview || !!input.error} onChange={(e) => {
               const shift = (e.nativeEvent as MouseEvent).shiftKey;
               select(shift && rangeAnchor.current !== null ? page.entries.slice(Math.min(index, rangeAnchor.current), Math.max(index, rangeAnchor.current) + 1) : [value], e.target.checked); rangeAnchor.current = index;

@@ -134,6 +134,6 @@ export function MobileServiceSettings() {
       {!status.devices.length && <p className="text-[var(--taomni-text-muted)] mt-2">{t("mobileSettings.noDevices")}</p>}
     </div>
     <FeishuAdapterSettings mobileEnabled={status.enabled} />
-    {error && <p role="alert" data-testid="mobile-settings-error" className="mt-2 text-red-400">{mobileSettingsError(error, t)}</p>}
+    {error && <p role="alert" data-testid="mobile-settings-error" className="mt-2 text-ui-danger">{mobileSettingsError(error, t)}</p>}
   </section>;
 }

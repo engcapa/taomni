@@ -58,7 +58,7 @@ export function BackupDestination({ target, applications, initiallyOpen = false 
       <label className="block space-y-1 text-xs text-theme-muted">{t("remoteBackup.password")}<input data-testid="backup-cloud-password" type="password" autoComplete="new-password" className={backupInput} value={password} onChange={(e) => { setPasswordDraft(e.target.value); setSavedPassword(false); }} /></label>
       <p className="text-xs text-theme-muted">{t(status?.passwordConfigured ? "backupUnified.passwordConfigured" : "remoteBackup.passwordHint")}</p>
       <button type="button" data-testid="backup-cloud-save" className={backupButton} disabled={busy || !password.trim()} onClick={() => void action(async () => { await setPassword(target.id, password); setPasswordDraft(""); setSavedPassword(true); })}>{t("backupUnified.savePassword")}</button>
-      {savedPassword && <p role="status" className="text-xs text-green-600">{t("remoteBackup.saved")}</p>}
+      {savedPassword && <p role="status" className="text-xs text-ui-success">{t("remoteBackup.saved")}</p>}
       <label className="flex items-center gap-2 text-xs text-theme-text"><input data-testid="backup-cloud-enabled" type="checkbox" checked={target.enabled} disabled={busy || !status?.passwordConfigured} onChange={(e) => patch({ enabled: e.target.checked })} />{t("backupUnified.enableDestination")}</label>
       {connection && <p className="text-xs text-theme-muted">{t("remoteBackup.account", { name: connection.accountName || t("remoteBackup.awaitingAccount"), application: connection.label, origin: t(connection.origin === "cli_existing" ? "remoteBackup.originExisting" : "remoteBackup.originRegistered") })}</p>}
       <p className="text-xs text-theme-muted">{t("remoteBackup.connectHint")}</p>

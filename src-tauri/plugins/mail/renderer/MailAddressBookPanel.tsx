@@ -201,7 +201,7 @@ export function MailAddressBookPanel({ info, initialDraft, onCompose, onStatus }
             <span className="w-20 shrink-0 pt-1 text-[var(--taomni-text-muted)]">Note</span>
             <textarea className="flex-1 min-h-[60px] p-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-ui-body" value={draft.note ?? ""} aria-label="Note" onChange={(event) => setDraft({ ...draft, note: event.target.value })} />
           </label>
-          {error && <div className="text-red-500" data-testid="mail-contact-error">{error}</div>}
+          {error && <div className="text-ui-danger" data-testid="mail-contact-error">{error}</div>}
         </div>
         <div className="h-11 shrink-0 px-3 flex items-center gap-2 border-t border-[var(--taomni-divider)]">
           <span className="text-[var(--taomni-text-muted)]">
@@ -258,9 +258,9 @@ export function MailAddressBookPanel({ info, initialDraft, onCompose, onStatus }
           <Download className="w-3.5 h-3.5" />
         </button>
       </div>
-      {error && <div className="px-3 py-1.5 text-red-500 border-b border-[var(--taomni-divider)]" data-testid="mail-address-book-error">{error}</div>}
+      {error && <div className="px-3 py-1.5 text-ui-danger border-b border-[var(--taomni-divider)]" data-testid="mail-address-book-error">{error}</div>}
       {syncErrors.length > 0 && (
-        <div className="px-3 py-1.5 border-b border-[var(--taomni-divider)] text-red-500" data-testid="mail-carddav-errors">
+        <div className="px-3 py-1.5 border-b border-[var(--taomni-divider)] text-ui-danger" data-testid="mail-carddav-errors">
           {syncErrors.map((message) => <div key={message}>{message}</div>)}
         </div>
       )}
@@ -282,7 +282,7 @@ export function MailAddressBookPanel({ info, initialDraft, onCompose, onStatus }
               </div>
               <div className="truncate text-ui-small text-[var(--taomni-text-muted)]">{[...entry.emails, ...entry.phones].join(", ")}</div>
             </div>
-            {entry.pendingSync && <span title="Not yet on the CardDAV server"><CloudOff className="w-3 h-3 text-amber-500" /></span>}
+            {entry.pendingSync && <span title="Not yet on the CardDAV server"><CloudOff className="w-3 h-3 text-ui-warning" /></span>}
             {onCompose && entry.emails.length > 0 && (
               <button type="button" className={iconButton} title={`Write to ${entry.emails[0]}`} aria-label={`Write to ${entry.displayName}`} data-testid="mail-contact-compose" onClick={() => onCompose(entry)}>
                 <MailIcon className="w-3 h-3" />

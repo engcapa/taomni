@@ -54,7 +54,7 @@ export function BackupLocalHistory(inputs: Pick<BackupSettingsViewProps, "t" | "
                         </td>
                         <td className="py-2 px-2">
                           {item.isEncrypted ? (
-                            <span className="inline-flex items-center gap-1 text-ui-small text-amber-500">
+                            <span className="inline-flex items-center gap-1 text-ui-small text-ui-warning">
                               <Lock className="w-3 h-3" />
                               {t("backupSettings.encrypted")}
                             </span>
@@ -77,7 +77,7 @@ export function BackupLocalHistory(inputs: Pick<BackupSettingsViewProps, "t" | "
                           <button
                             type="button"
                             onClick={() => void handleDeleteItem(item.fileName)}
-                            className="text-xs text-red-500 hover:underline"
+                            className="text-xs text-ui-danger hover:underline"
                           >
                             {t("backupSettings.deleteAction")}
                           </button>

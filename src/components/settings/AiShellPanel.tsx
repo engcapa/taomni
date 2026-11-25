@@ -142,7 +142,7 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
           </div>
 
           {error && (
-            <div className="text-ui-small text-red-400 rounded border border-red-500/30 bg-red-500/5 px-2 py-1.5">
+            <div className="text-ui-small text-ui-danger rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1.5">
               {error}
             </div>
           )}

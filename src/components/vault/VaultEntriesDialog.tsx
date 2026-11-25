@@ -156,7 +156,7 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
                   ) : (
                     <IconButton
                       type="button"
-                      className="p-1 rounded text-red-600 hover:bg-red-500/10 shrink-0"
+                      className="p-1 rounded text-ui-danger hover:bg-ui-danger-surface shrink-0"
                       onClick={() => handleDelete(e.id, e.label)}
                       label={t("vaultSettings.deleteEntry")}
                       data-testid={`vault-entry-delete-${e.id}`}

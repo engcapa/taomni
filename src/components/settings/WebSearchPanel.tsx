@@ -127,7 +127,7 @@ export function WebSearchPanel() {
                 </button>
               </div>
               {probeResult && (
-                <div className="text-ui-small text-green-400 mt-1">{probeResult}</div>
+                <div className="text-ui-small text-ui-success mt-1">{probeResult}</div>
               )}
             </div>
           )}

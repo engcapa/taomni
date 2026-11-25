@@ -314,7 +314,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                         />
                         <button
                           type="button"
-                          className="p-1.5 rounded hover:text-red-500 disabled:opacity-50"
+                          className="p-1.5 rounded hover:text-ui-danger disabled:opacity-50"
                           disabled={viewProps.locked}
                           title={viewProps.t("common.remove")}
                           aria-label={viewProps.t("common.remove")}
@@ -416,7 +416,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                         <span className="block truncate font-mono text-ui-caption text-[var(--taomni-text-muted)]">
                           {formatRootlessCommand(a.path, a.args)}
                         </span>
-                        <span className="block text-ui-caption text-sky-700 dark:text-sky-300">
+                        <span className="block text-ui-caption text-ui-info">
                           {viewProps.t(
                             a.launchMode === "terminal"
                               ? "sockscap.rootlessLaunchModeTerminal"
@@ -450,8 +450,8 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                     {launched && (
                       <span
                         className={`block text-ui-caption ${launched.phase === "preparing"
-                          ? "text-amber-600 dark:text-amber-400"
-                          : "text-emerald-600 dark:text-emerald-400"
+                          ? "text-ui-warning"
+                          : "text-ui-success"
                           }`}
                       >
                         {viewProps.t(
@@ -464,7 +464,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                     )}
                     {!launched && latestLaunch?.phase === "failed" && (
                       <span
-                        className="block truncate text-ui-caption text-red-600 dark:text-red-400"
+                        className="block truncate text-ui-caption text-ui-danger"
                         title={latestLaunch.launchError}
                       >
                         {viewProps.t("sockscap.applicationLaunchFailed", {
@@ -486,7 +486,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                       <button
                         type="button"
                         data-testid={`sockscap-stop-launched-app-${launched.pid}`}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded border border-ui-danger-border text-ui-danger hover:bg-ui-danger-surface disabled:opacity-50"
                         disabled={viewProps.stoppingPid !== null || viewProps.launchingPath !== null}
                         onClick={() => void viewProps.onStopLaunchedApp(launched.pid)}
                       >
@@ -556,7 +556,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                   )}
                   <IconButton
                     type="button"
-                    className="p-1 hover:text-red-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="p-1 hover:text-ui-danger disabled:opacity-40 disabled:cursor-not-allowed"
                     disabled={viewProps.locked}
                     labelKey="removeApplication" hint={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
                     onClick={() =>

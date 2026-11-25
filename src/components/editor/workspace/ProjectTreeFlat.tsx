@@ -148,7 +148,7 @@ export function matchingFlatFileRows(
     </div>
   ) });
   if (state.error) rows.push({ key: `${root.id}:search-error`, render: () => (
-    <div className="px-3 py-1 text-ui-small text-red-500" role="status">Some folders could not be searched: {state.error}</div>
+    <div className="px-3 py-1 text-ui-small text-ui-danger" role="status">Some folders could not be searched: {state.error}</div>
   ) });
   if (state.truncated) rows.push({ key: `${root.id}:truncated`, render: () => (
     <div className="px-3 py-1 text-ui-small text-[var(--taomni-code-muted)]">{treeFilter.trim() ? "Partial results; narrow your search" : `Showing first ${FLAT_VIEW_MAX_FILES} files`}</div>

@@ -111,7 +111,7 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
       </div>
 
       {error && (
-        <div className="text-ui-small text-red-400 mb-2">{error}</div>
+        <div className="text-ui-small text-ui-danger mb-2">{error}</div>
       )}
 
       {/* Diff display */}

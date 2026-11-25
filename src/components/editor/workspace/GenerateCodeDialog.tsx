@@ -100,7 +100,7 @@ export function GenerateCodeDialog({
           )}
           {phase === "error" && (
             <div data-testid="generate-code-error" className="space-y-1 px-1 py-2">
-              <p className="text-ui-small text-red-400">{error ?? "Generation failed."}</p>
+              <p className="text-ui-small text-ui-danger">{error ?? "Generation failed."}</p>
               <p className="text-ui-caption text-[var(--taomni-code-muted)]">
                 Nothing was inserted by Taomni itself; retry re-requests the provider.
               </p>

@@ -18,7 +18,7 @@ export function BackupAuthorizationBanner() {
     try { await fn(); } catch (e) { setError(String(e)); } finally { setBusy(null); }
   };
   if (!visible.length && !error) return null;
-  return <aside data-testid="backup-authorization-banner" className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
+  return <aside data-testid="backup-authorization-banner" className="space-y-3 rounded-lg border border-ui-warning-border bg-ui-warning-surface p-4">
     <h4 className="text-sm font-medium text-theme-text">{t("backupUnified.authorization")}</h4>
     {visible.slice(0, 5).map((session) => <div key={session.id} data-testid="backup-feishu-session" data-session-id={session.id} data-phase={session.phase} data-cleanup-complete={authClean(session)} className="space-y-2 text-xs text-theme-muted">
       <p className="font-medium text-theme-text">{targets?.find((item) => item.id === session.targetId)?.name ?? t("backupUnified.removedDestination")}</p>

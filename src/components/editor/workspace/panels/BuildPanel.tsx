@@ -360,10 +360,10 @@ export function BuildPanel({ roots, active, onRunTask, onLoadModules, toolConfig
       </div>
       <div className="min-h-0 flex-1 overflow-auto py-1">
         {error && (
-          <div className="px-2 py-1 text-red-500" data-testid="build-panel-error">{error}</div>
+          <div className="px-2 py-1 text-ui-danger" data-testid="build-panel-error">{error}</div>
         )}
         {executionError && (
-          <div className="px-2 py-1 text-red-500" data-testid="build-panel-execution-error">
+          <div className="px-2 py-1 text-ui-danger" data-testid="build-panel-execution-error">
             {executionError}
           </div>
         )}

@@ -177,7 +177,7 @@ export function SegmentPopup({
           <div className="px-2 py-1.5 text-[var(--taomni-code-muted)]">Loading…</div>
         )}
         {open.kind === "path" && open.error && (
-          <div className="px-2 py-1.5 text-red-400">{open.error}</div>
+          <div className="px-2 py-1.5 text-ui-danger">{open.error}</div>
         )}
         {open.kind === "path" && !open.loading && !open.error && filteredPath.length === 0 && (
           <div className="px-2 py-1.5 text-[var(--taomni-code-muted)]">

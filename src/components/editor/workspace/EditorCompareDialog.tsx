@@ -256,7 +256,7 @@ export function EditorCompareDialog({
         </div>
       </div>
       {applyError && (
-        <div role="alert" data-testid="compare-apply-error" className="mt-3 shrink-0 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+        <div role="alert" data-testid="compare-apply-error" className="mt-3 shrink-0 rounded border border-ui-danger-border bg-ui-danger-surface px-3 py-2 text-xs text-ui-danger">
           Apply failed: {applyError}
         </div>
       )}

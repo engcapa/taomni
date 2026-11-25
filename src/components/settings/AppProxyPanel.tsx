@@ -397,7 +397,7 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
               {testing ? t("sessionEditor2.proxyTestTesting") : t("settings.appProxyTest")}
             </button>
             {msg && (
-              <span className={`text-ui-small break-all max-w-full ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</span>
+              <span className={`text-ui-small break-all max-w-full ${msg.ok ? "text-ui-success" : "text-ui-danger"}`}>{msg.text}</span>
             )}
           </div>
           {!embedded && <div className="text-ui-caption text-[var(--taomni-text-muted)]">{t("settings.appProxyUpdaterNote")}</div>}

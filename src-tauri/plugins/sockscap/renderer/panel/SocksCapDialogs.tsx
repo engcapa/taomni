@@ -127,7 +127,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--taomni-divider)]">
-            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-ui-warning shrink-0" />
             <h2 id="sockscap-tun-warning-title" className="flex-1 text-ui-body font-semibold">
               {t("sockscap.tunConflictTitle")}
             </h2>
@@ -176,7 +176,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
       >
         <div className="w-[min(480px,92vw)] flex flex-col rounded-lg bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-xl">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--taomni-divider)]">
-            <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-ui-danger shrink-0" />
             <div className="text-ui-body font-semibold">
               {t("sockscap.configIssueTitle")}
             </div>
@@ -191,7 +191,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
                   key={iss.profileId}
                   className="flex items-start gap-1.5 px-2 py-1.5 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
                 >
-                  <X className="w-3.5 h-3.5 text-red-500 mt-0.5 shrink-0" />
+                  <X className="w-3.5 h-3.5 text-ui-danger mt-0.5 shrink-0" />
                   <span>
                     <span className="font-semibold">{iss.profileName}</span>
                     {" — "}
@@ -223,7 +223,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
       >
         <div className="w-[min(560px,92vw)] max-h-[75vh] flex flex-col rounded-lg bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-xl">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--taomni-divider)]">
-            <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-ui-warning shrink-0" />
             <div className="text-ui-body font-semibold">
               {t("sockscap.probeFailTitle")}
             </div>
@@ -244,7 +244,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
                       {f.kind}
                     </span>
                   </div>
-                  <div className="mt-1 font-mono text-ui-small text-red-500 break-words whitespace-pre-wrap">
+                  <div className="mt-1 font-mono text-ui-small text-ui-danger break-words whitespace-pre-wrap">
                     {f.error}
                   </div>
                 </li>
@@ -314,7 +314,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
               onClick={() => void copyTestDetail()}
             >
               {testCopied ? (
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-ui-success" />
               ) : (
                 <Copy className="w-3.5 h-3.5" />
               )}

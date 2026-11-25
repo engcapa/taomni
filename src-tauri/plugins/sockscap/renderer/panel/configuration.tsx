@@ -108,14 +108,14 @@ export type SessionOpt = { id: string; name: string; host: string; port: number;
 export function phaseTone(phase: string): string {
   switch (phase) {
     case "active":
-      return "text-emerald-500";
+      return"text-ui-success";
     case "degraded":
-      return "text-amber-500";
+      return"text-ui-warning";
     case "preparing":
     case "stopping":
-      return "text-sky-500";
+      return"text-ui-info";
     case "recoveryRequired":
-      return "text-red-500";
+      return"text-ui-danger";
     default:
       return "text-[var(--taomni-text-muted)]";
   }

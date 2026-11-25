@@ -445,7 +445,7 @@ export function LiveTemplatesSettings() {
               </div>
             </div>
             {formError && (
-              <div className="text-ui-small text-red-500" data-testid="live-template-custom-error">
+              <div className="text-ui-small text-ui-danger" data-testid="live-template-custom-error">
                 {formError}
               </div>
             )}
@@ -523,7 +523,7 @@ export function LiveTemplatesSettings() {
                     </button>
                     <IconButton
                       type="button"
-                      className="taomni-btn h-7 px-2 text-ui-small text-red-500"
+                      className="taomni-btn h-7 px-2 text-ui-small text-ui-danger"
                       data-testid={`live-template-custom-delete-${item.id}`}
                       onClick={() => removeCustom(item.id)}
                       label={t("settings.liveTemplatesDelete")}

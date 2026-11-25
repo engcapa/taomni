@@ -37,7 +37,7 @@ function CopyButton({ text }: { text: string }) {
       }}
       label={t("aiSettings.ccCopy")}
     >
-      <Copy className={`w-3 h-3 ${copied ? "text-green-400" : ""}`} />
+      <Copy className={`w-3 h-3 ${copied ? "text-ui-success" : ""}`} />
     </IconButton>
   );
 }
@@ -104,9 +104,9 @@ export function CodexCodePanel() {
 
   const StatusIcon = () => {
     if (!status) return <Terminal className="w-4 h-4 text-[var(--taomni-text-muted)]" />;
-    if (ready) return <CheckCircle className="w-4 h-4 text-green-400" />;
-    if (notAuth) return <AlertTriangle className="w-4 h-4 text-yellow-400" />;
-    return <XCircle className="w-4 h-4 text-red-400" />;
+    if (ready) return <CheckCircle className="w-4 h-4 text-ui-success" />;
+    if (notAuth) return <AlertTriangle className="w-4 h-4 text-ui-warning" />;
+    return <XCircle className="w-4 h-4 text-ui-danger" />;
   };
 
   return (
@@ -176,12 +176,12 @@ export function CodexCodePanel() {
       )}
 
       {versionLow && status?.status.type === "version_too_low" && (
-        <div className="text-ui-small text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
+        <div className="text-ui-small text-ui-warning rounded border border-ui-warning-border bg-ui-warning-surface px-2 py-1.5">
           {t("aiSettings.codexVersionLow", { found: status.status.found, required: status.status.required })}
         </div>
       )}
       {notAuth && (
-        <div className="flex items-center gap-2 text-ui-small text-yellow-400 rounded border border-yellow-500/30 bg-yellow-500/5 px-2 py-1.5">
+        <div className="flex items-center gap-2 text-ui-small text-ui-warning rounded border border-ui-warning-border bg-ui-warning-surface px-2 py-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
           <span>{t("aiSettings.codexNotAuthenticated", { cmd: "codex login" })}</span>
         </div>

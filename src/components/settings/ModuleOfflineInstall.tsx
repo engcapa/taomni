@@ -15,6 +15,8 @@ export function ModuleOfflineInstall({ onRegistryChanged }: ModuleOfflineInstall
   const state = useModuleInstallStore();
   const [pickerError, setPickerError] = useState<string | null>(null);
   const busy = state.phase === "verifying";
+  const archiveMissing = state.validationError && !state.archivePath.trim();
+  const signatureMissing = state.validationError && !state.detachedSignature.trim();
 
   useEffect(() => {
     if (state.completionRevision > 0) onRegistryChanged?.();
@@ -51,6 +53,7 @@ export function ModuleOfflineInstall({ onRegistryChanged }: ModuleOfflineInstall
         <div className="flex gap-2">
           <input id="module-offline-archive" data-testid="module-offline-archive"
             className="taomni-input min-w-0 flex-1 text-ui-body" disabled={busy}
+            aria-invalid={archiveMissing || undefined} aria-describedby={archiveMissing ? "module-offline-validation" : undefined}
             value={state.archivePath} onChange={(event) => state.setArchivePath(event.target.value)} />
           <button type="button" className="taomni-btn px-2 text-ui-body" disabled={busy}
             data-testid="module-offline-choose" onClick={() => { void chooseArchive(); }}>
@@ -60,21 +63,23 @@ export function ModuleOfflineInstall({ onRegistryChanged }: ModuleOfflineInstall
         <label className="block text-ui-body" htmlFor="module-offline-signature">{t("settings.moduleOfflineSignature")}</label>
         <textarea id="module-offline-signature" data-testid="module-offline-signature" rows={4}
           spellCheck={false} disabled={busy} value={state.detachedSignature}
+          aria-invalid={signatureMissing || undefined} aria-describedby={signatureMissing ? "module-offline-validation" : undefined}
           className="taomni-input w-full resize-y font-mono text-ui-small"
           onChange={(event) => state.setDetachedSignature(event.target.value)} />
         {(state.validationError || state.error || pickerError) && (
-          <div data-testid="module-offline-error" role="alert" className="text-ui-body text-red-700 dark:text-red-300">
+          <div id="module-offline-validation" data-testid="module-offline-error" role="alert"
+            className="rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1 text-ui-body text-ui-danger">
             {state.validationError ? t("settings.moduleOfflineRequired") : state.error || pickerError}
           </div>
         )}
         <div role="status" aria-live="polite" data-testid="module-offline-status" className="flex items-center gap-2 text-ui-body">
           {busy && <><Loader2 className="h-3.5 w-3.5 animate-spin" />{t("settings.moduleOfflineWorking")}</>}
-          {state.phase === "completed" && <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+          {state.phase === "completed" && <><CheckCircle2 className="h-3.5 w-3.5 text-ui-success" />
             {t("settings.moduleOfflineCompleted", { name: state.installed?.manifest?.name ?? state.installed?.slug ?? "" })}</>}
           {state.phase === "failed" && t("settings.moduleOfflineFailed")}
         </div>
         {state.refreshError && <div data-testid="module-offline-refresh-error" role="alert"
-          className="text-ui-body text-amber-700 dark:text-amber-300">
+          className="text-ui-body text-ui-warning">
           {t("settings.moduleOfflineRefreshFailed")} {state.refreshError}
         </div>}
         <button type="submit" data-testid="module-offline-submit" disabled={busy} className="taomni-btn px-3 text-ui-body">

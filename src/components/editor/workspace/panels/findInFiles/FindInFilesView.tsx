@@ -355,7 +355,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
       )}
       <div className="flex-1 min-h-0 overflow-auto py-1">
         {error && (
-          <div data-testid="code-workspace-find-error" className="mx-2 mb-1 rounded border border-red-500/30 bg-red-500/10 p-2 text-red-500">{error}</div>
+          <div data-testid="code-workspace-find-error" className="mx-2 mb-1 rounded border border-ui-danger-border bg-ui-danger-surface p-2 text-ui-danger">{error}</div>
         )}
         {!error && groups.length === 0 && (
           <div className="px-3 py-2 text-[var(--taomni-code-muted)]">

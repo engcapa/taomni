@@ -126,7 +126,7 @@ export function MailComposer(viewProps: MailComposerProps) {
               >
                 {attachProgress.done < attachProgress.total
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                  : <CheckCircle2 className="w-3.5 h-3.5 text-ui-success" />}
                 <span>
                   {attachProgress.label}
                   {" "}

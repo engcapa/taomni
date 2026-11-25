@@ -104,7 +104,7 @@ export function MailFoldersPane(viewProps: MailFoldersPaneProps) {
                   >
                     <FilterIcon className="w-3.5 h-3.5" />
                     {filterErrors.length > 0 && (
-                      <AlertTriangle className="w-2.5 h-2.5 -ml-1 -mt-2 text-amber-500" data-testid="mail-filters-error-badge" />
+                      <AlertTriangle className="w-2.5 h-2.5 -ml-1 -mt-2 text-ui-warning" data-testid="mail-filters-error-badge" />
                     )}
                   </button>
                 </div>

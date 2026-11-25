@@ -60,9 +60,9 @@ function formatSize(bytes: number | undefined, unknownLabel: string): string {
 
 function statusClass(record: ModuleRecord | undefined): string {
   switch (record?.lifecycle) {
-    case "enabled": return "border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
-    case "disabled": return "border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-400";
-    case "rollback": return "border-blue-500/35 bg-blue-500/10 text-blue-700 dark:text-blue-400";
+    case"enabled": return"border-ui-success-border bg-ui-success-surface text-ui-success";
+    case"disabled": return"border-ui-warning-border bg-ui-warning-surface text-ui-warning";
+    case"rollback": return"border-ui-info-border bg-ui-info-surface text-ui-info";
     case "uninstalled": return "border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[var(--taomni-text-muted)]";
     default: return "border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[var(--taomni-text-muted)]";
   }
@@ -187,7 +187,7 @@ export function ModuleStorePanel({
         <div
           data-testid="module-upgrade-status"
           data-state={migrationSnapshot.candidates.length > 0 ? "candidates" : "empty"}
-          className="mb-3 rounded border border-blue-500/30 bg-blue-500/10 p-3"
+          className="mb-3 rounded border border-ui-info-border bg-ui-info-surface p-3"
         >
           <div className="text-ui-body font-semibold">{t("settings.moduleUpgradeTitle")}</div>
           <div className="mt-1 text-ui-body text-[var(--taomni-text-muted)]">
@@ -210,11 +210,11 @@ export function ModuleStorePanel({
             </div>
           )}
           {migrationResult?.pending.length ? (
-            <div data-testid="module-upgrade-pending" className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-ui-body text-amber-800 dark:text-amber-200">
+            <div data-testid="module-upgrade-pending" className="mt-2 rounded border border-ui-warning-border bg-ui-warning-surface p-2 text-ui-body text-ui-warning">
               {migrationResult.pending_reason || t("settings.moduleUpgradePending")}
             </div>
           ) : null}
-          {migrationError && <div role="alert" data-testid="module-upgrade-error" className="mt-2 text-ui-body text-red-700 dark:text-red-300">{migrationError}</div>}
+          {migrationError && <div role="alert" data-testid="module-upgrade-error" className="mt-2 text-ui-body text-ui-danger">{migrationError}</div>}
           {migrationSnapshot.candidates.length > 0 && (
             <button
               type="button"
@@ -235,13 +235,13 @@ export function ModuleStorePanel({
         </div>
       )}
       {migrationError && !migrationSnapshot && (
-        <div data-testid="module-upgrade-status" data-state="error" className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-3">
+        <div data-testid="module-upgrade-status" data-state="error" className="mb-3 rounded border border-ui-danger-border bg-ui-danger-surface p-3">
           <div className="text-ui-body font-semibold">{t("settings.moduleUpgradeTitle")}</div>
-          <div role="alert" data-testid="module-upgrade-error" className="mt-1 text-ui-body text-red-700 dark:text-red-300">{migrationError}</div>
+          <div role="alert" data-testid="module-upgrade-error" className="mt-1 text-ui-body text-ui-danger">{migrationError}</div>
         </div>
       )}
-      {catalogError && <div role="alert" data-testid="module-store-catalog-error" className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-2 text-ui-body text-red-700 dark:text-red-300">{catalogError}</div>}
-      {error && <div role="alert" data-testid="module-store-error" className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-2 text-ui-body text-red-700 dark:text-red-300">{error}</div>}
+      {catalogError && <div role="alert" data-testid="module-store-catalog-error" className="mb-3 rounded border border-ui-danger-border bg-ui-danger-surface p-2 text-ui-body text-ui-danger">{catalogError}</div>}
+      {error && <div role="alert" data-testid="module-store-error" className="mb-3 rounded border border-ui-danger-border bg-ui-danger-surface p-2 text-ui-body text-ui-danger">{error}</div>}
       {catalogLoading ? (
         <div data-testid="module-store-loading" className="rounded border border-dashed border-[var(--taomni-divider)] p-4 text-ui-body text-[var(--taomni-text-muted)]">{t("settings.moduleStoreLoading")}</div>
       ) : entries.length === 0 ? (
@@ -258,7 +258,7 @@ export function ModuleStorePanel({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-ui-body font-semibold">
                       <span>{entry.name}</span>
-                      {compatible && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-label={t("settings.moduleStoreCompatible")} />}
+                      {compatible && <CheckCircle2 className="h-3.5 w-3.5 text-ui-success" aria-label={t("settings.moduleStoreCompatible")} />}
                     </div>
                     <p className="mt-1 text-ui-body text-[var(--taomni-text-muted)]">{entry.description}</p>
                   </div>
@@ -269,7 +269,7 @@ export function ModuleStorePanel({
                 <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-ui-small text-[var(--taomni-text-muted)]">
                   <span data-testid={`module-version-${entry.slug}`}>{t("settings.moduleStoreVersion", { version: entry.version })}</span>
                   <span>{formatSize(entry.sizeBytes, t("settings.moduleStoreSizeUnknown"))}</span>
-                  <span className={compatible ? "" : "text-amber-700 dark:text-amber-400"}>{compatible ? t("settings.moduleStoreCompatible") : t("settings.moduleStoreIncompatible")}</span>
+                  <span className={compatible ? "" : "text-ui-warning"}>{compatible ? t("settings.moduleStoreCompatible") : t("settings.moduleStoreIncompatible")}</span>
                   {record?.dataRetained && record.lifecycle === "uninstalled" && <span data-testid={`module-data-retained-${entry.slug}`}>{t("settings.moduleStoreDataRetained")}</span>}
                 </div>
                 {entry.permissions && entry.permissions.length > 0 && <div data-testid={`module-permissions-${entry.slug}`} className="mt-2 text-ui-small text-[var(--taomni-text-muted)]">{t("settings.moduleStorePermissions", { permissions: entry.permissions.join(", ") })}</div>}

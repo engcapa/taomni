@@ -268,7 +268,7 @@ export function TestsPanel({
               <span className="ml-auto">{formatTestDuration(testResults.summary.durationMs)}</span>
             </div>}
             {testResults?.diagnostics.map((diagnostic) => <div key={diagnostic} className="mt-1 whitespace-pre-wrap text-amber-600" data-testid="tests-result-diagnostic">{diagnostic}</div>)}
-            {resultsError && <div className="mt-1 text-red-500" data-testid="tests-result-error">{resultsError}</div>}
+            {resultsError && <div className="mt-1 text-ui-danger" data-testid="tests-result-error">{resultsError}</div>}
           </div>
         )}
         {resultTree}
@@ -278,7 +278,7 @@ export function TestsPanel({
           </div>
         )}
         {canDiscover && error && (
-          <div className="px-3 py-2 text-red-500" data-testid="tests-error">{error}</div>
+          <div className="px-3 py-2 text-ui-danger" data-testid="tests-error">{error}</div>
         )}
         {canDiscover && !error && !loading && items.length === 0 && loadedFor && (
           <div className="px-3 py-2 text-[var(--taomni-text-muted)]">No tests found in this file.</div>

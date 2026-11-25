@@ -28,7 +28,7 @@ export function MailCertificateDialog(context: MailCertificateDialogContext) {
               <Loader2 className="w-3.5 h-3.5 animate-spin" /> Fetching the certificate…
             </div>
           )}
-          {certReview.error && <div className="text-red-500">{certReview.error}</div>}
+          {certReview.error && <div className="text-ui-danger">{certReview.error}</div>}
           {certReview.info && (
             <>
               <div className="text-[var(--taomni-warning-text,#d97706)]">

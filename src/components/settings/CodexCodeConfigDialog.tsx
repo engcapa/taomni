@@ -324,7 +324,7 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <span className="truncate">{p.name}</span>
                       {isActive && (
-                        <span className="px-1 text-ui-caption leading-tight bg-green-500/15 text-green-400 border border-green-500/35 rounded shrink-0">
+                        <span className="px-1 text-ui-caption leading-tight bg-ui-success-surface text-ui-success border border-ui-success-border rounded shrink-0">
                           {t("aiSettings.ccCustomActiveLabel")}
                         </span>
                       )}
@@ -334,7 +334,7 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
                         </span>
                       )}
                     </div>
-                    <IconButton type="button" label={t("common.delete")} className="opacity-0 group-hover:opacity-100 hover:text-red-400 p-0.5 transition-opacity rounded" onClick={(e) => deleteProfile(p.id, e)}>
+                    <IconButton type="button" label={t("common.delete")} className="opacity-0 group-hover:opacity-100 hover:text-ui-danger p-0.5 transition-opacity rounded" onClick={(e) => deleteProfile(p.id, e)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </IconButton>
                   </div>
@@ -425,7 +425,7 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
                         </div>
                       )}
                       {testOutput && <div className="whitespace-pre-wrap text-[var(--taomni-text)]">{testOutput}</div>}
-                      {testError && <div className="text-red-400 whitespace-pre-wrap">Error: {testError}</div>}
+                      {testError && <div className="text-ui-danger whitespace-pre-wrap">Error: {testError}</div>}
                     </div>
                   )}
                 </div>
@@ -446,7 +446,7 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
 
         <div className="h-10 px-3 flex items-center gap-2 border-t shrink-0" style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}>
           {error && (
-            <span className="text-ui-small text-red-400 flex items-center gap-1">
+            <span className="text-ui-small text-ui-danger flex items-center gap-1">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate max-w-[400px]">{error}</span>
             </span>

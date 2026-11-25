@@ -86,7 +86,7 @@ export function GitCloneProgressView({ task }: GitCloneProgressViewProps) {
       {task.phase === "failed" && task.error && (
         <div data-testid="workspace-git-clone-error" role="alert" className="rounded-lg border p-3"
           style={{ borderColor: "var(--taomni-danger, #ef4444)", background: "var(--taomni-card-bg)" }}>
-          <strong className="block text-ui-body text-red-500">{t("gitClone.failed")}</strong>
+          <strong className="block text-ui-body text-ui-danger">{t("gitClone.failed")}</strong>
           <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words taomni-mono text-ui-small text-[var(--taomni-text-muted)]">{task.error}</pre>
         </div>
       )}

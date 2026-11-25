@@ -48,7 +48,7 @@ function statusSummaryKey(status: RedirectorInstallStatus | null): string {
 
 function StepMarker({ index, state }: { index: number; state: StepState }) {
   if (state === "done") {
-    return <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-500" />;
+    return <CheckCircle2 className="w-5 h-5 shrink-0 text-ui-success" />;
   }
   return (
     <span
@@ -186,7 +186,7 @@ export function SocksCapMacosSetupGuide({
           <div
             data-testid="sockscap-macos-setup-status"
             data-installer-source={installStatus?.resourceSource ?? undefined}
-            className="mb-3 flex items-start gap-2 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-ui-small text-sky-800 dark:text-sky-300"
+            className="mb-3 flex items-start gap-2 rounded-lg border border-ui-info-border bg-ui-info-surface px-3 py-2 text-ui-small text-ui-info"
           >
             {busy ? (
               <Loader2 className="mt-0.5 w-3.5 h-3.5 shrink-0 animate-spin" />
@@ -237,7 +237,7 @@ export function SocksCapMacosSetupGuide({
           {error && (
             <div
               data-testid="sockscap-macos-setup-error"
-              className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-ui-small text-red-600 dark:text-red-300 break-words"
+              className="mt-3 rounded-lg border border-ui-danger-border bg-ui-danger-surface px-3 py-2 text-ui-small text-ui-danger break-words"
             >
               {error}
             </div>

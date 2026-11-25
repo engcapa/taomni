@@ -191,7 +191,7 @@ export function FileTransferQueue({
           {filtered.length}
         </span>
         {hasActive && (
-          <span className="text-emerald-500 text-ui-caption flex items-center gap-1 font-medium">
+          <span className="text-ui-success text-ui-caption flex items-center gap-1 font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             {t("fileBrowser.transferActive", { count: activeCount })}
           </span>
@@ -261,7 +261,7 @@ export function FileTransferQueue({
           {filtered.length}
         </span>
         {hasActive && (
-          <span className="text-emerald-500 text-ui-caption flex items-center gap-1 font-medium">
+          <span className="text-ui-success text-ui-caption flex items-center gap-1 font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             {t("fileBrowser.transferActive", { count: activeCount })}
           </span>
@@ -409,7 +409,7 @@ export function FileTransferQueue({
                 />
               </div>
               {it.error && (
-                <div className="text-ui-caption mt-0.5 text-red-500 truncate">{it.error}</div>
+                <div className="text-ui-caption mt-0.5 text-ui-danger truncate">{it.error}</div>
               )}
             </div>
           );

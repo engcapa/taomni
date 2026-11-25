@@ -252,7 +252,7 @@ export function SocksCapView(props: SocksCapViewProps) {
       />
 
       {runtime.status?.phase === "recoveryRequired" && caps?.platform === "macos" && (
-        <div className="px-4 py-3 bg-red-500/10 border-b border-red-500/30 text-ui-small text-red-700 dark:text-red-300">
+        <div className="px-4 py-3 bg-ui-danger-surface border-b border-ui-danger-border text-ui-small text-ui-danger">
           <div className="font-semibold">{t("sockscap.manualRecoveryTitle")}</div>
           <div className="mt-1">{runtime.status.message}</div>
           <ol className="mt-2 ml-4 list-decimal space-y-1">
@@ -262,7 +262,7 @@ export function SocksCapView(props: SocksCapViewProps) {
           </ol>
           <button
             type="button"
-            className="mt-2 inline-flex items-center gap-1 px-2 py-1 rounded border border-red-500/40 hover:bg-red-500/10"
+            className="mt-2 inline-flex items-center gap-1 px-2 py-1 rounded border border-ui-danger-border hover:bg-ui-danger-surface"
             onClick={() => void copyDiagnostics()}
           >
             <Copy className="w-3 h-3" />
@@ -272,12 +272,12 @@ export function SocksCapView(props: SocksCapViewProps) {
       )}
 
       {caps?.platform === "macos" && runtime.redirectorInstall?.state !== "ready" && (
-        <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 text-ui-small flex flex-wrap items-center justify-between gap-2 text-amber-800 dark:text-amber-300">
+        <div className="px-4 py-2 bg-ui-warning-surface border-b border-ui-warning-border text-ui-small flex flex-wrap items-center justify-between gap-2 text-ui-warning">
           <span>{runtime.redirectorInstall?.message || t("sockscap.redirectorMissing")}</span>
           <button
             type="button"
             data-testid="sockscap-redirector-action"
-            className="inline-flex items-center gap-1 px-2 py-1 rounded border border-amber-500/40 hover:bg-amber-500/10 disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded border border-ui-warning-border hover:bg-ui-warning-surface disabled:opacity-50"
             disabled={
               busy ||
               (runtime.redirectorInstall?.state !== "pendingSystemApproval" &&
@@ -307,7 +307,7 @@ export function SocksCapView(props: SocksCapViewProps) {
       {linuxLaunchOnly && (
         <div
           data-testid="sockscap-launch-only-banner"
-          className="px-4 py-2 bg-sky-500/10 border-b border-sky-500/30 text-ui-small text-sky-800 dark:text-sky-300"
+          className="px-4 py-2 bg-ui-info-surface border-b border-ui-info-border text-ui-small text-ui-info"
           title={caps?.linux?.transparentUnavailableReason || undefined}
         >
           <div className="flex items-start gap-2">
@@ -420,7 +420,7 @@ export function SocksCapView(props: SocksCapViewProps) {
           {linuxLaunchOnly && (
             <section
               data-testid="sockscap-rootless-mode"
-              className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3"
+              className="rounded-lg border border-ui-info-border bg-ui-info-surface p-3"
             >
               <div className="text-ui-body font-semibold">
                 {t("sockscap.rootlessModeTitle")}
@@ -429,7 +429,7 @@ export function SocksCapView(props: SocksCapViewProps) {
                 {t("sockscap.rootlessModeDescription")}
               </p>
               {caps?.linux?.containerized && (
-                <p className="mt-1 text-ui-small text-sky-700 dark:text-sky-300">
+                <p className="mt-1 text-ui-small text-ui-info">
                   {t("sockscap.launchOnlyContainer")}
                 </p>
               )}
@@ -662,7 +662,7 @@ export function SocksCapView(props: SocksCapViewProps) {
 
           {msg && (
             <div
-              className={`mt-2 text-ui-small flex gap-1 items-start ${msg.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"
+              className={`mt-2 text-ui-small flex gap-1 items-start ${msg.ok ? "text-ui-success" : "text-ui-danger"
                 }`}
             >
               {msg.ok ? (

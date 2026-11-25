@@ -239,8 +239,8 @@ export function RepoFlatStatusRow({
         {repoAbbr(root.name || root.repoRoot)}
       </span>
       {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-accent)]" /> : null}
-      {error ? <AlertTriangle className="w-3.5 h-3.5 text-red-500" /> : null}
-      <span className={error ? "truncate text-red-500" : "truncate text-[var(--taomni-text-muted)]"}>
+      {error ? <AlertTriangle className="w-3.5 h-3.5 text-ui-danger" /> : null}
+      <span className={error ? "truncate text-ui-danger" : "truncate text-[var(--taomni-text-muted)]"}>
         {error ?? t("git.workspaceChanges.loadingChanges")}
       </span>
     </div>
