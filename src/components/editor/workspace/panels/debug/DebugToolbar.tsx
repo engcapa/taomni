@@ -165,14 +165,14 @@ export function DebugToolWindowToolbar({
       className="flex shrink-0 items-center gap-0.5"
     >
       <ToolButton testId="debug-restart" title="Rerun (Ctrl+F5)" disabled={!debug.canRestart} onClick={() => debug.restart()}>
-        <RotateCcw className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
+        <RotateCcw className="h-3.5 w-3.5 text-ui-success" />
       </ToolButton>
       <ToolButton testId="debug-stop" title="Stop (Ctrl+F2)" disabled={!activeRunning} onClick={() => debug.terminate()}>
-        <Square className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
+        <Square className="h-3.5 w-3.5 text-ui-danger" />
       </ToolButton>
       <Separator />
       <ToolButton testId="debug-continue" title="Resume Program (F9)" disabled={!stopped} onClick={() => void debug.step("continue")}>
-        <CirclePlay className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
+        <CirclePlay className="h-3.5 w-3.5 text-ui-success" />
       </ToolButton>
       <ToolButton
         testId="debug-pause"
@@ -180,16 +180,16 @@ export function DebugToolWindowToolbar({
         disabled={!activeRunning || stopped}
         onClick={() => void debug.step("pause")}
       >
-        <Pause className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
+        <Pause className="h-3.5 w-3.5 text-ui-warning" />
       </ToolButton>
       <ToolButton testId="debug-step-over" title="Step Over (F8)" disabled={stepDisabled} onClick={() => void handleStep("stepOver")}>
-        <ArrowRightToLine className="h-3.5 w-3.5 text-sky-500 dark:text-sky-400" />
+        <ArrowRightToLine className="h-3.5 w-3.5 text-ui-info" />
       </ToolButton>
       <ToolButton testId="debug-step-in" title="Step Into (F7)" disabled={stepDisabled} onClick={() => void handleStep("stepIn")}>
-        <ArrowDownToLine className="h-3.5 w-3.5 text-sky-500 dark:text-sky-400" />
+        <ArrowDownToLine className="h-3.5 w-3.5 text-ui-info" />
       </ToolButton>
       <ToolButton testId="debug-step-out" title="Step Out (Shift+F8)" disabled={stepDisabled} onClick={() => void handleStep("stepOut")}>
-        <ArrowUpFromLine className="h-3.5 w-3.5 text-sky-500 dark:text-sky-400" />
+        <ArrowUpFromLine className="h-3.5 w-3.5 text-ui-info" />
       </ToolButton>
       <Separator />
       <ToolButton
@@ -198,7 +198,7 @@ export function DebugToolWindowToolbar({
         disabled={!onViewBreakpoints}
         onClick={() => onViewBreakpoints?.()}
       >
-        <LayoutList className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
+        <LayoutList className="h-3.5 w-3.5 text-ui-danger" />
       </ToolButton>
       <ToolButton
         testId="debug-toolbar-mute-breakpoints"
@@ -206,7 +206,7 @@ export function DebugToolWindowToolbar({
         pressed={debug.breakpointsMuted}
         onClick={() => debug.setBreakpointsMuted(!debug.breakpointsMuted)}
       >
-        <CircleOff className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
+        <CircleOff className="h-3.5 w-3.5 text-ui-danger" />
       </ToolButton>
       <Separator />
       <button

@@ -25,7 +25,7 @@ export function SearchProgressChip({ query, provider, onCancel, done, resultCoun
   return (
     <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] px-2.5 py-1 text-ui-small">
       {done ? (
-        <Globe className="w-3 h-3 text-green-400 shrink-0" />
+        <Globe className="w-3 h-3 text-ui-success shrink-0" />
       ) : (
         <Loader2 className="w-3 h-3 animate-spin text-[var(--taomni-accent)] shrink-0" />
       )}

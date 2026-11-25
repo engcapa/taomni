@@ -34,7 +34,7 @@ export function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
         <button
           type="button"
           aria-label={t("attachment.remove")}
-          className="hover:text-red-400 transition-colors"
+          className="hover:text-ui-danger transition-colors"
           onClick={onRemove}
         >
           <X className="w-2.5 h-2.5" />

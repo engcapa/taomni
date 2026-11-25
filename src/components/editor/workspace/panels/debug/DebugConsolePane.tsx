@@ -41,7 +41,7 @@ function renderConsoleLine(
       <button
         key={`${match.index}-${fullMatch}`}
         type="button"
-        className="underline underline-offset-2 hover:text-[var(--taomni-accent)] text-sky-500 dark:text-sky-400 cursor-pointer inline font-mono"
+        className="underline underline-offset-2 hover:text-[var(--taomni-accent)] text-ui-info cursor-pointer inline font-mono"
         onClick={() => onOpenLocation(path, line, col)}
         title={`Jump to ${path}:${line}${col != null ? ":" + col : ""}`}
       >

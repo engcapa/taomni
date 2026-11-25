@@ -59,7 +59,7 @@ export function SurroundWithDialog({ open, languageId, onClose, onPick }: Surrou
       <div className="flex w-full max-w-md flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
           <div className="flex items-center gap-2">
-            <BoxSelect className="h-4 w-4 text-sky-400" />
+            <BoxSelect className="h-4 w-4 text-ui-info" />
             <h2 id="surround-with-title" className="text-ui-body font-semibold">Surround With…</h2>
           </div>
           <button
@@ -92,7 +92,7 @@ export function SurroundWithDialog({ open, languageId, onClose, onPick }: Surrou
                 }}
                 className={`flex w-full items-center justify-between rounded px-3 py-1.5 text-left ${
                   idx === selectedIndex
-                    ? "bg-sky-500/15 text-[var(--taomni-code-text)]"
+                    ? "bg-ui-info-surface text-[var(--taomni-code-text)]"
                     : "hover:bg-[var(--taomni-code-active-line-bg)]"
                 }`}
               >

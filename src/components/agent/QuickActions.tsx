@@ -93,7 +93,7 @@ export function QuickActions({ sessionId, terminalContent, hasError, onExplanati
       {hasError && (
         <button
           type="button"
-          className="taomni-btn h-6 px-2 text-ui-small inline-flex items-center gap-1 text-yellow-400 border-yellow-500/30"
+          className="taomni-btn h-6 px-2 text-ui-small inline-flex items-center gap-1 text-ui-warning border-ui-warning-border"
           onClick={handleExplainError}
           disabled={loading === "explain"}
           title={t("agent.explainErrorTitle")}

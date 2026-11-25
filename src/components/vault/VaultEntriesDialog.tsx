@@ -88,7 +88,7 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
           <div className="ml-auto flex items-center">
             <IconButton
               label={t("vaultSettings.close")}
-              className="hover:bg-red-500 rounded p-0.5 animate-all duration-150"
+              className="hover:bg-[var(--taomni-control-hover)] rounded p-0.5 animate-all duration-150"
               onClick={onClose}
               type="button"
             >

@@ -290,7 +290,7 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
                 >
                   <div className="flex items-center gap-2">
                     <span className={`min-w-0 flex-1 truncate ${unread ? "font-semibold" : ""}`}>{sender(entry.message)}</span>
-                    {isStarred(entry.message) && <Star className="w-3 h-3 text-ui-warning fill-amber-500" />}
+                    {isStarred(entry.message) && <Star className="w-3 h-3 text-ui-warning fill-[var(--taomni-warning-icon)]" />}
                     <span className="shrink-0 text-ui-small text-[var(--taomni-text-muted)]">{formatDate(entry.message.dateTs)}</span>
                   </div>
                   <div className={`truncate ${unread ? "font-semibold" : ""}`}>{entry.message.subject || "(no subject)"}</div>

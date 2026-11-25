@@ -124,7 +124,7 @@ export function ToolboxDialogs({
             </IconButton>
           </div>
         )}
-        {hashErr && <div className="text-ui-body text-red-500">{hashErr}</div>}
+        {hashErr && <div className="text-ui-body text-ui-danger">{hashErr}</div>}
       </NotepadDialog>
     );
   }
@@ -174,7 +174,7 @@ export function ToolboxDialogs({
         value={workText}
         onChange={(e) => setWorkText(e.target.value)}
       />
-      {mimeErr && <div className="text-ui-body text-red-500">{mimeErr}</div>}
+      {mimeErr && <div className="text-ui-body text-ui-danger">{mimeErr}</div>}
     </NotepadDialog>
   );
 }

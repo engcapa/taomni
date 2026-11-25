@@ -196,7 +196,7 @@ export function QuickDocPopup({
         onClick={onBodyClick}
         dangerouslySetInnerHTML={{ __html: html }}
       />
-      {linkError && <div role="status" className="px-2 pb-1 text-ui-caption text-red-400">{linkError}</div>}
+      {linkError && <div role="status" className="px-2 pb-1 text-ui-caption text-ui-danger">{linkError}</div>}
       <ReferenceContentFooter content={content} onOpenSource={onOpenSource} />
       <div className="absolute top-0 left-0 z-[var(--taomni-z-sticky)] h-4 w-4 cursor-nw-resize select-none" onMouseDown={handleResizeMouseDown("nw")} />
       <div className="absolute top-0 right-0 z-[var(--taomni-z-sticky)] h-4 w-4 cursor-ne-resize select-none" onMouseDown={handleResizeMouseDown("ne")} />

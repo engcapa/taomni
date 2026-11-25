@@ -185,7 +185,7 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
             data-testid="workspace-resource-cleanup-recovery"
             role="status"
             aria-live="polite"
-            className="shrink-0 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-ui-small"
+            className="shrink-0 border-b border-ui-warning-border bg-ui-warning-surface px-3 py-1.5 text-ui-small"
           >
             {recoveryState.resourceCleanupRecoveries.map((recovery) => (
               <div
@@ -197,7 +197,7 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
                 data-attempt-count={recovery.attemptCount}
                 className="flex min-w-0 items-center gap-2"
               >
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-ui-warning" />
                 <span className="min-w-0 flex-1 truncate">
                   Cleanup paused at {recovery.nextStage} for {recovery.fileKey}: {recovery.error}
                 </span>

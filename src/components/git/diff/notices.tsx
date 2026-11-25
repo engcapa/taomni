@@ -41,11 +41,11 @@ export function ImageDiff({ pair }: { pair: GitBlobPair }) {
 export function ImageSide({ label, url, missing }: { label: string; url: string | null; missing: string }) {
   return (
     <div className="min-w-0 flex flex-col items-center gap-2">
-      <div className="text-ui-small text-slate-300">{label}</div>
+      <div className="text-ui-small text-[var(--taomni-text)]">{label}</div>
       {url ? (
         <img src={url} alt={label} className="max-w-full object-contain border border-[var(--taomni-divider)]" />
       ) : (
-        <div className="flex-1 flex items-center justify-center text-ui-body text-slate-400">{missing}</div>
+        <div className="flex-1 flex items-center justify-center text-ui-body text-[var(--taomni-text)]">{missing}</div>
       )}
     </div>
   );

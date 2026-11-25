@@ -431,7 +431,7 @@ export function SearchEverywhere({
               <span className="shrink-0">Open In Right Split Ctrl+Enter</span>
             )}
             {(mode === "files" || mode === "all") && fileSearchError && (
-              <span role="status" className="truncate text-amber-600" title={fileSearchError}>Some folders could not be searched: {fileSearchError}</span>
+              <span role="status" className="truncate text-ui-warning" title={fileSearchError}>Some folders could not be searched: {fileSearchError}</span>
             )}
             {(mode === "files" || mode === "all") && loading && (
               <span role="status" className="shrink-0">Searching workspace…</span>
@@ -447,7 +447,7 @@ export function SearchEverywhere({
                 aria-label={providerStatus}
                 title={providerStatus}
                 data-complete={symbolQueryStatus.complete}
-                className={`inline-block h-2 w-2 shrink-0 rounded-full ${symbolQueryStatus.complete ? "bg-emerald-500/70" : "bg-amber-500"}`}
+                className={`inline-block h-2 w-2 shrink-0 rounded-full ${symbolQueryStatus.complete ? "bg-[var(--taomni-success-icon)]" : "bg-[var(--taomni-warning-icon)]"}`}
               />
             )}
             {mode === "text" && <Type className="inline h-3 w-3 shrink-0" />}

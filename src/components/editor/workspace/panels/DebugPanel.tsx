@@ -334,7 +334,7 @@ export function DebugPanel({
               <div
                 data-testid="debug-configuration-diagnostic"
                 role="status"
-                className="max-w-64 truncate text-ui-caption text-amber-600 dark:text-amber-400"
+                className="max-w-64 truncate text-ui-caption text-ui-warning"
                 title={configurationDiagnostic}
               >
                 {configurationDiagnostic}
@@ -344,33 +344,33 @@ export function DebugPanel({
               <IconButton
                 type="button"
                 data-testid="debug-start"
-                className={`${controlBtn} hover:bg-emerald-500/15`}
+                className={`${controlBtn} hover:bg-ui-success-surface`}
                 onClick={() => onStart?.()}
                 disabled={!onStart}
                 labelKey="debugActiveFile"
               >
-                <CirclePlay className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+                <CirclePlay className="h-4 w-4 text-ui-success" />
               </IconButton>
               {onAttach && (
                 <IconButton
                   type="button"
                   data-testid="debug-attach"
-                  className={`${controlBtn} hover:bg-sky-500/15`}
+                  className={`${controlBtn} hover:bg-ui-info-surface`}
                   onClick={onAttach}
                   labelKey="attachRemoteJvm"
                 >
-                  <Plug className="h-4 w-4 text-sky-500 dark:text-sky-400" />
+                  <Plug className="h-4 w-4 text-ui-info" />
                 </IconButton>
               )}
               {debug.canRestart && !state && (
                 <IconButton
                   type="button"
                   data-testid="debug-restart"
-                  className={`${controlBtn} hover:bg-emerald-500/15`}
+                  className={`${controlBtn} hover:bg-ui-success-surface`}
                   onClick={() => debug.restart()}
                   labelKey="restartDebug"
                 >
-                  <RotateCcw className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+                  <RotateCcw className="h-4 w-4 text-ui-success" />
                 </IconButton>
               )}
             </div>

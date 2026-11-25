@@ -10,7 +10,7 @@ export function DiffPane({ diff,loading }: { diff: string; loading: boolean; }) 
           <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading diff
         </div>
       ):diff? (
-        <pre className="taomni-mono text-ui-body leading-5 p-3 whitespace-pre-wrap break-words text-slate-100">{diff}</pre>
+        <pre className="taomni-mono text-ui-body leading-5 p-3 whitespace-pre-wrap break-words text-[var(--taomni-text)]">{diff}</pre>
       ):(
         <EmptyState title="Select an item to preview its diff" />
       )}

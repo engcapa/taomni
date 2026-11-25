@@ -200,7 +200,7 @@ export function DapAdapterGuideDialog({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/40 px-4 py-3">
           <div className="flex items-center gap-2.5">
-            <Bug className="h-5 w-5 text-emerald-400" />
+            <Bug className="h-5 w-5 text-ui-success" />
             <div>
               <h2 className="text-ui-body font-semibold">DAP Debug Adapter Matrix & Setup Guide</h2>
               <p className="text-ui-small text-[var(--taomni-code-muted)]">
@@ -228,7 +228,7 @@ export function DapAdapterGuideDialog({
               onClick={() => setSelectedLang(fixture.language)}
               className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-ui-body font-medium transition-colors ${
                 selectedLang === fixture.language
-                  ? "border-emerald-500 text-emerald-400"
+                  ? "border-ui-success-border text-ui-success"
                   : "border-transparent text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
               }`}
             >
@@ -258,19 +258,19 @@ export function DapAdapterGuideDialog({
 
             {/* Protocol Capabilities Checklist */}
             <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[var(--taomni-code-border)]/40 text-ui-small">
-              <div className="flex items-center gap-1 text-emerald-400">
+              <div className="flex items-center gap-1 text-ui-success">
                 <Check className="h-3.5 w-3.5" />
                 <span>Breakpoints / Step</span>
               </div>
-              <div className="flex items-center gap-1 text-emerald-400">
+              <div className="flex items-center gap-1 text-ui-success">
                 <Check className="h-3.5 w-3.5" />
                 <span>Evaluate / Watch</span>
               </div>
-              <div className="flex items-center gap-1 text-emerald-400">
+              <div className="flex items-center gap-1 text-ui-success">
                 <Check className="h-3.5 w-3.5" />
                 <span>Exception Options</span>
               </div>
-              <div className="flex items-center gap-1 text-emerald-400">
+              <div className="flex items-center gap-1 text-ui-success">
                 <Check className="h-3.5 w-3.5" />
                 <span>Memory & Mode Gate</span>
               </div>
@@ -281,7 +281,7 @@ export function DapAdapterGuideDialog({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5 text-ui-body font-semibold">
-                <Terminal className="h-4 w-4 text-emerald-400" />
+                <Terminal className="h-4 w-4 text-ui-success" />
                 <span>Installation & Binary Setup</span>
               </div>
               <button
@@ -290,7 +290,7 @@ export function DapAdapterGuideDialog({
                 onClick={() => handleCopy(details.installCommand, "install")}
                 className="flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-2 py-0.5 text-ui-caption hover:bg-[var(--taomni-code-active-line-bg)]"
               >
-                {copiedKey === "install" ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                {copiedKey === "install" ? <Check className="h-3 w-3 text-ui-success" /> : <Copy className="h-3 w-3" />}
                 <span>{copiedKey === "install" ? "Copied" : "Copy Command"}</span>
               </button>
             </div>
@@ -303,7 +303,7 @@ export function DapAdapterGuideDialog({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5 text-ui-body font-semibold">
-                <Layers className="h-4 w-4 text-emerald-400" />
+                <Layers className="h-4 w-4 text-ui-success" />
                 <span>Launch Configuration Template (<code>.taomni/run-configurations.json</code>)</span>
               </div>
               <button
@@ -312,7 +312,7 @@ export function DapAdapterGuideDialog({
                 onClick={() => handleCopy(details.defaultConfigSnippet, "config")}
                 className="flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-2 py-0.5 text-ui-caption hover:bg-[var(--taomni-code-active-line-bg)]"
               >
-                {copiedKey === "config" ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                {copiedKey === "config" ? <Check className="h-3 w-3 text-ui-success" /> : <Copy className="h-3 w-3" />}
                 <span>{copiedKey === "config" ? "Copied" : "Copy JSON"}</span>
               </button>
             </div>
@@ -332,7 +332,7 @@ export function DapAdapterGuideDialog({
             href={details.docsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-emerald-400 hover:underline"
+            className="flex items-center gap-1 text-ui-success hover:underline"
           >
             <span>Adapter Documentation</span>
             <ExternalLink className="h-3 w-3" />

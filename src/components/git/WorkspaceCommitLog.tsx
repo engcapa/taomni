@@ -236,7 +236,7 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
             {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           </div>
           {error && (
-            <div className="shrink-0 px-3 py-1 text-ui-small text-red-500 border-b border-[var(--taomni-divider)]">
+            <div className="shrink-0 px-3 py-1 text-ui-small text-ui-danger border-b border-[var(--taomni-divider)]">
               {error}
             </div>
           )}

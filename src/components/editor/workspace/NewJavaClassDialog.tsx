@@ -122,7 +122,7 @@ export function NewJavaClassDialog({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
           <div className="flex items-center gap-2 font-medium">
-            <FileCode className="h-4 w-4 text-blue-400" />
+            <FileCode className="h-4 w-4 text-ui-info" />
             <span id={titleId}>New Java Class</span>
           </div>
           <div className="flex items-center gap-1">
@@ -163,7 +163,7 @@ export function NewJavaClassDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. MyService"
               data-testid="new-java-class-name-input"
-              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-blue-500"
+              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-[var(--taomni-focus-ring)]"
             />
           </div>
 
@@ -176,7 +176,7 @@ export function NewJavaClassDialog({
               value={kind}
               onChange={(e) => setKind(e.target.value as JavaTemplateKind)}
               data-testid="new-java-class-kind-select"
-              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-blue-500"
+              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-[var(--taomni-focus-ring)]"
             >
               {TEMPLATE_KIND_OPTIONS.map((opt) => (
                 <option key={opt.kind} value={opt.kind}>
@@ -196,7 +196,7 @@ export function NewJavaClassDialog({
             </div>
             {projectFactsStatus && projectFactsStatus !== "ready" && (
               <div
-                className="flex items-center gap-1.5 text-amber-400"
+                className="flex items-center gap-1.5 text-ui-warning"
                 data-testid="new-java-class-facts-status"
               >
                 <AlertCircle className="h-3 w-3 shrink-0" />
@@ -208,7 +208,7 @@ export function NewJavaClassDialog({
           {/* Error message */}
           {error && (
             <div
-              className="flex items-center gap-1.5 rounded bg-red-950/40 border border-red-900/50 p-2 text-ui-small text-red-400"
+              className="flex items-center gap-1.5 rounded bg-ui-danger-surface border border-ui-danger-border p-2 text-ui-small text-ui-danger"
               data-testid="new-java-class-error"
             >
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
@@ -231,7 +231,8 @@ export function NewJavaClassDialog({
             onClick={() => void handleSubmit()}
             disabled={!plan?.valid || submitting}
             data-testid="new-java-class-submit"
-            className="rounded bg-blue-600 px-3 py-1 font-medium text-ui-small text-white hover:bg-blue-500 disabled:opacity-50 disabled:pointer-events-none"
+            data-primary="true"
+            className="taomni-btn rounded px-3 py-1 font-medium text-ui-small disabled:opacity-50 disabled:pointer-events-none"
           >
             {submitting ? "Creating..." : "OK"}
           </button>

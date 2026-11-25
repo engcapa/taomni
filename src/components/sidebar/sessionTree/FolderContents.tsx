@@ -146,18 +146,18 @@ export function TreeFolder({
         onContextMenu={onContextMenu}
       >
         {open ? (
-          <ChevronDown className="w-3 h-3 text-slate-500" />
+          <ChevronDown className="w-3 h-3 text-[var(--taomni-text-muted)]" />
         ) : (
-          <ChevronRight className="w-3 h-3 text-slate-500" />
+          <ChevronRight className="w-3 h-3 text-[var(--taomni-text-muted)]" />
         )}
         {open || isRoot ? (
-          <FolderOpen className="w-3.5 h-3.5 text-amber-600" />
+          <FolderOpen className="w-3.5 h-3.5 text-ui-warning" />
         ) : (
-          <Folder className="w-3.5 h-3.5 text-amber-600" />
+          <Folder className="w-3.5 h-3.5 text-ui-warning" />
         )}
         <span className="flex-1 font-medium truncate">{node.name}</span>
         {count !== undefined && hasChildren && (
-          <span className="text-slate-500" style={{ fontSize: "calc(var(--taomni-ui-font-size) - 2px)" }}>({count})</span>
+          <span className="text-[var(--taomni-text-muted)]" style={{ fontSize: "calc(var(--taomni-ui-font-size) - 2px)" }}>({count})</span>
         )}
       </div>
       {open && <div className="pl-4">{children}</div>}

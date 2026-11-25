@@ -58,7 +58,7 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete, pre
                 data-testid={`${prefix}-toggle-complete`}
               >
                 {done ? (
-                  <CheckCircle2 className="w-4 h-4 text-green-400" />
+                  <CheckCircle2 className="w-4 h-4 text-ui-success" />
                 ) : (
                   <Circle className="w-4 h-4" />
                 )}

@@ -70,7 +70,7 @@ export default function ProxyTestTab({ info }: { info: ProxyTestTabInfo }) {
       </div>
 
       {result && (
-        <div className={`flex items-center gap-2 text-sm ${result.ok ? "text-green-600" : "text-red-600"}`}>
+        <div className={`flex items-center gap-2 text-sm ${result.ok ? "text-ui-success" : "text-ui-danger"}`}>
           {result.ok
             ? <CheckCircle2 className="w-5 h-5" />
             : <XCircle className="w-5 h-5" />}

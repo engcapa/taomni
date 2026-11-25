@@ -153,7 +153,7 @@ export function DataBreakpointsView({
             <div
               data-testid="debug-data-breakpoint-create-notice"
               role="status"
-              className={targetNotice.added ? "text-emerald-500" : "text-rose-500"}
+              className={targetNotice.added ? "text-ui-success" : "text-ui-danger"}
             >
               {targetNotice.message}
             </div>
@@ -161,7 +161,7 @@ export function DataBreakpointsView({
         </div>
       )}
       {hasUnsupportedEntries && (
-        <div data-testid="debug-data-breakpoint-unsupported" className="px-3 pb-1 text-ui-caption text-amber-500">
+        <div data-testid="debug-data-breakpoint-unsupported" className="px-3 pb-1 text-ui-caption text-ui-warning">
           The active debug adapter does not support data breakpoints.
         </div>
       )}
@@ -201,15 +201,15 @@ export function DataBreakpointsView({
                 title={breakpoint.description}
               >
                 {breakpoint.description}
-                {breakpoint.condition && <span className="ml-2 text-amber-500">if {breakpoint.condition}</span>}
-                {breakpoint.hitCondition && <span className="ml-2 text-amber-500">hit {breakpoint.hitCondition}</span>}
-                {breakpoint.asAddress && <span className="ml-2 text-sky-600 dark:text-sky-400">address</span>}
-                {breakpoint.bytes && <span className="ml-2 text-sky-600 dark:text-sky-400">{breakpoint.bytes} bytes</span>}
-                {modeLabel && <span className="ml-2 text-emerald-600 dark:text-emerald-400">{modeLabel}</span>}
+                {breakpoint.condition && <span className="ml-2 text-ui-warning">if {breakpoint.condition}</span>}
+                {breakpoint.hitCondition && <span className="ml-2 text-ui-warning">hit {breakpoint.hitCondition}</span>}
+                {breakpoint.asAddress && <span className="ml-2 text-ui-info">address</span>}
+                {breakpoint.bytes && <span className="ml-2 text-ui-info">{breakpoint.bytes} bytes</span>}
+                {modeLabel && <span className="ml-2 text-ui-success">{modeLabel}</span>}
                 {bindingHint && (
                   <span
                     data-testid={`debug-data-breakpoint-binding-${index}`}
-                    className={`ml-2 ${bindingHint.status === "failed" ? "text-rose-500" : "text-[var(--taomni-text-muted)]"}`}
+                    className={`ml-2 ${bindingHint.status === "failed" ? "text-ui-danger" : "text-[var(--taomni-text-muted)]"}`}
                     title={bindingHint.message ?? undefined}
                   >
                     {bindingHint.status === "failed" ? "not bound" : "pending"}
@@ -253,7 +253,7 @@ export function DataBreakpointsView({
               <IconButton
                 type="button"
                 data-testid={`debug-data-breakpoint-remove-${index}`}
-                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-rose-500"
+                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-ui-danger"
                 labelKey="removeDataBreakpoint"
                 onClick={() => debug.removeDataBreakpoint(key)}
               >

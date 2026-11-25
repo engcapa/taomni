@@ -426,7 +426,7 @@ export function Composer({
               {onRemoveQueued && (
                 <button
                   type="button"
-                  className="shrink-0 rounded p-0.5 text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-red-400"
+                  className="shrink-0 rounded p-0.5 text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-ui-danger"
                   onClick={() => onRemoveQueued(item.id)}
                   title={t("chat.queuedRemove")}
                   aria-label={t("chat.queuedRemove")}

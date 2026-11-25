@@ -219,7 +219,7 @@ export function TabItem(props: TabItemProps) {
         <TabIcon tab={tab} />
         {tab.hasNewOutput && (
           <span
-            className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 pointer-events-none"
+            className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--taomni-success-icon)] pointer-events-none"
             aria-label={t("tabs.newOutput")}
           />
         )}

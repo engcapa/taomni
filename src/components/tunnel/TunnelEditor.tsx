@@ -215,7 +215,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
           <div className="text-ui-body font-semibold">{initial ? t("tunnels.editor.titleEdit") : t("tunnels.editor.titleNew")}</div>
           <IconButton
             label={t("tunnels.editor.close")}
-            className="ml-auto hover:bg-red-500 rounded p-0.5"
+            className="ml-auto hover:bg-[var(--taomni-control-hover)] rounded p-0.5"
             onClick={onCancel}
             type="button"
           >

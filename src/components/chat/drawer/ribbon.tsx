@@ -153,10 +153,10 @@ export function ChatDrawerRibbon() {
   }
   const badgeBg =
     colorBucket === "red"
-      ? "bg-red-500 text-white"
+      ? "bg-ui-danger-surface text-ui-danger"
       : colorBucket === "amber"
-        ? "bg-amber-400 text-black"
-        : "bg-[var(--taomni-accent)] text-white";
+        ? "bg-ui-warning-surface text-ui-warning"
+        : "bg-ui-info-surface text-ui-info";
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;

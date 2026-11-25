@@ -60,7 +60,7 @@ export function SessionEditorView(props: SessionEditorViewProps) {
             <IconButton
               data-testid="session-close"
               label={form.t("sessionEditor2.closeTitle")}
-              className="hover:bg-red-500 rounded p-0.5"
+              className="hover:bg-[var(--taomni-control-hover)] rounded p-0.5"
               onClick={onClose}
               type="button"
             >

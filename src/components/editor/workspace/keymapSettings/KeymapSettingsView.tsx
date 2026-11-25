@@ -220,7 +220,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
         </div>
 
         {(corruptDiagnostic || draftScheme?.readOnly) && (
-          <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-1.5 text-xs text-amber-500" role="status">
+          <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-1.5 text-xs text-ui-warning" role="status">
             {corruptDiagnostic
               ? "Stored keymap was corrupted; a backup was kept and defaults are active."
               : "Built-in scheme — the first change creates an editable copy."}
@@ -389,9 +389,9 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
                   ? <span data-testid="keymap-mouse-recorder-value"><ShortcutKeyCaps shortcut={mouseShortcut} /></span>
                   : <span className="opacity-60">Click here with modifier keys</span>}
               </div>
-              {mouseHint && <div data-testid="keymap-mouse-recorder-hint" role="alert" className="mt-1.5 text-amber-500">{mouseHint}</div>}
+              {mouseHint && <div data-testid="keymap-mouse-recorder-hint" role="alert" className="mt-1.5 text-ui-warning">{mouseHint}</div>}
               {mouseConflicts.length > 0 && (
-                <div data-testid="keymap-mouse-recorder-conflicts" role="status" className="mt-1.5 text-amber-500">
+                <div data-testid="keymap-mouse-recorder-conflicts" role="status" className="mt-1.5 text-ui-warning">
                   ⚠ Already assigned to: {mouseConflicts.map((holder) => `${holder.title} (${holder.actionId})`).join(", ")}
                 </div>
               )}

@@ -206,7 +206,7 @@ export function TodosBookmarksPanel({
                           {item.state === "missing" && (
                             <span
                               data-testid="code-workspace-bookmark-missing"
-                              className="block truncate text-ui-caption text-amber-400"
+                              className="block truncate text-ui-caption text-ui-warning"
                             >
                               Missing target
                             </span>

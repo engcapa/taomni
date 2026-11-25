@@ -129,7 +129,7 @@ export function MacroDialogs({
   if (kind === "tamper") {
     return (
       <NotepadDialog testId="notepad-macro-tamper-dialog" onClose={onClose}
-        title={<span className="inline-flex items-center gap-1.5 text-amber-500">
+        title={<span className="inline-flex items-center gap-1.5 text-ui-warning">
               <ShieldAlert size={15} />
               {label("宏配置文件完整性校验失败", "Macro Integrity Check Failed")}
             </span>}

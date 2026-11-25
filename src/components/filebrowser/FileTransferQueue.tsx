@@ -192,7 +192,7 @@ export function FileTransferQueue({
         </span>
         {hasActive && (
           <span className="text-ui-success text-ui-caption flex items-center gap-1 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--taomni-success-icon)] animate-pulse" />
             {t("fileBrowser.transferActive", { count: activeCount })}
           </span>
         )}
@@ -262,7 +262,7 @@ export function FileTransferQueue({
         </span>
         {hasActive && (
           <span className="text-ui-success text-ui-caption flex items-center gap-1 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--taomni-success-icon)] animate-pulse" />
             {t("fileBrowser.transferActive", { count: activeCount })}
           </span>
         )}
@@ -421,15 +421,15 @@ export function FileTransferQueue({
 
 function StateBadge({ state }: { state: TransferState }) {
   const colors: Record<TransferState, string> = {
-    queued: "bg-slate-500",
-    running: "bg-[var(--taomni-accent)]",
-    paused: "bg-amber-500",
-    done: "bg-emerald-600",
-    error: "bg-red-600",
-    cancelled: "bg-slate-400",
+    queued: "bg-[var(--taomni-panel-bg)] text-[var(--taomni-text)]",
+    running: "bg-ui-info-surface text-ui-info",
+    paused: "bg-ui-warning-surface text-ui-warning",
+    done: "bg-ui-success-surface text-ui-success",
+    error: "bg-ui-danger-surface text-ui-danger",
+    cancelled: "bg-[var(--taomni-panel-bg)] text-[var(--taomni-text-muted)]",
   };
   return (
-    <span className={`text-white text-ui-caption px-1 rounded ${colors[state]}`}>
+    <span className={`text-ui-caption px-1 rounded ${colors[state]}`}>
       {state}
     </span>
   );

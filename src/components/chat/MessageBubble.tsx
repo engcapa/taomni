@@ -289,7 +289,7 @@ export function MessageBubble({
               aria-label={t("chat.sendAllAria")}
             >
               {sentAll ? (
-                <Check className="w-3 h-3 text-green-400" />
+                <Check className="w-3 h-3 text-ui-success" />
               ) : (
                 <Send className="w-3 h-3" />
               )}
@@ -305,7 +305,7 @@ export function MessageBubble({
               aria-label={t("chat.sendAllQueryAria")}
             >
               {sentAllQuery ? (
-                <Check className="w-3 h-3 text-green-400" />
+                <Check className="w-3 h-3 text-ui-success" />
               ) : (
                 <Database className="w-3 h-3" />
               )}
@@ -320,7 +320,7 @@ export function MessageBubble({
             aria-label={t("chat.copyMessageAria")}
           >
             {copied ? (
-              <Check className="w-3 h-3 text-green-400" />
+              <Check className="w-3 h-3 text-ui-success" />
             ) : (
               <Copy className="w-3 h-3 text-[var(--taomni-text-muted)]" />
             )}

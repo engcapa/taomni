@@ -217,7 +217,7 @@ function BindingRow({ registry, resolved, rootId, busyKey, onBindingChange, t }:
           <span className="font-medium text-[var(--taomni-code-text)]">{sourceLabel(resolved.source, t)}</span>
           {` · ${resolved.reason}`}
           {resolved.installation?.lastError && resolved.installation.lastError !== resolved.reason && (
-            <div className="mt-1 whitespace-pre-wrap break-words text-red-400">
+            <div className="mt-1 whitespace-pre-wrap break-words text-ui-danger">
               {resolved.installation.lastError}
             </div>
           )}
@@ -327,8 +327,8 @@ function KotlinProfileDetails({ profile, t }: { profile: ProjectSdkProfile; t: T
     [t("settings.workspaceSdkGradleLauncher"), kotlin.gradleLauncherJavaHome],
   ];
   return (
-    <div data-testid={`workspace-kotlin-profile-${profileTestId(profile.scopePath)}`} className="mt-2 rounded border border-violet-500/25 bg-violet-500/5 p-2">
-      <div className="mb-1.5 text-ui-caption font-semibold text-violet-400">
+    <div data-testid={`workspace-kotlin-profile-${profileTestId(profile.scopePath)}`} className="mt-2 rounded border border-ui-info-border bg-ui-info-surface p-2">
+      <div className="mb-1.5 text-ui-caption font-semibold text-ui-info">
         {t("settings.workspaceSdkKotlinTitle")}
       </div>
       <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-ui-caption sm:grid-cols-2 xl:grid-cols-4">
@@ -424,7 +424,7 @@ export const WorkspaceSdkStatus = memo(function WorkspaceSdkStatus({ roots, auto
           : issueCount > 0
             ? <AlertTriangle className="h-3 w-3" />
             : loaded
-              ? <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+              ? <CheckCircle2 className="h-3 w-3 text-ui-success" />
               : <Wrench className="h-3 w-3" />}
         {buttonText}
       </button>

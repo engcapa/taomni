@@ -93,7 +93,7 @@ export function MarkdownPreview({
         })
         .catch((err) => {
           if (cancelled) return;
-          diagram.className = "p-3 text-ui-body text-red-500";
+          diagram.className = "p-3 text-ui-body text-ui-danger";
           diagram.textContent = errorMessage(err);
         });
     }

@@ -58,10 +58,10 @@ export function ShortcutMapperDialog({ open, onClose }: { open: boolean; onClose
       </div>
       {conflicts.length > 0 && (
         <div
-          className="flex items-center gap-2 text-ui-body p-2 rounded border border-amber-500/60 bg-amber-500/10"
+          className="flex items-center gap-2 text-ui-body p-2 rounded border border-ui-warning-border bg-ui-warning-surface"
           data-testid="notepad-keymap-conflict-banner"
         >
-          <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+          <AlertTriangle size={14} className="text-ui-warning shrink-0" />
           <span>
             {label(
               `检测到 ${conflicts.length} 组快捷键冲突`,
@@ -85,7 +85,7 @@ export function ShortcutMapperDialog({ open, onClose }: { open: boolean; onClose
               <button
                 type="button"
                 data-testid={`notepad-keymap-bind-${cmd.id}`}
-                className={`np-btn font-mono min-w-28 ${isCapturing ? "primary" : ""} ${hasConflict ? "border-amber-500 text-amber-500" : ""}`}
+                className={`np-btn font-mono min-w-28 ${isCapturing ? "primary" : ""} ${hasConflict ? "border-ui-warning-border text-ui-warning" : ""}`}
                 onClick={() => setCapturingId(cmd.id)}
                 onKeyDown={(e) => {
                   if (!isCapturing) return;

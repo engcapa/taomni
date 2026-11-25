@@ -307,7 +307,8 @@ export function SocksCapMacosSetupGuide({
             <button
               type="button"
               data-testid="sockscap-macos-setup-finish"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body bg-emerald-600 text-white hover:bg-emerald-500"
+              data-primary="true"
+              className="taomni-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body"
               onClick={onClose}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />

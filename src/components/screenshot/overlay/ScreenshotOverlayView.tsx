@@ -185,7 +185,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
             </label>)}
           </fieldset>
           <p data-testid="screenshot-scroll-mode-description" className="mb-3">{state.t(state.scrollMode === "auto" ? "screenshot.scrollRunningHint" : "screenshot.scrollManualHint")}</p>
-          {state.plannedRegion && physSel && state.plannedRegion.height !== physSel.height && <p data-testid="screenshot-scroll-adjusted" className="mb-3 text-amber-600">{state.t("screenshot.scrollAdjusted", { width: state.plannedRegion.width, height: state.plannedRegion.height })}</p>}
+          {state.plannedRegion && physSel && state.plannedRegion.height !== physSel.height && <p data-testid="screenshot-scroll-adjusted" className="mb-3 text-ui-warning">{state.t("screenshot.scrollAdjusted", { width: state.plannedRegion.width, height: state.plannedRegion.height })}</p>}
           <p data-testid="screenshot-scroll-instructions" className="mb-4">{state.t("screenshot.scrollInstructions")}</p>
           <div className="flex justify-end gap-2">
             <button data-testid="screenshot-scroll-confirm-cancel" type="button" className="px-3 py-2 rounded-lg" onClick={() => state.setScrollConfirm(false)}>{state.t("screenshot.cancel")}</button>

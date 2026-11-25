@@ -72,14 +72,14 @@ export function ExceptionBreakpointsView({ debug }: ExceptionBreakpointsViewProp
               <span className="min-w-0 flex-1 truncate">
                 {filter.label}
                 {setting.condition && (
-                  <span className="ml-2 text-amber-500">if {setting.condition}</span>
+                  <span className="ml-2 text-ui-warning">if {setting.condition}</span>
                 )}
                 {bindingHint && (
                   <span
                     data-testid={`debug-exception-breakpoint-binding-${index}`}
                     className={`ml-2 ${
                       bindingHint.status === "failed"
-                        ? "text-rose-500"
+                        ? "text-ui-danger"
                         : "text-[var(--taomni-text-muted)]"
                     }`}
                     title={bindingHint.message ?? undefined}
@@ -223,7 +223,7 @@ export function ExceptionBreakpointRulesView({
                     data-testid={`debug-exception-rule-binding-${index}`}
                     className={`ml-2 font-sans ${
                       bindingHint.status === "failed"
-                        ? "text-rose-500"
+                        ? "text-ui-danger"
                         : "text-[var(--taomni-text-muted)]"
                     }`}
                     title={bindingHint.message ?? undefined}

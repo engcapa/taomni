@@ -144,7 +144,8 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
       <button
         type="button"
         data-testid="sockscap-stop"
-        className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-ui-body bg-red-600/90 text-white hover:bg-red-600"
+        data-danger="true"
+        className="taomni-btn inline-flex items-center gap-1 px-3 py-1.5 rounded text-ui-body"
         onClick={() => void viewProps.onStop()}
         disabled={viewProps.busy}
       >

@@ -116,7 +116,7 @@ export function RecentLocationsDialog({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-3">
           <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-sky-400" />
+            <Clock className="h-5 w-5 text-ui-info" />
             <div>
               <h2 id="recent-locations-title" className="text-ui-title font-semibold">
                 Recent Locations
@@ -163,7 +163,7 @@ export function RecentLocationsDialog({
               placeholder="Search in recent locations and code snippets..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-9 pr-3 text-ui-body text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-sky-500"
+              className="h-8 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-9 pr-3 text-ui-body text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-[var(--taomni-focus-ring)]"
             />
           </div>
         </div>
@@ -188,13 +188,13 @@ export function RecentLocationsDialog({
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={`cursor-pointer rounded-lg border p-3 transition-colors ${
                     isSelected
-                      ? "border-sky-500/60 bg-sky-500/10 shadow-sm"
-                      : "border-[var(--taomni-code-border)]/60 bg-[var(--taomni-code-active-line-bg)]/20 hover:border-sky-500/40"
+                      ? "border-ui-info-border bg-ui-info-surface shadow-sm"
+                      : "border-[var(--taomni-code-border)]/60 bg-[var(--taomni-code-active-line-bg)]/20 hover:border-ui-info-border"
                   }`}
                 >
                   <div className="flex items-center justify-between pb-1.5 border-b border-[var(--taomni-code-border)]/40 mb-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <Code2 className="h-4 w-4 text-sky-400 shrink-0" />
+                      <Code2 className="h-4 w-4 text-ui-info shrink-0" />
                       <span className="font-medium text-ui-body text-[var(--taomni-code-text)]">
                         {loc.title}
                       </span>

@@ -244,7 +244,7 @@ export function BranchesView({
         <button className="taomni-btn h-7 px-2" type="button" disabled={busy||!localSel||!selected} onClick={() => selected&&onRename(selected)}>Rename</button>
         <button className="taomni-btn h-7 px-2" type="button" disabled={busy||!localSel||!selected} onClick={() => selected&&onPush(selected)}>Push</button>
         <button className="taomni-btn h-7 px-2" type="button" disabled={busy||!localSel||!selected} onClick={() => selected&&onSetUpstream(selected)}>Upstream</button>
-        <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy||!selected||selected.current||selected.remote} onClick={() => selected&&onDelete(selected)}>Delete</button>
+        <button className="taomni-btn h-7 px-2 text-ui-danger" type="button" disabled={busy||!selected||selected.current||selected.remote} onClick={() => selected&&onDelete(selected)}>Delete</button>
       </div>
       <div className="flex-1 min-h-0 overflow-auto">
         {branches.length===0? <EmptyState title="No branches" />:filteredBranches.length===0? <EmptyState title="No branches match" />:(

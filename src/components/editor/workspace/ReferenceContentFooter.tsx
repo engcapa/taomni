@@ -20,7 +20,7 @@ export function ReferenceContentFooter({ content, onOpenSource }: ReferenceConte
         {content.source}
       </span>
       {openError && (
-        <span role="status" className="truncate text-red-400" title={openError}>
+        <span role="status" className="truncate text-ui-danger" title={openError}>
           {openError}
         </span>
       )}

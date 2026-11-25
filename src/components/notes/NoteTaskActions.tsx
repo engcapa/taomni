@@ -17,7 +17,7 @@ export function NoteTaskActions({ note, prefix = "note-editor", onDeleted }: {
       disabled={pending} data-testid={`${prefix}-complete`} aria-pressed={done}
       title={t(done ? "notes.reopen" : "notes.complete")} aria-label={t(done ? "notes.reopen" : "notes.complete")}
       onClick={() => { void actions.complete(note.id, !done); }}>
-      {done ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : <Circle className="h-3.5 w-3.5" />}
+      {done ? <CheckCircle2 className="h-3.5 w-3.5 text-ui-success" /> : <Circle className="h-3.5 w-3.5" />}
     </button>
     <button type="button" className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${note.pinned ? "text-[var(--taomni-accent)]" : ""}`}
       disabled={pending} data-testid={`${prefix}-pin`} aria-pressed={note.pinned}
@@ -29,7 +29,7 @@ export function NoteTaskActions({ note, prefix = "note-editor", onDeleted }: {
       onClick={() => { void actions.archive(note.id, !archived); }}>
       {archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
     </button>
-    <button type="button" className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center hover:text-red-400"
+    <button type="button" className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center hover:text-ui-danger"
       disabled={pending} data-testid={`${prefix}-delete`} title={t("notes.delete")} aria-label={t("notes.delete")}
       onClick={() => { void (async () => {
         if (await confirmAppDialog({ message: t("notes.deleteConfirm"), confirmLabel: t("notes.delete"), danger: true })) {

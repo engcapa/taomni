@@ -62,8 +62,8 @@ function severityKind(severity: number | null): SeverityKind {
 
 function SeverityIcon({ kind }: { kind: SeverityKind }) {
   if (kind === "error") return <AlertCircle className="h-3.5 w-3.5 shrink-0 text-ui-danger" />;
-  if (kind === "warning") return <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />;
-  return <Info className="h-3.5 w-3.5 shrink-0 text-sky-500" />;
+  if (kind === "warning") return <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-ui-warning" />;
+  return <Info className="h-3.5 w-3.5 shrink-0 text-ui-info" />;
 }
 
 export function ProblemsPanel({
@@ -144,7 +144,7 @@ export function ProblemsPanel({
         {fullProjectNote && projectScope && (
           <span
             data-testid="problems-full-project-note"
-            className="mr-1 truncate text-ui-caption text-amber-500"
+            className="mr-1 truncate text-ui-caption text-ui-warning"
             title={fullProjectNote}
           >
             {fullProjectNote}
@@ -188,7 +188,7 @@ export function ProblemsPanel({
             data-testid="code-workspace-problems-stale"
             data-state={readiness.kind}
             role="status"
-            className="px-3 py-1 text-ui-caption text-amber-600 dark:text-amber-400"
+            className="px-3 py-1 text-ui-caption text-ui-warning"
           >
             Results may be outdated: {readiness.message}
           </div>
@@ -308,7 +308,7 @@ export function ProblemsPanel({
                     {suppressedInSource?.(file.key, original) && (
                       <span
                         data-testid="problems-suppressed-in-source"
-                        className="block text-ui-caption text-emerald-500"
+                        className="block text-ui-caption text-ui-success"
                       >
                         Suppressed in source
                       </span>

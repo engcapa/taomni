@@ -435,7 +435,7 @@ export function HBaseSchemaTree({
         )}
         {timedOut && (
           <div className="px-2 py-2 text-ui-small flex flex-col gap-1.5 border-b" style={{ borderColor: "var(--taomni-divider)" }}>
-            <span className="text-amber-500 font-medium">{t("hbaseObjects.loadTimedOut")}</span>
+            <span className="text-ui-warning font-medium">{t("hbaseObjects.loadTimedOut")}</span>
             <button type="button" className="taomni-btn self-start px-2 py-1 text-ui-caption" onClick={() => void loadTables()}>{t("hbaseObjects.retryLoad")}</button>
           </div>
         )}

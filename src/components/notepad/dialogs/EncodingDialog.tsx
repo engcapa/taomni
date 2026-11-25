@@ -131,10 +131,10 @@ export function EncodingDialog({
       </div>
       {actionMode === "convert" && loss && loss.unrepresentableCount > 0 && (
         <div
-          className="flex items-start gap-2 p-2.5 rounded border border-amber-500/60 bg-amber-500/10 text-ui-body"
+          className="flex items-start gap-2 p-2.5 rounded border border-ui-warning-border bg-ui-warning-surface text-ui-body"
           data-testid="notepad-encoding-loss-warning"
         >
-          <AlertTriangle size={16} className="shrink-0 text-amber-500 mt-0.5" />
+          <AlertTriangle size={16} className="shrink-0 text-ui-warning mt-0.5" />
           <div>
             <div className="font-semibold">
               {label(

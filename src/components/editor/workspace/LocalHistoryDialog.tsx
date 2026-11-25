@@ -157,7 +157,7 @@ export function LocalHistoryDialog({
               )}
             </div>
             {error && (
-              <div className="shrink-0 border-t border-[var(--taomni-code-border)] px-3 py-2 text-ui-small text-amber-500">
+              <div className="shrink-0 border-t border-[var(--taomni-code-border)] px-3 py-2 text-ui-small text-ui-warning">
                 {error}
               </div>
             )}

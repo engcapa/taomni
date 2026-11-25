@@ -90,7 +90,7 @@ function CompareSide({
         </button>
       </div>
       {copyStatus && (
-        <div role="status" className="border-b border-[var(--taomni-code-border)] px-3 py-1 text-ui-caption text-amber-400">
+        <div role="status" className="border-b border-[var(--taomni-code-border)] px-3 py-1 text-ui-caption text-ui-warning">
           {copyStatus}
         </div>
       )}
@@ -98,7 +98,7 @@ function CompareSide({
         <div
           role="alert"
           data-testid={`${isLeft ? "compare-left" : "compare-right"}-unavailable`}
-          className="m-3 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-300"
+          className="m-3 rounded border border-ui-warning-border bg-ui-warning-surface p-3 text-xs text-ui-warning"
         >
           <div className="font-medium">Unavailable: {side.unavailable.reason}</div>
           <div className="mt-1 break-words">{side.unavailable.message}</div>
@@ -108,7 +108,7 @@ function CompareSide({
           {rows.map((row, index) => {
             const value = isLeft ? row.left : row.right;
             const changed = row.kind !== "same";
-            const color = isLeft ? "bg-red-500/10 text-red-300" : "bg-emerald-500/10 text-emerald-300";
+            const color = isLeft ? "bg-ui-danger-surface text-ui-danger" : "bg-ui-success-surface text-ui-success";
             return (
               <div
                 key={`${index}:${row.kind}`}

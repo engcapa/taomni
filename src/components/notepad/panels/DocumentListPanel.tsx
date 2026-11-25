@@ -60,7 +60,7 @@ export function DocumentListPanel({
           >
             {doc.pinned && <Pin size={11} className="shrink-0 text-[var(--taomni-accent)]" />}
             <span className="truncate flex-1">{doc.title}</span>
-            {doc.dirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}
+            {doc.dirty && <span className="w-1.5 h-1.5 rounded-full bg-[var(--taomni-warning-icon)] shrink-0" />}
             <button
               type="button"
               className="opacity-60 hover:opacity-100"

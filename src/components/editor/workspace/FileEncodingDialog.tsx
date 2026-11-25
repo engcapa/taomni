@@ -149,7 +149,7 @@ export function FileEncodingDialog({
           </label>
 
           {dirty && (
-            <p className="text-ui-caption leading-4 text-amber-500">
+            <p className="text-ui-caption leading-4 text-ui-warning">
               Reload discards unsaved changes. Convert on save keeps the current buffer and marks it dirty.
             </p>
           )}

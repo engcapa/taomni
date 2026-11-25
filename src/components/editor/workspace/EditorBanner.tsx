@@ -56,19 +56,19 @@ export function EditorBanner({ banners, onDismiss, floating = false }: EditorBan
     >
       {banners.map((banner) => {
         const icon = banner.category === "read-only" ? (
-          <Lock className="h-3.5 w-3.5 shrink-0 text-sky-400" />
+          <Lock className="h-3.5 w-3.5 shrink-0 text-ui-info" />
         ) : banner.severity === "error" ? (
-          <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" />
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 text-ui-danger" />
         ) : banner.severity === "warning" ? (
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-ui-warning" />
         ) : (
-          <Info className="h-3.5 w-3.5 shrink-0 text-sky-400" />
+          <Info className="h-3.5 w-3.5 shrink-0 text-ui-info" />
         );
 
         const bgClass = banner.severity === "error"
-          ? "bg-red-500/10 text-red-200 border-red-500/20"
+          ? "bg-ui-danger-surface text-ui-danger border-ui-danger-border"
           : banner.severity === "warning"
-          ? "bg-amber-500/10 text-amber-200 border-amber-500/20"
+          ? "bg-ui-warning-surface text-ui-warning border-ui-warning-border"
           : "bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-text)] border-[var(--taomni-code-border)]";
 
         return (
@@ -97,7 +97,7 @@ export function EditorBanner({ banners, onDismiss, floating = false }: EditorBan
                     id={`banner-action-error-${action.id}`}
                     role="alert"
                     data-testid={`banner-action-error-${action.id}`}
-                    className="mt-1 break-words text-red-700 dark:text-red-300"
+                    className="mt-1 break-words text-ui-danger"
                   >
                     {action.label} failed: {error}
                   </div>
@@ -123,7 +123,7 @@ export function EditorBanner({ banners, onDismiss, floating = false }: EditorBan
                         action.primary
                           ? "bg-[var(--taomni-accent)] text-[var(--taomni-code-bg)] hover:brightness-110"
                           : action.danger
-                          ? "bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                          ? "bg-ui-danger-surface text-ui-danger hover:underline"
                           : "bg-[var(--taomni-code-gutter-bg)] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-border)]"
                       }`}
                     >

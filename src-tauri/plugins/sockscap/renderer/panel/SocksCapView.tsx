@@ -375,7 +375,7 @@ export function SocksCapView(props: SocksCapViewProps) {
                     >
                       <span className="text-base select-none">{p.icon || "🛡️"}</span>
                       {isActive && (
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 absolute -top-0.5 -right-0.5 ring-2 ring-[var(--taomni-panel-bg)]" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-[var(--taomni-success-icon)] absolute -top-0.5 -right-0.5 ring-2 ring-[var(--taomni-panel-bg)]" />
                       )}
                     </div>
                   );

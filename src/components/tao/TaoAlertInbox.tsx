@@ -148,9 +148,9 @@ export function TaoAlertInbox({
             const Icon = kindIcon(alert.kind);
             const color =
               alert.kind === "note_overdue"
-                ? "text-red-400"
+                ? "text-ui-danger"
                 : alert.kind === "note_due_soon" || alert.kind === "note_reminder"
-                  ? "text-amber-400"
+                  ? "text-ui-warning"
                   : "text-[var(--taomni-accent)]";
             return (
               <li key={alert.id} className="border-b border-[var(--taomni-divider)] last:border-b-0">
@@ -167,7 +167,7 @@ export function TaoAlertInbox({
                   </button>
                   <button
                     type="button"
-                    className="taomni-btn h-5 w-5 p-0 inline-flex items-center justify-center hover:text-red-400"
+                    className="taomni-btn h-5 w-5 p-0 inline-flex items-center justify-center hover:text-ui-danger"
                     onClick={() => onAck(alert)}
                     title={t("tao.alertAck")}
                     aria-label={t("tao.alertAck")}

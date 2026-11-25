@@ -103,14 +103,14 @@ export function HighlightingWidget({
       ) : null}
 
       {diagnosticsReady && warnings > 0 ? (
-        <span className="inline-flex items-center gap-0.5 font-semibold text-amber-400" title={`${warnings} warning(s)`}>
+        <span className="inline-flex items-center gap-0.5 font-semibold text-ui-warning" title={`${warnings} warning(s)`}>
           <AlertTriangle className="h-3 w-3" />
           <span>{warnings}</span>
         </span>
       ) : null}
 
       {diagnosticsReady && errors === 0 && warnings === 0 && (
-        <span className="inline-flex items-center gap-0.5 text-emerald-400" title="No problems found">
+        <span className="inline-flex items-center gap-0.5 text-ui-success" title="No problems found">
           <CheckCircle2 className="h-3 w-3" />
         </span>
       )}

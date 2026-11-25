@@ -30,10 +30,10 @@ interface TestsPanelProps {
 }
 
 function statusIcon(status: StructuredTestResult["status"]) {
-  if (status === "passed") return <CheckCircle2 className="h-3 w-3 text-emerald-500" />;
-  if (status === "failed") return <CircleX className="h-3 w-3 text-red-500" />;
-  if (status === "error") return <CircleAlert className="h-3 w-3 text-orange-500" />;
-  if (status === "skipped") return <Square className="h-3 w-3 text-amber-500" />;
+  if (status === "passed") return <CheckCircle2 className="h-3 w-3 text-ui-success" />;
+  if (status === "failed") return <CircleX className="h-3 w-3 text-ui-danger" />;
+  if (status === "error") return <CircleAlert className="h-3 w-3 text-ui-warning" />;
+  if (status === "skipped") return <Square className="h-3 w-3 text-ui-warning" />;
   return <CircleDashed className="h-3 w-3 text-[var(--taomni-text-muted)]" />;
 }
 
@@ -85,7 +85,7 @@ function TestRow({
         <IconButton
           type="button"
           data-testid={`tests-debug-${item.fullName}`}
-          className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors"
+          className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-ui-success transition-colors"
           onClick={() => onDebug(item)}
           labelKey="debugTest"
         >
@@ -216,7 +216,7 @@ export function TestsPanel({
               <button
                 type="button"
                 data-testid={`tests-failure-details-${result.id}`}
-                className="mt-0.5 block w-full whitespace-pre-wrap break-words border-l-2 border-red-500/50 pl-2 text-left text-ui-caption text-red-500 hover:bg-[var(--taomni-hover)]"
+                className="mt-0.5 block w-full whitespace-pre-wrap break-words border-l-2 border-ui-danger-border pl-2 text-left text-ui-caption text-ui-danger hover:bg-[var(--taomni-hover)]"
                 onClick={() => onOpenFailure?.(result)}
               >
                 {result.message ?? result.details}
@@ -262,12 +262,12 @@ export function TestsPanel({
             {testResults && <div className="flex items-center gap-2">
               <span className="font-medium">Results</span>
               <span>{testResults.summary.total} total</span>
-              <span className="text-emerald-500">{testResults.summary.passed} passed</span>
-              <span className="text-red-500">{testResults.summary.failed + testResults.summary.errors} failed</span>
-              <span className="text-amber-500">{testResults.summary.skipped} skipped</span>
+              <span className="text-ui-success">{testResults.summary.passed} passed</span>
+              <span className="text-ui-danger">{testResults.summary.failed + testResults.summary.errors} failed</span>
+              <span className="text-ui-warning">{testResults.summary.skipped} skipped</span>
               <span className="ml-auto">{formatTestDuration(testResults.summary.durationMs)}</span>
             </div>}
-            {testResults?.diagnostics.map((diagnostic) => <div key={diagnostic} className="mt-1 whitespace-pre-wrap text-amber-600" data-testid="tests-result-diagnostic">{diagnostic}</div>)}
+            {testResults?.diagnostics.map((diagnostic) => <div key={diagnostic} className="mt-1 whitespace-pre-wrap text-ui-warning" data-testid="tests-result-diagnostic">{diagnostic}</div>)}
             {resultsError && <div className="mt-1 text-ui-danger" data-testid="tests-result-error">{resultsError}</div>}
           </div>
         )}

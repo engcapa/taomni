@@ -368,7 +368,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
                 aria-label={t("chat.copyAllAria")}
               >
                 {copiedAll ? (
-                  <Check className="w-3.5 h-3.5 text-green-400" />
+                  <Check className="w-3.5 h-3.5 text-ui-success" />
                 ) : (
                   <Copy className="w-3.5 h-3.5" />
                 )}
@@ -708,7 +708,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
                   </div>
                   <button
                     type="button"
-                    className="taomni-btn h-5 px-2 text-ui-caption flex items-center gap-1 hover:text-red-400 border border-[var(--taomni-divider)] rounded hover:bg-[var(--taomni-hover)] transition-colors"
+                    className="taomni-btn h-5 px-2 text-ui-caption flex items-center gap-1 hover:text-ui-danger border border-[var(--taomni-divider)] rounded hover:bg-[var(--taomni-hover)] transition-colors"
                     // Stops this turn only — the queue keeps draining, so this is
                     // "skip this answer" rather than "abandon everything".
                     title={queuedSends.length > 0 ? t("chat.stopKeepsQueue") : undefined}
@@ -718,7 +718,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
                       }
                     }}
                   >
-                    <span className="w-1.5 h-1.5 bg-red-500 rounded-sm" />
+                    <span className="w-1.5 h-1.5 bg-[var(--taomni-danger-icon)] rounded-sm" />
                     <span>{t("common.stop") || "Stop"}</span>
                   </button>
                 </div>

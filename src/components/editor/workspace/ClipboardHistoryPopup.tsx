@@ -95,7 +95,7 @@ export function ClipboardHistoryPopup({
       <div className="flex w-full max-w-xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-3 py-2">
           <div className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-sky-400" />
+            <ClipboardList className="h-4 w-4 text-ui-info" />
             <h2 id="clipboard-history-title" className="text-ui-body font-semibold">Paste from History</h2>
             <span className="text-ui-caption text-[var(--taomni-code-muted)]">session only</span>
           </div>
@@ -159,7 +159,7 @@ export function ClipboardHistoryPopup({
             placeholder="Filter history…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-7 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 text-ui-small focus:outline-none focus:border-sky-500"
+            className="h-7 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 text-ui-small focus:outline-none focus:border-[var(--taomni-focus-ring)]"
           />
         </div>
 
@@ -188,7 +188,7 @@ export function ClipboardHistoryPopup({
                   onClose();
                 }}
                 className={`group flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 ${
-                  position === selectedIndex ? "bg-sky-500/15" : "hover:bg-[var(--taomni-code-active-line-bg)]"
+                  position === selectedIndex ? "bg-ui-info-surface" : "hover:bg-[var(--taomni-code-active-line-bg)]"
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate font-mono text-ui-small">
@@ -204,7 +204,7 @@ export function ClipboardHistoryPopup({
                     e.stopPropagation();
                     onDelete(index);
                   }}
-                  className="shrink-0 rounded p-0.5 text-[var(--taomni-code-muted)] opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+                  className="shrink-0 rounded p-0.5 text-[var(--taomni-code-muted)] opacity-0 transition-opacity hover:text-ui-danger group-hover:opacity-100"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>

@@ -177,7 +177,7 @@ export function RefactorRecoveryReviewDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+          <AlertTriangle className="h-4 w-4 shrink-0 text-ui-warning" />
           <div className="min-w-0 flex-1">
             <div className="truncate text-ui-body font-semibold text-[var(--taomni-code-text)]">
               Review refactor recovery
@@ -253,13 +253,13 @@ export function RefactorRecoveryReviewDialog({
           </div>
           {confirmingDismiss && (
             <div
-              className="mt-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5"
+              className="mt-2 rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1.5"
               data-testid="refactor-recovery-dismiss-confirm"
             >
-              <div className="text-ui-small font-semibold text-red-200">
+              <div className="text-ui-small font-semibold text-ui-danger">
                 Abandon recovery for {affectedCount} file{affectedCount === 1 ? "" : "s"}?
               </div>
-              <div className="mt-0.5 break-all text-ui-small leading-4 text-red-100/90">
+              <div className="mt-0.5 break-all text-ui-small leading-4 text-ui-danger">
                 This ends only this reminder and keeps the current state (files stay missing as they are now).
                 It does not restore files, edit references, or affect other pending entries.
               </div>
@@ -284,7 +284,8 @@ export function RefactorRecoveryReviewDialog({
                 type="button"
                 data-testid="refactor-recovery-dismiss-confirm-button"
                 disabled={!canDismiss}
-                className="h-8 rounded bg-red-700 px-3 text-ui-small font-medium text-white hover:brightness-110 disabled:opacity-40"
+                data-danger="true"
+                className="taomni-btn h-8 rounded px-3 text-ui-small font-medium disabled:opacity-40"
                 onClick={onDismiss}
               >
                 Abandon recovery

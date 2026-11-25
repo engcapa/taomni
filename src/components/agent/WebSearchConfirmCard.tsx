@@ -40,7 +40,7 @@ export function WebSearchConfirmCard({ query, provider, providerUrl, onDecide }:
         </div>
       </div>
 
-      <div className="text-ui-caption text-yellow-500 mb-3">
+      <div className="text-ui-caption text-ui-warning mb-3">
         {t("agent.webSearchPrivacyWarn")}
       </div>
 

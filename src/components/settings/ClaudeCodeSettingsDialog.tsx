@@ -423,7 +423,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
           <div className="text-ui-body font-semibold">{t("aiSettings.ccCustomModalTitle")}</div>
           <IconButton
             label={t("common.close")}
-            className="ml-auto hover:bg-red-500 rounded p-0.5"
+            className="ml-auto hover:bg-[var(--taomni-control-hover)] rounded p-0.5"
             onClick={onClose}
             type="button"
           >

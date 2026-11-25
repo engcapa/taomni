@@ -38,7 +38,7 @@ function DependencyRow({ node, depth }: { node: DependencyNode; depth: number })
         </span>
         {node.conflict && (
           <span
-            className="ml-auto inline-flex items-center gap-0.5 text-ui-caption text-amber-500"
+            className="ml-auto inline-flex items-center gap-0.5 text-ui-caption text-ui-warning"
             title={node.conflict}
           >
             <AlertTriangle className="h-3 w-3" />
@@ -441,7 +441,7 @@ export function BuildPanel({ roots, active, onRunTask, onLoadModules, toolConfig
                   onClick={() => runBuildTarget(task)}
                 >
                   {task.execution?.error
-                    ? <AlertTriangle className="h-3 w-3 shrink-0 text-amber-500" />
+                    ? <AlertTriangle className="h-3 w-3 shrink-0 text-ui-warning" />
                     : <Play className="h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100" />}
                   {task.modulePath && <span className="shrink-0 rounded bg-[var(--taomni-code-active-line-bg)] px-1 text-ui-caption text-[var(--taomni-text-muted)]">{task.modulePath}</span>}
                   <span className="truncate">{task.label}</span>
@@ -485,7 +485,7 @@ export function BuildPanel({ roots, active, onRunTask, onLoadModules, toolConfig
               {!isCollapsed && (
                 <div data-testid={`build-panel-deps-${tree.rootId}`}>
                   {depsError[tree.rootId] && (
-                    <div className="px-2 py-1 text-red-500">{depsError[tree.rootId]}</div>
+                    <div className="px-2 py-1 text-ui-danger">{depsError[tree.rootId]}</div>
                   )}
                   {loaded && loaded.length === 0 && !depsError[tree.rootId] && (
                     <div className="px-2 py-1 text-[var(--taomni-text-muted)]">No dependencies resolved.</div>
@@ -562,7 +562,7 @@ export function BuildPanel({ roots, active, onRunTask, onLoadModules, toolConfig
                                 <span>Depends on:</span>
                                 <div className="flex flex-wrap gap-1">
                                   {mod.moduleDependencies.map((dep) => (
-                                    <span key={dep} className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 py-0.2 text-ui-caption text-emerald-400 font-mono">
+                                    <span key={dep} className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 py-0.2 text-ui-caption text-ui-success font-mono">
                                       {dep}
                                     </span>
                                   ))}
@@ -574,7 +574,7 @@ export function BuildPanel({ roots, active, onRunTask, onLoadModules, toolConfig
                       </div>
                     )}
                     {modulesError[tree.rootId] && (
-                      <div className="px-2 py-1 text-red-500">{modulesError[tree.rootId]}</div>
+                      <div className="px-2 py-1 text-ui-danger">{modulesError[tree.rootId]}</div>
                     )}
                     {loaded && loaded.length === 0 && !modulesError[tree.rootId] && (!tree.modelModules || tree.modelModules.length === 0) && (
                       <div className="px-2 py-1 text-[var(--taomni-text-muted)]">No modules reported.</div>

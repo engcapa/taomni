@@ -341,7 +341,7 @@ export function DebugVariablesPane({
             data-testid="debug-data-breakpoint-notice"
             role="status"
             className={`px-3 py-1 text-ui-caption ${
-              dataBreakpointNotice.added ? "text-emerald-500" : "text-rose-500"
+              dataBreakpointNotice.added ? "text-ui-success" : "text-ui-danger"
             }`}
           >
             {dataBreakpointNotice.message}

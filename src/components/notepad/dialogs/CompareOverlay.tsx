@@ -138,10 +138,10 @@ export function CompareOverlay({
       </div>
       {exceedsLimit ? (
         <div
-          className="flex items-center gap-2 p-4 rounded border border-amber-500/50 bg-amber-500/10 text-ui-body"
+          className="flex items-center gap-2 p-4 rounded border border-ui-warning-border bg-ui-warning-surface text-ui-body"
           data-testid="notepad-compare-too-large"
         >
-          <AlertTriangle size={16} className="text-amber-500 shrink-0" />
+          <AlertTriangle size={16} className="text-ui-warning shrink-0" />
           <span>
             {label(
               "文档超过 5 MB 对比上限，无法在交互界面直接展开合并差异视图。",

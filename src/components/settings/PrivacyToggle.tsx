@@ -36,13 +36,13 @@ export function PrivacyToggle() {
       data-testid="ai-full-local-toggle"
       className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
         isLocalMode
-          ? "border-purple-500/50 bg-purple-500/10"
+          ? "border-ui-info-border bg-ui-info-surface"
           : "border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
       }`}
       onClick={toggle}
     >
       {isLocalMode ? (
-        <Shield className="w-5 h-5 text-purple-400 shrink-0" />
+        <Shield className="w-5 h-5 text-ui-info shrink-0" />
       ) : (
         <ShieldOff className="w-5 h-5 text-[var(--taomni-text-muted)] shrink-0" />
       )}
@@ -58,7 +58,7 @@ export function PrivacyToggle() {
       </div>
       <div
         className={`w-9 h-5 rounded-full transition-colors relative ${
-          isLocalMode ? "bg-purple-500" : "bg-[var(--taomni-divider)]"
+          isLocalMode ? "bg-[var(--taomni-info-icon)]" : "bg-[var(--taomni-divider)]"
         }`}
       >
         <div

@@ -313,8 +313,8 @@ export function GitPanelView(inputs: GitPanelViewProps) {
       </nav>
 
       {(operation && operation.kind !== "none") || hasConflicts ? (
-        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-amber-500/30 bg-amber-500/10 text-ui-body">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-ui-warning-border bg-ui-warning-surface text-ui-body">
+          <AlertTriangle className="w-4 h-4 text-ui-warning shrink-0" />
           <span className="min-w-0">
             {operationLabel(operation)}
             {operation?.conflictedPaths.length
@@ -343,7 +343,7 @@ export function GitPanelView(inputs: GitPanelViewProps) {
                 </button>
               )}
               <button
-                className="taomni-btn h-7 px-2 text-red-500"
+                className="taomni-btn h-7 px-2 text-ui-danger"
                 type="button"
                 disabled={busy}
                 onClick={() => void runAction(`Abort ${operation.kind}`, () => gitOperationAbort(repoRoot, operation.kind))}

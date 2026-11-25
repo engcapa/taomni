@@ -95,7 +95,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
             <div
               data-testid="run-panel-execution-diagnostics"
               role="status"
-              className="mb-2 space-y-1 border-b border-amber-500/30 pb-2 text-amber-600 dark:text-amber-400"
+              className="mb-2 space-y-1 border-b border-ui-warning-border pb-2 text-ui-warning"
             >
               <div className="font-medium">Execution configuration diagnostics</div>
               {roots.flatMap((root) => (configurations.executionDiagnostics[root.id] ?? []).map((diagnostic) => (
@@ -152,7 +152,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                       data-testid="run-configuration-delete"
                       aria-label="Delete run configuration"
                       title="Delete run configuration"
-                      className="h-6 w-6 rounded text-red-500"
+                      className="h-6 w-6 rounded text-ui-danger"
                       onClick={() => configurations.deleteNamedConfiguration(configuration)}
                     >
                       <Trash2 className="mx-auto h-3.5 w-3.5" />
@@ -355,8 +355,8 @@ export function RunPanelView(inputs: RunPanelViewProps) {
               title="Run again"
             >
               <span className={entry.status === "running"
-                ? "text-sky-500"
-                : entry.status === "passed" ? "text-emerald-500" : "text-red-500"}
+                ? "text-ui-info"
+                : entry.status === "passed" ? "text-ui-success" : "text-ui-danger"}
               >
                 {entry.status === "running" ? "●" : entry.status === "passed" ? "✓" : "×"}
               </span>
@@ -365,7 +365,7 @@ export function RunPanelView(inputs: RunPanelViewProps) {
                 {entry.exitCode === null ? "running" : `exit ${entry.exitCode}`}
               </span>
               {entry.message && (
-                <span className="max-w-[45%] truncate text-red-500" title={entry.message}>
+                <span className="max-w-[45%] truncate text-ui-danger" title={entry.message}>
                   {entry.message}
                 </span>
               )}

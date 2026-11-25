@@ -78,8 +78,8 @@ export function SessionBackupDialogs({
           value={sessionPath}
           onChange={(e) => setSessionPath(e.target.value)}
         />
-        {status && <div className="text-ui-body text-emerald-600">{status}</div>}
-        {err && <div className="text-ui-body text-red-500">{err}</div>}
+        {status && <div className="text-ui-body text-ui-success">{status}</div>}
+        {err && <div className="text-ui-body text-ui-danger">{err}</div>}
       </NotepadDialog>
     );
   }
@@ -87,7 +87,7 @@ export function SessionBackupDialogs({
   return (
     <NotepadDialog testId="notepad-backups-dialog" onClose={onClose} wide
       title={<span className="inline-flex items-center gap-1.5"><ArchiveRestore size={14} />{label("崩溃恢复与定期备份快照", "Backup & Recovery Snapshots")}</span>}>
-      {err && <div className="text-ui-body text-red-500">{err}</div>}
+      {err && <div className="text-ui-body text-ui-danger">{err}</div>}
       {entries.length === 0 ? (
         <div className="text-ui-body text-[var(--taomni-text-muted)]">
           {label("没有待恢复的未保存备份快照。", "No pending unsaved backup snapshots.")}

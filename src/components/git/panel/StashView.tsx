@@ -63,7 +63,7 @@ export function StashView({
           <div className="flex-1" />
           <button className="taomni-btn h-7 px-2" type="button" disabled={busy||!selected} onClick={onApply}>Apply</button>
           <button className="taomni-btn h-7 px-2" type="button" disabled={busy||!selected} onClick={onPop}>Pop</button>
-          <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy||!selected} onClick={onDrop}>Drop</button>
+          <button className="taomni-btn h-7 px-2 text-ui-danger" type="button" disabled={busy||!selected} onClick={onDrop}>Drop</button>
         </div>
         <DiffPane diff={diff} loading={diffLoading} />
       </Panel>

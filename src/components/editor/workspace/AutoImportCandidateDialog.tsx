@@ -67,7 +67,7 @@ export function AutoImportCandidateDialog({
           <IconButton
             type="button"
             onClick={onClose}
-            className="p-1 rounded hover:bg-neutral-800 text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
+            className="p-1 rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
             labelKey="cancelEsc"
             data-testid="auto-import-candidate-cancel"
           >
@@ -80,7 +80,7 @@ export function AutoImportCandidateDialog({
         </p>
 
         {/* Candidate List */}
-        <div className="flex flex-col gap-1 max-h-60 overflow-y-auto rounded-lg border border-[var(--taomni-code-border)] p-1 bg-neutral-900/50">
+        <div className="flex flex-col gap-1 max-h-60 overflow-y-auto rounded-lg border border-[var(--taomni-code-border)] p-1 bg-[var(--taomni-panel-bg)]">
           {candidates.map((cand, idx) => {
             const isSelected = idx === selectedIndex;
             return (
@@ -92,7 +92,7 @@ export function AutoImportCandidateDialog({
                 className={`flex items-center justify-between px-3 py-2 text-xs rounded text-left transition-colors cursor-pointer ${
                   isSelected
                     ? "bg-[var(--taomni-accent)]/20 text-[var(--taomni-accent)] font-medium"
-                    : "hover:bg-neutral-800 text-neutral-300"
+                    : "hover:bg-[var(--taomni-hover)] text-[var(--taomni-code-text)]"
                 }`}
                 data-testid="auto-import-candidate-option"
                 data-candidate-fqn={cand.fullyQualifiedName}
@@ -104,7 +104,7 @@ export function AutoImportCandidateDialog({
                   </span>
                 </div>
                 {cand.priority !== undefined && cand.priority > 0 && (
-                  <span className="text-ui-caption text-neutral-500 font-mono shrink-0 ml-2">
+                  <span className="text-ui-caption text-[var(--taomni-code-muted)] font-mono shrink-0 ml-2">
                     prio {cand.priority}
                   </span>
                 )}
@@ -122,7 +122,7 @@ export function AutoImportCandidateDialog({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1 border border-[var(--taomni-code-border)] text-neutral-300 hover:bg-neutral-800 rounded transition-colors"
+              className="px-3 py-1 border border-[var(--taomni-code-border)] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-hover)] rounded transition-colors"
             >
               Cancel
             </button>
@@ -132,7 +132,8 @@ export function AutoImportCandidateDialog({
                 const chosen = candidates[selectedIndex];
                 if (chosen) onSelect(chosen);
               }}
-              className="px-3 py-1 bg-[var(--taomni-accent)] text-black font-medium hover:brightness-110 rounded transition-colors"
+              data-primary="true"
+              className="taomni-btn px-3 py-1 rounded transition-colors"
               data-testid="auto-import-candidate-submit"
             >
               Select

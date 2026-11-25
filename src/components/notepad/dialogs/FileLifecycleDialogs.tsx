@@ -194,7 +194,7 @@ export function FileLifecycleDialogs({
           value={nameInput}
           onChange={(e) => setNameInput(e.target.value)}
         />
-        {err && <div className="text-ui-body text-red-500">{err}</div>}
+        {err && <div className="text-ui-body text-ui-danger">{err}</div>}
       </NotepadDialog>
     );
   }
@@ -230,7 +230,7 @@ export function FileLifecycleDialogs({
           {label(`确定要将 “${modal.name}” 移到系统回收站并关闭标签页吗？`, `Move "${modal.name}" to the system Trash and close its tab?`)}
         </p>
         <p className="text-ui-small font-mono text-[var(--taomni-text-muted)] break-all">{modal.path}</p>
-        {err && <div className="text-ui-body text-red-500">{err}</div>}
+        {err && <div className="text-ui-body text-ui-danger">{err}</div>}
       </NotepadDialog>
     );
   }
@@ -264,7 +264,7 @@ export function FileLifecycleDialogs({
         </>}>
         <p className="text-ui-body">{modal.error}</p>
         <p className="text-ui-small font-mono text-[var(--taomni-text-muted)] break-all">{modal.path}</p>
-        {err && <div className="text-ui-body text-red-500">{err}</div>}
+        {err && <div className="text-ui-body text-ui-danger">{err}</div>}
       </NotepadDialog>
     );
   }

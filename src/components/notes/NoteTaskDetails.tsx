@@ -57,7 +57,7 @@ export function NoteTaskDetails({ note, prefix = "note-editor" }: { note: NoteIt
       <div className="flex flex-wrap items-center gap-1">
         {note.tags.map((tag) => <span key={tag.id} data-testid={`${prefix}-tag`}
           className="inline-flex h-5 items-center gap-1 rounded-full border border-[var(--taomni-divider)] px-1.5 text-ui-caption">
-          #{tag.name}<button type="button" className="hover:text-red-400" title={`${t("notes.delete")} ${tag.name}`}
+          #{tag.name}<button type="button" className="hover:text-ui-danger" title={`${t("notes.delete")} ${tag.name}`}
             aria-label={`${t("notes.delete")} ${tag.name}`} onClick={() => { void actions.removeTag(note.id, tag.id); }}><X className="h-2.5 w-2.5" /></button>
         </span>)}
         <input type="text" className="taomni-input h-5 w-24 text-ui-caption" placeholder={t("notes.tagPlaceholder")}

@@ -106,7 +106,7 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
   return (
     <div data-testid="debug-memory-disassembly" className="border-t border-[var(--taomni-code-border)]/60">
       {!anySupported && active && (
-        <div data-testid="debug-memory-unsupported" className="px-3 py-1 text-ui-caption text-amber-500">
+        <div data-testid="debug-memory-unsupported" className="px-3 py-1 text-ui-caption text-ui-warning">
           The active debug adapter does not expose memory or disassembly requests.
         </div>
       )}
@@ -257,7 +257,7 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
         </div>
       )}
       {notice && (
-        <div data-testid="debug-memory-notice" role="status" className="px-3 pb-1 text-ui-caption text-rose-500">{notice}</div>
+        <div data-testid="debug-memory-notice" role="status" className="px-3 pb-1 text-ui-caption text-ui-danger">{notice}</div>
       )}
       {instructions.length > 0 && (
         <div data-testid="debug-disassembly-output" className="max-h-48 overflow-auto border-t border-[var(--taomni-code-border)]/40 px-3 py-1 font-mono text-ui-caption">

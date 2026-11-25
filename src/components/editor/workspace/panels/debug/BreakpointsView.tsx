@@ -68,18 +68,18 @@ export function BreakpointsView({
                 title={`${path}:${bp.line}`}
               >
                 {path.split(/[\\/]/).pop()}:{bp.line}
-                {bp.condition && <span className="ml-2 text-amber-500">if {bp.condition}</span>}
-                {bp.hitCondition && <span className="ml-2 text-amber-500">hit {bp.hitCondition}</span>}
-                {bp.logMessage && <span className="ml-2 text-sky-500">log</span>}
+                {bp.condition && <span className="ml-2 text-ui-warning">if {bp.condition}</span>}
+                {bp.hitCondition && <span className="ml-2 text-ui-warning">hit {bp.hitCondition}</span>}
+                {bp.logMessage && <span className="ml-2 text-ui-info">log</span>}
                 {sourceModeMetadata && (
-                  <span className="ml-2 text-emerald-600 dark:text-emerald-400">
+                  <span className="ml-2 text-ui-success">
                     {sourceModeMetadata.label}
                   </span>
                 )}
                 {bindingHint && (
                   <span
                     data-testid={`debug-breakpoint-binding-${bp.line}`}
-                    className={`ml-2 ${bindingHint.status === "failed" ? "text-rose-500" : "text-[var(--taomni-text-muted)]"}`}
+                    className={`ml-2 ${bindingHint.status === "failed" ? "text-ui-danger" : "text-[var(--taomni-text-muted)]"}`}
                     title={bindingHint.message ?? undefined}
                   >
                     {bindingHint.status === "failed" ? "not bound" : "pending"}
@@ -97,7 +97,7 @@ export function BreakpointsView({
               <IconButton
                 type="button"
                 data-testid={`debug-breakpoint-remove-${bp.line}`}
-                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-rose-500"
+                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-ui-danger"
                 onClick={() => debug.removeBreakpoint(path, bp.line)}
                 labelKey="removeBreakpoint"
               >

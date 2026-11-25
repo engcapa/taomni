@@ -193,8 +193,8 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
       icon: WORKSPACE_TOOL_ICONS["problems"],
       badge: problems.activeProblemCounts.errors > 0 || problems.activeProblemCounts.warnings > 0 ? (
         <span className="inline-flex items-center gap-1">
-          {problems.activeProblemCounts.errors > 0 && <span className="text-red-500">{problems.activeProblemCounts.errors}</span>}
-          {problems.activeProblemCounts.warnings > 0 && <span className="text-amber-500">{problems.activeProblemCounts.warnings}</span>}
+          {problems.activeProblemCounts.errors > 0 && <span className="text-ui-danger">{problems.activeProblemCounts.errors}</span>}
+          {problems.activeProblemCounts.warnings > 0 && <span className="text-ui-warning">{problems.activeProblemCounts.warnings}</span>}
         </span>
       ) : undefined,
       renderContent: () => (

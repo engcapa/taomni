@@ -266,7 +266,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
             <button
               type="button"
               data-testid="sockscap-probe-fail-force"
-              className="px-3 py-1.5 rounded text-ui-body bg-amber-600 text-white hover:bg-amber-500"
+              className="px-3 py-1.5 rounded text-ui-body border border-ui-warning-border bg-ui-warning-surface text-ui-warning hover:underline"
               onClick={() => {
                 setProbeFailures(null);
                 void onStart();

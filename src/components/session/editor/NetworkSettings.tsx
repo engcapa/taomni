@@ -421,7 +421,7 @@ export function NetworkSettings({
                 </div>
                 {rowError && (
                   <div
-                    className="text-ui-small text-red-400 ml-[2px]"
+                    className="text-ui-small text-ui-danger ml-[2px]"
                     role="status"
                     data-testid={`forward-row-error-${forward.id}`}
                   >

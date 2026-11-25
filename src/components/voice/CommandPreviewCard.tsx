@@ -24,9 +24,9 @@ interface CommandPreviewCardProps {
 
 function riskConfig(t: TranslateFn) {
   return {
-    low:    { label: t("voice.riskLow"),    color: "text-green-400",  border: "border-green-500/30",  bg: "bg-green-500/5"  },
-    medium: { label: t("voice.riskMedium"), color: "text-yellow-400", border: "border-yellow-500/40", bg: "bg-yellow-500/5" },
-    high:   { label: t("voice.riskHigh"),   color: "text-red-400",    border: "border-red-500/50",    bg: "bg-red-500/8"    },
+    low:    { label: t("voice.riskLow"),    color: "text-ui-success",  border: "border-ui-success-border",  bg: "bg-ui-success-surface"  },
+    medium: { label: t("voice.riskMedium"), color: "text-ui-warning", border: "border-ui-warning-border", bg: "bg-ui-warning-surface" },
+    high:   { label: t("voice.riskHigh"),   color: "text-ui-danger",    border: "border-ui-danger-border",    bg: "bg-ui-danger-surface"    },
   };
 }
 
@@ -137,14 +137,14 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
 
       {/* Unfilled placeholders */}
       {preview.needs_inputs.length > 0 && (
-        <div className="mb-3 text-ui-small text-yellow-400">
+        <div className="mb-3 text-ui-small text-ui-warning">
           {t("voice.cardNeedsInputs", { inputs: preview.needs_inputs.join("、") })}
         </div>
       )}
 
       {/* High-risk second confirmation */}
       {preview.risk === "high" && !preview.blocked && (
-        <div className="mb-3 flex items-center gap-2 text-ui-small text-red-400">
+        <div className="mb-3 flex items-center gap-2 text-ui-small text-ui-danger">
           <input
             type="checkbox"
             id="high-risk-confirm"

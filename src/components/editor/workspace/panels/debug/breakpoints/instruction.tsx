@@ -129,12 +129,12 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
         </div>
       </div>
       {active && !supported && (
-        <div data-testid="debug-instruction-breakpoint-unsupported" className="px-3 pb-1 text-ui-caption text-amber-500">
+        <div data-testid="debug-instruction-breakpoint-unsupported" className="px-3 pb-1 text-ui-caption text-ui-warning">
           The active debug adapter does not support instruction breakpoints.
         </div>
       )}
       {notice && (
-        <div data-testid="debug-instruction-breakpoint-notice" role="status" className="px-3 pb-1 text-ui-caption text-rose-500">
+        <div data-testid="debug-instruction-breakpoint-notice" role="status" className="px-3 pb-1 text-ui-caption text-ui-danger">
           {notice}
         </div>
       )}
@@ -179,13 +179,13 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
                   </span>
                 )}
                 <span className="ml-2 text-ui-caption text-[var(--taomni-text-muted)]">{breakpoint.adapterId}</span>
-                {breakpoint.condition && <span className="ml-2 text-amber-500">if {breakpoint.condition}</span>}
-                {breakpoint.hitCondition && <span className="ml-2 text-amber-500">hit {breakpoint.hitCondition}</span>}
-                {rowModeLabel && <span className="ml-2 text-emerald-600 dark:text-emerald-400">{rowModeLabel}</span>}
+                {breakpoint.condition && <span className="ml-2 text-ui-warning">if {breakpoint.condition}</span>}
+                {breakpoint.hitCondition && <span className="ml-2 text-ui-warning">hit {breakpoint.hitCondition}</span>}
+                {rowModeLabel && <span className="ml-2 text-ui-success">{rowModeLabel}</span>}
                 {bindingHint && (
                   <span
                     data-testid={`debug-instruction-breakpoint-binding-${index}`}
-                    className={`ml-2 ${bindingHint.status === "failed" ? "text-rose-500" : "text-[var(--taomni-text-muted)]"}`}
+                    className={`ml-2 ${bindingHint.status === "failed" ? "text-ui-danger" : "text-[var(--taomni-text-muted)]"}`}
                     title={bindingHint.message ?? undefined}
                   >
                     {bindingHint.status === "failed" ? "not bound" : "pending"}
@@ -203,7 +203,7 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
               <IconButton
                 type="button"
                 data-testid={`debug-instruction-breakpoint-remove-${index}`}
-                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-rose-500"
+                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-ui-danger"
                 labelKey="removeInstructionBreakpoint"
                 onClick={() => debug.removeInstructionBreakpoint(key)}
               >

@@ -163,7 +163,7 @@ export function StructuralSearchPanel({ session, onOpenMatch }: StructuralSearch
             No occurrences found for the template in {result?.query.scope === "file" ? "the current file" : result?.query.scope === "module" ? "the module" : "the project"}.
           </div>
         ) : phase === "unavailable" ? (
-          <div data-testid="structural-search-unavailable" className="px-3 py-6 text-center text-amber-700 dark:text-amber-300">
+          <div data-testid="structural-search-unavailable" className="px-3 py-6 text-center text-ui-warning">
             {message ?? "Structural Search backend is not available"}
           </div>
         ) : !result ? (

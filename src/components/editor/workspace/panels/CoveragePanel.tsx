@@ -50,9 +50,9 @@ export function CoveragePanel({
   };
 
   const getBarColor = (pct: number) => {
-    if (pct >= 80) return "bg-emerald-500";
-    if (pct >= 50) return "bg-amber-500";
-    return "bg-rose-500";
+    if (pct >= 80) return"bg-[var(--taomni-success-icon)]";
+    if (pct >= 50) return"bg-[var(--taomni-warning-icon)]";
+    return"bg-[var(--taomni-danger-icon)]";
   };
 
   if (!report) {

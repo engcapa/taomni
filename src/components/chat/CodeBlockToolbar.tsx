@@ -194,7 +194,7 @@ export function CodeBlockToolbar({
           onClick={handleCopy}
           title={t("chat.codeCopyTitle")}
         >
-          {copied ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Copy className="w-2.5 h-2.5" />}
+          {copied ? <Check className="w-2.5 h-2.5 text-ui-success" /> : <Copy className="w-2.5 h-2.5" />}
           <span>{t("chat.codeCopy")}</span>
         </button>
         <SendToTerminalButton
@@ -430,7 +430,7 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend, t }: SendTo
             : t("chat.codeSendNoTarget")
         }
       >
-        {sent ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Send className="w-2.5 h-2.5" />}
+        {sent ? <Check className="w-2.5 h-2.5 text-ui-success" /> : <Send className="w-2.5 h-2.5" />}
         <span>{t("chat.codeSendToTerminal")}</span>
       </button>
     );
@@ -445,7 +445,7 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend, t }: SendTo
         disabled={disabled || allTerminals.length === 0}
         title={t("chat.codeSendPickTitle")}
       >
-        {sent ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Send className="w-2.5 h-2.5" />}
+        {sent ? <Check className="w-2.5 h-2.5 text-ui-success" /> : <Send className="w-2.5 h-2.5" />}
         <span>{t("chat.codeSendToTerminalDropdown")}</span>
       </button>
       {open && (
@@ -514,7 +514,7 @@ function SendToQueryButton({ targetEntry, disabled, sent, onSend, t }: SendToQue
             : t("chat.codeSendQueryNoTarget")
         }
       >
-        {sent ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Database className="w-2.5 h-2.5" />}
+        {sent ? <Check className="w-2.5 h-2.5 text-ui-success" /> : <Database className="w-2.5 h-2.5" />}
         <span>{t("chat.codeSendToQuery")}</span>
       </button>
     );
@@ -529,7 +529,7 @@ function SendToQueryButton({ targetEntry, disabled, sent, onSend, t }: SendToQue
         disabled={disabled}
         title={t("chat.codeSendQueryPickTitle")}
       >
-        {sent ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Database className="w-2.5 h-2.5" />}
+        {sent ? <Check className="w-2.5 h-2.5 text-ui-success" /> : <Database className="w-2.5 h-2.5" />}
         <span>{t("chat.codeSendToQueryDropdown")}</span>
       </button>
       {open && (

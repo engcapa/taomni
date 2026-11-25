@@ -177,7 +177,7 @@ export function TagsView({
           Checkout
         </button>
         <button className="taomni-btn h-7 px-2" type="button" disabled={busy||!current||!hasRemote} onClick={() => current&&onPush(current)}>Push</button>
-        <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy||!current} onClick={() => current&&onDelete(current)}>Delete</button>
+        <button className="taomni-btn h-7 px-2 text-ui-danger" type="button" disabled={busy||!current} onClick={() => current&&onDelete(current)}>Delete</button>
       </div>
       <div className="flex-1 min-h-0 overflow-auto">
         {tags.length===0? <EmptyState title="No tags" />:filteredTags.length===0? <EmptyState title="No tags match" />:(

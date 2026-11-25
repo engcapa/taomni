@@ -212,7 +212,7 @@ export function RefactoringPreviewDialog({
             data-testid="refactoring-preview-error-conflicts"
             className="mx-4 mt-2 flex items-start gap-2 rounded border border-ui-danger-border bg-ui-danger-surface px-3 py-2 text-ui-small text-ui-danger"
           >
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-ui-danger" />
             <div>
               <div className="font-semibold">Refactoring Blocked by Conflicts:</div>
               <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
@@ -228,7 +228,7 @@ export function RefactoringPreviewDialog({
             data-testid="refactoring-preview-warning-conflicts"
             className="mx-4 mt-2 flex items-start gap-2 rounded border border-ui-warning-border bg-ui-warning-surface px-3 py-2 text-ui-small text-ui-warning"
           >
-            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-ui-warning" />
             <div>
               <div className="font-semibold">Warnings:</div>
               <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
@@ -257,7 +257,7 @@ export function RefactoringPreviewDialog({
               onClick={selectAll}
               className="flex items-center gap-1 rounded px-2 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)]"
             >
-              <CheckSquare className="h-3.5 w-3.5 text-emerald-500" />
+              <CheckSquare className="h-3.5 w-3.5 text-ui-success" />
               <span>Select All</span>
             </button>
             <button
@@ -360,7 +360,7 @@ export function RefactoringPreviewDialog({
                           <span className="text-[var(--taomni-code-muted)] shrink-0 w-16">
                             L{usage.range.start.line + 1}:{usage.range.start.character + 1}
                           </span>
-                          <span className="text-emerald-500 font-semibold shrink-0">
+                          <span className="text-ui-success font-semibold shrink-0">
                             → {usage.newText || "(empty)"}
                           </span>
                           {usage.annotationLabel && (
@@ -379,12 +379,12 @@ export function RefactoringPreviewDialog({
                             <pre
                               data-testid="refactoring-preview-before"
                               aria-label="Before"
-                              className="m-0 whitespace-pre-wrap break-all bg-red-500/10 px-2 py-0.5 text-[var(--taomni-code-text)]"
+                              className="m-0 whitespace-pre-wrap break-all bg-ui-danger-surface px-2 py-0.5 text-[var(--taomni-code-text)]"
                             >{images.before.map((line) => `- ${line}`).join("\n")}</pre>
                             <pre
                               data-testid="refactoring-preview-after"
                               aria-label="After"
-                              className="m-0 whitespace-pre-wrap break-all bg-emerald-500/10 px-2 py-0.5 text-[var(--taomni-code-text)]"
+                              className="m-0 whitespace-pre-wrap break-all bg-ui-success-surface px-2 py-0.5 text-[var(--taomni-code-text)]"
                             >{images.after.map((line) => `+ ${line}`).join("\n")}</pre>
                           </div>
                         ) : (
@@ -428,7 +428,8 @@ export function RefactoringPreviewDialog({
                 ? "Cannot apply refactoring with unresolved conflicts"
                 : undefined
             }
-            className="rounded bg-sky-600 px-4 py-1.5 font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+            data-primary="true"
+            className="taomni-btn rounded px-4 py-1.5 font-medium disabled:opacity-50"
           >
             Do Refactor ({includedCount})
           </button>

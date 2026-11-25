@@ -317,7 +317,7 @@ export function HierarchyPanel({
           <span className="font-medium">{node.item.name}</span>
           {node.item.detail && <span className="text-[var(--taomni-code-muted)]"> · {node.item.detail}</span>}
           <span className="text-[var(--taomni-code-muted)]"> — {displayPath(node.item)}:{node.item.selectionRange.start.line + 1}</span>
-          {node.cycle && <span className="ml-1 text-amber-500">↻</span>}
+          {node.cycle && <span className="ml-1 text-ui-warning">↻</span>}
         </button>
         <span className="shrink-0 text-ui-caption text-[var(--taomni-code-muted)]">
           {symbolKindLabel(node.item.kind)}

@@ -54,7 +54,7 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
         </button>
       </div>
       {active && !supported && (
-        <div data-testid="debug-function-breakpoint-unsupported" className="px-3 pb-1 text-ui-caption text-amber-500">
+        <div data-testid="debug-function-breakpoint-unsupported" className="px-3 pb-1 text-ui-caption text-ui-warning">
           The active debug adapter does not support function breakpoints.
         </div>
       )}
@@ -87,12 +87,12 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
               <span className={`min-w-0 flex-1 truncate font-mono ${disabled ? "text-[var(--taomni-text-muted)] line-through" : ""
                 }`} title={breakpoint.name}>
                 {breakpoint.name}
-                {breakpoint.condition && <span className="ml-2 text-amber-500">if {breakpoint.condition}</span>}
-                {breakpoint.hitCondition && <span className="ml-2 text-amber-500">hit {breakpoint.hitCondition}</span>}
+                {breakpoint.condition && <span className="ml-2 text-ui-warning">if {breakpoint.condition}</span>}
+                {breakpoint.hitCondition && <span className="ml-2 text-ui-warning">hit {breakpoint.hitCondition}</span>}
                 {bindingHint && (
                   <span
                     data-testid={`debug-function-breakpoint-binding-${index}`}
-                    className={`ml-2 ${bindingHint.status === "failed" ? "text-rose-500" : "text-[var(--taomni-text-muted)]"}`}
+                    className={`ml-2 ${bindingHint.status === "failed" ? "text-ui-danger" : "text-[var(--taomni-text-muted)]"}`}
                     title={bindingHint.message ?? undefined}
                   >
                     {bindingHint.status === "failed" ? "not bound" : "pending"}
@@ -110,7 +110,7 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
               <IconButton
                 type="button"
                 data-testid={`debug-function-breakpoint-remove-${index}`}
-                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-rose-500"
+                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-ui-danger"
                 labelKey="removeFunctionBreakpoint"
                 onClick={() => debug.removeFunctionBreakpoint(breakpoint.name)}
               >

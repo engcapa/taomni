@@ -219,7 +219,8 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
                   data-testid="backup-restore-confirm"
                   disabled={restoring || restoreStaged}
                   onClick={handleConfirmRestore}
-                  className="flex items-center gap-1.5 rounded bg-red-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                  data-danger="true"
+                  className="taomni-btn flex items-center gap-1.5 rounded px-4 py-1.5 text-xs font-medium disabled:opacity-50"
                 >
                   {restoring ? (
                     <>

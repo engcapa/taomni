@@ -280,7 +280,7 @@ export function SegmentPopup({
                 data-testid={`code-workspace-breadcrumb-action-${action.id}`}
                 disabled={action.disabled}
                 className={`flex w-full items-center px-2 py-1 text-left hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40 ${index === safeIndex ? "bg-[var(--taomni-code-active-line-bg)]" : ""
-                  } ${action.danger ? "text-red-400" : "text-[var(--taomni-code-text)]"}`}
+                  } ${action.danger ? "text-ui-danger" : "text-[var(--taomni-code-text)]"}`}
                 onMouseEnter={() => onSelectedIndexChange(index)}
                 onClick={() => activate(index)}
               >

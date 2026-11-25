@@ -71,7 +71,7 @@ export function GenerateCodeDialog({
       <div className="flex w-full max-w-lg flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-sky-400" />
+            <Sparkles className="h-4 w-4 text-ui-info" />
             <h2 id="generate-code-title" className="text-ui-body font-semibold">Generate Code</h2>
           </div>
           <button
@@ -178,7 +178,8 @@ export function GenerateCodeDialog({
                 data-testid="generate-code-apply"
                 onClick={() => onApply([...selected])}
                 disabled={busy || selected.size === 0}
-                className="rounded bg-sky-500/80 px-2.5 py-1 text-ui-small font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+                data-primary="true"
+                className="taomni-btn rounded px-2.5 py-1 text-ui-small font-medium disabled:opacity-50"
               >
                 {phase === "running" ? "Applying…" : "Generate"}
               </button>

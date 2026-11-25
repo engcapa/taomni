@@ -308,7 +308,7 @@ export function LanguageServersSettings() {
                 <span
                   data-available={status.available || undefined}
                   data-runtime-error={!!status.error || undefined}
-                  className="h-2 w-2 shrink-0 rounded-full bg-amber-500 data-[available=true]:bg-[var(--taomni-accent)] data-[runtime-error=true]:bg-amber-500"
+                  className="h-2 w-2 shrink-0 rounded-full bg-[var(--taomni-warning-icon)] data-[available=true]:bg-[var(--taomni-accent)] data-[runtime-error=true]:bg-[var(--taomni-warning-icon)]"
                   title={
                     status.available
                       ? t("settings.languageServersRuntimeOk")

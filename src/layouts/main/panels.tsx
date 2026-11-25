@@ -58,7 +58,7 @@ export function UnavailablePanel({ title, message }: { title: string; message?: 
     >
       <div className="max-w-md text-center">
         <div className="text-lg font-semibold mb-2">{title}</div>
-        <div className="text-ui-body text-slate-300">
+        <div className="text-ui-body text-[var(--taomni-text)]">
           {message ?? t("status.commandUnavailable")}
         </div>
       </div>

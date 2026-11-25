@@ -373,7 +373,7 @@ export function DiffViewer({
       {eolOnly && eolLabel ? (
         <div
           data-testid="git-diff-eol-only-banner"
-          className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-amber-500/40 bg-amber-500/10 text-ui-small text-amber-700 dark:text-amber-300"
+          className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-ui-warning-border bg-ui-warning-surface text-ui-small text-ui-warning"
         >
           <span className="min-w-0 flex-1">{eolLabel}</span>
           {onNormalizeLineEndings ? (

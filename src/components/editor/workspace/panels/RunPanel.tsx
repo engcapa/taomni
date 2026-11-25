@@ -166,8 +166,8 @@ export const RunPanel = forwardRef<RunPanelHandle, RunPanelProps>(function RunPa
           disabled={!!toolError}
         >
           {toolError
-            ? <AlertTriangle className="h-3 w-3 shrink-0 text-amber-500" />
-            : <Play className="h-3 w-3 shrink-0 text-emerald-500" />}
+            ? <AlertTriangle className="h-3 w-3 shrink-0 text-ui-warning" />
+            : <Play className="h-3 w-3 shrink-0 text-ui-success" />}
           <span className="truncate">{task.label}</span>
           <span className="ml-auto shrink-0 text-ui-caption text-[var(--taomni-code-muted)]">{task.source}</span>
           {task.runConfiguration && (
@@ -185,7 +185,7 @@ export const RunPanel = forwardRef<RunPanelHandle, RunPanelProps>(function RunPa
           <button
             type="button"
             aria-label={`Remove custom task ${task.label}`}
-            className="px-1 text-red-500 opacity-0 group-hover:opacity-100"
+            className="px-1 text-ui-danger opacity-0 group-hover:opacity-100"
             onClick={() => configurations.setCustomTasks((current) => current.filter((item) => item.id !== task.id))}
           >
             ×

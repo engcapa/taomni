@@ -299,7 +299,7 @@ export function CodeStyleSettingsDialog({
               <div
                 role="alert"
                 data-testid="code-style-error"
-                className="mb-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-ui-small"
+                className="mb-2 rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1 text-ui-small"
               >
                 {error}
               </div>
@@ -510,7 +510,7 @@ export function CodeStyleSettingsDialog({
                           <IconButton labelKey="removeExclusion"
                             type="button"
                             data-testid={`code-style-remove-exclusion-${idx}`}
-                            className="text-[var(--taomni-code-muted)] hover:text-red-400"
+                            className="text-[var(--taomni-code-muted)] hover:text-ui-danger"
                             onClick={() => {
                               const nextPatterns = (selected.exclusions?.patterns ?? []).filter((_, i) => i !== idx);
                               updateExclusions({ patterns: nextPatterns });

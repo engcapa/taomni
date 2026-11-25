@@ -111,9 +111,9 @@ export function EditorAiRewriteDialog({
               key={`${line.kind}:${index}`}
               className={
                 line.kind === "old"
-                  ? "flex bg-red-500/10 text-red-400"
+                  ? "flex bg-ui-danger-surface text-ui-danger"
                   : line.kind === "new"
-                    ? "flex bg-green-500/10 text-green-400"
+                    ? "flex bg-ui-success-surface text-ui-success"
                     : "flex text-[var(--taomni-code-text)]"
               }
             >

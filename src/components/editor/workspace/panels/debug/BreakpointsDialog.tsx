@@ -215,7 +215,7 @@ export function BreakpointsDialog({ debug, initial = null, onOpenBreakpoint, onC
                     <span className={`truncate ${disabled ? "text-[var(--taomni-text-muted)]" : ""}`}>
                       {breakpointDisplayName(row.path, row.line)}
                     </span>
-                    {entry.bp.condition && <span className="truncate text-ui-caption text-amber-500">{entry.bp.condition}</span>}
+                    {entry.bp.condition && <span className="truncate text-ui-caption text-ui-warning">{entry.bp.condition}</span>}
                   </div>
                 );
               })}

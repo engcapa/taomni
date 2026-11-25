@@ -101,7 +101,7 @@ export function DocumentationPane({
         onClick={onBodyClick}
         dangerouslySetInnerHTML={{ __html: html }}
       />
-      {linkError && <div role="status" className="px-2 pb-1 text-ui-caption text-red-400">{linkError}</div>}
+      {linkError && <div role="status" className="px-2 pb-1 text-ui-caption text-ui-danger">{linkError}</div>}
       <ReferenceContentFooter content={content} onOpenSource={onOpenSource} />
     </div>
   );

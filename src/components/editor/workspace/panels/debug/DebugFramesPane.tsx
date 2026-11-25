@@ -238,13 +238,13 @@ export function DebugFramesPane({
       {state?.exceptionInfo && (
         <div
           data-testid="debug-exception-info"
-          className="border-b border-[var(--taomni-code-border)] bg-rose-500/10 px-2.5 py-1.5 shrink-0"
+          className="border-b border-[var(--taomni-code-border)] bg-ui-danger-surface px-2.5 py-1.5 shrink-0"
         >
-          <div className="font-medium text-rose-600 dark:text-rose-400">
+          <div className="font-medium text-ui-danger">
             {state.exceptionInfo.exceptionId}
           </div>
           {state.exceptionInfo.description && (
-            <div className="text-ui-caption text-rose-600/90 dark:text-rose-400/90">
+            <div className="text-ui-caption text-ui-danger">
               {state.exceptionInfo.description}
             </div>
           )}

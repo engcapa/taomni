@@ -117,10 +117,10 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
       {/* Diff display */}
       {rewritten !== null && (
         <div className="space-y-1 mb-2">
-          <div className="font-mono text-ui-small bg-red-500/10 border border-red-500/20 rounded px-2 py-1 line-through text-[var(--taomni-text-muted)]">
+          <div className="font-mono text-ui-small bg-ui-danger-surface border border-ui-danger-border rounded px-2 py-1 line-through text-[var(--taomni-text-muted)]">
             {currentCommand}
           </div>
-          <div className="font-mono text-ui-small bg-green-500/10 border border-green-500/20 rounded px-2 py-1 text-green-300">
+          <div className="font-mono text-ui-small bg-ui-success-surface border border-ui-success-border rounded px-2 py-1 text-ui-success">
             {rewritten}
           </div>
         </div>

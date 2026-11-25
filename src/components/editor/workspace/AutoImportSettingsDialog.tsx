@@ -85,7 +85,7 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
           <IconButton
             type="button"
             onClick={onClose}
-            className="p-1 rounded hover:bg-neutral-800 text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
+            className="p-1 rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
             labelKey="closeEsc"
             data-testid="auto-import-close-button"
           >
@@ -96,8 +96,8 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
         {/* Form Controls */}
         <div className="flex flex-col gap-4 text-xs">
           {/* On-the-fly section */}
-          <div className="flex flex-col gap-2 rounded-lg border border-[var(--taomni-code-border)] p-3 bg-neutral-900/30">
-            <span className="font-semibold text-ui-body text-neutral-300">Java / On The Fly</span>
+          <div className="flex flex-col gap-2 rounded-lg border border-[var(--taomni-code-border)] p-3 bg-[var(--taomni-panel-bg)]">
+            <span className="font-semibold text-ui-body text-[var(--taomni-code-text)]">Java / On The Fly</span>
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -108,7 +108,7 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
                     addUnambiguousImportsOnTheFly: e.target.checked,
                   }))
                 }
-                className="rounded border-[var(--taomni-code-border)] bg-neutral-800 text-[var(--taomni-accent)] focus:ring-0"
+                className="rounded border-[var(--taomni-code-border)] bg-[var(--taomni-input-bg)] text-[var(--taomni-accent)] focus:ring-0"
                 data-testid="auto-import-on-the-fly-checkbox"
               />
               <span>Add unambiguous imports on the fly</span>
@@ -124,7 +124,7 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
                     optimizeImportsOnTheFly: e.target.checked,
                   }))
                 }
-                className="rounded border-[var(--taomni-code-border)] bg-neutral-800 text-[var(--taomni-accent)] focus:ring-0"
+                className="rounded border-[var(--taomni-code-border)] bg-[var(--taomni-input-bg)] text-[var(--taomni-accent)] focus:ring-0"
                 data-testid="auto-import-optimize-on-the-fly-checkbox"
               />
               <span>Optimize imports on the fly (for current project or module)</span>
@@ -132,10 +132,10 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
           </div>
 
           {/* Paste section */}
-          <div className="flex flex-col gap-2 rounded-lg border border-[var(--taomni-code-border)] p-3 bg-neutral-900/30">
-            <span className="font-semibold text-ui-body text-neutral-300">Paste</span>
+          <div className="flex flex-col gap-2 rounded-lg border border-[var(--taomni-code-border)] p-3 bg-[var(--taomni-panel-bg)]">
+            <span className="font-semibold text-ui-body text-[var(--taomni-code-text)]">Paste</span>
             <div className="flex items-center justify-between gap-4">
-              <label htmlFor="auto-import-paste-mode" className="text-neutral-400">
+              <label htmlFor="auto-import-paste-mode" className="text-[var(--taomni-code-muted)]">
                 Insert imports on paste:
               </label>
               <select
@@ -147,7 +147,7 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
                     pasteImportMode: e.target.value as "all" | "ask" | "none",
                   }))
                 }
-                className="rounded border border-[var(--taomni-code-border)] bg-neutral-800 px-2 py-1 text-xs text-neutral-200 focus:outline-hidden"
+                className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-input-bg)] px-2 py-1 text-xs text-[var(--taomni-code-text)] focus:outline-hidden"
                 data-testid="auto-import-paste-mode-select"
               >
                 <option value="all">All</option>
@@ -166,7 +166,7 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
 
           {/* Excluded packages section */}
           <div className="flex flex-col gap-1.5">
-            <label className="font-semibold text-neutral-300">
+            <label className="font-semibold text-[var(--taomni-code-text)]">
               Exclude from import and completion:
             </label>
             <textarea
@@ -174,7 +174,7 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
               value={excludedPackagesText}
               onChange={(e) => setExcludedPackagesText(e.target.value)}
               placeholder="e.g. com.sun.*, sun.*, jdk.internal.*"
-              className="w-full rounded-md border border-[var(--taomni-code-border)] bg-neutral-900 p-2 font-mono text-xs text-neutral-200 focus:outline-hidden focus:border-[var(--taomni-accent)] resize-none"
+              className="w-full rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-input-bg)] p-2 font-mono text-xs text-[var(--taomni-code-text)] focus:outline-hidden focus:border-[var(--taomni-accent)] resize-none"
               data-testid="auto-import-excluded-packages-input"
             />
             <span className="text-ui-small text-[var(--taomni-code-muted)]">
@@ -188,7 +188,7 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
           <button
             type="button"
             onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[var(--taomni-code-muted)] hover:text-neutral-200 hover:bg-neutral-800 rounded transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)] hover:bg-[var(--taomni-hover)] rounded transition-colors"
             data-testid="auto-import-reset-button"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -197,19 +197,20 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
 
           <div className="flex items-center gap-2">
             {savedNotice && (
-              <span className="text-xs text-emerald-400">Settings saved!</span>
+              <span className="text-xs text-ui-success">Settings saved!</span>
             )}
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-xs border border-[var(--taomni-code-border)] text-neutral-300 hover:bg-neutral-800 rounded transition-colors"
+              className="px-3 py-1.5 text-xs border border-[var(--taomni-code-border)] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-hover)] rounded transition-colors"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--taomni-accent)] text-black font-medium hover:brightness-110 rounded transition-colors"
+              data-primary="true"
+              className="taomni-btn flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors"
               data-testid="auto-import-save-button"
             >
               <Save className="w-3.5 h-3.5" />

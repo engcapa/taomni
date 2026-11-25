@@ -136,7 +136,7 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
                         </span>
                       )}
                       {rec.decision === "direct" && (
-                        <span className="px-1.5 py-0.5 rounded text-ui-caption font-semibold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">
+                        <span className="px-1.5 py-0.5 rounded text-ui-caption font-semibold bg-[var(--taomni-panel-bg)] text-[var(--taomni-text-muted)] border border-[var(--taomni-divider)]">
                           DIRECT
                         </span>
                       )}

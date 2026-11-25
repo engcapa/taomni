@@ -131,7 +131,7 @@ export function ReferencesPanel({ result, roots, semanticIndex, onOpenLocation, 
       <div className="flex items-center gap-1 border-b border-[var(--taomni-code-border)] px-3 py-1">
         <div
           data-testid="references-semantic-index"
-          className={`min-w-0 flex-1 truncate text-ui-caption ${resultCurrent ? "text-[var(--taomni-code-muted)]" : "text-amber-500"}`}
+          className={`min-w-0 flex-1 truncate text-ui-caption ${resultCurrent ? "text-[var(--taomni-code-muted)]" : "text-ui-warning"}`}
           title="References are supplied by the active language server. This is not an IntelliJ PSI index guarantee."
         >
           Provider snapshot: {semanticLabel}

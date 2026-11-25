@@ -47,7 +47,7 @@ export function AiMasterSwitch() {
       </div>
       <div
         className={`w-9 h-5 rounded-full transition-colors relative ${
-          disabled ? "bg-yellow-500" : "bg-[var(--taomni-divider)]"
+          disabled ? "bg-[var(--taomni-warning-icon)]" : "bg-[var(--taomni-divider)]"
         }`}
       >
         <div

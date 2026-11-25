@@ -73,7 +73,7 @@ export function ExternalFileConflictDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+          <AlertTriangle className="h-4 w-4 shrink-0 text-ui-warning" />
           <div className="min-w-0 flex-1">
             <div className="truncate text-ui-body font-semibold text-[var(--taomni-code-text)]">
               File changed outside the editor

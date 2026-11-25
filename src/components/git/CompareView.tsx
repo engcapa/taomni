@@ -27,7 +27,7 @@ function statusColor(status: string): string {
       return "bg-ui-danger-surface text-ui-danger";
     case "renamed":
     case "copied":
-      return "bg-purple-500/15 text-purple-500";
+      return"bg-[var(--taomni-git-moved-bg)] text-[var(--taomni-git-moved-text)]";
     default:
       return "bg-ui-info-surface text-ui-info";
   }

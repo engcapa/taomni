@@ -58,12 +58,12 @@ const PROJECT_PHASE_LABELS: Record<ProjectAnalysisPhase, string> = {
 function projectPhaseClassName(phase: ProjectAnalysisPhase): string {
   switch (phase) {
     case "ready":
-      return "text-emerald-500";
+      return"text-ui-success";
     case "degraded":
     case "offline":
-      return "text-amber-500";
+      return"text-ui-warning";
     case "error":
-      return "text-red-500";
+      return"text-ui-danger";
     default:
       return "text-[var(--taomni-code-muted)]";
   }
@@ -228,7 +228,7 @@ export function AnalysisPanel({
                 )}
               </div>
               {projectAnalysis.diagnostics.length > 0 && (
-                <div data-testid="analysis-project-diagnostics" className="text-amber-500" title={projectAnalysis.diagnostics.join("\n")}>
+                <div data-testid="analysis-project-diagnostics" className="text-ui-warning" title={projectAnalysis.diagnostics.join("\n")}>
                   {projectAnalysis.diagnostics.length === 1
                     ? projectAnalysis.diagnostics[0]
                     : `${projectAnalysis.diagnostics.length} provider notes`}
@@ -274,7 +274,7 @@ export function AnalysisPanel({
               </div>
             )}
             {semanticIndex.staleReasons.length > 0 && (
-              <div className="text-amber-500">
+              <div className="text-ui-warning">
                 Pending invalidation: {semanticIndex.staleReasons.join(", ")}
               </div>
             )}
@@ -289,7 +289,7 @@ export function AnalysisPanel({
               </div>
             )}
             {semanticIndex.lastQuery?.coverage && (semanticIndex.lastQuery.coverage.diagnostics?.length ?? 0) > 0 && (
-              <div className="text-amber-500" title={semanticIndex.lastQuery.coverage.diagnostics?.join("\n")}>
+              <div className="text-ui-warning" title={semanticIndex.lastQuery.coverage.diagnostics?.join("\n")}>
                 Query diagnostics: {semanticIndex.lastQuery.coverage.diagnostics?.length}
               </div>
             )}
@@ -309,14 +309,14 @@ export function AnalysisPanel({
             <div className="space-y-1 rounded border border-[var(--taomni-code-border)] p-2">
               <div className="flex items-center gap-2">
                 <span className="font-medium">{status.displayName ?? status.presetId ?? "LSP"}</span>
-                <span className={status.active ? "text-emerald-500" : "text-amber-500"}>
+                <span className={status.active ? "text-ui-success" : "text-ui-warning"}>
                   {status.active ? "active" : status.error ?? "inactive"}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-ui-caption text-[var(--taomni-code-muted)]">
                 {capabilities.map(([label, enabled]) => (
                   <span key={label} className="inline-flex items-center gap-1">
-                    {enabled ? <CheckCircle2 className="h-3 w-3 text-emerald-500" /> : <Circle className="h-3 w-3" />}
+                    {enabled ? <CheckCircle2 className="h-3 w-3 text-ui-success" /> : <Circle className="h-3 w-3" />}
                     {label}
                   </span>
                 ))}

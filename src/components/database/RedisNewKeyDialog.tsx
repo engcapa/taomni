@@ -63,7 +63,7 @@ export function RedisNewKeyDialog({ sessionId, onClose, onCreated }: RedisNewKey
       >
         <div className="h-7 flex shrink-0 items-center px-2 text-ui-body font-semibold" style={{ background: "linear-gradient(to bottom,#5895c8,#2b5d8b)", color: "#fff" }}>
           New Redis key
-          <IconButton labelKey="close" type="button" className="ml-auto hover:bg-red-500 rounded p-0.5" onClick={onClose}>
+          <IconButton labelKey="close" type="button" className="ml-auto hover:bg-[var(--taomni-control-hover)] rounded p-0.5" onClick={onClose}>
             <X className="w-3.5 h-3.5" />
           </IconButton>
         </div>

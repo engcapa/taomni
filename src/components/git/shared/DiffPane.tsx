@@ -108,7 +108,7 @@ export function DiffPane({
         ) : null}
         <button className="taomni-btn h-7 px-2" type="button" data-testid="git-diff-stage" disabled={busy || selectedCount === 0} onClick={onStage}>Stage</button>
         <button className="taomni-btn h-7 px-2" type="button" data-testid="git-diff-unstage" disabled={busy || selectedCount === 0} onClick={onUnstage}>Unstage</button>
-        <button className="taomni-btn h-7 px-2 text-red-500" type="button" data-testid="git-diff-discard" disabled={busy || selectedCount === 0} onClick={onDiscard}>Discard</button>
+        <button className="taomni-btn h-7 px-2 text-ui-danger" type="button" data-testid="git-diff-discard" disabled={busy || selectedCount === 0} onClick={onDiscard}>Discard</button>
       </div>
       {sideLabels ? (
         <div className="h-6 shrink-0 grid grid-cols-2 border-b border-[var(--taomni-divider)] text-ui-small text-[var(--taomni-text-muted)]">

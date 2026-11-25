@@ -82,9 +82,9 @@ export function consoleLineClass(category: string): string {
   switch (category) {
     case "stderr":
     case "error":
-      return "text-rose-500 dark:text-rose-400";
+      return"text-ui-danger";
     case "repl":
-      return "text-sky-600 dark:text-sky-400";
+      return"text-ui-info";
     case "console":
     case "important":
       return "text-[var(--taomni-text-muted)] italic";
@@ -188,7 +188,7 @@ export function SectionAction({
       aria-label={label}
       aria-pressed={active}
       className={`inline-flex h-5 w-5 items-center justify-center rounded ${
-        active ? "text-amber-500" : "text-[var(--taomni-text-muted)]"
+        active ? "text-ui-warning" : "text-[var(--taomni-text-muted)]"
       } hover:bg-[var(--taomni-hover)]`}
       onClick={onClick}
     >

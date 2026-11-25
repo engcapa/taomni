@@ -38,7 +38,7 @@ export function JavaMainClassPicker({ open, candidates, onClose, onPick }: JavaM
       itemKey={(item) => `${item.projectName}:${item.mainClass}`}
       renderItem={(item) => (
         <>
-          <Play className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+          <Play className="h-3.5 w-3.5 shrink-0 text-ui-success" />
           <span className="shrink-0 text-[var(--taomni-code-text)]">
             {item.mainClass.split(".").pop() ?? item.mainClass}
           </span>

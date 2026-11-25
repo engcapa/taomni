@@ -77,7 +77,7 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
           <div className="flex items-center gap-2 font-medium">
-            <Settings2 className="h-4 w-4 text-blue-400" />
+            <Settings2 className="h-4 w-4 text-ui-info" />
             <span id={titleId}>File and Code Templates</span>
           </div>
           <IconButton labelKey="close"
@@ -100,7 +100,7 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
               data-testid={`file-template-tab-${tab.kind}`}
               className={`border-b-2 px-3 py-2 text-ui-body font-medium transition-colors ${
                 activeKind === tab.kind
-                  ? "border-blue-500 text-[var(--taomni-code-text)]"
+                  ? "border-ui-info-border text-[var(--taomni-code-text)]"
                   : "border-transparent text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
               }`}
             >
@@ -129,7 +129,7 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
               }
               rows={10}
               data-testid="file-template-editor-textarea"
-              className="w-full font-mono rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] p-2.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-blue-500"
+              className="w-full font-mono rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] p-2.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-[var(--taomni-focus-ring)]"
             />
           </div>
 
@@ -165,7 +165,7 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
 
           <div className="flex items-center gap-2">
             {savedNotice && (
-              <span className="text-ui-small text-green-400 font-medium">Saved!</span>
+              <span className="text-ui-small text-ui-success font-medium">Saved!</span>
             )}
             <button
               type="button"
@@ -178,7 +178,8 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
               type="button"
               onClick={handleSave}
               data-testid="file-template-save-button"
-              className="flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1 font-medium text-ui-small text-white hover:bg-blue-500"
+              data-primary="true"
+              className="taomni-btn flex items-center gap-1.5 rounded px-3 py-1 font-medium text-ui-small"
             >
               <Save className="h-3.5 w-3.5" />
               <span>Save</span>

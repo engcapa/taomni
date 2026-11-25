@@ -116,7 +116,7 @@ export function VariableRow({
             data-testid={node.hasChanged ? "debug-variable-changed" : undefined}
             className={`truncate ${
               node.hasChanged
-                ? "text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-1 rounded"
+                ? "text-ui-warning font-semibold bg-ui-warning-surface px-1 rounded"
                 : "text-[var(--taomni-text)]"
             }`}
             title={onStartEdit ? "Set Value (F2), or double-click" : undefined}
@@ -132,7 +132,7 @@ export function VariableRow({
                 type="button"
                 tabIndex={-1}
                 data-testid="debug-variable-data-breakpoint"
-                className="text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100 hover:text-rose-500 disabled:opacity-30"
+                className="text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100 hover:text-ui-danger disabled:opacity-30"
                 onClick={() => onAddDataBreakpoint(node)}
                 disabled={addingDataBreakpointKey === dataTargetKey}
                 title={`Add data breakpoint for ${node.name}`}

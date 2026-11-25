@@ -398,7 +398,7 @@ export function KeymapSettingsDialog({
           : {})}
       >
         <ShortcutKeyCaps shortcut={shortcut} platform={displayPlatform === "mac" ? "mac" : undefined} />
-        {conflicts.length ? <span aria-label="conflict" className="text-amber-500">⚠</span> : null}
+        {conflicts.length ? <span aria-label="conflict" className="text-ui-warning">⚠</span> : null}
         <button
           type="button"
           aria-label={`Remove shortcut ${label} from ${item.title}`}
