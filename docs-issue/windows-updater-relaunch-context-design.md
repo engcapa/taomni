@@ -41,7 +41,22 @@ Tauri updater 2.11.0 在 Windows 运行签名校验通过的安装包，再退�
 - `initial.json` 对应独立安装的修复前程序，三组系统剪贴板实测中仅 CRLF 触发异常。`unit-before.log` 记录 7 项通过、CRLF 文末和多选区 2 项失败。
 - 修复后本机首轮 Notepad、共享剪贴板及更新 service/store 的 6 个单测文件共 72 项通过。`unit.log`、`refactor.log` 保留输出。
 - `auto-before.json`、`manual-before.json`、`upgrade-fixed.json`、`auto-fixed.json` 和 `http.log` 对应两次应用内升级。`initial.json` 使用 Win32 键盘事件。上表三组用 Windows 系统剪贴板写入和回读，再向 WebView2 发送组合键。修复后自动启动的父进程为 `explorer.exe`。
-- `nsis-unit.log` 中 8 项通过，包含对新装、仅 `/R`、仅 `/UPDATE`、同时传入两者的真实安装进程检查。`os-contract.log` 保留同一生产 Rust 模块的交互桌面回执。仓库中的测试入口为 `cargo test --bin taomni desktop_environment_after_update -- --ignored --nocapture`。
+- `nsis-unit.log` 中 8 项通过，包含对新装、仅 `/R`、仅 `/UPDATE`、同时传入两者的真实安装进程检查。`os-contract.log` 保留同一生产 Rust 模块的交互桌面回执。在 `src-tauri/` 下运行 `cargo test --release --bin taomni desktop_environment_after_update -- --ignored --nocapture` 也通过，见 `rust-repo-release-test.log`。本机调试缓存曾因 Whisper 与 CityHash 的 MSVC 运行库选择不一致而链接失败。
 - 安装器实测范围为本机当前用户 NSIS 安装。MSI、其他 Windows 桌面环境和用户原先失效的具体路径仍缺少现场证据。保存目录持久化作为回归用例，故障归因限于上表能复现的行为。
 - Windows browser 的 TC-NP-104、TC-NP-106 均通过。Windows 标准 QA release 的 TC-NP-103、TC-NP-105、TC-NP-107 均通过。TC-NP-107 在同一配置的第二个进程中验证上次保存目录，独立读取的两个文件分别为 14 和 22 字节。TC-NP-105 覆盖快捷键和菜单连续粘贴、系统剪贴板的复制与剪切。
 - Windows browser 完整崩溃回归使用 Vite 开发服务串行执行，17 项通过，TC-FILE-OPEN-008 因缺少 SSH fixture 跳过。最初三 worker 运行中发生首屏超时，静态预览也缺少 fixture 动态导入的源码模块；保留两轮诊断收据，以开发服务的完整串行结果记录验收。Windows Sherpa 原生缓存与安装器回归 3 项通过。
+- Windows native 的完整崩溃回归有 21 项通过，同一个 SSH fixture 缺失用例跳过。移动端探针需要在隔离桌面上找到已安装的 Chromium，设置本机的 `PLAYWRIGHT_BROWSERS_PATH` 后重跑整组通过可执行项。Notepad 的 24 个单测文件共 121 项通过，前端构建和 `pnpm check:refactor` 均通过。
+
+## 最终平台回归
+
+在提交 `641e92472` 上合并执行 TC-NP-103 至 TC-NP-107 各自适用的模式和完整 `crash-regression` 集合。Windows 使用本机的 Vite 与独立 QA release，Linux 和 macOS 使用 `qa-ui-auto-platforms`。三端收据记录的产品源码 SHA-256 均为 `13f6b52bdb27ed415b225ca813545fbc733eb802abf434847ea4ea99af8f43cb`。
+
+| 平台 | Browser | Native |
+|---|---|---|
+| Windows x64 本机 | 19 通过，1 跳过 | 24 通过，1 跳过 |
+| Linux x64 GitHub runner | 20 通过 | 25 通过 |
+| macOS ARM64 GitHub runner | 20 通过 | 25 通过 |
+
+Windows 两处跳过均为需要 SSH fixture 的 TC-FILE-OPEN-008，对应原始收据在 `browser-branch-warm/` 与 `native-branch/`。macOS 使用 WKWebView 的组合键发送和独立系统剪贴板验证内容，物理键盘投递不在这组自动化收据的覆盖范围。
+
+首次 GitHub 规划发现 TC-NP-106 点到的两个 Paste Special 控件缺少目录登记，补齐后重新运行成功。12 个测试分片均在 workflow 仍处于 `in_progress` 时下载。逐个核对选择集、源码与 runner 标识、用例摘要及 1,554 个回执附件的大小和 SHA-256。当地时间 10:24:24 收到首批分片，11:05:33 收到最后一个测试分片。下载时间与逐项核对结果保存在报告目录下的 `hosted-45532200387/`。[GitHub Actions 运行](https://github.com/engcapa/taomni/actions/runs/45532200387)
