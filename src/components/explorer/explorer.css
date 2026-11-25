@@ -73,15 +73,15 @@
 .ex-nav-row .ex-nav-label { overflow:hidden; text-overflow:ellipsis; }
 .ex-tw { width:14px; height:18px; display:inline-flex; justify-content:center; align-items:center; color:var(--ex-muted); flex-shrink:0; }
 .ex-tw svg.lucide { width:11px; height:11px; }
-.ex-split { width:4px; cursor:col-resize; flex-shrink:0; margin-left:-2px; z-index:2; touch-action:none; }
+.ex-split { width:4px; cursor:col-resize; flex-shrink:0; margin-left:-2px; z-index:var(--taomni-z-sticky); touch-action:none; }
 .ex-split:hover { background:var(--ex-accent-s); opacity:.5; }
 .ex-files { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; position:relative; }
-.ex-fhead { display:flex; align-items:center; height:26px; min-height:26px; border-bottom:1px solid var(--ex-divider); color:var(--ex-muted); font-size:var(--taomni-fs-small); padding:0 4px; position:sticky; top:0; z-index:2; background:var(--ex-bg); }
+.ex-fhead { display:flex; align-items:center; height:26px; min-height:26px; border-bottom:1px solid var(--ex-divider); color:var(--ex-muted); font-size:var(--taomni-fs-small); padding:0 4px; position:sticky; top:0; z-index:var(--taomni-z-sticky); background:var(--ex-bg); }
 .ex-column { min-width:0; height:100%; flex:1; position:relative; }
 .ex-column>button { padding:0 8px; height:100%; width:100%; display:flex; align-items:center; gap:4px; text-align:left; overflow:hidden; }
 .ex-column>button>span:first-child { overflow:hidden; text-overflow:ellipsis; }
 .ex-column>button:hover { background:var(--ex-hover); }
-.ex-col-resize { position:absolute; top:0; bottom:0; right:-4px; width:8px; cursor:col-resize; touch-action:none; z-index:1; outline:none; }
+.ex-col-resize { position:absolute; top:0; bottom:0; right:-4px; width:8px; cursor:col-resize; touch-action:none; z-index:var(--taomni-z-sticky); outline:none; }
 .ex-col-resize::after { content:""; position:absolute; top:4px; bottom:4px; left:3px; width:1px; background:var(--ex-divider); }
 .ex-col-resize:hover::after,.ex-col-resize:focus-visible::after { width:2px; background:var(--ex-accent-s); }
 .ex-fhead .on { color:var(--ex-accent); font-weight:600; }
@@ -113,10 +113,10 @@
 .ex-error { padding:5px 12px; color:var(--taomni-danger-text); border-bottom:1px solid var(--ex-divider); font-size:var(--taomni-fs-small); display:flex; gap:8px; align-items:center; }
 .ex-warning { color:var(--ex-muted); padding:4px 12px; font-size:var(--taomni-fs-small); }
 .ex-drop { background:var(--ex-sel)!important; outline:2px solid var(--ex-accent-s); outline-offset:-2px; }
-.ex-rubber { position:absolute; border:1px solid var(--ex-accent-s); background:color-mix(in srgb,var(--ex-accent-s) 15%,transparent); pointer-events:none; z-index:3; }
+.ex-rubber { position:absolute; border:1px solid var(--ex-accent-s); background:color-mix(in srgb,var(--ex-accent-s) 15%,transparent); pointer-events:none; z-index:var(--taomni-z-docked-overlay); }
 .ex-progress { position:absolute; left:50%; bottom:34px; transform:translateX(-50%); background:var(--taomni-card-bg); color:var(--taomni-text); padding:8px 12px; border-radius:var(--taomni-radius-lg); z-index:var(--taomni-z-docked-overlay); display:flex; align-items:center; gap:12px; box-shadow:var(--taomni-shadow-sm); font-size:var(--taomni-fs-body); max-width:90%; }
 .ex-progress button { color:var(--taomni-accent); font-weight:600; }
-.ex-preview-overlay { position:absolute; top:0; right:0; bottom:0; z-index:10; box-shadow:var(--ex-shadow); display:flex; max-width:100%; }
+.ex-preview-overlay { position:absolute; top:0; right:0; bottom:0; z-index:var(--taomni-z-docked-overlay); box-shadow:var(--ex-shadow); display:flex; max-width:100%; }
 .ex-dialog-back { position:absolute; inset:0; background:var(--taomni-overlay); z-index:var(--taomni-z-modal); display:flex; align-items:center; justify-content:center; }
 .ex-dialog { width:420px; max-width:95%; max-height:90%; overflow:auto; background:var(--ex-card); border:1px solid var(--ex-card-b); border-radius:12px; box-shadow:var(--ex-shadow); padding:18px 20px; }
 .ex-dialog h3 { font-size:var(--taomni-fs-title); font-weight:600; margin-bottom:8px; }

@@ -85,7 +85,7 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
     >
       {panel.background.url && <img data-testid="session-terminal-background" src={panel.background.url}
         alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ opacity: panel.background.opacity }} />}
-      {panel.background.error && <span role="status" className="absolute top-1 right-2 z-10 text-xs">{panel.background.error}</span>}
+      {panel.background.error && <span role="status" className="absolute top-1 right-2 z-[var(--taomni-z-docked-overlay)] text-xs">{panel.background.error}</span>}
       <div ref={panel.containerRef} className="terminal-host relative w-full h-full overflow-hidden" />
       {sftpToggle && !sftpToggle.open && activeForShortcuts && (
         <SftpFloatingButton onOpen={sftpToggle.onToggle} />
@@ -170,15 +170,15 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
 
       {isMultiExecTarget && (
         <div
-          className="absolute top-1 left-1 z-40 px-1.5 py-0.5 rounded pointer-events-none"
-          style={{ background: "var(--taomni-accent)", color: "#fff", opacity: 0.85, fontSize: 10, fontWeight: 600 }}
+          className="absolute top-1 left-1 z-[var(--taomni-z-docked-overlay)] px-1.5 py-0.5 rounded pointer-events-none"
+          style={{ background: "var(--taomni-primary-bg)", color: "var(--taomni-primary-text)", fontSize: "var(--taomni-fs-caption)", fontWeight: 600 }}
         >
           ⊕ {panel.t("terminal.multiExecBadge")}
         </div>
       )}
 
       {highlights.keywordHighlights.length > 0 && (
-        <div className="absolute inset-0 z-20 pointer-events-none">
+        <div className="absolute inset-0 z-[var(--taomni-z-content)] pointer-events-none">
           {highlights.keywordHighlights.map((highlight) => (
             <div
               key={`kw-${highlight.row}-${highlight.col}-${highlight.kind}`}
@@ -195,7 +195,7 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
       )}
 
       {highlights.searchHighlights.length > 0 && (
-        <div className="absolute inset-0 z-30 pointer-events-none">
+        <div className="absolute inset-0 z-[var(--taomni-z-content)] pointer-events-none">
           {highlights.searchHighlights.map((highlight) => (
             <div
               key={`${highlight.row}-${highlight.col}-${highlight.active ? "active" : "match"}`}
@@ -213,7 +213,7 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
       )}
 
       {highlights.blockSelectionHighlights.length > 0 && (
-        <div className="absolute inset-0 z-[35] pointer-events-none">
+        <div className="absolute inset-0 z-[var(--taomni-z-content)] pointer-events-none">
           {highlights.blockSelectionHighlights.map((highlight) => (
             <div
               key={`block-${highlight.row}`}
@@ -251,7 +251,7 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
       {lifecycle.effectiveReadOnly && (
         <div
           data-testid={inputLocked ? "terminal-input-locked" : "terminal-read-only"}
-          className="absolute right-3 bottom-3 z-40 px-2 py-1 rounded border bg-white/90 text-ui-small text-slate-700 shadow-sm pointer-events-none"
+          className="absolute right-3 bottom-3 z-[var(--taomni-z-docked-overlay)] px-2 py-1 rounded border border-[var(--taomni-card-border)] bg-[var(--taomni-card-bg)] text-ui-small text-[var(--taomni-text)] shadow-sm pointer-events-none"
         >
           {inputLocked ? panel.t("terminal.inputLocked") : panel.t("terminal.readOnlyBadge")}
         </div>
@@ -259,23 +259,26 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
 
       {interaction.searchOpen && (
         <div
-          className="absolute right-3 top-3 z-50 flex items-center gap-1 rounded border border-slate-400 bg-white p-1 shadow-lg text-ui-body"
+          data-testid="terminal-search-bar"
+          className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] flex-wrap z-[var(--taomni-z-popover)] flex items-center gap-1 rounded border border-[var(--taomni-card-border)] bg-[var(--taomni-card-bg)] text-[var(--taomni-text)] p-1 shadow-lg text-ui-body"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
           onContextMenu={(event) => event.stopPropagation()}
         >
           <input
             ref={panel.searchInputRef}
-            className="taomni-input h-7 w-56"
+            className="taomni-input h-7 min-w-0 w-56"
+            aria-label={panel.t("terminal.findPlaceholder")}
             value={interaction.searchValue}
             placeholder={panel.t("terminal.findPlaceholder")}
             onChange={(event) => {
               const next = event.target.value;
               interaction.setSearchValue(next);
               interaction.fallbackSearchRef.current = { query: next.trim(), index: -1 };
-              interaction.setSearchStatus("");
+              interaction.setSearchComplete(false);
             }}
             onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
               if (event.key === "Escape") {
                 event.preventDefault();
                 interaction.closeSearch();
@@ -294,19 +297,21 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
           <button className="taomni-btn h-7 px-2" type="button" onClick={interaction.closeSearch}>
             {panel.t("terminal.findClose")}
           </button>
-          {interaction.searchStatus && <span className="px-1 text-ui-small text-[#b22222]">{interaction.searchStatus}</span>}
+          {interaction.searchComplete && <span role="status" data-testid="terminal-find-status" className="px-1 text-ui-small text-[var(--taomni-text)]">{interaction.activeSearchIndex >= 0
+            ? panel.t("terminal.findMatch", { current: interaction.activeSearchIndex + 1, total: interaction.searchMatches.length })
+            : panel.t("terminal.findNoMatches")}</span>}
         </div>
       )}
 
       {panel.eventLogOpen && (
         <div
           data-testid="terminal-event-log"
-          className="absolute right-4 bottom-4 z-50 w-[520px] max-w-[calc(100%-2rem)] max-h-[360px] rounded border border-slate-500 bg-white shadow-xl text-ui-body overflow-hidden"
+          className="absolute right-4 bottom-4 z-[var(--taomni-z-popover)] w-[520px] max-w-[calc(100%-2rem)] max-h-[360px] rounded border border-[var(--taomni-card-border)] bg-[var(--taomni-card-bg)] text-[var(--taomni-text)] shadow-xl text-ui-body overflow-hidden"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
           onContextMenu={(event) => event.stopPropagation()}
         >
-          <div className="h-8 flex items-center px-3 border-b bg-slate-100">
+          <div className="h-8 flex items-center px-3 border-b bg-[var(--taomni-quick-bg)]">
             <span className="font-semibold">{panel.t("terminal.eventLogTitle")}</span>
             <button
               data-testid="terminal-event-log-close"
@@ -319,13 +324,13 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
           </div>
           <div className="max-h-[320px] overflow-auto">
             {panel.eventLog.length === 0 ? (
-              <div className="p-3 text-slate-500">{panel.t("terminal.eventLogEmpty")}</div>
+              <div className="p-3 text-[var(--taomni-text-muted)]">{panel.t("terminal.eventLogEmpty")}</div>
             ) : (
               <table className="w-full border-collapse">
                 <tbody>
                   {panel.eventLog.map((entry) => (
-                    <tr key={entry.id} className="border-b border-slate-100">
-                      <td className="w-20 px-2 py-1 text-slate-500 taomni-mono">{entry.time}</td>
+                    <tr key={entry.id} className="border-b border-[var(--taomni-divider)]">
+                      <td className="w-20 px-2 py-1 text-[var(--taomni-text-muted)] taomni-mono">{entry.time}</td>
                       <td className="w-24 px-2 py-1 font-semibold">{entry.type}</td>
                       <td className="px-2 py-1">{entry.detail}</td>
                     </tr>
@@ -338,21 +343,21 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
       )}
 
       {panel.zmodemState !== "idle" && (
-        <div className="absolute left-1/2 top-4 z-50 -translate-x-1/2 flex items-center gap-3 rounded border border-slate-400 bg-white px-4 py-2 shadow-lg text-ui-body">
+        <div className="absolute left-1/2 top-4 z-[var(--taomni-z-docked-overlay)] -translate-x-1/2 flex items-center gap-3 rounded border border-[var(--taomni-card-border)] bg-[var(--taomni-card-bg)] text-[var(--taomni-text)] px-4 py-2 shadow-lg text-ui-body">
           <span className="font-semibold">
             {panel.zmodemState === "receiving" ? panel.t("terminal.zmodemReceiving") : panel.t("terminal.zmodemSending")} {panel.t("terminal.zmodemViaZmodem")}
           </span>
           {panel.zmodemProgress && (
             <>
-              <span className="text-slate-600 taomni-mono">{panel.zmodemProgress.fileName}</span>
-              <span className="text-slate-500">
+              <span className="text-[var(--taomni-text)] taomni-mono">{panel.zmodemProgress.fileName}</span>
+              <span className="text-[var(--taomni-text-muted)]">
                 {formatZmodemBytes(panel.zmodemProgress.bytesTransferred)}
                 {panel.zmodemProgress.fileSize > 0 && ` / ${formatZmodemBytes(panel.zmodemProgress.fileSize)}`}
               </span>
               {panel.zmodemProgress.fileSize > 0 && (
-                <div className="w-32 h-2 rounded bg-slate-200 overflow-hidden">
+                <div className="w-32 h-2 rounded bg-[var(--taomni-divider)] overflow-hidden">
                   <div
-                    className="h-full bg-blue-500 transition-all"
+                    className="h-full bg-[var(--taomni-accent)] motion-safe:transition-[width]"
                     style={{ width: `${Math.min(100, Math.round(panel.zmodemProgress.bytesTransferred / panel.zmodemProgress.fileSize * 100))}%` }}
                   />
                 </div>

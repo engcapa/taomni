@@ -246,7 +246,7 @@ export function ChatDrawerRibbon() {
         data-position={drawerPosition}
         data-dragging={dragging || undefined}
         data-alert-count={alertBadgeCount || undefined}
-        className={`${ribbonClass} z-40 flex items-center justify-center text-ui-caption font-semibold tracking-normal shadow-lg transition-transform duration-150 hover:scale-105 cursor-grab active:cursor-grabbing ${bumping ? "animate-bounce" : ""}`}
+        className={`${ribbonClass} z-[var(--taomni-z-docked-overlay)] flex items-center justify-center text-ui-caption font-semibold tracking-normal shadow-lg transition-transform duration-150 hover:scale-105 cursor-grab active:cursor-grabbing ${bumping ? "animate-bounce" : ""}`}
         style={ribbonStyle}
         title={ribbonTitle}
         aria-label={ribbonAria}

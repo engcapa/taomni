@@ -72,7 +72,7 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
 
   return (
     <div
-      className="absolute bottom-full left-0 right-0 mb-1 mx-2 rounded-lg border border-[var(--taomni-accent)]/40 bg-[var(--taomni-panel-bg)] shadow-xl p-3 z-[300]"
+      className="absolute bottom-full left-0 right-0 mb-1 mx-2 rounded-lg border border-[var(--taomni-accent)]/40 bg-[var(--taomni-panel-bg)] shadow-xl p-3 z-[var(--taomni-z-popover)]"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-2 mb-2">

@@ -274,7 +274,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
             </button>
             {showPositionMenu && (
               <div
-                className="absolute right-0 top-7 z-30 min-w-[118px] rounded border border-[var(--taomni-divider)] shadow-lg overflow-hidden"
+                className="absolute right-0 top-7 z-[var(--taomni-z-popover)] min-w-[118px] rounded border border-[var(--taomni-divider)] shadow-lg overflow-hidden"
                 style={{ background: "var(--taomni-panel-bg)" }}
               >
                 {DRAWER_POSITIONS.map((position) => {
@@ -330,7 +330,7 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
               </button>
               {showOpacityMenu && (
                 <div
-                  className="absolute right-0 top-7 z-30 w-[180px] rounded border border-[var(--taomni-divider)] shadow-lg px-2 py-1.5"
+                  className="absolute right-0 top-7 z-[var(--taomni-z-popover)] w-[180px] rounded border border-[var(--taomni-divider)] shadow-lg px-2 py-1.5"
                   style={{ background: "var(--taomni-panel-bg)" }}
                   data-testid="ai-chat-drawer-opacity-menu"
                 >

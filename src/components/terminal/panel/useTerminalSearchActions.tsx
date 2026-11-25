@@ -20,13 +20,13 @@ export function useTerminalSearchActions(context: UseTerminalSearchActionsContex
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const searchTimerRef = useRef<number | null>(null);
-  const [searchStatus, setSearchStatus] = useState("");
+  const [searchComplete, setSearchComplete] = useState(false);
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([]);
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
 
   const openSearch = useCallback(() => {
     setSearchOpen(true);
-    setSearchStatus("");
+    setSearchComplete(false);
   }, []);
 
   const cancelPendingSearch = useCallback(() => {
@@ -39,7 +39,7 @@ export function useTerminalSearchActions(context: UseTerminalSearchActionsContex
   const closeSearch = useCallback(() => {
     cancelPendingSearch();
     setSearchOpen(false);
-    setSearchStatus("");
+    setSearchComplete(false);
     setSearchMatches([]);
     setActiveSearchIndex(-1);
     searchAddonRef.current?.clearDecorations();
@@ -56,7 +56,7 @@ export function useTerminalSearchActions(context: UseTerminalSearchActionsContex
       searchAddonRef.current?.clearDecorations();
       setSearchMatches([]);
       setActiveSearchIndex(-1);
-      setSearchStatus("");
+      setSearchComplete(false);
       return;
     }
 
@@ -71,11 +71,11 @@ export function useTerminalSearchActions(context: UseTerminalSearchActionsContex
     if (result) {
       setSearchMatches(result.matches);
       setActiveSearchIndex(result.index);
-      setSearchStatus(`Match ${result.index + 1}/${result.total}`);
+      setSearchComplete(true);
     } else {
       setSearchMatches([]);
       setActiveSearchIndex(-1);
-      setSearchStatus("No matches");
+      setSearchComplete(true);
     }
   }, [cancelPendingSearch, clearTerminalBlockSelection, searchValue]);
 
@@ -98,12 +98,12 @@ export function useTerminalSearchActions(context: UseTerminalSearchActionsContex
       setSearchMatches([]);
       setActiveSearchIndex(-1);
       termRef.current?.clearSelection();
-      setSearchStatus("");
+      setSearchComplete(false);
       return;
     }
 
     searchTimerRef.current = window.setTimeout(() => runSearch("next"), 120);
     return cancelPendingSearch;
   }, [cancelPendingSearch, runSearch, searchOpen, searchValue]);
-  return { openSearch, closeSearch, cancelPendingSearch, runSearch, setSearchOpen, setSearchStatus, searchTimerRef, setSearchMatches, setActiveSearchIndex, searchValue, fallbackSearchRef, searchOpen, searchMatches, activeSearchIndex, setSearchValue, searchStatus };
+  return { openSearch, closeSearch, cancelPendingSearch, runSearch, setSearchOpen, setSearchComplete, searchTimerRef, setSearchMatches, setActiveSearchIndex, searchValue, fallbackSearchRef, searchOpen, searchMatches, activeSearchIndex, setSearchValue, searchComplete };
 }

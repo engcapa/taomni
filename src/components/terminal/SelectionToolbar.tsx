@@ -57,7 +57,7 @@ export function SelectionToolbar({
   return (
     <div
       ref={ref}
-      className="fixed z-[400] flex items-center gap-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] px-1 py-0.5 shadow-lg"
+      className="fixed z-[var(--taomni-z-popover)] flex items-center gap-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] px-1 py-0.5 shadow-lg"
       style={{ top, left }}
       onMouseDown={(e) => e.stopPropagation()}
     >

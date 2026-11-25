@@ -59,7 +59,7 @@ export interface TerminalSessionLifecycleContext {
   searchInputRef: import("react").RefObject<HTMLInputElement | null>;
   setSearchMatches: import("react").Dispatch<import("react").SetStateAction<SearchMatch[]>>;
   setActiveSearchIndex: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setSearchStatus: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setSearchComplete: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   appendEvent: (type: string, detail: string) => void;
   syncTerminalSize: (force?: boolean) => void;
   sockscapTerminal: import("../../../types").SocksCapTerminalLaunchInfo | undefined;

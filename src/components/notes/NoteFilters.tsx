@@ -86,7 +86,7 @@ export function NoteStatusFilter({ filters, onToggleFilter, className = "", pref
       </button>
       {open && (
         <div
-          className="absolute left-0 top-[30px] z-20 w-44 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg"
+          className="absolute left-0 top-[30px] z-[var(--taomni-z-popover)] w-44 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg"
           role="menu"
           data-testid={`${prefix}-filter-dropdown`}
         >

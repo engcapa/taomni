@@ -58,7 +58,7 @@ export function NewThreadFormatPicker({
 
   return (
     <div
-      className="absolute inset-0 z-20 flex items-center justify-center bg-black/40"
+      className="absolute inset-0 z-[var(--taomni-z-modal)] flex items-center justify-center bg-black/40"
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}

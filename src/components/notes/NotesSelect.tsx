@@ -101,7 +101,7 @@ export function NotesSelect({
         <div
           role="listbox"
           data-testid={testId ? `${testId}-menu` : undefined}
-          className="absolute left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded border p-0.5 shadow-md flex flex-col gap-0.5"
+          className="absolute left-0 right-0 z-[var(--taomni-z-popover)] mt-1 max-h-48 overflow-y-auto rounded border p-0.5 shadow-md flex flex-col gap-0.5"
           style={{
             backgroundColor: selectBg || "var(--taomni-input-bg)",
             color: selectColor || "var(--taomni-text)",

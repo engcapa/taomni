@@ -46,7 +46,7 @@ export function MultiExecTargets({ selectedCount, totalCount }: { selectedCount:
       {selectedCount} / {totalCount}<ChevronDown className="h-3 w-3" />
     </button>
     {open && createPortal(<div ref={menu} data-testid="multiexec-target-menu" role="dialog" aria-label={t("multiExec.targets")}
-      className="fixed z-[9999] flex max-h-[60vh] w-80 max-w-[95vw] flex-col rounded-md border p-2 text-xs shadow-lg"
+      className="fixed z-[var(--taomni-z-menu-over-modal)] flex max-h-[60vh] w-80 max-w-[95vw] flex-col rounded-md border p-2 text-xs shadow-lg"
       style={{ ...position, background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
       onKeyDown={(event) => {
         if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setOpen(false); button.current?.focus(); }

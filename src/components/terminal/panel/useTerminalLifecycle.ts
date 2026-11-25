@@ -278,7 +278,7 @@ export function useTerminalLifecycle(context: UseTerminalLifecycleContext) {
     searchInputRef: panel.searchInputRef,
     setSearchMatches: interaction.setSearchMatches,
     setActiveSearchIndex: interaction.setActiveSearchIndex,
-    setSearchStatus: interaction.setSearchStatus,
+    setSearchComplete: interaction.setSearchComplete,
     appendEvent: interaction.appendEvent,
     syncTerminalSize: interaction.syncTerminalSize,
     sockscapTerminal,

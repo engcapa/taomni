@@ -121,9 +121,9 @@ export function VaultGateProvider({ children }: { children: ReactNode }) {
     <VaultGateContext.Provider value={api}>
       {children}
       {active && (
-        // Wrapper creates a stacking context above editor modals (z-50), so
+        // Wrapper creates a stacking context above editor modals, so
         // the gate dialog paints on top of an open SessionEditor / TunnelEditor.
-        <div style={{ position: "relative", zIndex: 60 }}>
+        <div style={{ position: "relative", zIndex: "var(--taomni-z-blocking-gate)" }}>
           {state === "empty" ? (
             <VaultSetupDialog
               onCancel={() => settle(active, false)}

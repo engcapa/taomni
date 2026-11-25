@@ -343,7 +343,7 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
             position: "fixed",
             left: pos.left,
             top: pos.top,
-            zIndex: 9999,
+            zIndex: "var(--taomni-z-menu-over-modal)",
             width: "248px",
             color: "var(--taomni-text)",
             background: "var(--taomni-panel-bg)",

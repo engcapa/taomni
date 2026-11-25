@@ -171,24 +171,24 @@ export function createHoverDocDom({
 
   // 4-corner resize handles
   const gripNW = document.createElement("div");
-  gripNW.className = "absolute top-0 left-0 h-4 w-4 cursor-nw-resize z-10 select-none";
+  gripNW.className = "absolute top-0 left-0 h-4 w-4 cursor-nw-resize z-[var(--taomni-z-sticky)] select-none";
   setupHoverResize(container, gripNW, activeResizeSessionRef, "nw");
   container.appendChild(gripNW);
 
   const gripNE = document.createElement("div");
-  gripNE.className = "absolute top-0 right-0 h-4 w-4 cursor-ne-resize z-10 select-none";
+  gripNE.className = "absolute top-0 right-0 h-4 w-4 cursor-ne-resize z-[var(--taomni-z-sticky)] select-none";
   setupHoverResize(container, gripNE, activeResizeSessionRef, "ne");
   container.appendChild(gripNE);
 
   const gripSW = document.createElement("div");
-  gripSW.className = "absolute bottom-0 left-0 h-4 w-4 cursor-sw-resize z-10 select-none";
+  gripSW.className = "absolute bottom-0 left-0 h-4 w-4 cursor-sw-resize z-[var(--taomni-z-sticky)] select-none";
   setupHoverResize(container, gripSW, activeResizeSessionRef, "sw");
   container.appendChild(gripSW);
 
   const gripSE = document.createElement("div");
   gripSE.setAttribute("data-testid", "code-workspace-hover-doc-resize-handle");
   gripSE.setAttribute("aria-label", "Resize hover documentation");
-  gripSE.className = "absolute bottom-0 right-0 h-4 w-4 cursor-se-resize flex items-end justify-end p-0.5 opacity-40 hover:opacity-100 select-none z-10";
+  gripSE.className = "absolute bottom-0 right-0 h-4 w-4 cursor-se-resize flex items-end justify-end p-0.5 opacity-40 hover:opacity-100 select-none z-[var(--taomni-z-sticky)]";
   gripSE.innerHTML = `<svg viewBox="0 0 6 6" class="h-2.5 w-2.5 fill-current text-[var(--taomni-code-muted)]"><path d="M5 1L1 5M5 3L3 5M5 5L5 5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>`;
   setupHoverResize(container, gripSE, activeResizeSessionRef, "se");
   container.appendChild(gripSE);

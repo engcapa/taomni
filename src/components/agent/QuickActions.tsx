@@ -138,7 +138,7 @@ export function QuickActions({ sessionId, terminalContent, hasError, onExplanati
       </button>
 
       {pendingAction && (
-        <div className="absolute bottom-full left-0 mb-2 z-[400]">
+        <div className="absolute bottom-full left-0 mb-2 z-[var(--taomni-z-popover)]">
           <ActionCard
             tool={pendingAction.tool}
             description={t("chat.agentWantsExecute", { tool: pendingAction.tool })}

@@ -109,7 +109,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
   return (
     // True modal backdrop — pointer events blocked, no click-to-close
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      className="fixed inset-0 z-[var(--taomni-z-modal)] flex items-end justify-center"
       style={{ background: "rgba(0,0,0,0.45)", pointerEvents: "all" }}
     >
       <div

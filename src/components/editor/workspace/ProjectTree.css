@@ -36,7 +36,7 @@
 .taomni-explorer-list-name {
   position: sticky;
   left: 0;
-  z-index: 1;
+  z-index: var(--taomni-z-sticky);
   width: var(--taomni-explorer-name-width);
   flex: 0 0 var(--taomni-explorer-name-width);
   background: var(--taomni-code-gutter-bg);

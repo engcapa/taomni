@@ -450,7 +450,7 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend, t }: SendTo
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-30 min-w-[160px] rounded border border-[var(--taomni-divider)] shadow-lg"
+          className="absolute right-0 top-full mt-1 z-[var(--taomni-z-popover)] min-w-[160px] rounded border border-[var(--taomni-divider)] shadow-lg"
           style={{ background: "var(--taomni-panel-bg)" }}
         >
           {allTerminals.map((t) => (
@@ -534,7 +534,7 @@ function SendToQueryButton({ targetEntry, disabled, sent, onSend, t }: SendToQue
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-30 min-w-[180px] rounded border border-[var(--taomni-divider)] shadow-lg"
+          className="absolute right-0 top-full mt-1 z-[var(--taomni-z-popover)] min-w-[180px] rounded border border-[var(--taomni-divider)] shadow-lg"
           style={{ background: "var(--taomni-panel-bg)" }}
         >
           {allQueries.map((query) => (

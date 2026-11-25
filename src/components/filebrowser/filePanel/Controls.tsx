@@ -68,7 +68,7 @@ export function SortHeader({
             onResizeReset?.();
           }}
           className="absolute top-0 right-0 h-full w-[5px] cursor-col-resize hover:bg-[var(--taomni-accent)]"
-          style={{ zIndex: 1 }}
+          style={{ zIndex: "var(--taomni-z-sticky)" }}
         />
       )}
     </th>
@@ -120,7 +120,7 @@ export function DrivesPicker({ onSelect }: { onSelect: (path: string) => void; }
       </IconButton>
       {open && (
         <div
-          className="absolute top-full left-0 mt-0.5 z-50 min-w-[160px] py-1 text-ui-body shadow-lg rounded"
+          className="absolute top-full left-0 mt-0.5 z-[var(--taomni-z-popover)] min-w-[160px] py-1 text-ui-body shadow-lg rounded"
           style={{
             background: "var(--taomni-bg)",
             border: "1px solid var(--taomni-divider)",

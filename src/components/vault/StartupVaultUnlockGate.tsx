@@ -73,7 +73,7 @@ function StartupVaultCheckOverlay({ onCancel }: { onCancel: () => void }) {
       style={{
         background: "rgba(0,0,0,0.4)",
         color: "white",
-        zIndex: 10001,
+        zIndex: "var(--taomni-z-blocking-gate)",
       }}
     >
       <div className="flex flex-col items-center gap-3 text-ui-body">

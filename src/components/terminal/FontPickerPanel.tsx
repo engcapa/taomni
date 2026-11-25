@@ -84,7 +84,7 @@ export function FontPickerSelect({
     const top = rect.bottom + estimatedHeight <= window.innerHeight - 6
       ? rect.bottom + 4
       : Math.max(6, rect.top - estimatedHeight - 4);
-    setPanelPosition({ position: "fixed", left, top, width, zIndex: 10_050 });
+    setPanelPosition({ position: "fixed", left, top, width, zIndex: "var(--taomni-z-menu-over-modal)" });
   }, [open, options.length]);
 
   const toggleOpen = () => {

@@ -69,7 +69,7 @@ export function PathCompletionInput({ path, value, onChange, onCommit, onCancel,
         position: "fixed", left: Math.max(4, rect.left), width: Math.min(rect.width, window.innerWidth - 8),
         top: upwards ? undefined : rect.bottom + 2,
         bottom: upwards ? window.innerHeight - rect.top + 2 : undefined,
-        maxHeight: Math.min(260, Math.max(60, (upwards ? above : below) - 8)), zIndex: 10000,
+        maxHeight: Math.min(260, Math.max(60, (upwards ? above : below) - 8)), zIndex: "var(--taomni-z-menu-over-modal)",
       });
     };
     update();

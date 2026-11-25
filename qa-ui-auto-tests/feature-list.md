@@ -2383,7 +2383,16 @@ status: done
 area: terminal/right-menu
 files:
   - src/components/terminal/TerminalPanel.tsx
-controls: []   # F4.8 covers OS-level keyboard shortcuts (Ctrl+0 / F11 / Ctrl+Shift+F / etc.) — exercised via `press` verb against [data-testid="terminal-pane"] (F2.2). No dedicated DOM surface.
+controls:
+  - id: terminal-find-input
+    selector: 'input[aria-label="Find"]'
+    kind: interactive
+  - id: terminal-search-bar
+    selector: '[data-testid="terminal-search-bar"]'
+    kind: display
+  - id: terminal-find-status
+    selector: '[data-testid="terminal-find-status"]'
+    kind: display
 -->
 
 - Shift+Insert 粘贴、Ctrl+Shift+F 查找、F11 全屏、Ctrl+0 重置字号、Ctrl+滚轮缩放字号

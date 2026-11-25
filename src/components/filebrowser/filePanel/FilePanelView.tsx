@@ -340,7 +340,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
         {ctx.render}
         {draggingOver && (
           <div
-            className="absolute inset-0 pointer-events-none border-2 border-dashed z-10 flex items-center justify-center"
+            className="absolute inset-0 pointer-events-none border-2 border-dashed z-[var(--taomni-z-docked-overlay)] flex items-center justify-center"
             style={{ borderColor: "var(--taomni-accent)", background: "rgba(43,93,139,0.08)" }}
           >
             <span className="text-xs font-semibold text-[var(--taomni-accent)]">
@@ -365,7 +365,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
             <col style={{ width: columns.colWidths.mtime }} />
             <col style={{ width: columns.colWidths.type }} />
           </colgroup>
-          <thead className="sticky top-0 z-10" style={{ background: "var(--taomni-quick-bg)" }}>
+          <thead className="sticky top-0 z-[var(--taomni-z-sticky)]" style={{ background: "var(--taomni-quick-bg)" }}>
             <tr className="text-ui-small uppercase tracking-wide" style={{ color: "var(--taomni-text-muted)" }}>
               <SortHeader
                 label={t("fileBrowser.sortName")}

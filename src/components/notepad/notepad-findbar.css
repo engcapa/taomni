@@ -27,7 +27,7 @@
   top: 8px;
   width: 520px;
   max-width: calc(100% - 32px);
-  z-index: 30;
+  z-index: var(--taomni-z-popover);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;

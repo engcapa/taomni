@@ -172,7 +172,7 @@ export function CommonCommandsPalette({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh]"
+      className="fixed inset-0 z-[var(--taomni-z-modal)] flex items-start justify-center pt-[12vh]"
       style={{ background: "rgba(0,0,0,0.4)" }}
       onMouseDown={onClose}
       onKeyDown={handleKeyDown}

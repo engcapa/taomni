@@ -67,7 +67,7 @@ export function SftpFloatingButton({ onOpen }: { onOpen: () => void }) {
       data-dragging={dragging || undefined}
       aria-label={t("terminal.sftpFloatingOpen")}
       title={t("terminal.sftpFloatingDragHint")}
-      className="absolute z-40 flex flex-col items-center justify-center rounded-md border shadow-sm opacity-65 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-[var(--taomni-accent)]"
+      className="absolute z-[var(--taomni-z-docked-overlay)] flex flex-col items-center justify-center rounded-md border shadow-sm opacity-65 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-[var(--taomni-accent)]"
       style={{
         width: WIDTH, height: HEIGHT,
         left: Math.min(INSET, Math.max(0, bounds.width - WIDTH)) + position.x * availableWidth,

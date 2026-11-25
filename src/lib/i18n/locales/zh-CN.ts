@@ -1323,6 +1323,8 @@ export const zhCN: DeepPartial<typeof en> = {
     inputLocked: "输入已锁定",
     readOnlyBadge: "只读",
     findPlaceholder: "查找",
+    findMatch: "第 {current} 项，共 {total} 项",
+    findNoMatches: "没有匹配项",
     findPrev: "上一个",
     findNext: "下一个",
     findClose: "关闭",

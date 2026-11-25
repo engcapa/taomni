@@ -169,7 +169,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
             </div>
           </div>
           <div
-            className="sticky top-0 z-20 -mx-5 mb-4 px-5 pb-3 pt-1"
+            className="sticky top-0 z-[var(--taomni-z-sticky)] -mx-5 mb-4 px-5 pb-3 pt-1"
             style={{ background: "var(--taomni-bg)" }}
           >
             <div className="flex items-center gap-2">

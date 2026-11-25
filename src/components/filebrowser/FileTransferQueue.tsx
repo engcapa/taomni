@@ -221,7 +221,7 @@ export function FileTransferQueue({
     >
       <div
         data-testid="sftp-transfer-queue-resize-handle"
-        className="h-1.5 -mt-0.5 cursor-row-resize bg-[var(--taomni-divider)]/40 hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors relative z-10 flex items-center justify-center group select-none"
+        className="h-1.5 -mt-0.5 cursor-row-resize bg-[var(--taomni-divider)]/40 hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors relative z-[var(--taomni-z-sticky)] flex items-center justify-center group select-none"
         onPointerDown={startResize}
       >
         <div className="w-8 h-0.5 rounded-full bg-transparent group-hover:bg-white/50 transition-colors" />

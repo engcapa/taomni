@@ -135,7 +135,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
     data-testid="terminal-split-stage"
     data-active={terminalSplitVisible || undefined}
     data-split-layout={terminalSplitVisible ? terminalSplitLayout : undefined}
-    className={terminalSplitVisible ? "absolute inset-0 z-10 flex flex-col" : "contents"}
+    className={terminalSplitVisible ? "absolute inset-0 z-[var(--taomni-z-content)] flex flex-col" : "contents"}
   >
     <div style={{ display: terminalSplitVisible ? "block" : "none" }}>
       <TerminalSplitToolbar
@@ -442,7 +442,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
             <div
               key={`grid-col-${index}`}
               data-testid="terminal-split-grid-column-resize-handle"
-              className="absolute top-0 bottom-0 z-30 w-1.5 -translate-x-1/2 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/70"
+              className="absolute top-0 bottom-0 z-[var(--taomni-z-sticky)] w-1.5 -translate-x-1/2 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/70"
               style={{ left: `${cumulativeWeightPercent(splitGridColumnWeightsForLayout, index)}%` }}
               onPointerDown={(event) => startGridSplitResize("column", index, event)}
               role="separator"
@@ -454,7 +454,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
             <div
               key={`grid-row-${index}`}
               data-testid="terminal-split-grid-row-resize-handle"
-              className="absolute left-0 right-0 z-30 h-1.5 -translate-y-1/2 cursor-row-resize bg-transparent hover:bg-[var(--taomni-accent)]/70"
+              className="absolute left-0 right-0 z-[var(--taomni-z-sticky)] h-1.5 -translate-y-1/2 cursor-row-resize bg-transparent hover:bg-[var(--taomni-accent)]/70"
               style={{ top: `${cumulativeWeightPercent(splitGridRowWeightsForLayout, index)}%` }}
               onPointerDown={(event) => startGridSplitResize("row", index, event)}
               role="separator"

@@ -63,5 +63,5 @@ export function TaoPopover({ owner, children, className = "", label }: { owner: 
     return () => window.removeEventListener("scroll", schedule, true);
   }, [owner.open, update, schedule]);
   if (!owner.open) return null;
-  return createPortal(<div ref={owner.contentRef} className={`tao-home-popup ${className}`} role="dialog" aria-label={label} style={{ position: "fixed", zIndex: 1000, ...position }}>{children}</div>, document.body);
+  return createPortal(<div ref={owner.contentRef} className={`tao-home-popup ${className}`} role="dialog" aria-label={label} style={{ position: "fixed", zIndex: "var(--taomni-z-popover)", ...position }}>{children}</div>, document.body);
 }

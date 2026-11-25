@@ -4494,6 +4494,12 @@
 - `[data-testid="terminal-event-log"]` — display [optional] — F4.7.event-log-panel
 - `[data-testid="terminal-event-log-close"]` — interactive [optional] — F4.7.event-log-close
 
+## terminal/right-menu (F4.8)
+
+- `input[aria-label="Find"]` — interactive — F4.8.terminal-find-input
+- `[data-testid="terminal-search-bar"]` — display — F4.8.terminal-search-bar
+- `[data-testid="terminal-find-status"]` — display — F4.8.terminal-find-status
+
 ## terminal/split (F-Split-1)
 
 - `[data-testid="terminal-split-stage"]` — display [optional] — F-Split-1.split-stage

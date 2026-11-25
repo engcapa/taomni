@@ -1324,6 +1324,8 @@ const dict = {
     inputLocked: "Input locked",
     readOnlyBadge: "Read-only",
     findPlaceholder: "Find",
+    findMatch: "Match {current}/{total}",
+    findNoMatches: "No matches",
     findPrev: "Prev",
     findNext: "Next",
     findClose: "Close",
