@@ -661,7 +661,7 @@ jobs:
               stream.write(f"sha={run['head_sha']}\n")
               stream.write(f"updated_at={run['created_at']}\n")
           PY
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           run-id: ${{ needs.source.outputs.rehearsal_baseline_run }}
           github-token: ${{ secrets.GITHUB_TOKEN }}

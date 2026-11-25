@@ -177,7 +177,7 @@ async function main([operation, directory], env) {
     const modules = JSON.parse(env.MODULE_SELECTION).map((slug) => readJson(join("src-tauri/plugins", slug, "module.json")));
     const selection = selectCandidate({ producer: readJson(join(directory, "producer.json")),
       artifacts: readJson(join(directory, "artifacts.json")).flatMap((page) => page.artifacts),
-      repository: env.GITHUB_REPOSITORY, source: env.GITHUB_SHA, runId: env.CANDIDATE_RUN,
+      repository: env.GITHUB_REPOSITORY, source: env.CANDIDATE_SOURCE || env.GITHUB_SHA, runId: env.CANDIDATE_RUN,
       version: env.VERSION, modules });
     verifyTagRefs(readFileSync(join(directory, "tag-refs.txt"), "utf8"), env.TAG, selection.sourceSha);
     writeJson(join(directory, "selection.json"), selection);

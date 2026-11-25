@@ -27,8 +27,15 @@ export function releaseBuildPlan(env, packageVersion) {
   const macosRunner = manual && !tag ? env.INPUT_MACOS_RUNNER || "macos-15" : "macos-15";
   const testVersion = manual ? env.RELEASE_TEST_VERSION || "" : "";
   const candidateRun = manual ? env.INPUT_CANDIDATE_RUN || "" : "";
-  if (candidateRun && (!tag || !/^[1-9]\d*$/.test(candidateRun))) {
-    throw new Error("candidate_run requires a release tag and a positive run ID.");
+  if (candidateRun && !/^[1-9]\d*$/.test(candidateRun)) {
+    throw new Error("candidate_run requires a positive run ID.");
+  }
+  const candidateSource = manual ? env.INPUT_CANDIDATE_SOURCE || "" : "";
+  if (candidateSource && (!candidateRun || !/^[a-f0-9]{40}$/.test(candidateSource))) {
+    throw new Error("candidate_source requires a candidate_run and a full lowercase commit SHA.");
+  }
+  if (candidateRun && (testVersion || env.INPUT_MACOS_STATIC_KRB5 === "true" || platforms !== "all" || arch !== "both")) {
+    throw new Error("Candidate promotion requires the release version and all production targets.");
   }
   const moduleRehearsalRun = manual ? env.INPUT_MODULE_REHEARSAL_BASELINE_RUN?.trim() || "" : "";
   const moduleInput = manual ? env.INPUT_RELEASE_MODULES?.trim() : "";
@@ -91,11 +98,11 @@ function firstReleaseSlugs() {
 }
 
 export function rehearsesFirstUpgrade(plan) {
-  return !plan.tag && JSON.stringify(JSON.parse(plan.modules).sort()) === JSON.stringify(firstReleaseSlugs());
+  return !plan.tag && !plan.candidate_run && JSON.stringify(JSON.parse(plan.modules).sort()) === JSON.stringify(firstReleaseSlugs());
 }
 
 export function selectPublicationModules(plan, lookup = publishedModuleCatalogTag) {
-  if (!plan.tag || lookup()) return plan;
+  if ((!plan.tag && !plan.candidate_run) || lookup()) return plan;
   const slugs = firstReleaseSlugs();
   const requested = JSON.parse(plan.modules);
   if (requested.length && JSON.stringify(requested.sort()) !== JSON.stringify(slugs)) {

@@ -113,10 +113,15 @@ test("manual releases forbid partial builds and test versions before any bundles
   assert.throws(() => releaseBuildPlan({ ...env, INPUT_RELEASE_TAG: "v0.4.29" }, version), /must match/);
 });
 
-test("only a manual tagged release can select a candidate producer", () => {
+test("a manual release can rehearse or publish a frozen candidate", () => {
   const reuse = { ...manual, INPUT_RELEASE_TAG: `v${version}`, INPUT_CANDIDATE_RUN: "123" };
   assert.equal(releaseBuildPlan(reuse, version).candidate_run, "123");
-  assert.throws(() => releaseBuildPlan({ ...reuse, INPUT_RELEASE_TAG: "" }, version), /requires a release tag/);
+  const rehearsal = releaseBuildPlan({ ...reuse, INPUT_RELEASE_TAG: "", INPUT_CANDIDATE_SOURCE: "a".repeat(40) }, version);
+  assert.equal(rehearsal.tag, "");
+  assert.equal(rehearsal.candidate_run, "123");
+  assert.equal(rehearsesFirstUpgrade(rehearsal), false);
+  assert.throws(() => releaseBuildPlan({ ...reuse, INPUT_CANDIDATE_SOURCE: "main" }, version), /full lowercase commit SHA/);
+  assert.throws(() => releaseBuildPlan({ ...reuse, INPUT_CANDIDATE_RUN: "", INPUT_CANDIDATE_SOURCE: "a".repeat(40) }, version), /requires a candidate_run/);
   assert.throws(() => releaseBuildPlan({ ...reuse, INPUT_CANDIDATE_RUN: "../123" }, version), /positive run ID/);
   assert.equal(releaseBuildPlan({ ...reuse, GITHUB_EVENT_NAME: "push", GITHUB_REF_TYPE: "tag",
     GITHUB_REF_NAME: `v${version}` }, version).candidate_run, "");

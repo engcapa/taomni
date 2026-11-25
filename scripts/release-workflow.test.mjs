@@ -101,10 +101,24 @@ test("candidate publication bypasses compilation and verifies exact prior artifa
   assert.match(coreAction, /artifact-ids: \$\{\{ inputs\.core_artifacts \}\}/);
   assert.match(coreAction, /run-id: \$\{\{ inputs\.candidate_run \}\}/);
 });
-const publishStep = workflow.split("      - name: Verify and publish release assets\n")[1];
-assert(publishStep, "the tested publishing step must exist in release.yml");
-const publishScript = publishStep.split("        run: |\n")[1].split("\n")
-  .map((line) => line.startsWith("          ") ? line.slice(10) : line).join("\n");
+function releaseStepScript(name) {
+  const header = "      - name: " + name + "\n";
+  const step = workflow.split(header)[1]?.split(/\n      - (?:name:|uses:)/)[0];
+  assert(step, `Release step ${name} must exist`);
+  return step.split("        run: |\n")[1].split("\n")
+    .map((line) => line.startsWith("          ") ? line.slice(10) : line).join("\n");
+}
+
+const publishScript = [releaseStepScript("Verify signed catalog and package sums"),
+  releaseStepScript("Verify and publish release assets")].join("\n");
+
+test("an empty-tag rehearsal runs candidate verification and skips every release mutation", () => {
+  const publish = workflow.split("      - name: Verify and publish release assets\n")[1];
+  assert.match(publish, /^        if: needs\.plan\.outputs\.tag != ''\n/);
+  assert.match(workflow, /if: needs.plan.outputs.candidate_run != ''[\s\S]*?verified-release-candidate-/);
+  assert.match(workflow, /CANDIDATE_SOURCE: \$\{\{ inputs\.candidate_source \|\| github\.sha \}\}/);
+  assert.match(publish, /--target "\$\{RELEASE_SOURCE:-\$GITHUB_SHA\}"/);
+});
 
 test("checks the previously published first-upgrade roster before signing new catalogs", () => {
   const stage = workflow.indexOf("node scripts/stage-published-module-catalog.mjs carried-module-catalog --allow-missing");

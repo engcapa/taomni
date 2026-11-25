@@ -19,7 +19,7 @@ runs:
         pattern: taomni-${{ inputs.version }}-*
         path: core-bundles
         merge-multiple: false
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       if: inputs.candidate_run != ''
       with:
         artifact-ids: ${{ inputs.core_artifacts }}
