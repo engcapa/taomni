@@ -1,5 +1,5 @@
-import { ModalSurface } from "../../../../src/components/ui/ModalSurface";
-import { Button } from "../../../../src/components/ui/Button";
+import { ModalSurface } from "../../../crates/taomni-plugin-api/frontend/ui/ModalSurface";
+import { Button } from "../../../crates/taomni-plugin-api/frontend/ui/Button";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AlertTriangle, Check, Copy, Eye, EyeOff, Link2 } from "lucide-react";
 import { useT } from "../../../../src/lib/i18n";

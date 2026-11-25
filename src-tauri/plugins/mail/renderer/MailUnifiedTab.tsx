@@ -1,4 +1,4 @@
-import { SectionTabs, sectionTab } from "../../../../src/components/ui/SectionTabs";
+import { SectionTabs, sectionTab } from "../../../crates/taomni-plugin-api/frontend/ui/SectionTabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ExternalLink, Inbox, Loader2, MailOpen, Mail as MailIcon, RefreshCw, Star, Trash2 } from "lucide-react";
 import type { MailTabInfo } from "../../../../src/types";

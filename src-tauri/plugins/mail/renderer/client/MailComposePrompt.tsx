@@ -1,6 +1,6 @@
 import { AlertTriangle } from "lucide-react";
-import { Button } from "../../../../../src/components/ui/Button";
-import { Modal } from "../../../../../src/components/ui/Modal";
+import { Button } from "../../../../crates/taomni-plugin-api/frontend/ui/Button";
+import { Modal } from "../../../../crates/taomni-plugin-api/frontend/ui/Modal";
 import { useT } from "../../../../../src/lib/i18n";
 import type { ComposePromptState } from "./types";
 

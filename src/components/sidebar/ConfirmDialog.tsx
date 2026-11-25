@@ -1,3 +1,4 @@
+import { ConfirmDialog as LabelledConfirmDialog } from "../../../src-tauri/crates/taomni-plugin-api/frontend/ui/ConfirmDialog";
 import { useCallback, useId, useState, type ReactNode } from "react";
 import { Modal } from "../ui/Modal";
 import { useT } from "../../lib/i18n";
@@ -148,15 +149,9 @@ export function useTextInputDialog(): {
 
 export function ConfirmDialog({ title, message, confirmLabel, cancelLabel, danger, onCancel, onConfirm }: ConfirmDialogProps) {
   const t = useT();
-  return <Modal title={title ?? t("common.confirm")} testId="confirm-dialog"
-    initialFocus={danger ? '[data-testid="confirm-dialog-cancel"]' : '[data-testid="confirm-dialog-confirm"]'}
-    onCancel={onCancel} footer={<>
-      <button type="button" className="taomni-btn" data-testid="confirm-dialog-cancel" onClick={onCancel}>{cancelLabel ?? t("common.cancel")}</button>
-      <button type="button" className="taomni-btn" data-primary={!danger} data-danger={danger}
-        data-testid="confirm-dialog-confirm" onClick={onConfirm}>{confirmLabel ?? t("common.ok")}</button>
-    </>}>
-    <p data-testid="confirm-dialog-message">{message}</p>
-  </Modal>;
+  return <LabelledConfirmDialog title={title ?? t("common.confirm")} message={message}
+    cancelLabel={cancelLabel ?? t("common.cancel")} confirmLabel={confirmLabel ?? t("common.ok")}
+    danger={danger} onCancel={onCancel} onConfirm={onConfirm} />;
 }
 
 export function ChoiceDialog({ title, message, primaryLabel, secondaryLabel, cancelLabel, danger, onCancel, onPrimary, onSecondary }: ChoiceDialogProps) {

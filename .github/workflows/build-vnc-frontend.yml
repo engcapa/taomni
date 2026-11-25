@@ -41,6 +41,12 @@ jobs:
             rdp-server|vnc-server|servers) dependencies=(vite-plugins/serverSettings.ts src/lib/servers) ;;
             *) echo 'Unknown module frontend' >&2; exit 1 ;;
           esac
+          case "$MODULE_SLUG" in
+            mail|mfa|sockscap) dependencies+=(src-tauri/crates/taomni-plugin-api/frontend/ui) ;;
+          esac
+          case "$MODULE_SLUG" in
+            mail|mfa|sockscap|vnc-client) dependencies+=(src/styles/ui-foundations.css src/styles/ui-typography.css src/styles/modal.css) ;;
+          esac
           git diff --quiet HEAD "${MODULE_SOURCE}^{commit}" -- \
             package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc patches \
             "src-tauri/plugins/$MODULE_SLUG/renderer" "src-tauri/plugins/$MODULE_SLUG/vite.config.ts" \

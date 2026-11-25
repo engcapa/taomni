@@ -1,4 +1,4 @@
-import { IconButton } from "../../../../src/components/ui/IconButton";
+import { IconButton } from "../../../crates/taomni-plugin-api/frontend/ui/IconButton";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, ChevronRight, Search, RefreshCw } from "lucide-react";

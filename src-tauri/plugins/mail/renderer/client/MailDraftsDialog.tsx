@@ -1,5 +1,6 @@
-import { SectionTabs, sectionTab } from "../../../../../src/components/ui/SectionTabs";
-import { IconButton } from "../../../../../src/components/ui/IconButton";
+import { useT } from "../../../../../src/lib/i18n";
+import { SectionTabs, sectionTab } from "../../../../crates/taomni-plugin-api/frontend/ui/SectionTabs";
+import { IconButton } from "../../../../crates/taomni-plugin-api/frontend/ui/IconButton";
 import { FileText, Loader2, RefreshCw, Send, Trash2 } from "lucide-react";
 import { type SetStateAction } from "react";
 import { type MailDraft } from "../../../../../src/lib/mail";
@@ -25,6 +26,7 @@ export interface MailDraftsDialogContext {
 }
 
 export function MailDraftsDialog(context: MailDraftsDialogContext) {
+  const t = useT();
   const {
     draftsOpen,
     draftsTab,
@@ -141,7 +143,7 @@ export function MailDraftsDialog(context: MailDraftsDialogContext) {
               <IconButton
                 type="button"
                 className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
-                labelKey="deleteDraft"
+                label={t("iconActions.deleteDraft")}
                 onClick={() => void deleteSavedDraft(saved)}
               >
                 <Trash2 className="w-3.5 h-3.5" />

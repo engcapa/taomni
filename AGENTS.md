@@ -123,6 +123,11 @@ Apply the same rules to detached windows, overlays and standalone desktop entry 
   Document deviations in UI-STANDARD §9 and cite the applicable IDs in the design and PR.
 - Reuse shared controls, theme tokens, effective platform bindings and window-local
   app dialogs. Preserve content-specific appearance and the original object of an async decision.
+- Shared controls for independently packaged renderers live in
+  `src-tauri/crates/taomni-plugin-api/frontend/ui/`. Pass translated labels and
+  use the renderer host's React instance. Build each affected module with its
+  production Vite config and include shared control and stylesheet inputs in
+  the signed frontend workflow's source check.
 - Verify the required interaction matrix for each affected entry, including keyboard
   completion, IME, focus return, disabled/busy/error states, both themes, font-size
   endpoints and the owning window where applicable.

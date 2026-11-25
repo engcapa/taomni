@@ -1,4 +1,4 @@
-import { SectionTabs, sectionTab } from "../../../../src/components/ui/SectionTabs";
+import { SectionTabs, sectionTab } from "../../../crates/taomni-plugin-api/frontend/ui/SectionTabs";
 import { useEffect, useState } from "react";
 import { Camera, Image as ImageIcon, KeyRound, ScanLine, X } from "lucide-react";
 import { useT } from "../../../../src/lib/i18n";

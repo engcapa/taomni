@@ -42,7 +42,7 @@ export function scanUI(path, text) {
       host.getSourceFile = (name) => name === ast.fileName ? ast : undefined;
       checker = ts.createProgram([ast.fileName], options, host).getTypeChecker();
     }
-    return !checker.getSymbolAtLocation(identifier);
+    return !checker.getSymbolAtLocation(identifier)?.declarations?.length;
   }
   function visit(node) {
     if (ts.isCallExpression(node)) {
@@ -84,7 +84,7 @@ export function increases(observed, baseline) {
 }
 
 function sourcePaths(args) {
-  return execFileSync("git", [...args, "--", "src", "src-tauri/plugins"], {
+  return execFileSync("git", [...args, "--", "src", "src-tauri/plugins", "src-tauri/crates/taomni-plugin-api/frontend"], {
     encoding: "utf8", maxBuffer: 16 * 1024 * 1024,
   }).split("\0").filter(isUISource);
 }

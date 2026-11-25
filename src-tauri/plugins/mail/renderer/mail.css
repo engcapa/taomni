@@ -3,6 +3,7 @@
 @import "../../../../src/styles/ui-foundations.css";
 
 @source "./";
+@source "../../../crates/taomni-plugin-api/frontend/ui";
 
 /* ── Mail message reader (Thunderbird-like paper surface) ───────────────────
  * HTML mail expects a light document canvas. Keep app chrome themed, but isolate

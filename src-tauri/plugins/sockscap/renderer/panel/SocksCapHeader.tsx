@@ -1,4 +1,4 @@
-import { IconButton } from "../../../../../src/components/ui/IconButton";
+import { IconButton } from "../../../../crates/taomni-plugin-api/frontend/ui/IconButton";
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, HelpCircle, Info, Layers, Loader2, Lock, Play, RefreshCw, Shield, Square, X } from "lucide-react";
 import { type HelperStatus, type SocksCapCapabilities, type SocksCapConfig, type SocksCapProfile, type SocksCapStatus, type StatsSnapshot } from "../../../../../src/lib/sockscap";
 import { type MacosSetupGuideMode, phaseTone } from "./configuration";

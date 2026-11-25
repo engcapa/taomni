@@ -1,4 +1,4 @@
-import { IconButton } from "../../../../../src/components/ui/IconButton";
+import { IconButton } from "../../../../crates/taomni-plugin-api/frontend/ui/IconButton";
 import { ArrowDown, ArrowUp, Copy, PanelLeftClose, Plus, Trash2 } from "lucide-react";
 import { type SocksCapConfig, type SocksCapProfile } from "../../../../../src/lib/sockscap";
 import { MIN_PROFILE_PRIORITY, MAX_PROFILE_PRIORITY } from "./configuration";

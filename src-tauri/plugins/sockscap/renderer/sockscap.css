@@ -4,6 +4,7 @@
 @import "../../../../src/styles/ui-foundations.css";
 
 @source "./";
+@source "../../../crates/taomni-plugin-api/frontend/ui";
 
 /* SocksCap surface
  *

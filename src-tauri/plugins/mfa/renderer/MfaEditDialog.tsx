@@ -4,10 +4,10 @@ import { errorText } from "../../../../src/lib/mfa/format";
 import type { MfaAccount } from "../../../../src/lib/mfa/types";
 import { useMfaStore } from "../../../../src/stores/mfaStore";
 
-import { Button } from "../../../../src/components/ui/Button";
-import { ModalSurface } from "../../../../src/components/ui/ModalSurface";
-import { usePendingAction } from "../../../../src/components/ui/usePendingAction";
-import { ConfirmDialog } from "../../../../src/components/sidebar/ConfirmDialog";
+import { Button } from "../../../crates/taomni-plugin-api/frontend/ui/Button";
+import { ModalSurface } from "../../../crates/taomni-plugin-api/frontend/ui/ModalSurface";
+import { usePendingAction } from "../../../crates/taomni-plugin-api/frontend/ui/usePendingAction";
+import { ConfirmDialog } from "../../../crates/taomni-plugin-api/frontend/ui/ConfirmDialog";
 
 const labelStyle = { color: "var(--taomni-text-muted)" };
 

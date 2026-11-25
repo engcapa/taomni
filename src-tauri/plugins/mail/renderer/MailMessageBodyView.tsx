@@ -1,4 +1,4 @@
-import { SectionTabs, sectionTab } from "../../../../src/components/ui/SectionTabs";
+import { SectionTabs, sectionTab } from "../../../crates/taomni-plugin-api/frontend/ui/SectionTabs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Code, FileText, Loader2, Minus, Plus, Search, X } from "lucide-react";
 import { MailHtmlReader, type MailHtmlReaderHandle } from "./MailHtmlReader";

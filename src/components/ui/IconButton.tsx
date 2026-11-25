@@ -1,10 +1,10 @@
-import type { ComponentProps } from "react";
+import { IconButton as LabelledIconButton, type IconButtonProps as LabelledIconButtonProps } from "../../../src-tauri/crates/taomni-plugin-api/frontend/ui/IconButton";
 import { useT } from "../../lib/i18n";
 import type { en } from "../../lib/i18n/locales/en";
 
 type ActionKey = keyof typeof en.iconActions;
 type Label = { label: string; labelKey?: never } | { labelKey: ActionKey; label?: never };
-type IconButtonProps = Omit<ComponentProps<"button">, "title" | "aria-label"> & Label & {
+type IconButtonProps = Omit<LabelledIconButtonProps, "label"> & Label & {
   hint?: string;
   hintKey?: ActionKey;
 };
@@ -14,6 +14,5 @@ export function IconButton({ label, labelKey, hint, hintKey, type = "button", ..
   const t = useT();
   const name = labelKey === undefined ? label : t(`iconActions.${labelKey}`);
   const description = hintKey ? t(`iconActions.${hintKey}`) : hint;
-  return <button {...button} type={type} aria-label={name} aria-description={description}
-    data-taomni-tooltip={description ?? name} />;
+  return <LabelledIconButton {...button} type={type} label={name} hint={description} />;
 }

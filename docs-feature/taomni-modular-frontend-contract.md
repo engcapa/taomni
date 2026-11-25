@@ -14,6 +14,8 @@
 
 ## 共享依赖与组件输入
 
+按钮、分区标签与模态框的共享实现位于 `src-tauri/crates/taomni-plugin-api/frontend/ui/`。模块直接打包这些无平台依赖的组件，向组件传入翻译后的名称，React 与 Portal 使用宿主现有导出。独立前端构建检查组件边界，签名工作流核对所用的组件和样式来源。
+
 核心在求值 ESM 前安装只读的 `globalThis.__taomniHost`。模块不能打包第二份 React；共享 hooks 必须使用该对象里的 React 实例。
 
 | SDK 字段 | 当前公开内容 |

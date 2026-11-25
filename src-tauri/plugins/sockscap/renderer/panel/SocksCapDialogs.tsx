@@ -1,4 +1,4 @@
-import { IconButton } from "../../../../../src/components/ui/IconButton";
+import { IconButton } from "../../../../crates/taomni-plugin-api/frontend/ui/IconButton";
 import { AlertCircle, AlertTriangle, CheckCircle2, Copy, X } from "lucide-react";
 import { type AppSelector, type ProcessInfo, type SocksCapConfig } from "../../../../../src/lib/sockscap";
 import { type UpstreamConfigIssue } from "../../../../../src/lib/sockscapPreflight";
@@ -83,7 +83,7 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
         <div className="w-[min(520px,90vw)] max-h-[70vh] flex flex-col rounded-lg bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-xl">
           <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--taomni-divider)]">
             <div className="text-ui-body font-semibold">{t("sockscap.pickProcess")}</div>
-            <IconButton labelKey="close" type="button" className="p-1" onClick={() => setShowProcPicker(false)}>
+            <IconButton label={t("common.close")} type="button" className="p-1" onClick={() => setShowProcPicker(false)}>
               <X className="w-4 h-4" />
             </IconButton>
           </div>
