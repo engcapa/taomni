@@ -438,7 +438,7 @@ impl CatalogService {
                 .await;
             match data.last_error {
                 Some(error) => Err(error),
-                None => Ok(data.providers),
+                None => Ok(data.provider("opencode-go")),
             }
         };
         let (live, metadata) = tokio::join!(s1, s2);
@@ -452,11 +452,7 @@ impl CatalogService {
                     .filter_map(|v| v["id"].as_str().map(String::from))
                     .collect::<Vec<_>>()
             });
-        let meta = metadata
-            .as_ref()
-            .ok()
-            .map(|v| &v["opencode-go"])
-            .filter(|v| v["models"].is_object());
+        let meta = metadata.as_ref().ok().filter(|v| v["models"].is_object());
         if ids.is_none() && meta.is_none() {
             return Err("Go catalog refresh failed: gateway and metadata unreachable or invalid; retained last-good catalog".into());
         }

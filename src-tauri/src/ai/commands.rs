@@ -394,7 +394,7 @@ pub async fn get_provider_models(
                 rows: assemble(
                     &provider.model,
                     &provider.runtime,
-                    &catalog.providers[key],
+                    &catalog.provider(key),
                     live.as_deref(),
                     &snapshot["aliases"][key],
                 ),
@@ -434,7 +434,7 @@ pub async fn get_provider_models(
                     assemble(
                         &provider.model,
                         &provider.runtime,
-                        &catalog.providers[key],
+                        &catalog.provider(key),
                         None,
                         &snapshot["aliases"][key],
                     )

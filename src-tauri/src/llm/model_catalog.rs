@@ -1,6 +1,7 @@
 //! Single models.dev fetch/cache/digest owner, shared by Go and the inspector.
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, value::RawValue};
 use sha2::{Digest, Sha256};
 use std::{
     path::PathBuf,
@@ -16,25 +17,60 @@ pub fn now() -> u64 {
         .unwrap_or_default()
         .as_secs()
 }
+type Providers = Arc<IndexMap<String, Box<RawValue>>>;
+
 #[derive(Clone, Serialize, Deserialize)]
-pub struct CatalogData {
-    pub providers: Value,
+pub struct CatalogData<P = Providers> {
+    providers: P,
     pub fetched_at: u64,
     pub source: String,
     pub last_error: Option<String>,
     pub digest: String,
 }
-fn digest(value: &Value) -> String {
-    Sha256::digest(serde_json::to_vec(value).unwrap())
-        .iter()
-        .map(|v| format!("{v:02x}"))
-        .collect()
+
+impl CatalogData {
+    pub fn provider(&self, key: &str) -> Value {
+        self.providers.get(key).map_or(Value::Null, |raw| {
+            serde_json::from_str(raw.get()).expect("validated provider metadata")
+        })
+    }
 }
-fn valid(value: &Value) -> bool {
-    value
-        .as_object()
-        .is_some_and(|o| !o.is_empty() && o.values().all(|p| p["models"].is_object()))
+
+fn compact_providers(value: Value) -> Option<(Providers, String)> {
+    let Value::Object(entries) = value else {
+        return None;
+    };
+    if entries.is_empty() {
+        return None;
+    }
+    // Keep the original serde_json::Map iteration order for the legacy digest.
+    let mut providers = IndexMap::with_capacity(entries.len());
+    for (key, entry) in entries {
+        if !entry["models"].is_object() {
+            return None;
+        }
+        providers.insert(
+            key,
+            serde_json::value::to_raw_value(&entry).expect("serialize provider metadata"),
+        );
+    }
+    let canonical = serde_json::to_vec(&providers).expect("serialize provider map");
+    let digest = hex::encode(Sha256::digest(canonical));
+    Some((Arc::new(providers), digest))
 }
+
+fn load_cache(bytes: &[u8]) -> Option<CatalogData> {
+    let cached: CatalogData<Value> = serde_json::from_slice(bytes).ok()?;
+    let (providers, digest) = compact_providers(cached.providers)?;
+    (digest == cached.digest).then(|| CatalogData {
+        providers,
+        digest,
+        fetched_at: cached.fetched_at,
+        source: "cache".into(),
+        last_error: None,
+    })
+}
+
 pub struct ModelCatalog {
     state: RwLock<CatalogData>,
     gate: Mutex<()>,
@@ -45,23 +81,21 @@ pub struct ModelCatalog {
 }
 impl ModelCatalog {
     pub fn new(path: PathBuf) -> Self {
-        let snapshot: Value = serde_json::from_str(SNAPSHOT).expect("embedded metadata snapshot");
-        let cached = std::fs::read(&path)
+        let state = std::fs::read(&path)
             .ok()
-            .and_then(|b| serde_json::from_slice::<CatalogData>(&b).ok())
-            .filter(|c| valid(&c.providers) && c.digest == digest(&c.providers));
-        let state = cached
-            .map(|c| CatalogData {
-                source: "cache".into(),
-                last_error: None,
-                ..c
-            })
-            .unwrap_or_else(|| CatalogData {
-                digest: digest(&snapshot["providers"]),
-                providers: snapshot["providers"].clone(),
-                fetched_at: 0,
-                source: "snapshot".into(),
-                last_error: None,
+            .and_then(|bytes| load_cache(&bytes))
+            .unwrap_or_else(|| {
+                let mut snapshot: Value =
+                    serde_json::from_str(SNAPSHOT).expect("embedded metadata snapshot");
+                let (providers, digest) = compact_providers(snapshot["providers"].take())
+                    .expect("embedded provider tree");
+                CatalogData {
+                    providers,
+                    digest,
+                    fetched_at: 0,
+                    source: "snapshot".into(),
+                    last_error: None,
+                }
             });
         Self {
             state: RwLock::new(state),
@@ -128,10 +162,7 @@ impl ModelCatalog {
                 .json()
                 .await
                 .map_err(|_| "Invalid metadata JSON".to_string())?;
-            if !valid(&providers) {
-                return Err("Invalid metadata provider tree".into());
-            }
-            Ok(providers)
+            compact_providers(providers).ok_or_else(|| "Invalid metadata provider tree".to_string())
         };
         let result = tokio::select! {
             biased;
@@ -141,11 +172,10 @@ impl ModelCatalog {
         self.attempts
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         match result {
-            Ok(providers) => {
-                let hash = digest(&providers);
+            Ok((providers, digest)) => {
                 let next = CatalogData {
                     providers,
-                    digest: hash,
+                    digest,
                     fetched_at: now(),
                     source: "live".into(),
                     last_error: None,
@@ -190,6 +220,36 @@ pub fn shared() -> Arc<ModelCatalog> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn legacy_cache_roundtrips_and_reads_share_the_compact_catalog() {
+        let providers = serde_json::json!({
+            "z": {"models": {"b": {"cost": 0.5}, "a": {}}},
+            "a": {"models": {}, "name": "α"}
+        });
+        let digest = hex::encode(Sha256::digest(serde_json::to_vec(&providers).unwrap()));
+        let mut legacy = serde_json::json!({
+            "providers": providers, "fetched_at": 42, "source": "live",
+            "last_error": "old error", "digest": digest
+        });
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("model-catalog.json");
+        std::fs::write(&path, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
+        let cache = ModelCatalog::new(path.clone());
+        let first = cache.get();
+        assert!(Arc::ptr_eq(&first.providers, &cache.get().providers));
+        assert_eq!(first.source, "cache");
+        assert_eq!(first.fetched_at, 42);
+        assert_eq!(first.last_error, None);
+        assert_eq!(first.digest, digest);
+        assert_eq!(first.provider("z"), providers["z"]);
+        assert_eq!(first.provider("absent"), Value::Null);
+        let encoded: Value = serde_json::from_slice(&serde_json::to_vec(&first).unwrap()).unwrap();
+        assert_eq!(encoded["providers"], providers);
+        legacy["providers"]["z"]["models"]["b"]["cost"] = 1.into();
+        std::fs::write(&path, serde_json::to_vec(&legacy).unwrap()).unwrap();
+        assert_eq!(ModelCatalog::new(path).get().source, "snapshot");
+    }
+
     #[tokio::test]
     async fn policy_change_cancels_in_flight_and_blocks_new_requests() {
         let path = std::env::temp_dir().join(format!("metadata-{}.json", uuid::Uuid::new_v4()));
@@ -272,7 +332,7 @@ mod tests {
             "siliconflow",
             "siliconflow-cn",
         ] {
-            assert!(catalog.get().providers[key]["models"].is_object());
+            assert!(catalog.get().provider(key)["models"].is_object());
         }
         assert!(
             catalog

@@ -10864,6 +10864,7 @@ dependencies = [
  "ignore",
  "image",
  "imap",
+ "indexmap 2.14.2",
  "jaq-core",
  "jaq-json",
  "jaq-std",
