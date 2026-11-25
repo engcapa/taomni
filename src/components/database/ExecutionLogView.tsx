@@ -18,10 +18,10 @@ const STATUS_LABEL: Record<ExecutionLogStatus, string> = {
 
 const STATUS_COLOR: Record<ExecutionLogStatus, string> = {
   running: "var(--taomni-accent)",
-  success: "#3fa652",
-  failed: "#d9534f",
-  cancelled: "#e6a817",
-  skipped: "#e6a817",
+  success: "var(--taomni-success-text)",
+  failed: "var(--taomni-danger-text)",
+  cancelled: "var(--taomni-warning-text)",
+  skipped: "var(--taomni-warning-text)",
   "not-run": "var(--taomni-text-muted)",
 };
 
@@ -93,7 +93,7 @@ export function ExecutionLogView({
                 <td className={cell}>{rowsLabel(entry)}</td>
                 <td
                   className="px-2 py-0.5 align-top whitespace-pre-wrap break-words max-w-[420px]"
-                  style={{ color: entry.status === "failed" ? "#d9534f" : undefined }}
+                  style={{ color: entry.status === "failed" ? "var(--taomni-danger-text)" : undefined }}
                   data-testid="db-execution-log-message"
                 >
                   {entry.message ?? ""}

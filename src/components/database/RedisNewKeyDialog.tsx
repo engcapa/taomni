@@ -61,7 +61,7 @@ export function RedisNewKeyDialog({ sessionId, onClose, onCreated }: RedisNewKey
         className="w-[440px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
         style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-chrome-border)", color: "var(--taomni-text)" }}
       >
-        <div className="h-7 flex shrink-0 items-center px-2 text-ui-body font-semibold" style={{ background: "linear-gradient(to bottom,#5895c8,#2b5d8b)", color: "#fff" }}>
+        <div className="h-7 flex shrink-0 items-center px-2 text-ui-body font-semibold" style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}>
           New Redis key
           <IconButton labelKey="close" type="button" className="ml-auto hover:bg-[var(--taomni-control-hover)] rounded p-0.5" onClick={onClose}>
             <X className="w-3.5 h-3.5" />
@@ -99,7 +99,7 @@ export function RedisNewKeyDialog({ sessionId, onClose, onCreated }: RedisNewKey
           <label className="text-right">TTL (s)</label>
           <input className="taomni-input col-span-3" value={ttl} placeholder="(optional)" onChange={(e) => setTtl(e.target.value)} aria-label="TTL seconds" />
 
-          {error && <div className="col-span-4 text-ui-small" style={{ color: "#d9534f" }}>{error}</div>}
+          {error && <div className="col-span-4 text-ui-small" style={{ color: "var(--taomni-danger-text)" }}>{error}</div>}
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 px-3 py-2" style={{ borderTop: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
           <button type="button" className="taomni-btn" onClick={onClose}>Cancel</button>

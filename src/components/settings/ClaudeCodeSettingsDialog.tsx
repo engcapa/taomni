@@ -415,8 +415,8 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
         <div
           className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none"
           style={{
-            background: "linear-gradient(to bottom, #5895c8, #2b5d8b)",
-            color: "white",
+            background: "var(--taomni-chrome-bg)",
+            color: "var(--taomni-text)",
           }}
         >
           <Sliders className="w-3.5 h-3.5 mr-1.5" />

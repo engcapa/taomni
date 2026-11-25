@@ -112,7 +112,7 @@ export function SchemaTreeView(props: SchemaTreeViewProps) {
         style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
       >
         {metadata.error && (
-          <div className="px-2 py-1 text-ui-small" style={{ color: "#d9534f" }}>
+          <div className="px-2 py-1 text-ui-small" style={{ color: "var(--taomni-danger-text)" }}>
             {metadata.error}
           </div>
         )}

@@ -242,7 +242,7 @@ export function SchemaTree({
           title={`${col.type}${col.nullable ? " NULL" : " NOT NULL"}`}
         >
           {col.primaryKey ? (
-            <KeyRound className="w-3 h-3" style={{ color: "#e6a817" }} />
+            <KeyRound className="w-3 h-3" style={{ color: "var(--taomni-warning-text)" }} />
           ) : (
             <Columns3 className="w-3 h-3 text-[var(--taomni-text-muted)]" />
           )}

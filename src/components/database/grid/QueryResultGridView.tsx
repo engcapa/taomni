@@ -541,13 +541,12 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                       background: selected
                         ? "var(--taomni-selected)"
                         : row.status === "deleted"
-                          ? "rgba(217, 83, 79, 0.12)"
+                          ? "var(--taomni-danger-bg)"
                           : row.status === "inserted"
-                            ? "rgba(98, 211, 111, 0.10)"
+                            ? "var(--taomni-success-bg)"
                             : row.status === "updated"
-                              ? "rgba(230, 168, 23, 0.10)"
+                              ? "var(--taomni-warning-bg)"
                               : undefined,
-                      opacity: row.status === "deleted" ? 0.65 : undefined,
                     }}
                   >
                     <button
@@ -579,11 +578,11 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                             ...columnStyle(columnIndex),
                             borderRight: "1px solid var(--taomni-divider)",
                             outline: active ? "1px solid var(--taomni-accent)" : undefined,
-                            background: blockSelected
-                              ? "var(--taomni-editor-selection-bg)"
-                              : searchHit
-                                ? "rgba(230, 168, 23, 0.22)"
-                                : undefined,
+                            background: searchHit
+                              ? "var(--taomni-warning-bg)"
+                              : blockSelected ? "var(--taomni-editor-selection-bg)" : undefined,
+                            color: searchHit ? "var(--taomni-warning-text)" : undefined,
+                            boxShadow: searchHit && blockSelected ? "inset 0 -2px var(--taomni-focus-ring)" : undefined,
                           }}
                           title={cell ?? "NULL"}
                           onMouseDown={(event) => selection.startCellBlockSelection(event, row.id, columnIndex)}
@@ -688,7 +687,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                         className="h-4"
                         style={{
                           width: `${Math.max(2, (Math.abs(point.value) / chartData.max) * 100)}%`,
-                          background: point.value < 0 ? "#d9534f" : "var(--taomni-accent)",
+                          background: point.value < 0 ? "var(--taomni-danger-icon)" : "var(--taomni-accent)",
                         }}
                       />
                     </div>

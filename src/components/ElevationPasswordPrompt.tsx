@@ -49,8 +49,8 @@ export function ElevationPasswordPrompt({
         <div
           className="h-8 flex shrink-0 items-center px-3"
           style={{
-            background: "linear-gradient(to bottom, #5895c8, #2b5d8b)",
-            color: "white",
+            background: "var(--taomni-chrome-bg)",
+            color: "var(--taomni-text)",
           }}
         >
           <ShieldAlert className="w-3.5 h-3.5 mr-1.5" />
@@ -63,7 +63,7 @@ export function ElevationPasswordPrompt({
             type="button"
             onClick={onCancel}
             aria-label={t("common.close")}
-            className="hover:bg-white/20 rounded p-0.5"
+            className="hover:bg-[var(--taomni-control-hover)] rounded p-0.5"
           >
             <X className="w-3.5 h-3.5" />
           </button>

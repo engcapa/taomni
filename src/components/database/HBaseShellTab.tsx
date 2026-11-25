@@ -135,7 +135,7 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
       { separator: true, label: "" },
       {
         label: "Run all commands",
-        icon: <Play className="w-3 h-3" style={{ color: "#62d36f" }} />,
+        icon: <Play className="w-3 h-3" style={{ color: "var(--taomni-success-text)" }} />,
         onClick: () => void execution.runStatements(workspace.activePanel.id, handle?.getValue() ?? workspace.activePanel.doc),
         disabled: !connectionSessionId || panelRunning,
       },

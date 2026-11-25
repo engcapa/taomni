@@ -71,7 +71,7 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
           fontSize: "var(--taomni-db-font-size-sm, 11px)",
         }}
       >
-        <span className="px-1.5 rounded uppercase text-ui-caption" style={{ background: "var(--taomni-accent)", color: "#fff" }}>
+        <span className="px-1.5 rounded uppercase text-ui-caption" style={{ background: "var(--taomni-info-bg)", color: "var(--taomni-info-text)" }}>
           {value?.kind ?? "?"}
         </span>
         <span className="font-mono truncate flex-1" title={redisKey}>{redisKey}</span>
@@ -115,7 +115,7 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
           type="button"
           labelKey="deleteKey"
           className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
-          style={{ color: "#d9534f" }}
+          style={{ color: "var(--taomni-danger-text)" }}
           onClick={async () => {
             const confirmed = await confirmAppDialog({
               message: `Delete key "${redisKey}"?`,
@@ -136,7 +136,7 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-2">
-        {error && <div className="text-ui-small mb-2" style={{ color: "#d9534f" }}>{error}</div>}
+        {error && <div className="text-ui-small mb-2" style={{ color: "var(--taomni-danger-text)" }}>{error}</div>}
         {value && (
           <ValueEditor
             sessionId={sessionId}
@@ -324,7 +324,7 @@ function PairEditor({
               </td>
               <td>
                 <IconButton labelKey="removeRow" type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
-                  <Trash2 className="w-3 h-3" style={{ color: "#d9534f" }} />
+                  <Trash2 className="w-3 h-3" style={{ color: "var(--taomni-danger-text)" }} />
                 </IconButton>
               </td>
             </tr>
@@ -381,7 +381,7 @@ function ListEditor({
               onChange={(e) => setRows((r) => r.map((x, j) => (j === i ? e.target.value : x)))}
             />
             <IconButton labelKey="removeRow" type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
-              <Trash2 className="w-3 h-3" style={{ color: "#d9534f" }} />
+              <Trash2 className="w-3 h-3" style={{ color: "var(--taomni-danger-text)" }} />
             </IconButton>
           </div>
         ))}

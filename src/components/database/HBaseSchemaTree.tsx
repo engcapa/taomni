@@ -332,7 +332,7 @@ export function HBaseSchemaTree({
           onContextMenu={(e) => openMenu(e, tableMenu(full))}
         >
           {st?.expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          <Table2 className="w-3.5 h-3.5" style={{ color: "#3b7ac2" }} />
+          <Table2 className="w-3.5 h-3.5" style={{ color: "var(--taomni-text)" }} />
           <span className="flex-1 truncate">{short}</span>
         </button>
         {st?.expanded && (
@@ -429,7 +429,7 @@ export function HBaseSchemaTree({
           <div className="px-2 py-2 text-[var(--taomni-text-muted)] flex items-center justify-between border-b" style={{ borderColor: "var(--taomni-divider)" }}>
             <span className="flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> {t("hbaseObjects.loadingTables")}</span>
             <button type="button" className="taomni-btn px-1.5 py-0.5 text-ui-caption flex items-center gap-0.5" onClick={cancelLoad} title={t("hbaseObjects.cancelLoad")}>
-              <Ban className="w-3 h-3" style={{ color: "#d9534f" }} /> {t("hbaseObjects.cancel")}
+              <Ban className="w-3 h-3" style={{ color: "var(--taomni-danger-text)" }} /> {t("hbaseObjects.cancel")}
             </button>
           </div>
         )}
@@ -439,7 +439,7 @@ export function HBaseSchemaTree({
             <button type="button" className="taomni-btn self-start px-2 py-1 text-ui-caption" onClick={() => void loadTables()}>{t("hbaseObjects.retryLoad")}</button>
           </div>
         )}
-        {error && <div className="px-2 py-1 text-ui-small" style={{ color: "#d9534f" }}>{error}</div>}
+        {error && <div className="px-2 py-1 text-ui-small" style={{ color: "var(--taomni-danger-text)" }}>{error}</div>}
         {sessionId && !loading && !timedOut && tables.length === 0 && (
           <div className="px-2 py-1 text-[var(--taomni-text-muted)]">{t("hbaseObjects.noTables")}</div>
         )}

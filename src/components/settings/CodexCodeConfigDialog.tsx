@@ -296,7 +296,7 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
           color: "var(--taomni-text)",
         }}
       >
-        <div className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none" style={{ background: "linear-gradient(to bottom, #5895c8, #2b5d8b)", color: "white" }}>
+        <div className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none" style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}>
           <Sliders className="w-3.5 h-3.5 mr-1.5" />
           <div className="text-ui-body font-semibold">{t("aiSettings.codexCustomModalTitle")}</div>
           <IconButton className="ml-auto hover:bg-[var(--taomni-control-hover)] rounded p-0.5" onClick={onClose} type="button" label={t("common.close")}>

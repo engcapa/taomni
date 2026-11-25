@@ -160,7 +160,7 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
       {connError && (
         <div
           className="h-7 shrink-0 px-2 flex items-center gap-2 text-ui-small border-b"
-          style={{ color: "#d9534f", borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+          style={{ color: "var(--taomni-danger-text)", borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           title={connError}
           data-testid="hbase-connection-error-banner"
         >
@@ -306,7 +306,7 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
                   title={`Run (${displaySqlShortcut(execution.executionPreferences.runAll)})`}
                   onClick={() => void execution.runStatements(workspace.activePanel.id, workspace.editorHandles.current[workspace.activePanel.id]?.getValue() ?? workspace.activePanel.doc)}
                 >
-                  <Play className="w-3.5 h-3.5" style={{ color: "#62d36f" }} /> Run
+                  <Play className="w-3.5 h-3.5" style={{ color: "var(--taomni-success-text)" }} /> Run
                 </button>
                 <button
                   type="button"
@@ -372,7 +372,7 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
                   )}
                 </div>
                 <button type="button" className={btn} disabled={!panelRunning} title="Cancel query" onClick={() => execution.cancelQuery(workspace.activePanel.id)}>
-                  <Ban className="w-3.5 h-3.5" style={{ color: "#d9534f" }} /> Cancel
+                  <Ban className="w-3.5 h-3.5" style={{ color: "var(--taomni-danger-text)" }} /> Cancel
                 </button>
                 <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
                 <button type="button" className={btn} title="Commands" onClick={() => { setShowCommands((v) => !v); setShowHistory(false); }}>

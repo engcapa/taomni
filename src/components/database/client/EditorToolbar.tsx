@@ -79,7 +79,7 @@ export function EditorToolbar({
       style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
     >
       <button type="button" className={btn} onClick={onRun} disabled={running} title={runAllTitle} data-testid="db-run-all">
-        <Play className="w-3.5 h-3.5" style={{ color: "#62d36f" }} /> Run
+        <Play className="w-3.5 h-3.5" style={{ color: "var(--taomni-success-text)" }} /> Run
       </button>
       <button type="button" className={btn} onClick={onRunSelection} disabled={running} title={runSelectionTitle}>
         <SquareDashedMousePointer className="w-3.5 h-3.5" /> Selection
@@ -105,7 +105,7 @@ export function EditorToolbar({
         <ListTree className="w-3.5 h-3.5" /> Explain
       </button>
       <button type="button" className={btn} onClick={onCancel} disabled={!running} title="Cancel query">
-        <Ban className="w-3.5 h-3.5" style={{ color: "#d9534f" }} /> Cancel
+        <Ban className="w-3.5 h-3.5" style={{ color: "var(--taomni-danger-text)" }} /> Cancel
       </button>
       {txAvailable && (
         <>

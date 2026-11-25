@@ -47,7 +47,7 @@ export function CommandsMenu({
                   >
                     <span className="flex items-center gap-1.5">
                       <span className="taomni-mono font-semibold">{c.verb}</span>
-                      {c.isWrite && <span className="text-ui-caption rounded px-1" style={{ background: "var(--taomni-divider)", color: c.destructive ? "#d9534f" : "var(--taomni-text-muted)" }}>{c.destructive ? "destructive" : "write"}</span>}
+                      {c.isWrite && <span className="text-ui-caption rounded px-1" style={{ background: "var(--taomni-divider)", color: c.destructive ? "var(--taomni-danger-text)" : "var(--taomni-text-muted)" }}>{c.destructive ? "destructive" : "write"}</span>}
                       {!supported && <span className="text-ui-caption text-[var(--taomni-text-muted)]">unsupported</span>}
                     </span>
                     <span className="taomni-mono text-ui-caption text-[var(--taomni-text-muted)] truncate">{c.example}</span>
@@ -115,7 +115,7 @@ export function HelpDialog({ transport, onClose }: { transport: HBaseTransport; 
                         <td className="py-1 pr-2 align-top taomni-mono text-ui-small text-[var(--taomni-text-muted)]">{c.syntax}</td>
                         <td className="py-1 align-top text-ui-small">
                           {c.description}
-                          {!supported && <div className="text-ui-caption" style={{ color: "#d9534f" }}>{t("hbaseObjects.helpRestNote")}</div>}
+                          {!supported && <div className="text-ui-caption" style={{ color: "var(--taomni-danger-text)" }}>{t("hbaseObjects.helpRestNote")}</div>}
                         </td>
                       </tr>
                     );

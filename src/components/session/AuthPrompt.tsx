@@ -40,11 +40,11 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
         style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-chrome-border)", color: "var(--taomni-text)" }}
       >
         <div className="h-8 flex shrink-0 items-center px-3"
-             style={{ background: "linear-gradient(to bottom, #5895c8, #2b5d8b)", color: "white" }}>
+             style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}>
           <KeyRound className="w-3.5 h-3.5 mr-1.5" />
           <span className="text-ui-body font-semibold">{t("authPrompt.titleRequired")}</span>
           <div className="flex-1" />
-          <button data-testid="auth-close" type="button" onClick={onCancel} aria-label={t("authPrompt.closeAria")} className="hover:bg-white/20 rounded p-0.5">
+          <button data-testid="auth-close" type="button" onClick={onCancel} aria-label={t("authPrompt.closeAria")} className="hover:bg-[var(--taomni-control-hover)] rounded p-0.5">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>

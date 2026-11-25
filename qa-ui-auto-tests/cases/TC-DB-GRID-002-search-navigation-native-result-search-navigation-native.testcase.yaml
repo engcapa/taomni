@@ -14,6 +14,7 @@ tags:
 fixtures:
 - reset_db
 - mysql_required
+ui_standard: [UI-FND-03a, UI-FND-03c]
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
@@ -166,6 +167,14 @@ steps:
 - assert_disabled: '[data-testid="query-result-search-previous"]'
 - assert_no_runtime_errors: null
 - screenshot: result-search-navigation-native.png
+- fill: {selector: 'input[aria-label="Search result set"]', value: Target-151}
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="light"]'
+- assert_solid_text_contrast: {selector: '[data-search-current="true"]', minimum: 4.5}
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="dark"]'
+- assert_text: {selector: '[data-search-current="true"]', contains: Target-151}
+- assert_solid_text_contrast: {selector: '[data-search-current="true"]', minimum: 4.5}
 verification:
   review: reviewed
   requirements:
@@ -304,6 +313,17 @@ verification:
       expectation: 'assert_disabled: ''[data-testid="query-result-search-previous"]'''
     - step: 69
       expectation: 'assert_no_runtime_errors: null'
+  - id: match-appearance
+    ui_standard: [UI-FND-03a, UI-FND-03c]
+    requirement: The current matching SQL value stays readable across live theme changes while row filtering stays active.
+    actions: [71, 72, 75]
+    checkpoints:
+    - {step: 73, expectation: Light mode is active.}
+    - {step: 74, expectation: The highlighted match clears the text contrast threshold.}
+    - {step: 76, expectation: Dark mode is active.}
+    - {step: 77, expectation: The current filtered result is still the matching cell.}
+    - {step: 78, expectation: The dark match clears the text contrast threshold.}
+    results: [73, 74, 76, 77, 78]
   native:
   - check: Native query-result search navigates virtual cells and respects sort/filter order
     method: automated

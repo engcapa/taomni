@@ -189,7 +189,7 @@ export function DatabaseWorkspaceView(props: DatabaseWorkspaceViewProps) {
       {connError && (
         <div
           className="h-7 shrink-0 px-2 flex items-center gap-2 text-ui-small border-b"
-          style={{ color: "#d9534f", borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+          style={{ color: "var(--taomni-danger-text)", borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           title={connError}
           data-testid="db-connection-error-banner"
         >

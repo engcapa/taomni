@@ -31,10 +31,10 @@ const PAGE_COUNT = 300;
 const TTL_REFRESH_MS = 10_000;
 
 function ttlColor(ttl: number): string {
-  if (ttl === -1) return "#62d36f"; // persistent
+  if (ttl === -1) return "var(--taomni-success-text)"; // persistent
   if (ttl < 0) return "var(--taomni-text-muted)";
-  if (ttl < 60) return "#d9534f";
-  return "#e6a817";
+  if (ttl < 60) return "var(--taomni-danger-text)";
+  return "var(--taomni-warning-text)";
 }
 
 function ttlLabel(ttl: number): string {
@@ -45,16 +45,6 @@ function ttlLabel(ttl: number): string {
   if (ttl < 86400) return `${Math.floor(ttl / 3600)}h`;
   return `${Math.floor(ttl / 86400)}d`;
 }
-
-const TYPE_COLORS: Record<string, string> = {
-  string: "#3b7ac2",
-  hash: "#a04b9c",
-  list: "#e6a817",
-  set: "#62d36f",
-  zset: "#cc6f00",
-  stream: "#7a3d9d",
-  none: "var(--taomni-text-muted)",
-};
 
 interface FolderNode {
   name: string;
@@ -163,7 +153,7 @@ export function RedisKeyBrowser({
                 onClick={() => setExpanded((p) => ({ ...p, [child.fullPrefix]: !isOpen }))}
               >
                 {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                <Folder className="w-3.5 h-3.5" style={{ color: "#e6a817" }} />
+                <Folder className="w-3.5 h-3.5" style={{ color: "var(--taomni-warning-text)" }} />
                 <span className="flex-1 truncate">{child.name}</span>
                 <span className="text-ui-caption text-[var(--taomni-text-muted)]">{totalKeys}</span>
               </button>
@@ -189,7 +179,7 @@ export function RedisKeyBrowser({
               >
                 <span
                   className="text-ui-caption px-1 rounded shrink-0 uppercase"
-                  style={{ background: TYPE_COLORS[entry.type] ?? "var(--taomni-divider)", color: "#fff" }}
+                  style={{ background: "var(--taomni-info-bg)", color: "var(--taomni-info-text)" }}
                 >
                   {entry.type.slice(0, 3)}
                 </span>
@@ -259,7 +249,7 @@ export function RedisKeyBrowser({
         className="flex-1 min-h-0 overflow-auto taomni-scroll-y py-1 text-ui-body"
         style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
       >
-        {error && <div className="px-2 py-1 text-ui-small" style={{ color: "#d9534f" }}>{error}</div>}
+        {error && <div className="px-2 py-1 text-ui-small" style={{ color: "var(--taomni-danger-text)" }}>{error}</div>}
         {renderNode(tree, 0)}
         {cursor !== "0" && (
           <button

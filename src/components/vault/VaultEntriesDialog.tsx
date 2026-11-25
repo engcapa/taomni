@@ -77,8 +77,8 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
           ref={handleRef}
           className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none"
           style={{
-            background: "linear-gradient(to bottom, #5895c8, #2b5d8b)",
-            color: "white",
+            background: "var(--taomni-chrome-bg)",
+            color: "var(--taomni-text)",
           }}
         >
           <Shield className="w-3.5 h-3.5 mr-1.5" />

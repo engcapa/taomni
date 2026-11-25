@@ -133,7 +133,7 @@ export function ResultArea({
           >
             <ScrollText className="w-3 h-3" />
             Log
-            {latestRunHasFailure && <span className="text-ui-caption" style={{ color: "#d9534f" }}>●</span>}
+            {latestRunHasFailure && <span className="text-ui-caption" style={{ color: "var(--taomni-danger-text)" }}>●</span>}
           </button>
         )}
         {panel.sheets.length === 0 ? (
@@ -257,9 +257,9 @@ export function ResultArea({
             className="flex-1 overflow-auto taomni-scroll-y p-2 text-ui-body font-mono"
             style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
           >
-            {sheet.error && <div style={{ color: "#d9534f" }}>{sheet.error}</div>}
+            {sheet.error && <div style={{ color: "var(--taomni-danger-text)" }}>{sheet.error}</div>}
             {sheet.warnings.map((w, i) => (
-              <div key={i} style={{ color: "#e6a817" }}>
+              <div key={i} style={{ color: "var(--taomni-warning-text)" }}>
                 {w}
               </div>
             ))}

@@ -276,7 +276,7 @@ export const RedisCli = forwardRef<RedisCliHandle, RedisCliProps>(function Redis
         <button
           type="button"
           className="inline-flex items-center gap-1 px-1.5 rounded hover:bg-[var(--taomni-hover)]"
-          style={{ color: monitoring ? "#d9534f" : "var(--taomni-text-muted)" }}
+          style={{ color: monitoring ? "var(--taomni-danger-text)" : "var(--taomni-text-muted)" }}
           onClick={toggleMonitor}
           title="Toggle MONITOR"
         >
@@ -326,7 +326,7 @@ export const RedisCli = forwardRef<RedisCliHandle, RedisCliProps>(function Redis
                 )}
               </div>
             )}
-            <pre className="whitespace-pre-wrap" style={{ color: line.error ? "#ff6b6b" : undefined, margin: 0 }}>
+            <pre className="whitespace-pre-wrap" style={{ color: line.error ? "var(--taomni-danger-text)" : undefined, margin: 0 }}>
               {line.reply}
             </pre>
           </div>

@@ -39,19 +39,19 @@ export function SessionEditorView(props: SessionEditorViewProps) {
           ref={navigation.handleRef}
           className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none"
           style={{
-            background: "linear-gradient(to bottom,#5895c8,#2b5d8b)",
-            color: "white",
+            background: "var(--taomni-chrome-bg)",
+            color: "var(--taomni-text)",
           }}
         >
           <Bookmark className="w-3.5 h-3.5 mr-1.5" />
-          <div className="text-[length:var(--taomni-fs-body)] font-semibold">
+          <h2 className="text-ui-title font-semibold">
             {form.isEdit ? form.t("sessionEditor2.titleEdit") : form.t("sessionEditor2.titleNew")}
-          </div>
+          </h2>
           <div className="ml-auto flex items-center gap-2 text-[length:var(--taomni-fs-small)] opacity-95">
             <IconButton
               data-testid="session-help"
               label={form.t("sessionEditor2.helpTitle")}
-              className="hover:bg-white/15 rounded p-0.5"
+              className="hover:bg-[var(--taomni-control-hover)] rounded p-0.5"
               onClick={() => form.setTestResult({ ok: true, msg: form.t("sessionEditor2.helpMessage") })}
               type="button"
             >
