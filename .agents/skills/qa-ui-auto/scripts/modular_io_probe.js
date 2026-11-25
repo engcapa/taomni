@@ -31,7 +31,7 @@ async function measureModularIo(input) {
       const marker = "ACK-" + i + "\n";
       const receipt = until(marker);
       const start = performance.now();
-      await invoke("write_terminal", {sessionId: id, data: "ping-" + i + "\n"});
+      await invoke("write_terminal", {sessionId: id, data: btoa("ping-" + i + "\n")});
       const reply = await receipt;
       if (reply.text !== marker) throw new Error("Wrong PTY echo: " + reply.text.slice(0, 120));
       if (i >= 5) timings.latencyMs.push(reply.at - start);
@@ -39,7 +39,7 @@ async function measureModularIo(input) {
     for (let i = 0; i < 6; ++i) {
       const receipt = until("AC13-END\n");
       const start = performance.now();
-      await invoke("write_terminal", {sessionId: id, data: "burst\n"});
+      await invoke("write_terminal", {sessionId: id, data: btoa("burst\n")});
       const reply = await receipt;
       const payload = reply.text.slice(0, -"AC13-END\n".length);
       if (payload.length !== 1048576 || /[^x]/.test(payload)) throw new Error("PTY payload corruption");
