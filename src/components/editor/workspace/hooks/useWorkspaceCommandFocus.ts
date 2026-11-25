@@ -24,8 +24,10 @@ export function useWorkspaceCommandFocus(context: UseWorkspaceCommandFocusContex
   }, []);
 
   const isSurfaceOwnedKeyEvent = useCallback((target: EventTarget | null): boolean => {
-    const node = target instanceof Node ? target : null;
-    const element = node instanceof Element ? node : node?.parentElement;
+    // A WebView or application command can dispatch to the window/document.
+    // In that case the focused popup still owns the key.
+    const node = target === window || target === document ? document.activeElement : target;
+    const element = node instanceof Element ? node : null;
     return Boolean(element?.closest?.(
       '[data-testid="code-workspace-editor-search"], [data-testid="markdown-preview-search"], [data-testid="code-workspace-breadcrumbs"], [data-testid="code-workspace-highlighting-widget"], [data-testid="code-workspace-todos-panel"], [data-taomni-context-menu], [data-testid="code-workspace-search-everywhere"]'
       // ED-PARITY-004 S7/A3.5: the Keymap settings + Cheat Sheet surfaces own

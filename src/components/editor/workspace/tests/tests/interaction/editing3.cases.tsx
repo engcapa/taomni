@@ -214,7 +214,7 @@ export function registerinteractionEditing3Cases(caseContext: registerinteractio
     const keyboardCandidate = await screen.findByRole("menuitem", { name: "Use shared candidate" });
     const keyboardCandidateId = keyboardCandidate.getAttribute("data-testid");
     expect(keyboardCandidateId).toMatch(/^code-workspace-intention-intention\.provider\./);
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(keyboardCandidate, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("menuitem", { name: "Use shared candidate" })).not.toBeInTheDocument());
 
     const bulb = rendered.container.querySelector('[data-testid="code-workspace-lightbulb"]');
@@ -318,7 +318,7 @@ export function registerinteractionEditing3Cases(caseContext: registerinteractio
     const problemCandidate = await screen.findByRole("menuitem", { name: "Use target-file candidate" });
     const problemCandidateId = problemCandidate.getAttribute("data-testid");
     expect(problemCandidateId).toMatch(/^code-workspace-intention-intention\.provider\./);
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(problemCandidate, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("menuitem", { name: "Use target-file candidate" })).not.toBeInTheDocument());
 
     const secondaryContent = secondaryPane?.querySelector<HTMLElement>(".cm-content");
