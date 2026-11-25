@@ -18,3 +18,19 @@ test("a reduction in another file or rule cannot mask a new violation", () => {
   const before = { "a.tsx": { L01: 2 }, "b.tsx": { L09: 3 } };
   assert.deepEqual(increases({ "b.tsx": { L01: 1, L09: 1 } }, before), ["b.tsx L01: 0 -> 1"]);
 });
+
+test("identifies modal, command and simulated button ownership from JSX", () => {
+  const cases = [
+    ['<div role="dialog" aria-modal="true"/>', { L02: 1 }],
+    ['<div role="menu"/>', { L13: 1 }],
+    ['<div className="fixed inset-0"><canvas /></div>', {}],
+    ['<div role="listbox"><div role="option" /></div>', {}],
+    ['<span role="button" onClick={run} />', { L06: 1 }],
+    ['<span role="button" tabIndex={0} onKeyDown={key} onClick={run} />', {}],
+    ['<button type="button" className="outline-none"><svg /></button>', { L07: 1, L11: 1 }],
+    ['<button type="button" aria-label={label} className="taomni-btn outline-none"><svg /></button>', {}],
+    ['<button type="button">📁</button>', { L12: 1 }],
+  ];
+  for (const [jsx, expected] of cases) assert.deepEqual(scanUI("src/Panel.tsx", jsx), expected);
+  assert.deepEqual(scanUI("src/Panel.tsx", 'import { Save as SaveIcon } from "lucide-react"; const control = <button type="button"><SaveIcon /></button>'), { L11: 1 });
+});

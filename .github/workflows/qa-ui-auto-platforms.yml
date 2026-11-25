@@ -802,6 +802,13 @@ jobs:
       - uses: ./.github/actions/qa-runtime
         with:
           mode: contracts
+      - name: Reject increased UI debt against the pull request base
+        if: matrix.shard == 1 && github.event_name == 'pull_request'
+        env:
+          QA_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$QA_BASE"
+          node scripts/ui-standard-lint.mjs --base "$QA_BASE"
       - name: Frontend refactor and QA script unit contracts
         if: matrix.shard == 1
         run: |
@@ -813,7 +820,7 @@ jobs:
             python -m unittest test_ci_ssh_features test_ci_x11_session test_ci_build_pipeline test_native_windows_integrity test_native_frame_errors test_native_pointer test_native_element_query test_ci_file_manager test_native_application_restart test_native_application_shutdown test_native_window_close_x11 test_native_external_browser test_native_authorization_route test_backup_cloud test_ci_selection test_terminal_rendering_probe qa_ui_auto.test_mobile_native test_native_drag test_tauri_webdriver.NativeSessionFillTest qa_ui_auto.test_mobile_case_readiness qa_ui_auto.test_mobile_openssh_readiness
             pnpm exec tsc -b
             pnpm check:refactor
-            node --test scripts/terminal-webgl-backport.test.mjs
+            node --test scripts/ui-standard-lint.test.mjs scripts/terminal-webgl-backport.test.mjs
           } 2>&1 | tee qa-build-output/frontend-unit-contracts.log
       - name: Frontend Vitest unit regressions
         run: |

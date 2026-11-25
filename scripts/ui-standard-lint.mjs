@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { checkElement, importedIconNames } from "./ui-standard-controls.mjs";
 
 const baselinePath = "scripts/ui-standard-baseline.json";
 const rules = {
@@ -28,6 +29,7 @@ export function scanUI(path, text) {
   }
   const ast = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true,
     /\.[jt]sx$/.test(path) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const icons = importedIconNames(ast);
   function visit(node) {
     if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
       const callee = node.expression;
@@ -40,6 +42,7 @@ export function scanUI(path, text) {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const attrs = new Map(node.attributes.properties.filter(ts.isJsxAttribute)
         .map((attr) => [attr.name.getText(ast), attr.initializer]));
+      checkElement(node, attrs, icons, path, add);
       if (node.tagName.getText(ast) === "button" && !attrs.has("type")) add("L10");
       for (const key of ["aria-label", "title", "placeholder"]) {
         const value = attrs.get(key);
@@ -59,19 +62,52 @@ export function increases(observed, baseline) {
       .map(([rule, count]) => `${path} ${rule}: ${baseline[path]?.[rule] ?? 0} -> ${count}`));
 }
 
+function sourcePaths(args) {
+  return execFileSync("git", [...args, "--", "src", "src-tauri/plugins"], {
+    encoding: "utf8", maxBuffer: 16 * 1024 * 1024,
+  }).split("\0").filter(isUISource);
+}
+
+function isUISource(path) {
+  return /\.(?:[jt]sx?|css)$/.test(path)
+    && !/\/(?:__tests__|tests|__fixtures__|fixtures|stubs|locales|vendor)\//.test(path)
+    && !/\.(?:test|spec|cases|stories)\./.test(path);
+}
+
+// Compare source on both sides with the same rule definitions. This also
+// protects the first baseline and new rules introduced by the current PR.
+export function sourceIncreases(base, observed) {
+  const existing = new Set(sourcePaths(["ls-tree", "-rz", "--name-only", base]));
+  const changed = sourcePaths(["diff", "-z", "--no-renames", "--name-only", "--diff-filter=AM", base]);
+  const prior = {};
+  const current = {};
+  for (const path of changed) {
+    if (!observed[path]) continue;
+    current[path] = observed[path];
+    if (existing.has(path)) {
+      const previous = execFileSync("git", ["show", base + ":" + path], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+      prior[path] = scanUI(path, previous);
+    }
+  }
+  return increases(current, prior);
+}
+
 function run() {
-  const paths = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard",
-    "--", "src", "src-tauri/plugins"], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }).split("\0");
+  const paths = sourcePaths(["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
   const observed = {};
   for (const path of [...new Set(paths)].sort()) {
-    if (!/\.(?:[jt]sx?|css)$/.test(path) || !existsSync(path)) continue;
-    if (/\/(?:__tests__|tests|__fixtures__|fixtures|stubs|locales|vendor)\//.test(path)
-      || /\.(?:test|spec|cases|stories)\./.test(path)) continue;
+    if (!existsSync(path)) continue;
     const counts = scanUI(path, readFileSync(path, "utf8"));
     if (Object.keys(counts).length) observed[path] = counts;
   }
   const initial = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, "utf8")) : {};
   const violations = increases(observed, initial);
+  const baseIndex = process.argv.indexOf("--base");
+  if (baseIndex !== -1) {
+    const base = process.argv[baseIndex + 1];
+    if (!base || base.startsWith("-")) throw new Error("--base requires a commit");
+    violations.push(...sourceIncreases(base, observed));
+  }
   if (process.argv.includes("--reduce") && (!violations.length || !existsSync(baselinePath))) {
     const lines = Object.entries(observed).map(([path, counts]) => `  ${JSON.stringify(path)}: ${JSON.stringify(counts)}`);
     writeFileSync(baselinePath, "{\n" + lines.join(",\n") + "\n}\n");
