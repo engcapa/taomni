@@ -12428,6 +12428,9 @@ files:
   - src/components/git/workspace/changeMenu.ts
   - src/components/git/DiffViewer.tsx
 controls:
+  - id: git-change-row
+    selector: '[data-testid="git-change-row"]'
+    kind: interactive
   - id: git-change-status
     selector: '[data-testid="git-change-status"]'
     kind: display

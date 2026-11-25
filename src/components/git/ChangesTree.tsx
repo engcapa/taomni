@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type MouseEvent } from "react";
+import { useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { ChevronDown, ChevronRight, Folder } from "lucide-react";
 import { gitChangeLabel, type GitChange } from "../../lib/git";
 import { gitChangeStatusColor } from "./shared/changeStatus";
@@ -24,6 +24,12 @@ export interface ChangesTreeProps {
   activePath: string | null;
   onSelect: (path: string, mods: { ctrl: boolean; shift: boolean }) => void;
   onContextMenu: (path: string, event: MouseEvent) => void;
+}
+
+function isRowActivation(event: KeyboardEvent<HTMLDivElement>) {
+  return event.target === event.currentTarget && !event.nativeEvent.isComposing
+    && event.nativeEvent.keyCode !== 229 && !event.altKey && !event.repeat
+    && (event.key === "Enter" || event.key === " ");
 }
 
 type TriState = "all" | "none" | "some";
@@ -105,21 +111,33 @@ export function ChangesTree({
   const renderFile = (change: GitChange, depth: number, sectionKey = "all") => {
     const isActive = activePath === change.path;
     const isSelected = selected.has(change.path);
+    const select = (event: MouseEvent | KeyboardEvent) =>
+      onSelect(change.path, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey });
     return (
       <div
         key={`${sectionKey}-${change.status}-${change.path}`}
         role="button"
+        data-testid="git-change-row"
+        data-path={change.path}
+        aria-pressed={isSelected}
+        onKeyDown={(event) => {
+          if (!isRowActivation(event)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          select(event);
+        }}
         tabIndex={0}
         style={{ paddingLeft: 8 + depth * 14 }}
         className={`w-full pr-2 py-1 flex items-center gap-2 text-left cursor-pointer border-b border-[var(--taomni-divider)] ${
           isActive ? "bg-[var(--taomni-hover)]" : isSelected ? "bg-[var(--taomni-accent)]/10" : "hover:bg-[var(--taomni-hover)]"
         }`}
-        onClick={(e) => onSelect(change.path, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey })}
+        onClick={select}
         onContextMenu={(e) => onContextMenu(change.path, e)}
       >
         <input
           type="checkbox"
           className="shrink-0"
+          aria-label={change.path}
           checked={checked.has(change.path)}
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => onToggleChecked([change.path], e.target.checked)}
@@ -139,21 +157,26 @@ export function ChangesTree({
     if (node.type === "file") return renderFile(node.change, depth, sectionKey);
     const collapsedKey = `${sectionKey}:${node.path}`;
     const isCollapsed = collapsed.has(collapsedKey);
+    const toggle = () => setCollapsed((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(collapsedKey)) next.add(collapsedKey);
+      return next;
+    });
     return (
       <div key={`${sectionKey}-dir-${node.path}`}>
         <div
           role="button"
+          aria-expanded={!isCollapsed}
+          onKeyDown={(event) => {
+            if (!isRowActivation(event)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            toggle();
+          }}
           tabIndex={0}
           style={{ paddingLeft: 8 + depth * 14 }}
           className="w-full pr-2 py-1 flex items-center gap-2 cursor-pointer hover:bg-[var(--taomni-hover)] border-b border-[var(--taomni-divider)]"
-          onClick={() =>
-            setCollapsed((prev) => {
-              const next = new Set(prev);
-              if (next.has(collapsedKey)) next.delete(collapsedKey);
-              else next.add(collapsedKey);
-              return next;
-            })
-          }
+          onClick={toggle}
           onContextMenu={(e) => {
             e.preventDefault();
             const first = collectFilePaths(node)[0];

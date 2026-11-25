@@ -1709,6 +1709,7 @@
 
 ## git/diff (F26.1)
 
+- `[data-testid="git-change-row"]` — interactive — F26.1.git-change-row
 - `[data-testid="git-change-status"]` — display — F26.1.git-change-status
 - `[data-testid="git-log-file-status"]` — display — F26.1.git-log-file-status
 - `[data-testid="git-changes-list-resize-handle"]` — interactive — F26.1.git-changes-list-resize-handle

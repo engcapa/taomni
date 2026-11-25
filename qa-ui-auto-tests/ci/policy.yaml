@@ -303,6 +303,7 @@ cases:
 - TC-UIC-006-detached-appearance
 - TC-UIC-007-page-zoom
 - TC-UIC-008-rail-tooltip
+- TC-UIC-009-git-change-keys
 - TC-MOBILE-001
 - TC-MOBILE-002
 - TC-MOBILE-003
