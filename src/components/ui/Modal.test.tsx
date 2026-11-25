@@ -66,3 +66,30 @@ it("keeps an owned listbox inside the top layer and dismisses one layer per Esca
   fireEvent.keyDown(trigger, { key: "Escape" });
   expect(cancel).toHaveBeenCalledTimes(1);
 });
+
+it("light dismisses only when the same pointer starts and ends on the backdrop", () => {
+  const cancel = vi.fn();
+  const view = (light: boolean) => <Modal title="Session information" testId="info" initialFocus="button"
+    dismissOnBackdrop={light} onCancel={cancel} footer={<button type="button">Close</button>}>
+    <p>Connected desktop</p>
+  </Modal>;
+  const component = render(view(true));
+  const panel = screen.getByRole("dialog");
+  vi.spyOn(panel, "getBoundingClientRect").mockReturnValue(new DOMRect(100, 100, 400, 240));
+  const outside = { pointerId: 7, button: 0, clientX: 20, clientY: 20 };
+  fireEvent.pointerDown(screen.getByText("Connected desktop"), outside);
+  fireEvent.pointerUp(panel, outside);
+  fireEvent.pointerDown(panel, { ...outside, clientX: 130, clientY: 125 });
+  fireEvent.pointerUp(panel, outside);
+  fireEvent.pointerDown(panel, outside);
+  fireEvent.pointerCancel(panel, outside);
+  fireEvent.pointerUp(panel, outside);
+  expect(cancel).not.toHaveBeenCalled();
+  fireEvent.pointerDown(panel, outside);
+  fireEvent.pointerUp(panel, outside);
+  expect(cancel).toHaveBeenCalledTimes(1);
+  component.rerender(view(false));
+  fireEvent.pointerDown(panel, outside);
+  fireEvent.pointerUp(panel, outside);
+  expect(cancel).toHaveBeenCalledTimes(1);
+});

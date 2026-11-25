@@ -753,6 +753,7 @@ export default function VncPanel({
       {sessionMenu.render}
       {infoOpen && (
         <VncSessionInfoDialog
+          returnFocus={canvasRef.current}
           info={{
             desktopName: conn?.name ?? "",
             device: `${host}:${port}`,
@@ -770,6 +771,7 @@ export default function VncPanel({
       )}
       {propertiesOpen && (
         <VncPropertiesDialog
+          returnFocus={canvasRef.current}
           initial={{
             viewer: { ...viewer, scaling, preserveAspect },
             viewOnly: pendingSessionSettingsRef.current?.viewOnly ?? viewOnly,

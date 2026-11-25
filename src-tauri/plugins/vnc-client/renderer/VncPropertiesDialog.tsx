@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
-import { useT, useFocusReturn } from "../../../../src/lib/vnc/viewerHost";
+import { useState } from "react";
+import { Button } from "../../../crates/taomni-plugin-api/frontend/ui/Button";
+import { ConfirmDialog } from "../../../crates/taomni-plugin-api/frontend/ui/ConfirmDialog";
+import { Modal } from "../../../crates/taomni-plugin-api/frontend/ui/Modal";
+import { useT } from "../../../../src/lib/vnc/viewerHost";
 import type { VncSessionProperties } from "../../../../src/lib/vnc/viewerContract";
 import { normalizeVncScaling, VNC_SCALE_PERCENTAGES, type VncClipboardPolicy, type VncScaling } from "../../../../src/lib/vnc/viewerProtocol";
 import type { VncMenuKey, VncPictureQuality, VncViewerOptions } from "../../../../src/lib/vncOptions";
@@ -23,20 +25,24 @@ const MENU_KEYS: VncMenuKey[] = ["F8", "F9", "F10", "F11", "F12", "none"];
  */
 export function VncPropertiesDialog({
   initial,
+  returnFocus,
   onApply,
   onClose,
 }: {
   initial: VncSessionProperties;
+  returnFocus: HTMLElement | null;
   onApply: (next: VncSessionProperties, reconnect: boolean) => void;
   onClose: () => void;
 }) {
   const t = useT();
-  useFocusReturn(true);
   const [draft, setDraft] = useState<VncSessionProperties>(initial);
-  const firstRef = useRef<HTMLSelectElement>(null);
-  useEffect(() => {
-    firstRef.current?.focus({ preventScroll: true });
-  }, []);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const changed = draft.viewOnly !== initial.viewOnly || draft.clipboardPolicy !== initial.clipboardPolicy
+    || (Object.keys(draft.viewer) as Array<keyof VncViewerOptions>).some((key) => draft.viewer[key] !== initial.viewer[key]);
+  function cancel() {
+    if (changed) setConfirmDiscard(true);
+    else onClose();
+  }
   const needsReconnect = propertiesNeedReconnect(initial, draft);
   const setViewer = <K extends keyof VncViewerOptions>(key: K, value: VncViewerOptions[K]) =>
     setDraft((current) => ({ ...current, viewer: { ...current.viewer, [key]: value } }));
@@ -58,138 +64,92 @@ export function VncPropertiesDialog({
     <h3 style={{ gridColumn: "1 / -1", fontWeight: 600, marginTop: 8 }}>{title}</h3>
   );
 
-  return (
-    <div
-      role="presentation"
-      style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)" }}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          event.stopPropagation();
-          onClose();
-        }
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="vnc-properties-title"
-        data-testid="vnc-properties"
-        className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-bg-elevated,var(--taomni-bg))] text-[var(--taomni-text)] shadow-xl"
-        style={{ minWidth: 440, maxWidth: "90%", maxHeight: "90%", overflow: "auto", padding: 16, fontSize: 12 }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <h2 id="vnc-properties-title" style={{ fontSize: 14, fontWeight: 600 }}>{t("vnc.propertiesTitle")}</h2>
-          <button type="button" aria-label={t("vnc.close")} onClick={onClose} className="rounded p-1 hover:bg-[var(--taomni-hover)]">
-            <X size={14} />
-          </button>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "max-content 1fr", columnGap: 16, rowGap: 8, alignItems: "center" }}>
-          {section(t("vnc.propertiesGeneral"))}
-          {row(t("vnc.pictureQuality"), (
-            <select
-              ref={firstRef}
-              data-testid="vnc-prop-quality"
-              className="taomni-input"
-              value={draft.viewer.pictureQuality}
-              onChange={(event) => setViewer("pictureQuality", event.target.value as VncPictureQuality)}
-            >
-              {QUALITIES.map((quality) => (
-                <option key={quality} value={quality}>{t(`vnc.quality${quality[0].toUpperCase()}${quality.slice(1)}`)}</option>
-              ))}
-            </select>
-          ))}
-          {check("vnc-prop-view-only", draft.viewOnly, (value) => setDraft((current) => ({ ...current, viewOnly: value })), t("vnc.propertiesViewOnly"))}
-          {section(t("vnc.scaling"))}
-          {row(t("vnc.scaling"), (
-            <select
-              data-testid="vnc-prop-scaling"
-              className="taomni-input"
-              value={scalingValue}
-              onChange={(event) => setViewer("scaling", normalizeVncScaling(event.target.value) as VncScaling)}
-            >
-              <option value="auto">{t("vnc.scaleAutomatically")}</option>
-              <option value="fit">{t("vnc.scaleFitWindow")}</option>
-              <option value="fit-width">{t("vnc.scaleFitWidth")}</option>
-              <option value="fit-height">{t("vnc.scaleFitHeight")}</option>
-              {VNC_SCALE_PERCENTAGES.map((percent) => (
-                <option key={percent} value={String(percent)}>{percent}%</option>
-              ))}
-            </select>
-          ))}
-          {check("vnc-prop-preserve-aspect", draft.viewer.preserveAspect, (value) => setViewer("preserveAspect", value), t("vnc.preserveAspect"))}
-          {section(t("vnc.propertiesKeys"))}
-          {check("vnc-prop-special-keys", draft.viewer.passSpecialKeys, (value) => setViewer("passSpecialKeys", value), t("vnc.propertiesPassSpecialKeys"))}
-          {row(t("vnc.propertiesMenuKey"), (
-            <select
-              data-testid="vnc-prop-menu-key"
-              className="taomni-input"
-              value={draft.viewer.menuKey}
-              onChange={(event) => setViewer("menuKey", event.target.value as VncMenuKey)}
-            >
-              {MENU_KEYS.map((key) => (
-                <option key={key} value={key}>{key === "none" ? t("vnc.propertiesMenuKeyNone") : key}</option>
-              ))}
-            </select>
-          ))}
-          {section(t("vnc.propertiesClipboard"))}
-          {row(t("vnc.propertiesClipboardDirection"), (
-            <select
-              data-testid="vnc-prop-clipboard"
-              className="taomni-input"
-              value={draft.clipboardPolicy}
-              onChange={(event) => setDraft((current) => ({ ...current, clipboardPolicy: event.target.value as VncClipboardPolicy }))}
-            >
-              <option value="bidirectional">{t("vnc.clipboardBidirectional")}</option>
-              <option value="client-to-server">{t("vnc.clipboardClientToServer")}</option>
-              <option value="server-to-client">{t("vnc.clipboardServerToClient")}</option>
-              <option value="disabled">{t("vnc.clipboardDisabled")}</option>
-            </select>
-          ))}
-          {check("vnc-prop-initial-clipboard", draft.viewer.sendInitialClipboard, (value) => setViewer("sendInitialClipboard", value), t("vnc.propertiesSendInitialClipboard"))}
-          {section(t("vnc.propertiesConnection"))}
-          {check("vnc-prop-shared", draft.viewer.shared, (value) => setViewer("shared", value), t("vnc.propertiesShared"))}
-          {check("vnc-prop-warn-unencrypted", draft.viewer.warnUnencrypted, (value) => setViewer("warnUnencrypted", value), t("vnc.propertiesWarnUnencrypted"))}
-          {check("vnc-prop-auto-reconnect", draft.viewer.autoReconnect, (value) => setViewer("autoReconnect", value), t("vnc.propertiesAutoReconnect"))}
-          {check("vnc-prop-bell", draft.viewer.acceptBell, (value) => setViewer("acceptBell", value), t("vnc.propertiesAcceptBell"))}
-        </div>
-        {needsReconnect && (
-          <p data-testid="vnc-prop-reconnect-hint" style={{ marginTop: 12, color: "var(--taomni-text-muted)" }}>
-            {t("vnc.propertiesReconnectHint")}
-          </p>
-        )}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-          {needsReconnect && (
-            <button
-              type="button"
-              data-testid="vnc-prop-ok-reconnect"
-              className="rounded border border-[var(--taomni-divider)] px-4 py-1 hover:bg-[var(--taomni-hover)]"
-              onClick={() => onApply(draft, true)}
-            >
-              {t("vnc.propertiesOkReconnect")}
-            </button>
-          )}
-          <button
-            type="button"
-            data-testid="vnc-prop-ok"
-            className="rounded border border-[var(--taomni-divider)] px-4 py-1 hover:bg-[var(--taomni-hover)]"
-            onClick={() => onApply(draft, false)}
+  return <>
+    <Modal title={t("vnc.propertiesTitle")} testId="vnc-properties"
+      initialFocus='[data-testid="vnc-prop-quality"]' returnFocus={returnFocus}
+      closeLabel={t("vnc.close")} onCancel={cancel} footer={<>
+        <Button data-testid="vnc-prop-cancel" onClick={cancel}>{t("vnc.cancel")}</Button>
+        {needsReconnect && <Button data-testid="vnc-prop-ok-reconnect" onClick={() => onApply(draft, true)}>
+          {t("vnc.propertiesOkReconnect")}
+        </Button>}
+        <Button variant="primary" data-testid="vnc-prop-ok" onClick={() => onApply(draft, false)}>{t("vnc.ok")}</Button>
+      </>}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(min-content, max-content) minmax(0, 1fr)", columnGap: 16, rowGap: 8, alignItems: "center" }}>
+        {section(t("vnc.propertiesGeneral"))}
+        {row(t("vnc.pictureQuality"), (
+          <select
+            data-testid="vnc-prop-quality"
+            className="taomni-input"
+            value={draft.viewer.pictureQuality}
+            onChange={(event) => setViewer("pictureQuality", event.target.value as VncPictureQuality)}
           >
-            {t("vnc.ok")}
-          </button>
-          <button
-            type="button"
-            data-testid="vnc-prop-cancel"
-            className="rounded border border-[var(--taomni-divider)] px-4 py-1 hover:bg-[var(--taomni-hover)]"
-            onClick={onClose}
+            {QUALITIES.map((quality) => (
+              <option key={quality} value={quality}>{t(`vnc.quality${quality[0].toUpperCase()}${quality.slice(1)}`)}</option>
+            ))}
+          </select>
+        ))}
+        {check("vnc-prop-view-only", draft.viewOnly, (value) => setDraft((current) => ({ ...current, viewOnly: value })), t("vnc.propertiesViewOnly"))}
+        {section(t("vnc.scaling"))}
+        {row(t("vnc.scaling"), (
+          <select
+            data-testid="vnc-prop-scaling"
+            className="taomni-input"
+            value={scalingValue}
+            onChange={(event) => setViewer("scaling", normalizeVncScaling(event.target.value) as VncScaling)}
           >
-            {t("vnc.cancel")}
-          </button>
-        </div>
+            <option value="auto">{t("vnc.scaleAutomatically")}</option>
+            <option value="fit">{t("vnc.scaleFitWindow")}</option>
+            <option value="fit-width">{t("vnc.scaleFitWidth")}</option>
+            <option value="fit-height">{t("vnc.scaleFitHeight")}</option>
+            {VNC_SCALE_PERCENTAGES.map((percent) => (
+              <option key={percent} value={String(percent)}>{percent}%</option>
+            ))}
+          </select>
+        ))}
+        {check("vnc-prop-preserve-aspect", draft.viewer.preserveAspect, (value) => setViewer("preserveAspect", value), t("vnc.preserveAspect"))}
+        {section(t("vnc.propertiesKeys"))}
+        {check("vnc-prop-special-keys", draft.viewer.passSpecialKeys, (value) => setViewer("passSpecialKeys", value), t("vnc.propertiesPassSpecialKeys"))}
+        {row(t("vnc.propertiesMenuKey"), (
+          <select
+            data-testid="vnc-prop-menu-key"
+            className="taomni-input"
+            value={draft.viewer.menuKey}
+            onChange={(event) => setViewer("menuKey", event.target.value as VncMenuKey)}
+          >
+            {MENU_KEYS.map((key) => (
+              <option key={key} value={key}>{key === "none" ? t("vnc.propertiesMenuKeyNone") : key}</option>
+            ))}
+          </select>
+        ))}
+        {section(t("vnc.propertiesClipboard"))}
+        {row(t("vnc.propertiesClipboardDirection"), (
+          <select
+            data-testid="vnc-prop-clipboard"
+            className="taomni-input"
+            value={draft.clipboardPolicy}
+            onChange={(event) => setDraft((current) => ({ ...current, clipboardPolicy: event.target.value as VncClipboardPolicy }))}
+          >
+            <option value="bidirectional">{t("vnc.clipboardBidirectional")}</option>
+            <option value="client-to-server">{t("vnc.clipboardClientToServer")}</option>
+            <option value="server-to-client">{t("vnc.clipboardServerToClient")}</option>
+            <option value="disabled">{t("vnc.clipboardDisabled")}</option>
+          </select>
+        ))}
+        {check("vnc-prop-initial-clipboard", draft.viewer.sendInitialClipboard, (value) => setViewer("sendInitialClipboard", value), t("vnc.propertiesSendInitialClipboard"))}
+        {section(t("vnc.propertiesConnection"))}
+        {check("vnc-prop-shared", draft.viewer.shared, (value) => setViewer("shared", value), t("vnc.propertiesShared"))}
+        {check("vnc-prop-warn-unencrypted", draft.viewer.warnUnencrypted, (value) => setViewer("warnUnencrypted", value), t("vnc.propertiesWarnUnencrypted"))}
+        {check("vnc-prop-auto-reconnect", draft.viewer.autoReconnect, (value) => setViewer("autoReconnect", value), t("vnc.propertiesAutoReconnect"))}
+        {check("vnc-prop-bell", draft.viewer.acceptBell, (value) => setViewer("acceptBell", value), t("vnc.propertiesAcceptBell"))}
       </div>
-    </div>
-  );
+      {needsReconnect && (
+        <p data-testid="vnc-prop-reconnect-hint" style={{ marginTop: 12, color: "var(--taomni-text-muted)" }}>
+          {t("vnc.propertiesReconnectHint")}
+        </p>
+      )}
+    </Modal>
+    {confirmDiscard && <ConfirmDialog danger title={t("vnc.discardTitle")} message={t("vnc.discardBody")}
+      cancelLabel={t("vnc.keepEditing")} confirmLabel={t("vnc.discard")}
+      onCancel={() => setConfirmDiscard(false)} onConfirm={onClose} />}
+  </>;
 }

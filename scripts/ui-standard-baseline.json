@@ -15,8 +15,6 @@
   "src-tauri/plugins/vnc-client/renderer/VncConnectionOverlay.tsx": {"L02":2},
   "src-tauri/plugins/vnc-client/renderer/VncFullScreenToolbar.tsx": {"L05-inline":2,"L04-inline":2},
   "src-tauri/plugins/vnc-client/renderer/VncPanel.tsx": {"L04-inline":1},
-  "src-tauri/plugins/vnc-client/renderer/VncPropertiesDialog.tsx": {"L05-inline":1,"L04-inline":1,"L02":1},
-  "src-tauri/plugins/vnc-client/renderer/VncSessionInfoDialog.tsx": {"L05-inline":1,"L04-inline":1,"L02":1},
   "src/App.tsx": {"L04-inline":1},
   "src/components/AboutDialog.tsx": {"L02":1,"L04-inline":1},
   "src/components/ElevationPasswordPrompt.tsx": {"L04-inline":1},

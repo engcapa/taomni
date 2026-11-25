@@ -4760,6 +4760,10 @@
 - `[data-testid="vnc-send-cad"]` — interactive [optional] — F9.6.send-ctrl-alt-del
 - `[data-testid="vnc-fullscreen"]` — interactive [optional] — F9.6.fullscreen
 - `[data-testid="vnc-session-menu"]` — interactive [optional] — F9.6.session-menu
+- `[data-testid="vnc-menu-properties"]` — interactive — F9.6.vnc-menu-properties
+- `[data-testid="vnc-prop-quality"]` — interactive — F9.6.vnc-prop-quality
+- `[data-testid="vnc-prop-cancel"]` — interactive — F9.6.vnc-prop-cancel
+- `[data-testid="vnc-session-info-ok"]` — interactive — F9.6.vnc-session-info-ok
 - `[data-testid="vnc-menu-info"]` — interactive [optional] — F9.6.menu-info
 - `[data-testid="vnc-menu-quality"]` — interactive [optional] — F9.6.menu-quality
 - `[data-testid="vnc-quality-low"]` — interactive [optional] — F9.6.quality-low

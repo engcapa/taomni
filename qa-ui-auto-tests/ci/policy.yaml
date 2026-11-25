@@ -317,6 +317,7 @@ cases:
 - TC-UIC-019-session-file-validation
 - TC-UIC-020-explorer-notifications
 - TC-UIC-021-settings-switches
+- TC-UIC-022-vnc-session-dialogs
 - TC-UIC-DLG-explorer-new-file
 - TC-UIC-DLG-mail-attachment-reminder
 - TC-UIC-DLG-workspace-build-tools

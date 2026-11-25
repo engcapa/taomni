@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { Button } from "../../../crates/taomni-plugin-api/frontend/ui/Button";
+import { Modal } from "../../../crates/taomni-plugin-api/frontend/ui/Modal";
 import type { VncSessionStats } from "../../../../src/lib/vnc/viewerProtocol";
 import type { VncPaintStats } from "./vncFramePainter";
-import { useT, useFocusReturn } from "../../../../src/lib/vnc/viewerHost";
+import { useT } from "../../../../src/lib/vnc/viewerHost";
 
 export interface VncSessionInfo {
   desktopName: string;
@@ -28,14 +28,12 @@ function formatKbps(value: number | null | undefined): string {
  * Information dialog, plus Taomni's pipeline counters (updates vs painted
  * frames, per-update decode time) for performance diagnosis.
  */
-export function VncSessionInfoDialog({ info, onClose }: { info: VncSessionInfo; onClose: () => void }) {
+export function VncSessionInfoDialog({ info, onClose, returnFocus }: {
+  info: VncSessionInfo;
+  onClose: () => void;
+  returnFocus: HTMLElement | null;
+}) {
   const t = useT();
-  useFocusReturn(true);
-  const closeRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    closeRef.current?.focus({ preventScroll: true });
-  }, []);
-
   const stats = info.stats;
   const qualityLabel = (value: string) => {
     switch (value) {
@@ -101,59 +99,19 @@ export function VncSessionInfoDialog({ info, onClose }: { info: VncSessionInfo; 
   ];
 
   return (
-    <div
-      role="presentation"
-      style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)" }}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          event.stopPropagation();
-          onClose();
-        }
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="vnc-session-info-title"
-        data-testid="vnc-session-info"
-        className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-bg-elevated,var(--taomni-bg))] text-[var(--taomni-text)] shadow-xl"
-        style={{ minWidth: 420, maxWidth: "90%", padding: 16 }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <h2 id="vnc-session-info-title" style={{ fontSize: 14, fontWeight: 600 }}>{t("vnc.infoTitle")}</h2>
-          <button
-            type="button"
-            aria-label={t("vnc.close")}
-            onClick={onClose}
-            className="rounded p-1 hover:bg-[var(--taomni-hover)]"
-          >
-            <X size={14} />
-          </button>
-        </div>
-        <dl style={{ display: "grid", gridTemplateColumns: "max-content 1fr", columnGap: 24, rowGap: 6, fontSize: 12 }}>
-          {rows.map(([label, value]) => (
-            <div key={label} style={{ display: "contents" }}>
-              <dt className="text-[var(--taomni-text-muted)]">{label}:</dt>
-              <dd data-testid={`vnc-info-${label}`} style={{ fontVariantNumeric: "tabular-nums" }}>{value}</dd>
-            </div>
-          ))}
-        </dl>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-          <button
-            ref={closeRef}
-            type="button"
-            data-testid="vnc-session-info-ok"
-            onClick={onClose}
-            className="rounded border border-[var(--taomni-divider)] px-4 py-1 text-xs hover:bg-[var(--taomni-hover)]"
-          >
-            OK
-          </button>
-        </div>
-      </div>
-    </div>
+    <Modal title={t("vnc.infoTitle")} testId="vnc-session-info" closeLabel={t("vnc.close")}
+      initialFocus='[data-testid="vnc-session-info-ok"]' returnFocus={returnFocus}
+      dismissOnBackdrop onCancel={onClose} footer={
+        <Button data-testid="vnc-session-info-ok" variant="primary" onClick={onClose}>{t("vnc.ok")}</Button>
+      }>
+      <dl style={{ display: "grid", gridTemplateColumns: "minmax(min-content, max-content) minmax(0, 1fr)", columnGap: 24, rowGap: 6 }}>
+        {rows.map(([label, value]) => (
+          <div key={label} style={{ display: "contents" }}>
+            <dt className="text-[var(--taomni-text-muted)]">{label}:</dt>
+            <dd data-testid={`vnc-info-${label}`} style={{ fontVariantNumeric: "tabular-nums" }}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Modal>
   );
 }

@@ -18,7 +18,8 @@
 }
 .taomni-modal[open] { display: flex; flex-direction: column; gap: 16px; }
 .taomni-modal::backdrop { background: var(--taomni-overlay, rgb(0 0 0 / 40%)); }
-.taomni-modal > h2 { flex: none; font-size: var(--taomni-fs-title, calc(var(--taomni-ui-font-size, 12px) + 2px)); font-weight: 600; }
+.taomni-modal-header { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; }
+.taomni-modal > h2, .taomni-modal-header > h2 { flex: none; font-size: var(--taomni-fs-title, calc(var(--taomni-ui-font-size, 12px) + 2px)); font-weight: 600; }
 .taomni-modal[data-tone="error"] > h2 { color: var(--taomni-danger-text); }
 .taomni-modal[data-tone="success"] > h2 { color: var(--taomni-success-text); }
 .taomni-modal-body { min-height: 0; overflow: auto; overflow-wrap: anywhere; }

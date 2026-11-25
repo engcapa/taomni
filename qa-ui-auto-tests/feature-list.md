@@ -4198,6 +4198,18 @@ controls:
     selector: '[data-testid="vnc-session-menu"]'
     kind: interactive
     optional: true          # connected; same menu as F8 (VNC-SESS-001)
+  - id: vnc-menu-properties
+    selector: '[data-testid="vnc-menu-properties"]'
+    kind: interactive
+  - id: vnc-prop-quality
+    selector: '[data-testid="vnc-prop-quality"]'
+    kind: interactive
+  - id: vnc-prop-cancel
+    selector: '[data-testid="vnc-prop-cancel"]'
+    kind: interactive
+  - id: vnc-session-info-ok
+    selector: '[data-testid="vnc-session-info-ok"]'
+    kind: interactive
   - id: menu-info
     selector: '[data-testid="vnc-menu-info"]'
     kind: interactive
