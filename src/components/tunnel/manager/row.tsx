@@ -21,17 +21,17 @@ export function StatusBadge({ status, error }: { status?: TunnelStatus; error?: 
   let label = t("tunnels.statusStopped");
   let color = "var(--taomni-text-muted)";
   if (s === "running") {
-    icon = <CheckCircle2 className="w-3 h-3" style={{ color: "#1f7a4a" }} />;
+    icon = <CheckCircle2 className="w-3 h-3" style={{ color: "var(--taomni-success-text)" }} />;
     label = t("tunnels.statusRunning");
-    color = "#1f7a4a";
+    color = "var(--taomni-success-text)";
   } else if (s === "starting") {
     icon = <Loader2 className="w-3 h-3 animate-spin" style={{ color: "var(--taomni-accent)" }} />;
     label = t("tunnels.statusStarting");
     color = "var(--taomni-accent)";
   } else if (s === "error") {
-    icon = <AlertCircle className="w-3 h-3" style={{ color: "#b22222" }} />;
+    icon = <AlertCircle className="w-3 h-3" style={{ color: "var(--taomni-danger-text)" }} />;
     label = t("tunnels.statusError");
-    color = "#b22222";
+    color = "var(--taomni-danger-text)";
   }
   return (
     <span
@@ -172,15 +172,15 @@ export function TunnelRow({
             onClick={running ? onStop : onStart}
           >
             {running ? (
-              <Square className="w-3.5 h-3.5" style={{ color: "#b22222" }} />
+              <Square className="w-3.5 h-3.5" style={{ color: "var(--taomni-danger-text)" }} />
             ) : (
-              <Play className="w-3.5 h-3.5" style={{ color: "#1f7a4a" }} />
+              <Play className="w-3.5 h-3.5" style={{ color: "var(--taomni-success-text)" }} />
             )}
           </button>
           <StatusBadge status={status?.status} error={status?.error} />
         </div>
         {status?.status === "error" && status.error && (
-          <div className="text-ui-caption mt-0.5 truncate max-w-[180px] mx-auto" title={status.error} style={{ color: "#b22222" }}>
+          <div className="text-ui-caption mt-0.5 truncate max-w-[180px] mx-auto" title={status.error} style={{ color: "var(--taomni-danger-text)" }}>
             {status.error}
           </div>
         )}
@@ -210,16 +210,16 @@ export function TunnelRow({
       <Td className="text-center">
         <div className="flex items-center justify-center gap-1">
           <IconBtn testId="tunnel-row-edit" title={t("tunnels.rowEdit")} onClick={onEdit}>
-            <Pencil className="w-3.5 h-3.5" style={{ color: "#2b5d8b" }} />
+            <Pencil className="w-3.5 h-3.5" style={{ color: "var(--taomni-text)" }} />
           </IconBtn>
           <IconBtn testId="tunnel-row-edit-key" title={t("tunnels.rowEditKey")} onClick={onEditKey}>
-            <KeyIcon className="w-3.5 h-3.5" style={{ color: "#c97a23" }} />
+            <KeyIcon className="w-3.5 h-3.5" style={{ color: "var(--taomni-warning-icon)" }} />
           </IconBtn>
           <IconBtn testId="tunnel-row-test" title={t("tunnels.rowTest")} onClick={onTest}>
-            <Activity className="w-3.5 h-3.5" style={{ color: "#1f7a4a" }} strokeWidth={2.5} />
+            <Activity className="w-3.5 h-3.5" style={{ color: "var(--taomni-success-text)" }} strokeWidth={2.5} />
           </IconBtn>
           <IconBtn testId="tunnel-row-clone" title={t("tunnels.rowClone")} onClick={onClone}>
-            <Copy className="w-3.5 h-3.5" style={{ color: "#7a3d9d" }} />
+            <Copy className="w-3.5 h-3.5" style={{ color: "var(--taomni-text)" }} />
           </IconBtn>
           <IconBtn
             testId="tunnel-row-autostart"
@@ -228,16 +228,16 @@ export function TunnelRow({
           >
             <Zap
               className="w-3.5 h-3.5"
-              style={{ color: tunnel.autostart ? "#c97a23" : "var(--taomni-text-muted)" }}
+              style={{ color: tunnel.autostart ? "var(--taomni-warning-icon)" : "var(--taomni-text-muted)" }}
             />
           </IconBtn>
           <IconBtn testId="tunnel-row-delete" title={t("tunnels.rowDelete")} onClick={onDelete}>
-            <Trash2 className="w-3.5 h-3.5" style={{ color: "#b22222" }} />
+            <Trash2 className="w-3.5 h-3.5" style={{ color: "var(--taomni-danger-text)" }} />
           </IconBtn>
           <IconBtn testId="tunnel-row-power" title={running ? t("tunnels.rowStop") : t("tunnels.rowStart")} onClick={running ? onStop : onStart}>
             <Power
               className="w-3.5 h-3.5"
-              style={{ color: running ? "#1f7a4a" : "var(--taomni-text-muted)" }}
+              style={{ color: running ? "var(--taomni-success-text)" : "var(--taomni-text-muted)" }}
             />
           </IconBtn>
         </div>

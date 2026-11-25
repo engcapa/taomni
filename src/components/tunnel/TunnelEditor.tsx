@@ -1,5 +1,5 @@
 import { IconButton } from "../ui/IconButton";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useModalDraggable } from "../../hooks/useModalDraggable";
 import { useModalShortcuts, getShortcutSuffixes } from "../../hooks/useModalShortcuts";
 import {
@@ -16,6 +16,7 @@ import {
   Globe,
 } from "lucide-react";
 import type { TunnelConfig, TunnelKind } from "../../lib/tunnel";
+import { firstTunnelError } from "./tunnelValidation";
 import { defaultTunnel } from "../../lib/tunnel";
 import type { SessionConfig } from "../../lib/ipc";
 import { vaultPut, isVaultReference, isVaultLockedError } from "../../lib/ipc";
@@ -42,6 +43,9 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
   const [draft, setDraft] = useState<TunnelConfig>(() => initial ?? defaultTunnel("Local"));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fieldPrefix = useId();
+  const fieldId = (field: string) => `${fieldPrefix}-${field}`;
+  const [invalidField, setInvalidField] = useState<string | null>(null);
   const vaultState = useVaultStore((s) => s.state);
   const refreshVault = useVaultStore((s) => s.refresh);
 
@@ -69,6 +73,14 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
     () => sessions.filter((s) => s.session_type === "SSH" || s.session_type === "SFTP"),
     [sessions],
   );
+
+  const validation = firstTunnelError(draft);
+  const showFieldError = validation != null && validation.field === invalidField;
+
+  // Reconcile the last submitted field with edits, including choosing a saved gateway.
+  useEffect(() => {
+    if (invalidField && !showFieldError) setInvalidField(null);
+  }, [showFieldError, invalidField]);
 
   const update = <K extends keyof TunnelConfig>(key: K, value: TunnelConfig[K]) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -104,26 +116,24 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
     }));
   };
 
-  const validate = (): string | null => {
-    if (!draft.name.trim()) return t("tunnels.editor.errNameRequired");
-    if (!draft.ssh.host.trim()) return t("tunnels.editor.errHostRequired");
-    if (!draft.ssh.username.trim()) return t("tunnels.editor.errUsernameRequired");
-    if (!Number.isFinite(draft.ssh.port) || draft.ssh.port <= 0) return t("tunnels.editor.errSshPort");
-    if (!Number.isFinite(draft.listenPort) || draft.listenPort <= 0)
-      return draft.kind === "Remote" ? t("tunnels.editor.errRemotePortGt0") : t("tunnels.editor.errForwardPortGt0");
-    if (draft.kind !== "Dynamic") {
-      if (!draft.destHost.trim()) return t("tunnels.editor.errDestHostRequired");
-      if (!Number.isFinite(draft.destPort) || draft.destPort <= 0) return t("tunnels.editor.errRemotePortGt0");
-    }
-    return null;
+  const fieldProps = (field: string) => {
+    const invalid = showFieldError && invalidField === field;
+    return {
+      id: fieldId(field),
+      "aria-invalid": invalid || undefined,
+      "aria-describedby": invalid ? fieldId("error") : undefined,
+    };
   };
 
   const handleSave = async () => {
-    const v = validate();
-    if (v) {
-      setError(v);
+    if (busy) return;
+    if (validation) {
+      setError(null);
+      setInvalidField(validation.field);
+      document.getElementById(fieldId(validation.field))?.focus();
       return;
     }
+    setInvalidField(null);
     setError(null);
     setBusy(true);
     try {
@@ -209,7 +219,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
         <div
           ref={handleRef}
           className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none"
-          style={{ background: "linear-gradient(to bottom,#5895c8,#2b5d8b)", color: "white" }}
+          style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}
         >
           <LinkIcon className="w-3.5 h-3.5 mr-1.5" />
           <div className="text-ui-body font-semibold">{initial ? t("tunnels.editor.titleEdit") : t("tunnels.editor.titleNew")}</div>
@@ -235,6 +245,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
               }}
             >
               <input
+                name={fieldId("kind")}
                 type="radio"
                 className="taomni-radio mt-0.5"
                 checked={draft.kind === opt.id}
@@ -259,15 +270,17 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
         >
           {/* Name / saved-session row */}
           <div className="flex items-center gap-2 mb-4">
-            <label className="text-ui-body w-28 text-right">{t("tunnels.editor.tunnelNameRequired")}</label>
+            <label htmlFor={fieldId("name")} className="text-ui-body w-28 text-right">{t("tunnels.editor.tunnelNameRequired")}</label>
             <input
+              {...fieldProps("name")}
               className="taomni-input w-64"
               placeholder={t("tunnels.editor.namePlaceholder")}
               value={draft.name}
               onChange={(e) => update("name", e.target.value)}
             />
-            <label className="text-ui-body w-32 text-right ml-3">{t("tunnels.editor.useSavedSession")}</label>
+            <label htmlFor={fieldId("sshSessionId")} className="text-ui-body w-32 text-right ml-3">{t("tunnels.editor.useSavedSession")}</label>
             <select
+              id={fieldId("sshSessionId")}
               className="taomni-input w-64 appearance-none"
               value={draft.sshSessionId ?? ""}
               onChange={(e) => pickSshSession(e.target.value)}
@@ -288,25 +301,27 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
           >
             {/* Left column: Local clients / My computer */}
             <DiagramCard
-              icon={isRemote ? <Server className="w-7 h-7" style={{ color: "#2b5d8b" }} /> : <Users className="w-7 h-7" style={{ color: "#c97a23" }} />}
+              icon={isRemote ? <Server className="w-7 h-7" style={{ color: "var(--taomni-text)" }} /> : <Users className="w-7 h-7" style={{ color: "var(--taomni-warning-icon)" }} />}
               title={isRemote ? t("tunnels.editor.remoteClients") : t("tunnels.editor.localClients")}
               subtitle={isRemote ? t("tunnels.editor.remoteClientsDesc") : t("tunnels.editor.localClientsDesc")}
             >
-              <Field label={forwardedLabel}>
+              <Field htmlFor={fieldId("listenPort")} label={forwardedLabel}>
                 <input
                   className="taomni-input w-24"
+                  {...fieldProps("listenPort")}
                   type="number"
                   placeholder="0"
                   value={draft.listenPort || ""}
-                  onChange={(e) => update("listenPort", parseInt(e.target.value || "0", 10) || 0)}
+                  onChange={(e) => update("listenPort", Number(e.target.value))}
                 />
                 <span className="text-ui-small ml-1" style={{ color: "var(--taomni-text-muted)" }}>
                   {isRemote ? t("tunnels.editor.serverBindHint") : t("tunnels.editor.listenHint")}
                 </span>
               </Field>
-              <Field label={isRemote ? t("tunnels.editor.bindAddress") : t("tunnels.editor.listenAddress")}>
+              <Field htmlFor={fieldId("listenHost")} label={isRemote ? t("tunnels.editor.bindAddress") : t("tunnels.editor.listenAddress")}>
                 <input
                   className="taomni-input w-32"
+                  id={fieldId("listenHost")}
                   placeholder={isRemote ? "0.0.0.0" : "127.0.0.1"}
                   value={draft.listenHost}
                   onChange={(e) => update("listenHost", e.target.value)}
@@ -324,38 +339,42 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
 
             {/* Middle column: SSH tunnel through firewall */}
             <DiagramCard
-              icon={<Flame className="w-7 h-7" style={{ color: "#d35a2c" }} />}
+              icon={<Flame className="w-7 h-7" style={{ color: "var(--taomni-warning-icon)" }} />}
               title={t("tunnels.editor.sshTunnelTitle")}
               subtitle={t("tunnels.editor.sshTunnelDesc")}
             >
-              <Field label={t("tunnels.editor.sshServerRequired")}>
+              <Field htmlFor={fieldId("host")} label={t("tunnels.editor.sshServerRequired")}>
                 <input
                   className="taomni-input w-44"
+                  {...fieldProps("host")}
                   placeholder="ssh.example.com"
                   value={draft.ssh.host}
                   onChange={(e) => updateSsh("host", e.target.value)}
                 />
               </Field>
-              <Field label={t("tunnels.editor.sshLoginRequired")}>
+              <Field htmlFor={fieldId("username")} label={t("tunnels.editor.sshLoginRequired")}>
                 <input
                   className="taomni-input w-32"
+                  {...fieldProps("username")}
                   placeholder="user"
                   value={draft.ssh.username}
                   onChange={(e) => updateSsh("username", e.target.value)}
                 />
               </Field>
-              <Field label={t("tunnels.editor.sshPort")}>
+              <Field htmlFor={fieldId("port")} label={t("tunnels.editor.sshPort")}>
                 <input
                   className="taomni-input w-20"
                   type="number"
+                  {...fieldProps("port")}
                   placeholder="22"
                   value={draft.ssh.port || ""}
-                  onChange={(e) => updateSsh("port", parseInt(e.target.value || "22", 10) || 22)}
+                  onChange={(e) => updateSsh("port", Number(e.target.value))}
                 />
               </Field>
-              <Field label={t("tunnels.editor.auth")}>
+              <Field htmlFor={fieldId("authMethod")} label={t("tunnels.editor.auth")}>
                 <select
                   className="taomni-input w-32 appearance-none"
+                  id={fieldId("authMethod")}
                   value={draft.ssh.authMethod}
                   onChange={(e) => updateSsh("authMethod", e.target.value as "Password" | "PrivateKey" | "Agent")}
                 >
@@ -364,7 +383,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                   <option value="Agent">{t("tunnels.editor.authAgent")}</option>
                 </select>
               </Field>
-              <Field
+              <Field htmlFor="tunnel-editor-auth-data"
                 label={draft.ssh.authMethod === "PrivateKey" ? t("tunnels.editor.keyPath") : t("tunnels.editor.password")}
                 disabled={draft.ssh.authMethod === "Agent"}
               >
@@ -390,7 +409,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                   disabled={draft.ssh.authMethod === "Agent"}
                 />
               </Field>
-              <Field label={t("tunnels.editor.vault")} disabled={draft.ssh.authMethod === "Agent"}>
+              <Field htmlFor={fieldId("saveAuth")} label={t("tunnels.editor.vault")} disabled={draft.ssh.authMethod === "Agent"}>
                 <label
                   className="flex items-center gap-1.5 text-ui-small"
                   title={
@@ -402,6 +421,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
                   <input
                     type="checkbox"
                     className="taomni-checkbox"
+                    id={fieldId("saveAuth")}
                     checked={!!draft.ssh.saveAuth}
                     onChange={(e) => updateSsh("saveAuth", e.target.checked)}
                     disabled={draft.ssh.authMethod === "Agent"}
@@ -415,11 +435,11 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
             <DiagramCard
               icon={
                 isDynamic ? (
-                  <Globe className="w-7 h-7" style={{ color: "#1e6db8" }} />
+                  <Globe className="w-7 h-7" style={{ color: "var(--taomni-text)" }} />
                 ) : isRemote ? (
-                  <Monitor className="w-7 h-7" style={{ color: "#2b5d8b" }} />
+                  <Monitor className="w-7 h-7" style={{ color: "var(--taomni-text)" }} />
                 ) : (
-                  <Server className="w-7 h-7" style={{ color: "#1e6db8" }} />
+                  <Server className="w-7 h-7" style={{ color: "var(--taomni-text)" }} />
                 )
               }
               title={isDynamic ? t("tunnels.editor.socksProxy") : isRemote ? t("tunnels.editor.thisComputer") : t("tunnels.editor.remoteServer")}
@@ -434,28 +454,30 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
               <div className="flex items-center justify-start mb-1">
                 <ArrowLeft className="w-5 h-5" style={{ color: "var(--taomni-accent)" }} />
               </div>
-              <Field
+              <Field htmlFor={fieldId("destHost")}
                 label={isRemote ? t("tunnels.editor.localTargetRequired") : t("tunnels.editor.remoteServerRequired", { label: destLabel })}
                 disabled={isDynamic}
               >
                 <input
                   className="taomni-input w-44"
+                  {...fieldProps("destHost")}
                   placeholder={isRemote ? "127.0.0.1" : "db.internal"}
                   value={draft.destHost}
                   onChange={(e) => update("destHost", e.target.value)}
                   disabled={isDynamic}
                 />
               </Field>
-              <Field
+              <Field htmlFor={fieldId("destPort")}
                 label={isRemote ? t("tunnels.editor.localPortRequired") : t("tunnels.editor.remotePortRequired")}
                 disabled={isDynamic}
               >
                 <input
                   className="taomni-input w-20"
                   type="number"
+                  {...fieldProps("destPort")}
                   placeholder="5432"
                   value={draft.destPort || ""}
-                  onChange={(e) => update("destPort", parseInt(e.target.value || "0", 10) || 0)}
+                  onChange={(e) => update("destPort", Number(e.target.value))}
                   disabled={isDynamic}
                 />
               </Field>
@@ -473,8 +495,9 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
 
           {/* Description / autostart */}
           <div className="mt-4 grid grid-cols-12 gap-3 items-center">
-            <label className="col-span-2 text-ui-body text-right">{t("tunnels.editor.description")}</label>
+            <label htmlFor={fieldId("description")} className="col-span-2 text-ui-body text-right">{t("tunnels.editor.description")}</label>
             <input
+              id={fieldId("description")}
               className="taomni-input col-span-7"
               placeholder={t("tunnels.editor.descriptionPlaceholder")}
               value={draft.description ?? ""}
@@ -491,12 +514,13 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
             </label>
           </div>
 
-          {error && (
+          {(error || showFieldError) && (
             <div
-              className="mt-3 px-3 py-2 rounded text-ui-body"
-              style={{ background: "#fff1f0", color: "#9b1c1c", border: "1px solid #f5b3b3" }}
+              role="alert" id={fieldId("error")}
+              className="mt-3 px-3 py-2 rounded text-ui-body select-text"
+              style={{ background: "var(--taomni-danger-bg)", color: "var(--taomni-danger-text)", border: "1px solid var(--taomni-danger-border)" }}
             >
-              {error}
+              {error ?? (validation && t(validation.message))}
             </div>
           )}
         </div>
@@ -554,10 +578,12 @@ function DiagramCard({
 }
 
 function Field({
+  htmlFor,
   label,
   disabled = false,
   children,
 }: {
+  htmlFor: string;
   label: string;
   disabled?: boolean;
   children: React.ReactNode;
@@ -567,7 +593,7 @@ function Field({
       className="flex items-center gap-2 text-ui-body"
       style={{ opacity: disabled ? 0.45 : 1 }}
     >
-      <label className="w-32 text-right shrink-0" style={{ color: "var(--taomni-text-muted)" }}>{label}</label>
+      <label htmlFor={htmlFor} className="w-32 text-right shrink-0" style={{ color: "var(--taomni-text-muted)" }}>{label}</label>
       <div className="flex items-center gap-1 flex-wrap">{children}</div>
     </div>
   );

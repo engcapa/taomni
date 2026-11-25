@@ -333,9 +333,9 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
         <div
           className="px-4 py-1.5 text-ui-small border-b shrink-0 flex items-center gap-1.5"
           style={{
-            background: "rgba(255,196,0,0.12)",
-            borderColor: "var(--taomni-divider)",
-            color: "var(--taomni-text-muted)",
+            background: "var(--taomni-warning-bg)",
+            borderColor: "var(--taomni-warning-border)",
+            color: "var(--taomni-warning-text)",
           }}
         >
           <AlertCircle className="w-3 h-3" />
@@ -436,7 +436,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
           onClick={handleStartAll}
           disabled={busy || tunnels.length === 0}
         >
-          <Play className="w-3.5 h-3.5" style={{ color: "#1f7a4a" }} /> {t("tunnels.startAllTunnels")}
+          <Play className="w-3.5 h-3.5" style={{ color: "var(--taomni-success-text)" }} /> {t("tunnels.startAllTunnels")}
         </button>
         <button
           data-testid="tunnel-stop-all"
@@ -445,7 +445,7 @@ export function TunnelManager({ onStatusMessage, onClose }: Props) {
           onClick={handleStopAll}
           disabled={busy || tunnels.length === 0}
         >
-          <Square className="w-3.5 h-3.5" style={{ color: "#b22222" }} /> {t("tunnels.stopAllTunnels")}
+          <Square className="w-3.5 h-3.5" style={{ color: "var(--taomni-danger-text)" }} /> {t("tunnels.stopAllTunnels")}
         </button>
         {onClose && (
           <button

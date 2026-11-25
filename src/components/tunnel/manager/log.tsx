@@ -50,7 +50,7 @@ export function ActivityLog({
         {errorCount > 0 && (
           <span
             className="px-1.5 py-0.5 rounded text-ui-caption font-semibold"
-            style={{ background: "rgba(178,34,34,0.15)", color: "#b22222" }}
+            style={{ background: "var(--taomni-danger-bg)", color: "var(--taomni-danger-text)" }}
           >
             {t("tunnels.logErrors", { count: errorCount })}
           </span>
@@ -62,9 +62,9 @@ export function ActivityLog({
             style={{
               color:
                 latest.level === "error"
-                  ? "#b22222"
+                  ? "var(--taomni-danger-text)"
                   : latest.level === "success"
-                    ? "#1f7a4a"
+                    ? "var(--taomni-success-text)"
                     : "var(--taomni-text-muted)",
             }}
             title={latest.text}
@@ -109,9 +109,9 @@ export function ActivityLog({
 export function ActivityLogRow({ entry }: { entry: TunnelLogEntry; }) {
   const color =
     entry.level === "error"
-      ? "#b22222"
+      ? "var(--taomni-danger-text)"
       : entry.level === "success"
-        ? "#1f7a4a"
+        ? "var(--taomni-success-text)"
         : "var(--taomni-text)";
   return (
     <div className="flex items-start gap-2" style={{ color }}>
