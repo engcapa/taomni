@@ -1,0 +1,74 @@
+id: TC-UIC-032-vault-unlock-keyboard
+title: Vault unlock keeps validation errors on the password field, traps Tab, and restores focus on Escape
+covers: [F12.1]
+fixtures: [reset_db]
+modes: [browser, native]
+tags: [ui-contract, vault, keyboard]
+ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-06, UI-DLG-07, UI-DLG-09, UI-INP-02]
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: vault}
+- click: '[data-testid="vault-init-button"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-vault-unlock-secret}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-vault-unlock-secret}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="vault-lock-button"]'
+- click: '[data-testid="vault-lock-button"]'
+- wait_for: '[data-testid="vault-unlock-button"]'
+- press: {selector: '[data-testid="vault-unlock-button"]', key: Enter}
+- wait_for: '[data-testid="vault-unlock-dialog"]:modal [data-testid="vault-unlock-pw"]'
+- assert_focus_on: '[data-testid="vault-unlock-pw"]'
+- fill: {selector: '[data-testid="vault-unlock-pw"]', value: wrong-vault-pass}
+- press: {selector: '[data-testid="vault-unlock-pw"]', key: Enter}
+- wait_for: '[data-testid="vault-unlock-error"][role="alert"]'
+- assert_text: {selector: '[data-testid="vault-unlock-error"]', contains: Incorrect master password}
+- assert_attribute: {selector: '[data-testid="vault-unlock-pw"]', name: aria-invalid, equals: 'true'}
+- assert_focus_on: '[data-testid="vault-unlock-pw"]'
+- press: Shift+Tab
+- assert_focus_on: '[data-testid="vault-unlock-confirm"]'
+- press: Tab
+- assert_focus_on: '[data-testid="vault-unlock-pw"]'
+- press: Escape
+- assert_not_visible: '[data-testid="vault-unlock-dialog"]'
+- assert_focus_on: '[data-testid="vault-unlock-button"]'
+- press: {selector: '[data-testid="vault-unlock-button"]', key: Enter}
+- wait_for: '[data-testid="vault-unlock-dialog"]:modal [data-testid="vault-unlock-pw"]'
+- fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-vault-unlock-secret}
+- press: {selector: '[data-testid="vault-unlock-pw"]', key: Enter}
+- wait_for: '[data-testid="vault-lock-button"]'
+- assert_not_visible: '[data-testid="vault-unlock-dialog"]'
+- assert_text: {selector: '[data-testid="vault-state-badge"]', contains: unlocked}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: unlock-error-and-focus
+    requirement: Opening Vault unlock focuses the password field and keeps focus there with an accessible alert when verification fails.
+    ui_standard: [UI-DLG-03, UI-DLG-06, UI-DLG-09, UI-INP-02]
+    actions: [11, 14, 15]
+    checkpoints:
+    - {step: 12, expectation: The Vault unlock modal opens in the window top layer.}
+    - {step: 13, expectation: Initial focus lands on the password input.}
+    - {step: 16, expectation: A visible alert error is displayed after submitting an invalid password.}
+    - {step: 17, expectation: The alert explains that the master password is incorrect.}
+    - {step: 18, expectation: The password input marks itself invalid for assistive tech.}
+    - {step: 19, expectation: Focus returns to the password input for immediate retry.}
+    results: [12, 13, 16, 17, 18, 19]
+  - id: trap-escape-and-unlock
+    requirement: Tab wraps at both ends of the modal, Escape returns focus to Settings without unlocking, and the correct password unlocks the vault.
+    ui_standard: [UI-DLG-04, UI-DLG-07]
+    actions: [20, 22, 24, 27, 29, 30]
+    checkpoints:
+    - {step: 21, expectation: Reverse Tab from the first input wraps to Unlock.}
+    - {step: 23, expectation: Forward Tab from Unlock wraps back to the password input.}
+    - {step: 25, expectation: Escape closes the unlock dialog.}
+    - {step: 26, expectation: The Settings Unlock trigger regains focus.}
+    - {step: 31, expectation: Submitting the valid master password unlocks the vault.}
+    - {step: 32, expectation: The unlock modal closes after unlocking.}
+    - {step: 33, expectation: Settings displays the unlocked vault state.}
+    results: [21, 23, 25, 26, 31, 32, 33]
+  visual:
+  - {check: Modal top layer and alert error, method: automated, reason: Verifies the top-layer unlock dialog and inline alert error in Settings.}
+  native:
+  - {check: Native Vault unlock routing, method: automated, reason: "Exercises real Rust vault locking, bad-password rejection, Tab wrapping, and focus return in the packaged desktop app."}

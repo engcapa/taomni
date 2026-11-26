@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useT } from "../../lib/i18n";
+import { Modal } from "../ui/Modal";
 
 export interface ExternalVaultUnlockDialogProps {
   /** Source tool name, e.g. "Tabby". Drives the dialog title. */
@@ -37,10 +38,8 @@ export function ExternalVaultUnlockDialog({
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  const pwId = useId();
+  const errorId = useId();
 
   useEffect(() => {
     if (errorMessage) setLocalError(errorMessage);
@@ -57,80 +56,30 @@ export function ExternalVaultUnlockDialog({
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setLocalError(msg);
+      queueMicrotask(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      });
     } finally {
       setBusy(false);
     }
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      onSkip();
-    } else if (event.key === "Enter") {
-      const target = event.target as HTMLElement;
-      if (target.tagName !== "BUTTON") {
-        event.preventDefault();
-        void handleSubmit();
-      }
-    }
-  };
-
   return (
-    <div
-      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
-      onClick={onSkip}
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        role="dialog"
-        aria-label={t("externalVault.ariaLabel", { tool: toolName })}
-        aria-modal="true"
-        data-testid="external-vault-unlock-dialog"
-        className="w-[460px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto rounded shadow-lg p-4"
-        style={{
-          background: "var(--taomni-bg)",
-          border: "1px solid var(--taomni-card-border)",
-          borderLeft: "3px solid var(--taomni-accent)",
-        }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="text-sm font-semibold mb-1">{title ?? t("externalVault.title", { tool: toolName })}</div>
-        <div
-          className="text-ui-body mb-3"
-          style={{ color: "var(--taomni-text-muted)" }}
-          data-testid="external-vault-unlock-description"
-        >
-          {description}
-        </div>
-
-        <label className="block text-ui-body mb-1" style={{ color: "var(--taomni-text-muted)" }}>
-          {passwordLabel ?? t("externalVault.masterPasswordLabel", { tool: toolName })}
-        </label>
-        <input
-          ref={inputRef}
-          data-testid="external-vault-unlock-pw"
-          type="password"
-          value={pw}
-          onChange={(event) => setPw(event.target.value)}
-          className="taomni-input w-full"
-          autoComplete="off"
-        />
-
-        {localError && (
-          <div
-            className="mt-2 text-ui-body"
-            style={{ color: "var(--taomni-danger-text, #c33)" }}
-            data-testid="external-vault-unlock-error"
-          >
-            {localError}
-          </div>
-        )}
-
-        <div className="flex gap-2 justify-end mt-4">
+    <Modal
+      title={title ?? t("externalVault.title", { tool: toolName })}
+      testId="external-vault-unlock-dialog"
+      initialFocus='[data-testid="external-vault-unlock-pw"]'
+      dismissOnBackdrop={false}
+      onCancel={() => {
+        if (!busy) onSkip();
+      }}
+      footer={
+        <>
           <button
             type="button"
             data-testid="external-vault-unlock-skip"
-            className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]"
+            className="taomni-btn"
             onClick={onSkip}
             disabled={busy}
           >
@@ -139,15 +88,63 @@ export function ExternalVaultUnlockDialog({
           <button
             type="button"
             data-testid="external-vault-unlock-confirm"
-            className="px-3 py-1 text-ui-body rounded text-white disabled:opacity-50"
-            style={{ background: "var(--taomni-accent)" }}
+            className="taomni-btn"
+            data-primary="true"
+            aria-busy={busy || undefined}
             onClick={() => void handleSubmit()}
             disabled={!valid || busy}
           >
             {busy ? t("externalVault.unlocking") : t("externalVault.unlock")}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="grid gap-2">
+        <p
+          className="text-ui-body text-[var(--taomni-text-muted)]"
+          data-testid="external-vault-unlock-description"
+        >
+          {description}
+        </p>
+
+        <label
+          htmlFor={pwId}
+          className="block text-ui-body text-[var(--taomni-text-muted)]"
+        >
+          {passwordLabel ?? t("externalVault.masterPasswordLabel", { tool: toolName })}
+        </label>
+        <input
+          id={pwId}
+          ref={inputRef}
+          data-testid="external-vault-unlock-pw"
+          type="password"
+          value={pw}
+          readOnly={busy}
+          onChange={(event) => setPw(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void handleSubmit();
+            }
+          }}
+          className="taomni-input w-full"
+          autoComplete="off"
+          aria-invalid={localError ? "true" : undefined}
+          aria-describedby={localError ? errorId : undefined}
+        />
+
+        {localError && (
+          <div
+            id={errorId}
+            role="alert"
+            className="text-ui-body text-ui-danger"
+            data-testid="external-vault-unlock-error"
+          >
+            {localError}
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

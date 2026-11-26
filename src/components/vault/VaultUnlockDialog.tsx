@@ -1,11 +1,6 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
-} from "react";
+import { useId, useRef, useState } from "react";
 import { useT } from "../../lib/i18n";
+import { Modal } from "../ui/Modal";
 
 export interface VaultUnlockDialogProps {
   onCancel?: () => void;
@@ -14,36 +9,24 @@ export interface VaultUnlockDialogProps {
   reason?: string;
   /** When false, the dialog cannot be dismissed without unlocking. */
   cancellable?: boolean;
-  /** Override stacking for app-level locks that must sit above all app chrome. */
+  /** Retained for caller compatibility; native dialog top layer sits above all app chrome. */
   zIndex?: number;
 }
-
-const FOCUSABLE_SELECTOR = [
-  "button:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  "a[href]",
-  "[tabindex]:not([tabindex='-1'])",
-].join(", ");
 
 export function VaultUnlockDialog({
   onCancel,
   onSubmit,
   reason,
   cancellable = true,
-  zIndex = 50,
+  zIndex: _zIndex,
 }: VaultUnlockDialogProps) {
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pwId = useId();
+  const errorId = useId();
   const t = useT();
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
 
   const valid = pw.length > 0;
 
@@ -58,116 +41,31 @@ export function VaultUnlockDialog({
       setError(
         msg.includes("VAULT_BAD_PASSWORD") ? t("vault.incorrectPassword") : msg,
       );
+      queueMicrotask(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      });
     } finally {
       setBusy(false);
     }
   };
 
-  const handleBackdropMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
-    if (event.target !== event.currentTarget) return;
-    event.preventDefault();
-    inputRef.current?.focus();
-  };
-
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      event.preventDefault();
-      if (cancellable) onCancel?.();
-    } else if (event.key === "Enter") {
-      const target = event.target as HTMLElement;
-      if (target.tagName !== "BUTTON") {
-        event.preventDefault();
-        void handleSubmit();
-      }
-    } else if (event.key === "Tab") {
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-
-      const focusable = Array.from(
-        dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-      ).filter((element) => element.getAttribute("aria-hidden") !== "true");
-      if (focusable.length === 0) {
-        event.preventDefault();
-        dialog.focus();
-        return;
-      }
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
-      if (!active || !dialog.contains(active)) {
-        event.preventDefault();
-        (event.shiftKey ? last : first).focus();
-      } else if (event.shiftKey && active === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-  };
-
   return (
-    <div
-      data-testid="vault-unlock-backdrop"
-      className="fixed inset-0 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)", zIndex }}
-      onMouseDown={handleBackdropMouseDown}
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-label={t("vault.unlockTitle")}
-        aria-modal="true"
-        tabIndex={-1}
-        data-testid="vault-unlock-dialog"
-        className="w-[420px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto rounded shadow-lg p-4"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="text-sm font-semibold mb-1">{t("vault.unlockTitle")}</div>
-        {reason && (
-          <div
-            className="text-ui-body mb-3"
-            style={{ color: "var(--taomni-text-muted)" }}
-            data-testid="vault-unlock-reason"
-          >
-            {reason}
-          </div>
-        )}
-
-        <label className="block text-ui-body mb-1" style={{ color: "var(--taomni-text-muted)" }}>
-          {t("vault.masterPassword")}
-        </label>
-        <input
-          ref={inputRef}
-          data-testid="vault-unlock-pw"
-          type="password"
-          value={pw}
-          onChange={(event) => setPw(event.target.value)}
-          className="taomni-input w-full"
-          autoComplete="current-password"
-        />
-
-        {error && (
-          <div
-            className="mt-2 text-ui-body"
-            style={{ color: "var(--taomni-danger-text, #c33)" }}
-            data-testid="vault-unlock-error"
-          >
-            {error}
-          </div>
-        )}
-
-        <div className="flex gap-2 justify-end mt-4">
+    <Modal
+      title={t("vault.unlockTitle")}
+      testId="vault-unlock-dialog"
+      initialFocus='[data-testid="vault-unlock-pw"]'
+      dismissOnBackdrop={false}
+      onCancel={() => {
+        if (cancellable && !busy) onCancel?.();
+      }}
+      footer={
+        <>
           {cancellable && (
             <button
               type="button"
               data-testid="vault-unlock-cancel"
-              className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]"
+              className="taomni-btn"
               onClick={onCancel}
               disabled={busy}
             >
@@ -177,15 +75,65 @@ export function VaultUnlockDialog({
           <button
             type="button"
             data-testid="vault-unlock-confirm"
-            className="px-3 py-1 text-ui-body rounded text-white disabled:opacity-50"
-            style={{ background: "var(--taomni-accent)" }}
+            className="taomni-btn"
+            data-primary="true"
+            aria-busy={busy || undefined}
             onClick={() => void handleSubmit()}
             disabled={!valid || busy}
           >
             {busy ? t("vault.unlocking") : t("vault.unlock")}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="grid gap-2">
+        {reason && (
+          <p
+            className="text-ui-body text-[var(--taomni-text-muted)]"
+            data-testid="vault-unlock-reason"
+          >
+            {reason}
+          </p>
+        )}
+
+        <label
+          htmlFor={pwId}
+          className="block text-ui-body text-[var(--taomni-text-muted)]"
+        >
+          {t("vault.masterPassword")}
+        </label>
+        <input
+          id={pwId}
+          ref={inputRef}
+          data-testid="vault-unlock-pw"
+          type="password"
+          value={pw}
+          readOnly={busy}
+          onChange={(event) => setPw(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void handleSubmit();
+            }
+          }}
+          className="taomni-input w-full"
+          autoComplete="current-password"
+          aria-invalid={error ? "true" : undefined}
+          aria-describedby={error ? errorId : undefined}
+        />
+
+        {error && (
+          <div
+            id={errorId}
+            role="alert"
+            className="text-ui-body text-ui-danger"
+            data-testid="vault-unlock-error"
+          >
+            {error}
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
