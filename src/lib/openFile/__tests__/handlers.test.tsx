@@ -10,7 +10,6 @@ import {
   listFileHandlers,
   openFile,
   openUntitledNotepadDocument,
-  UnavailableFileHandlerError,
 } from "../index";
 import { resetFileOpenPreferences, setFileOpenPreferences, useFileOpenPreferences } from "../preferences";
 import { useAppStore } from "../../../stores/appStore";
@@ -31,45 +30,48 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("FileHandlerRegistry and Open With integration (V-49 / V-50)", () => {
-  it("registers notepad & taoffice, scopes TaOffice to office extensions, and throws explicit error when unavailable", async () => {
+  it("routes a stored office association to an independent document tab and keeps core text formats", async () => {
     expect(isHandlerAvailable("notepad")).toBe(true);
-    expect(isHandlerAvailable("taoffice")).toBe(false);
-    expect(getFileHandler("taoffice")?.inDevelopment).toBe(true);
+    expect(isHandlerAvailable("taoffice")).toBe(true);
+    expect(getFileHandler("taoffice")?.inDevelopment).toBeFalsy();
     expect(isOfficeExtension("report.docx")).toBe(true);
-    expect(isOfficeExtension("sheet.csv")).toBe(true);
+    expect(isOfficeExtension("sheet.csv")).toBe(false);
     expect(isOfficeExtension("notes.txt")).toBe(false);
     expect(listFileHandlers("txt").some((h) => h.id === "taoffice")).toBe(false);
     expect(listFileHandlers("docx").some((h) => h.id === "taoffice")).toBe(true);
 
     setFileOpenPreferences({ associations: { docx: "taoffice" } });
     expect(useFileOpenPreferences.getState().associations.docx).toBe("taoffice");
-    await expect(openFile({ path: "/docs/weekly.docx" }, { context: "explorer" })).rejects.toBeInstanceOf(
-      UnavailableFileHandlerError,
-    );
+    await openFile("/docs/weekly.docx", { context: "explorer" });
+    await openFile("/docs/another.docx", { context: "explorer" });
+    await openFile("/docs/weekly.docx", { context: "explorer" });
+    const tabs = useExplorerStore.getState();
+    expect(tabs.tabs.map((tab) => tab.fileViewer?.kind)).toEqual(["document", "document"]);
+    expect(tabs.activeTabId).toBe(tabs.tabs[0].id);
   });
 
-  it("exposes TaOffice disabled item only for office extensions in fileOpenMenu", () => {
+  it("names the responsible document module in Open With", () => {
     const label = (_zh: string, en: string) => en;
     const docxItems = fileOpenMenu("/docs/report.docx", undefined, label, () => {});
     const txtItems = fileOpenMenu("/docs/notes.txt", undefined, label, () => {});
 
     const taofficeDocx = docxItems.find((item) => item.testId === "file-open-with-taoffice");
     expect(taofficeDocx).toBeDefined();
-    expect(taofficeDocx?.disabled).toBe(true);
-    expect(taofficeDocx?.label).toContain("In development");
+    expect(taofficeDocx?.disabled).toBeFalsy();
+    expect(taofficeDocx?.label).toContain("Word");
     expect(docxItems.some((item) => item.testId === "file-open-with-notepad")).toBe(true);
 
     expect(txtItems.some((item) => item.testId === "file-open-with-taoffice")).toBe(false);
     expect(txtItems.find((item) => item.testId === "file-open-with-taomni")?.label).toBe("Taomni Notepad");
   });
 
-  it("shows Notepad & disabled TaOffice options in FileOpenSettings and opens untitled documents", () => {
+  it("offers TaOffice for document associations and opens untitled Notepad documents", () => {
     render(<FileOpenSettings />);
-    const dataSelect = screen.getByTestId("file-open-association-data") as HTMLSelectElement;
+    const dataSelect = screen.getByTestId("file-open-association-binary") as HTMLSelectElement;
     const taofficeOpt = Array.from(dataSelect.options).find((o) => o.value === "taoffice");
     expect(taofficeOpt).toBeDefined();
-    expect(taofficeOpt?.disabled).toBe(true);
-    expect(taofficeOpt?.textContent).toContain("In development");
+    expect(taofficeOpt?.disabled).toBe(false);
+    expect(taofficeOpt?.textContent).toBe("TaOffice");
 
     fireEvent.change(screen.getByTestId("file-open-association-text"), { target: { value: "notepad" } });
     expect(useFileOpenPreferences.getState().associations.txt).toBe("notepad");

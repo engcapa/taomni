@@ -1,5 +1,6 @@
 import { Braces, Check, ExternalLink, FileText, Monitor, Pencil } from "lucide-react";
-import { openFile, classifyFile, fileExtension, isOfficeExtension, supportsFileViewer, type OpenFileMode } from "../../lib/openFile";
+import { openFile, classifyFile, fileExtension, supportsFileViewer, type OpenFileMode } from "../../lib/openFile";
+import { documentProvider } from "../../lib/openFile/documentProvider";
 import { setFileOpenPreferences, useFileOpenPreferences } from "../../lib/openFile/preferences";
 import type { MenuItem } from "../ContextMenu";
 
@@ -12,7 +13,7 @@ export function fileOpenMenu(
 ): MenuItem[] {
   const kind = classifyFile(path);
   const supported = supportsFileViewer(kind);
-  const office = isOfficeExtension(path);
+  const office = documentProvider(path);
   const run = (mode: OpenFileMode) => {
     void openFile({ path }, { context: "explorer", workspaceId, mode }).catch((error) => onError(String(error), error));
   };
@@ -26,7 +27,7 @@ export function fileOpenMenu(
   const prefs = useFileOpenPreferences.getState();
   const extension = fileExtension(path);
   return [
-    ...(supported ? [{
+    ...(supported && !office ? [{
       label: kind === "text" ? "Taomni Notepad" : `Taomni ${names[kind]}`,
       icon: <ExternalLink />,
       testId: "file-open-with-taomni",
@@ -47,15 +48,14 @@ export function fileOpenMenu(
       label: label("Code editor (Code Workspace)", "Code editor (Code Workspace)"),
       icon: <Braces />,
       testId: "file-open-with-workspace",
-      disabled: !supported && kind !== "source",
+      disabled: !!office || (!supported && kind !== "source"),
       onClick: () => run("workspace"),
     },
     ...(office ? [{
-      label: label("TaOffice（开发中）", "TaOffice (In development)"),
+      label: `TaOffice · ${office.name}`,
       icon: <FileText />,
       testId: "file-open-with-taoffice",
-      disabled: true,
-      onClick: () => {},
+      onClick: () => run("taoffice"),
     }] : []),
     { label: "", separator: true },
     {
@@ -66,7 +66,12 @@ export function fileOpenMenu(
     },
     ...(extension && (supported || office || kind === "source") ? [
       { label: "", separator: true },
-      ...(supported ? [{
+      ...(office ? [{
+        label: label(`始终使用 TaOffice 打开 .${extension}`, `Always open .${extension} with TaOffice`),
+        checked: prefs.associations[extension] === "taoffice",
+        testId: "file-open-with-remember-taoffice",
+        onClick: () => setFileOpenPreferences({ associations: { ...prefs.associations, [extension]: "taoffice" } }),
+      }] : supported ? [{
         label: label(
           `记住：.${extension} 始终用 ${kind === "text" ? "Notepad" : "Taomni"} 打开`,
           `Always open .${extension} with ${kind === "text" ? "Notepad" : "Taomni"}`,

@@ -267,7 +267,6 @@ export function NotepadDialogsHost({
         onClose={() => setPickerModal(null)}
         onOpenWith={(mode) => {
           setPickerModal(null);
-          if (mode === "taoffice") return;
           void openFile({ path: document.path }, { context: "notepad", mode }).catch((error) => onError(String(error)));
         }}
         onRememberHandler={(mode) => rememberOpenWith(document.path, mode)}

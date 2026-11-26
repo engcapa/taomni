@@ -14,11 +14,12 @@ const GROUPS: Array<{ id: string; extensions: string[]; zh: string; en: string; 
   { id: "image", extensions: ["png", "jpg", "gif", "webp", "bmp", "ico", "avif"], zh: "图片查看器", en: "Image viewer", handler: "taomni" },
   { id: "svg", extensions: ["svg"], zh: "SVG 查看器（渲染+代码）", en: "SVG viewer (render + code)", handler: "taomni" },
   { id: "text", extensions: ["txt", "log", "ini", "conf", "env"], zh: "Notepad", en: "Notepad", handler: "notepad" },
-  { id: "data", extensions: ["json", "yaml", "toml", "xml", "csv"], zh: "Notepad（CSV 可切 TaOffice 占位）", en: "Notepad (CSV office-aware)", handler: "notepad", officeEligible: true },
+  { id: "data", extensions: ["json", "yaml", "toml", "xml"], zh: "结构化文本", en: "Structured text", handler: "notepad" },
+  { id: "delimited", extensions: ["csv", "tsv"], zh: "分隔文本", en: "Delimited text", handler: "taomni" },
   { id: "markdown", extensions: ["md", "markdown"], zh: "Markdown 编辑器（实时渲染）", en: "Markdown editor (live rendering)", handler: "taomni" },
   { id: "html", extensions: ["html", "htm"], zh: "HTML 预览", en: "HTML preview", handler: "taomni" },
   { id: "source", extensions: ["ts", "tsx", "js", "jsx", "rs", "py", "java", "go", "c", "cpp"], zh: "Code editor (Code Workspace)", en: "Code editor (Code Workspace)", handler: "workspace" },
-  { id: "binary", extensions: ["pdf", "docx", "xlsx", "zip"], zh: "系统默认应用", en: "System default app", handler: "system", officeEligible: true },
+  { id: "binary", extensions: ["pdf", "docx", "xlsx", "pptx", "mpp", "vsdx"], zh: "文档", en: "Documents", handler: "taoffice", officeEligible: true },
 ];
 const KNOWN_EXTENSIONS = new Set(GROUPS.flatMap((group) => group.extensions));
 const SELECTABLE_HANDLERS: readonly FileHandler[] = ["taomni", "notepad", "workspace", "system"];
@@ -48,7 +49,7 @@ export function FileOpenSettings() {
     notepad: "Notepad",
     workspace: label("Code editor (Code Workspace)", "Code editor (Code Workspace)"),
     system: label("用系统应用打开", "Open with system app"),
-    taoffice: label("TaOffice（开发中）", "TaOffice (In development)"),
+    taoffice: "TaOffice",
   })[handler];
   const updateAssociation = (extensions: string[], handler: string) => {
     const associations = { ...preferences.associations };
@@ -119,7 +120,7 @@ export function FileOpenSettings() {
                     <option value="">{inherited} · {label("默认", "Default")}</option>
                     {!uniform && <option value="mixed" disabled>{label("按扩展名分别设置", "Different extension overrides")}</option>}
                     {SELECTABLE_HANDLERS.map((handler) => <option key={handler} value={handler}>{handlerLabel(handler)}</option>)}
-                    {showTaOffice && <option value="taoffice" disabled>{handlerLabel("taoffice")}</option>}
+                    {showTaOffice && <option value="taoffice">{handlerLabel("taoffice")}</option>}
                   </select></td>
                 </tr>
               );
@@ -129,7 +130,7 @@ export function FileOpenSettings() {
               <td className="p-2"><select aria-label={`.${ext}`} data-testid="file-open-association-custom" data-extension={ext} className="taomni-input h-8 w-full" value={preferences.associations[ext]} onChange={(event) => updateAssociation([ext], event.target.value)}>
                 <option value="">{label("移除关联（使用默认）", "Remove override (use default)")}</option>
                 {SELECTABLE_HANDLERS.map((handler) => <option key={handler} value={handler}>{handlerLabel(handler)}</option>)}
-                {isOfficeExtension(ext) && <option value="taoffice" disabled>{handlerLabel("taoffice")}</option>}
+                {isOfficeExtension(ext) && <option value="taoffice">{handlerLabel("taoffice")}</option>}
               </select></td>
             </tr>)}
           </tbody>
@@ -139,7 +140,7 @@ export function FileOpenSettings() {
         <input data-testid="file-open-extension" aria-label={label("扩展名", "Extension")} placeholder=".jpeg" className="taomni-input h-8 w-32" value={extension} onChange={(event) => { setExtension(event.target.value); setExtensionError(false); }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAssociation(); } }} />
         <select data-testid="file-open-extension-handler" aria-label={label("扩展名打开方式", "Extension handler")} className="taomni-input h-8" value={customHandler} onChange={(event) => setCustomHandler(event.target.value as FileHandler)}>
           {SELECTABLE_HANDLERS.map((handler) => <option key={handler} value={handler}>{handlerLabel(handler)}</option>)}
-          {isOfficeExtension(customExtension) && <option value="taoffice" disabled>{handlerLabel("taoffice")}</option>}
+          {isOfficeExtension(customExtension) && <option value="taoffice">{handlerLabel("taoffice")}</option>}
         </select>
         <button type="button" data-testid="file-open-association-add" className="taomni-btn" onClick={addAssociation}>{label("添加扩展名", "Add extension")}</button>
         {preferences.associations[customExtension] && <button type="button" data-testid="file-open-association-remove" className="taomni-btn" onClick={() => updateAssociation([customExtension], "")}>{label("移除关联", "Remove override")}</button>}

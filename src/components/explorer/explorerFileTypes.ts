@@ -54,7 +54,7 @@ export function newFileNameError(name: string, label: Label): string | null {
   if (!name.trim() || name === "." || name === ".." || /[\\/\0]/.test(name)) {
     return label("请输入当前目录下的有效文件名", "Enter a valid file name in the current folder");
   }
-  if (["binary", "image", "pdf"].includes(classifyFile(name))) {
+  if (["binary", "image", "pdf", "document"].includes(classifyFile(name))) {
     return label("请选择 Taomni 支持编辑的文件类型或扩展名", "Choose a file type or extension Taomni can edit");
   }
   return null;

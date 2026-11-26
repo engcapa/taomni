@@ -56,6 +56,11 @@ def setup(ctx: Any) -> None:
         "assets/local.css": b"#resource { color: rgb(12, 34, 56); }", "assets/pixel.png": PNG,
         "src/sample.ts": b"export const fileOpenSource = true;\n", "unsupported.bin": b"\x00\xff\x10",
     }
+    if ctx.case_id == "TC-TAOFFICE-001":
+        for name in ("Build", "Review"):
+            files[f"{name}.mppx"] = (
+                f'<Project xmlns="http://schemas.microsoft.com/project"><Name>{name}</Name></Project>'
+            ).encode()
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative

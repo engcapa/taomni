@@ -8,6 +8,8 @@ import { openExplorer } from "../../lib/explorer/openExplorer";
 import { useViewerLabels } from "./viewerLabels";
 import { ViewerDiff } from "./ViewerDialogs";
 import { NotepadEditor } from "../notepad/NotepadEditor";
+import { ModuleDocumentPane } from "./ModuleDocumentPane";
+import { viewerReleaseTemp } from "../../lib/viewer";
 import type { FileViewerTabInfo } from "../../types";
 import "./viewer.css";
 
@@ -16,7 +18,32 @@ const HtmlPreview = lazy(() => import("./HtmlPreview").then((module) => ({ defau
 const MarkdownEditor = lazy(() => import("./markdown/MarkdownEditor").then((module) => ({ default: module.MarkdownEditor })));
 const hosts = new Map<string, number>();
 
-export function ViewerShell({ viewer, active = true, workspaceId, host }: { viewer: FileViewerTabInfo; active?: boolean; workspaceId?: string; host?: "explorer" }) {
+interface ViewerShellProps { viewer: FileViewerTabInfo; active?: boolean; workspaceId?: string; host?: "explorer" }
+
+export function ViewerShell(props: ViewerShellProps) {
+  const { viewer, active = true } = props;
+  const key = documentPathKey(viewer.path);
+  const temporary = viewer.source === "remote-temp" || viewer.source === "mail-attachment";
+  useEffect(() => {
+    hosts.set(key, (hosts.get(key) ?? 0) + 1);
+    return () => {
+      hosts.set(key, (hosts.get(key) ?? 1) - 1);
+      queueMicrotask(() => {
+        if (hosts.get(key) !== 0) return;
+        hosts.delete(key);
+        const store = useDocumentStore.getState();
+        if (store.documents[key]) store.release(viewer.path);
+        else if (temporary) void viewerReleaseTemp(viewer.path).catch(() => {});
+      });
+    };
+  }, [key, viewer.path, temporary]);
+  if ((viewer.kind === "document" || viewer.kind === "pdf") && viewer.mode !== "source" && viewer.mode !== "notepad") {
+    return <ModuleDocumentPane key={viewer.path} viewer={viewer} active={active} />;
+  }
+  return <BuiltinViewer {...props} />;
+}
+
+function BuiltinViewer({ viewer, active = true, workspaceId, host }: ViewerShellProps) {
   const label = useViewerLabels();
   const key = documentPathKey(viewer.path);
   const document = useDocumentStore((state) => state.documents[key]);
@@ -25,12 +52,7 @@ export function ViewerShell({ viewer, active = true, workspaceId, host }: { view
   const [compare, setCompare] = useState(false);
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
   useEffect(() => {
-    hosts.set(key, (hosts.get(key) ?? 0) + 1);
     void useDocumentStore.getState().open(viewer.path, viewer.readOnlyReason);
-    return () => {
-      hosts.set(key, Math.max(0, (hosts.get(key) ?? 1) - 1));
-      queueMicrotask(() => { if (hosts.get(key) === 0) { hosts.delete(key); useDocumentStore.getState().release(viewer.path); } });
-    };
   }, [key, viewer.path, viewer.readOnlyReason]);
   useEffect(() => {
     if (!active) return;

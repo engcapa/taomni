@@ -27,7 +27,7 @@ const OPEN_WITH_OPTIONS: Array<{ mode: OpenFileMode; zh: string; en: string; ico
   { mode: "taomni", zh: "Taomni 默认打开", en: "Taomni default", icon: <FileText size={14} /> },
   { mode: "workspace", zh: "Code editor（Code Workspace）", en: "Code editor (Code Workspace)", icon: <MonitorUp size={14} /> },
   { mode: "notepad", zh: "Notepad", en: "Notepad", icon: <FileText size={14} /> },
-  { mode: "taoffice", zh: "TaOffice（开发中）", en: "TaOffice (in development)", icon: <FileText size={14} />, disabled: true },
+  { mode: "taoffice", zh: "TaOffice", en: "TaOffice", icon: <FileText size={14} /> },
 ];
 
 export function PickerDialogs({

@@ -16759,6 +16759,8 @@ status: implemented
 area: files/viewer
 components: [ViewerShell, TextEditor, ImageViewer, MarkdownEditor, HtmlPreview, FileOpenSettings]
 files:
+  - src/components/viewer/ModuleDocumentPane.tsx
+  - src/lib/openFile/documentProvider.ts
   - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts
   - src/lib/openFile/preferences.ts
@@ -16849,6 +16851,18 @@ controls:
     optional: true
   - id: file-viewer
     selector: '[data-testid="file-viewer"]'
+    kind: display
+  - id: document-module-state
+    selector: '[data-testid="document-module-state"]'
+    kind: display
+  - id: document-open-store
+    selector: '[data-testid="document-open-store"]'
+    kind: interactive
+  - id: document-open-system
+    selector: '[data-testid="document-open-system"]'
+    kind: interactive
+  - id: document-readonly
+    selector: '[data-testid="document-readonly"]'
     kind: display
   - id: viewer-editor
     selector: '[data-testid="viewer-editor"]'

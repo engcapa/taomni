@@ -55,10 +55,11 @@ describe("global open file routing", () => {
     await openFile({ path: "/docs/a.txt" }, { context: "explorer", alternate: true });
     expect(useAppStore.getState().tabs).toHaveLength(1);
   });
-  it("keeps unsupported binary and PDF external even if Taomni is requested", async () => {
+  it("keeps unclaimed binaries external and opens PDF in a document tab", async () => {
     await openFile({ path: "/docs/a.pdf" }, { context: "explorer", mode: "taomni" });
-    await openFile({ path: "/docs/a.zip" }, { context: "explorer", mode: "taomni" });
-    expect(sftpOpenPath).toHaveBeenCalledTimes(2); expect(useAppStore.getState().tabs).toHaveLength(0);
+    await openFile({ path: "/docs/a.bin" }, { context: "explorer", mode: "taomni" });
+    expect(sftpOpenPath).toHaveBeenCalledTimes(1);
+    expect(useAppStore.getState().tabs[0].fileViewer?.path).toBe("/docs/a.pdf");
   });
   it("treats remote text/source copies as read-only, never writable IDE documents", async () => {
     await openFile({ path: "/tmp/example.rs", source: "remote-temp" }, { context: "sftp", mode: "workspace" });

@@ -8,10 +8,11 @@ describe("file opening classification and identity", () => {
     ["/tmp/a.PNG", "image"], ["C:\\docs\\logo.SvG", "svg"], ["/a.markdown", "markdown"],
     ["/a.htm", "html"], ["/a.log", "text"], ["/a.json", "text"], ["/.env.local", "text"],
     ["/README", "text"], ["/LICENSE", "text"], ["/a.rs", "source"], ["/Dockerfile", "source"],
-    ["/a.pdf", "pdf"], ["/a.xlsx", "binary"], ["/unknown", "binary"],
+    ["/a.pdf", "pdf"], ["/a.xlsx", "document"], ["/unknown", "binary"],
   ])("classifies %s as %s", (path, kind) => expect(classifyFile(path)).toBe(kind));
-  it("keeps unknown and P1 types external", () => {
-    expect(supportsFileViewer("pdf")).toBe(false);
+  it("opens document types in a viewer and keeps unknown types external", () => {
+    expect(supportsFileViewer("pdf")).toBe(true);
+    expect(supportsFileViewer("binary")).toBe(false);
     expect(supportsFileViewer("source")).toBe(false);
     expect(supportsFileViewer("markdown")).toBe(true);
   });

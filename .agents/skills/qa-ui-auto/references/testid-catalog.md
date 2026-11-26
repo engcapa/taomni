@@ -1471,6 +1471,10 @@
 - `[data-testid="markdown-export-open-tao"]` — interactive [optional] — F-FILEOPEN-1.markdown-export-open-tao
 - `[data-testid="markdown-export-show-system"]` — interactive [optional] — F-FILEOPEN-1.markdown-export-show-system
 - `[data-testid="file-viewer"]` — display — F-FILEOPEN-1.file-viewer
+- `[data-testid="document-module-state"]` — display — F-FILEOPEN-1.document-module-state
+- `[data-testid="document-open-store"]` — interactive — F-FILEOPEN-1.document-open-store
+- `[data-testid="document-open-system"]` — interactive — F-FILEOPEN-1.document-open-system
+- `[data-testid="document-readonly"]` — display — F-FILEOPEN-1.document-readonly
 - `[data-testid="viewer-editor"]` — interactive — F-FILEOPEN-1.viewer-editor
 - `[data-testid="viewer-save"]` — interactive — F-FILEOPEN-1.viewer-save
 - `[data-testid="viewer-readonly"]` — display — F-FILEOPEN-1.viewer-readonly

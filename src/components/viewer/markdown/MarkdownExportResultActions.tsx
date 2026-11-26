@@ -6,6 +6,9 @@ import { openExplorer } from "../../../lib/explorer/openExplorer";
 import { markdownDirectory } from "../../../lib/markdownAssets";
 import { sftpOpenPath } from "../../../lib/sftp";
 import { useViewerLabels } from "../viewerLabels";
+import { documentProvider } from "../../../lib/openFile/documentProvider";
+import { fileExtension } from "../../../lib/openFile/classifyFile";
+import { usePluginFrontendStore } from "../../../stores/pluginFrontendStore";
 
 /** Capture the export's owner before a chooser or generation yields. */
 export function exportWorkspaceId(): string | undefined {
@@ -21,7 +24,14 @@ export function MarkdownExportResultActions({ path, filePath, workspaceId, onErr
 }) {
   const label = useViewerLabels();
   const kind = classifyFile(filePath);
-  const preview = supportsFileViewer(kind) || kind === "source";
+  const provider = documentProvider(filePath);
+  const ready = usePluginFrontendStore((state) => {
+    if (!provider) return false;
+    const record = state.records[provider.slug];
+    return state.status === "ready" && !state.pending.has(provider.slug)
+      && record?.lifecycle === "enabled" && record.manifest?.document?.extensions.includes(fileExtension(filePath));
+  });
+  const preview = provider ? ready : supportsFileViewer(kind) || kind === "source";
   const directory = path !== filePath ? path : markdownDirectory(filePath);
   const run = (action: () => Promise<unknown>) => {
     void Promise.resolve().then(action).catch((cause: unknown) => onError(cause instanceof Error ? cause.message : String(cause)));
