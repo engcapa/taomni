@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { ModalSurface } from "../../ui/ModalSurface";
 import { ThemedSelect } from "../../ThemedSelect";
 import { useViewerLabels } from "../viewerLabels";
 import { DEFAULT_DRAWIO_OPTIONS, type DrawioExportOptions } from "./drawioExport";
@@ -8,18 +8,17 @@ export function DrawioExportSettings({ settings, onChange, onCancel, onConfirm }
   settings: MarkdownExportSettings; onChange: (value: MarkdownExportSettings) => void; onCancel: () => void;
   onConfirm: (kind: MarkdownExportKind) => void;
 }) {
-  const label = useViewerLabels(), root = useRef<HTMLDivElement>(null);
+  const label = useViewerLabels();
   const options = settings.drawio || DEFAULT_DRAWIO_OPTIONS;
   const patch = (value: Partial<DrawioExportOptions>) => onChange({ ...settings, drawio: { ...options, ...value } });
-  useEffect(() => { root.current?.querySelector<HTMLButtonElement>("[role=combobox]")?.focus(); }, []);
-  return <div className="fv-modal-bg" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}><div ref={root} className="fv-modal fv-md-export-settings" role="dialog" aria-modal="true" aria-labelledby="fv-drawio-export-title" data-testid="markdown-drawio-export-settings" onKeyDown={(event) => {
-    if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onCancel(); }
-    if (event.key === "Tab") {
-      const nodes = Array.from(root.current?.querySelectorAll<HTMLElement>("button,select") || []);
-      if (event.shiftKey && document.activeElement === nodes[0]) { event.preventDefault(); nodes.at(-1)?.focus(); }
-      else if (!event.shiftKey && document.activeElement === nodes.at(-1)) { event.preventDefault(); nodes[0]?.focus(); }
-    }
-  }}>
+  return <ModalSurface
+    dismissOnBackdrop
+    initialFocus="[role=combobox], button:enabled"
+    onCancel={onCancel}
+    className="fv-modal fv-md-export-settings"
+    aria-labelledby="fv-drawio-export-title"
+    data-testid="markdown-drawio-export-settings"
+  >
     <h3 id="fv-drawio-export-title">{label("导出 draw.io", "Export draw.io")}</h3>
     <div className="fv-md-export-fields">
       <div className="fv-md-field"><span>{label("导出内容", "Content")}</span>
@@ -42,5 +41,5 @@ export function DrawioExportSettings({ settings, onChange, onCancel, onConfirm }
       <button type="button" className="fv-button outline" data-testid="markdown-drawio-open-link" onClick={() => onConfirm("drawio-open")}>{label("在线打开", "Open online")}</button>
       <button type="button" className="fv-button primary" data-testid="markdown-drawio-save" onClick={() => onConfirm("drawio")}>{label("保存 .drawio 文件", "Save .drawio file")}</button>
     </footer>
-  </div></div>;
+  </ModalSurface>;
 }

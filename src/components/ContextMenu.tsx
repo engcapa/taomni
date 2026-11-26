@@ -166,6 +166,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   autoFocus?: boolean;
   handleKeyboard?: boolean;
   closeOnTab?: boolean;
+  rovingFocus?: boolean;
 }>(({
   items,
   onClose,
@@ -179,6 +180,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   autoFocus = true,
   handleKeyboard = true,
   closeOnTab = false,
+  rovingFocus = false,
 }, forwardedRef) => {
   const innerRef = useRef<HTMLDivElement | null>(null);
   const menuId = useId();
@@ -313,6 +315,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
           appearance={appearance}
           item={item}
           active={activeIndex === i}
+          rovingFocus={rovingFocus}
           isSubmenuOpen={openSubmenuIndex === i}
           onHover={() => setActiveIndex(i)}
           onOpenSubmenu={() => setOpenSubmenuIndex(i)}
@@ -389,6 +392,7 @@ function MenuRow({
   appearance,
   item,
   active,
+  rovingFocus,
   isSubmenuOpen,
   onHover,
   onOpenSubmenu,
@@ -399,6 +403,7 @@ function MenuRow({
   appearance?: "default" | "code-candidates";
   item: MenuItem;
   active: boolean;
+  rovingFocus?: boolean;
   isSubmenuOpen: boolean;
   onHover: () => void;
   onOpenSubmenu: () => void;
@@ -441,8 +446,9 @@ function MenuRow({
   useEffect(() => {
     if (active && triggerRef.current) {
       triggerRef.current.scrollIntoView?.({ block: "nearest" });
+      if (rovingFocus) triggerRef.current.focus({ preventScroll: true });
     }
-  }, [active]);
+  }, [active, rovingFocus]);
 
   if (item.separator) {
     return <div role="separator" className="h-px mx-2 my-1" style={{ background: "var(--taomni-divider)" }} />;

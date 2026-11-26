@@ -44,14 +44,5 @@
   "src/components/screenshot/overlay/ScreenshotBaseImage.tsx": {"L05":1},
   "src/components/screenshot/overlay/ScreenshotOverlayView.tsx": {"L07":1,"L04-inline":15,"L05":7,"L05-inline":12,"L02":1},
   "src/components/screenshot/overlay/ScreenshotToolbar.tsx": {"L05":2,"L05-inline":2,"L04-inline":2},
-  "src/components/screenshot/overlay/ToolButton.tsx": {"L04-inline":1},
-  "src/components/viewer/markdown/DrawioExportSettings.tsx": {"L02":1},
-  "src/components/viewer/markdown/DrawioImportDialog.tsx": {"L02":1},
-  "src/components/viewer/markdown/MarkdownDiagramActions.tsx": {"L13":1},
-  "src/components/viewer/markdown/MarkdownDiagramViewer.tsx": {"L02":1},
-  "src/components/viewer/markdown/MarkdownExportMenu.tsx": {"L13":1,"L02":1},
-  "src/components/viewer/markdown/MarkdownToolbar.tsx": {"L13":1},
-  "src/components/viewer/markdown/diagram.css": {"L05":4},
-  "src/components/viewer/markdown/markdown.css": {"L05":7},
-  "src/components/viewer/viewer.css": {"L05":2}
+  "src/components/screenshot/overlay/ToolButton.tsx": {"L04-inline":1}
 }

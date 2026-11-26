@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import type { EditorView } from "@codemirror/view";
 import type { ReactNode } from "react";
+import { MenuSurface } from "../../ContextMenu";
 import { ThemedSelect } from "../../ThemedSelect";
 import { useViewerLabels } from "../viewerLabels";
 import { formatMarkdown, setMarkdownHeading, type MarkdownFormat } from "./markdownCommands";
@@ -39,11 +40,34 @@ export function MarkdownToolbar({ view, readOnly, mode, focus, outline, heading,
   </>;
 }
 
-export function MarkdownInsertMenu({ from, onInsert }: { from: number; onInsert: (from: number, action: MarkdownFormat | "heading" | "image") => void }) {
+export function MarkdownInsertMenu({
+  from,
+  onInsert,
+  onClose,
+}: {
+  from: number;
+  onInsert: (from: number, action: MarkdownFormat | "heading" | "image") => void;
+  onClose?: () => void;
+}) {
   const label = useViewerLabels();
   const options: Array<[MarkdownFormat | "heading" | "image", string, string, typeof Bold]> = [
     ["heading", "标题", "Heading", Heading], ["table", "表格", "Table", Table], ["image", "图片", "Image", ImagePlus],
     ["codeblock", "代码块", "Code block", CodeXml], ["formula", "公式（代码块）", "Formula (code block)", Code], ["mermaid", "Mermaid 图表", "Mermaid diagram", ListTree],
   ];
-  return <div className="fv-menu fv-md-insert-menu" data-testid="markdown-insert-menu" role="menu" aria-label={label("插入", "Insert")}>{options.map(([action, zh, en, Icon]) => <button type="button" key={action} role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={() => onInsert(from, action)}><Icon />{label(zh, en)}</button>)}</div>;
+  return (
+    <MenuSurface
+      autoFocus={false}
+      handleKeyboard={false}
+      testId="markdown-insert-menu"
+      ariaLabel={label("插入", "Insert")}
+      className="fv-menu fv-md-insert-menu"
+      items={options.map(([action, zh, en, Icon]) => ({
+        label: label(zh, en),
+        icon: <Icon />,
+        preventMouseDownFocus: true,
+        onClick: () => onInsert(from, action),
+      }))}
+      onClose={() => onClose?.()}
+    />
+  );
 }

@@ -209,7 +209,7 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
         <div className={`fv-md-editor-pane ${mode === "live" ? "fv-md-live-pane" : "fv-md-source-pane"}`} data-preview-theme={mode === "live" ? previewTheme : undefined} style={mode === "live" ? previewThemeStyle(previewTheme) : undefined}>
           <EditorSurface document={surfaceDocument} extensions={extensions} onView={onView} onChange={owner?.onChange} onSave={save}
             className={mode === "live" ? "fv-md-live-surface" : "fv-md-source-surface"} nativeSelection={mode === "live" && effectiveReadOnly} createSearchPanel={createWorkspaceSearchPanel} />
-          {slash !== null && <MarkdownInsertMenu from={slash} onInsert={insert} />}
+          {slash !== null && <MarkdownInsertMenu from={slash} onInsert={insert} onClose={() => setSlash(null)} />}
         </div>
         {mode === "split" ? <MarkdownPreviewPane content={current.content} path={current.path} onError={report} onWarning={onRenderWarning}
           theme={previewTheme} readImage={readImage} label={label} /> : null}

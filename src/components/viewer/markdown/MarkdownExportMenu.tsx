@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useElementResizeFrame } from "../../../hooks/useElementResizeFrame";
+import { MenuSurface, type MenuItem } from "../../ContextMenu";
+import { ModalSurface } from "../../ui/ModalSurface";
 import { ThemedSelect } from "../../ThemedSelect";
 import { ChevronDown, Copy, Download, FileCode2, FileImage, FileText, FolderDown, Printer, X } from "lucide-react";
 import { useViewerLabels } from "../viewerLabels";
@@ -36,10 +38,8 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
   useEffect(() => {
     if (!open) return;
     const close = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node) && !menu.current?.contains(event.target as Node)) setOpen(false); };
-    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { setOpen(false); trigger.current?.focus(); } };
-    window.addEventListener("pointerdown", close); window.addEventListener("keydown", escape);
-    menu.current?.querySelector<HTMLButtonElement>("[role='menuitem']")?.focus();
-    return () => { window.removeEventListener("pointerdown", close); window.removeEventListener("keydown", escape); };
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
   }, [open]);
   const update = useCallback(() => {
     const anchor = trigger.current?.getBoundingClientRect(), popup = menu.current?.getBoundingClientRect();
@@ -91,24 +91,43 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
     ["richtext", "复制为富文本（粘贴到邮件/文档）", "Copy rich text (paste into mail/docs)", Copy],
     ["html-source", "复制为 HTML 源码", "Copy HTML source", Copy], ["print", "打印…", "Print…", Printer],
   ];
-  return <>
-    <div className="fv-md-export-control" ref={root}>
-      <button type="button" ref={trigger} className="fv-button primary" data-testid="markdown-export" disabled={busy || current.loading} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}><Download />{label("导出", "Export")}<ChevronDown /></button>
-      {open && createPortal(<div className="fv" style={{ display: "contents" }}><div ref={menu} className="fv-menu fv-md-export-menu" style={{ position: "fixed", ...position }} role="menu" data-testid="markdown-export-menu" onKeyDown={(event) => {
-        if (event.key === "Tab") { setOpen(false); trigger.current?.focus(); return; }
-        if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-        event.preventDefault();
-        const buttons = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>("[role='menuitem']") || []);
-        const index = buttons.indexOf(window.document.activeElement as HTMLButtonElement);
-        buttons[event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length]?.focus();
-      }}>
-        <div className="fv-md-menu-title">{label("导出为", "Export as")}</div>
-        {entries.map(([kind, zh, en, Icon]) => <button type="button" key={kind} role="menuitem" className={kind === "richtext" ? "fv-md-menu-divider" : ""} data-testid={`markdown-export-${kind}`} onClick={() => {
+  const menuItems: MenuItem[] = [
+    { label: label("导出为", "Export as"), sectionHeader: true },
+    ...entries.flatMap(([kind, zh, en, Icon]): MenuItem[] => {
+      const item: MenuItem = {
+        label: label(zh, en),
+        testId: `markdown-export-${kind}`,
+        icon: <Icon />,
+        shortcut: kind === "pdf" ? label("页面设置", "Page setup") : kind === "print" ? (/Mac/i.test(navigator.platform) ? "⌘P" : "Ctrl+P") : undefined,
+        onClick: () => {
           setOpen(false);
           if (kind === "pdf" || kind === "print" || kind === "docx" || kind === "drawio") setDialog(kind);
           else void run(kind);
-        }}><Icon /><span>{label(zh, en)}</span>{kind === "pdf" && <small>{label("页面设置", "Page setup")}</small>}{kind === "print" && <small>{/Mac/i.test(navigator.platform) ? "⌘P" : "Ctrl+P"}</small>}</button>)}
-      </div></div>, window.document.body)}
+        },
+      };
+      return kind === "richtext" ? [{ label: "", separator: true }, item] : [item];
+    }),
+  ];
+  return <>
+    <div className="fv-md-export-control" ref={root}>
+      <button type="button" ref={trigger} className="fv-button primary" data-testid="markdown-export" disabled={busy || current.loading} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}><Download />{label("导出", "Export")}<ChevronDown /></button>
+      {open && createPortal(<div className="fv" style={{ display: "contents" }}>
+        <MenuSurface
+          ref={menu}
+          testId="markdown-export-menu"
+          ariaLabel={label("导出为", "Export as")}
+          className="fv-menu fv-md-export-menu"
+          style={{ position: "fixed", ...position }}
+          autoFocus={false}
+          rovingFocus
+          closeOnTab
+          items={menuItems}
+          onClose={(reason) => {
+            setOpen(false);
+            if (reason === "escape") trigger.current?.focus();
+          }}
+        />
+      </div>, window.document.body)}
     </div>
     {notice && <div className="fv-md-export-notice" role="status" data-testid="markdown-export-status" data-export-state={exportState} data-export-path={saved || undefined}><span>{notice}</span>{saved && savedFile && <MarkdownExportResultActions path={saved} filePath={savedFile} workspaceId={savedWorkspace} onError={onError} />}<button type="button" className="fv-icon-button" aria-label={label("关闭提示", "Dismiss")} onClick={() => setNotice("")}><X /></button></div>}
     {dialog && createPortal(<div className="fv" style={{ display: "contents" }}>{dialog === "drawio" ? <DrawioExportSettings settings={settings} onChange={setSettings} onCancel={() => { setDialog(null); trigger.current?.focus(); }} onConfirm={(kind) => void run(kind)} /> : <ExportSettings kind={dialog} filename={markdownBasename(current.path)} settings={settings} onChange={setSettings} onCancel={() => { setDialog(null); trigger.current?.focus(); }} onConfirm={() => void run(dialog)} />}</div>, window.document.body)}
@@ -120,18 +139,16 @@ function ExportSettings({ kind, filename, settings, onChange, onCancel, onConfir
   onChange: (value: MarkdownExportSettings) => void; onCancel: () => void; onConfirm: () => void;
 }) {
   const label = useViewerLabels();
-  const root = useRef<HTMLDivElement>(null);
-  useEffect(() => { root.current?.querySelector<HTMLButtonElement>("[role=combobox]")?.focus(); }, []);
   const patch = (value: Partial<MarkdownExportSettings>) => onChange({ ...settings, ...value });
   const check = (field: "toc" | "pageNumbers" | "fileHeader" | "wrapCode" | "highlight", zh: string, en: string) => <label className="fv-md-setting-check"><input type="checkbox" data-testid={`markdown-export-${field}`} checked={settings[field]} onChange={(event) => patch({ [field]: event.target.checked })} />{label(zh, en)}</label>;
-  return <div className="fv-modal-bg" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}><div ref={root} className="fv-modal fv-md-export-settings" role="dialog" aria-modal="true" aria-labelledby="fv-md-export-title" data-testid="markdown-export-settings" onKeyDown={(event) => {
-    if (event.key === "Escape") { event.preventDefault(); onCancel(); }
-    if (event.key === "Tab") {
-      const nodes = Array.from(root.current?.querySelectorAll<HTMLElement>("button,input,select") || []);
-      if (event.shiftKey && window.document.activeElement === nodes[0]) { event.preventDefault(); nodes.at(-1)?.focus(); }
-      else if (!event.shiftKey && window.document.activeElement === nodes.at(-1)) { event.preventDefault(); nodes[0]?.focus(); }
-    }
-  }}>
+  return <ModalSurface
+    dismissOnBackdrop
+    initialFocus="[role=combobox], button:enabled"
+    onCancel={onCancel}
+    className="fv-modal fv-md-export-settings"
+    aria-labelledby="fv-md-export-title"
+    data-testid="markdown-export-settings"
+  >
     <h3 id="fv-md-export-title">{label("导出", "Export")} {kind === "print" ? label("打印", "Print") : kind.toUpperCase()} — {filename}</h3>
     <div className="fv-md-export-fields">
       <div className="fv-md-field"><span>{label("主题", "Theme")}</span>
@@ -155,5 +172,5 @@ function ExportSettings({ kind, filename, settings, onChange, onCancel, onConfir
       <p className="fv-md-export-hint">{kind === "print" ? label("打印使用系统打印窗口。", "Printing uses the system print dialog.") : label("图片以内嵌方式导出；本地相对路径图片已解析。PDF 直接保存为文件，无需打印机。", "Images are embedded; local relative images are resolved. PDF saves directly to a file without a printer.")}</p>
     </div>
     <footer><button type="button" className="fv-button outline" onClick={onCancel}>{label("取消", "Cancel")}</button><button type="button" className="fv-button primary" data-testid="markdown-export-confirm" onClick={onConfirm}>{label("导出…", "Export…")}</button></footer>
-  </div></div>;
+  </ModalSurface>;
 }
