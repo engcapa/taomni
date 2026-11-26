@@ -8,6 +8,9 @@ import { openExplorer } from "../../lib/explorer/openExplorer";
 import { useViewerLabels } from "./viewerLabels";
 import { ViewerDiff } from "./ViewerDialogs";
 import { NotepadEditor } from "../notepad/NotepadEditor";
+import { DelimitedDocumentPane } from "./DelimitedDocumentPane";
+import { fileExtension } from "../../lib/openFile/classifyFile";
+import { readViewerDrafts } from "../../stores/viewerDrafts";
 import { ModuleDocumentPane } from "./ModuleDocumentPane";
 import { viewerReleaseTemp } from "../../lib/viewer";
 import type { FileViewerTabInfo } from "../../types";
@@ -39,6 +42,10 @@ export function ViewerShell(props: ViewerShellProps) {
   }, [key, viewer.path, temporary]);
   if ((viewer.kind === "document" || viewer.kind === "pdf") && viewer.mode !== "source" && viewer.mode !== "notepad") {
     return <ModuleDocumentPane key={viewer.path} viewer={viewer} active={active} />;
+  }
+  if (viewer.mode !== "source" && viewer.mode !== "notepad" && ["csv", "tsv"].includes(fileExtension(viewer.path))
+    && !useDocumentStore.getState().documents[key]?.dirty && !readViewerDrafts()[key]) {
+    return <DelimitedDocumentPane key={key} {...props} />;
   }
   return <BuiltinViewer {...props} />;
 }

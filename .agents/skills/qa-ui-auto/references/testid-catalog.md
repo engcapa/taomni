@@ -1475,6 +1475,8 @@
 - `[data-testid="document-open-store"]` — interactive — F-FILEOPEN-1.document-open-store
 - `[data-testid="document-open-system"]` — interactive — F-FILEOPEN-1.document-open-system
 - `[data-testid="document-readonly"]` — display — F-FILEOPEN-1.document-readonly
+- `[data-testid="delimited-table"]` — display — F-FILEOPEN-1.delimited-table
+- `[data-testid="delimited-source"]` — interactive — F-FILEOPEN-1.delimited-source
 - `[data-testid="viewer-editor"]` — interactive — F-FILEOPEN-1.viewer-editor
 - `[data-testid="viewer-save"]` — interactive — F-FILEOPEN-1.viewer-save
 - `[data-testid="viewer-readonly"]` — display — F-FILEOPEN-1.viewer-readonly

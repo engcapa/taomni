@@ -56,6 +56,7 @@ opt_in:
         reason: Agnes key is not provisioned; the Agnes regression is opt-in
 cases:
 - TC-TAOFFICE-001
+- TC-TAOFFICE-002
 - TC-EXPLORER-013
 - TC-EXPLORER-014
 - TC-FILE-OPEN-041

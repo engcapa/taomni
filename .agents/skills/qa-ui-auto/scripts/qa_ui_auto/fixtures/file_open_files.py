@@ -56,6 +56,8 @@ def setup(ctx: Any) -> None:
         "assets/local.css": b"#resource { color: rgb(12, 34, 56); }", "assets/pixel.png": PNG,
         "src/sample.ts": b"export const fileOpenSource = true;\n", "unsupported.bin": b"\x00\xff\x10",
     }
+    if ctx.case_id == "TC-TAOFFICE-002":
+        files["records.tsv"] = 'City\tNote\r\nTokyo\t"Metro, East"\r\nParis\t"Line 1\nLine 2"\r\n'.encode()
     if ctx.case_id == "TC-TAOFFICE-001":
         for name in ("Build", "Review"):
             files[f"{name}.mppx"] = (

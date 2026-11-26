@@ -16760,6 +16760,7 @@ area: files/viewer
 components: [ViewerShell, TextEditor, ImageViewer, MarkdownEditor, HtmlPreview, FileOpenSettings]
 files:
   - src/components/viewer/ModuleDocumentPane.tsx
+  - src/components/viewer/DelimitedDocumentPane.tsx
   - src/lib/openFile/documentProvider.ts
   - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts
@@ -16864,6 +16865,12 @@ controls:
   - id: document-readonly
     selector: '[data-testid="document-readonly"]'
     kind: display
+  - id: delimited-table
+    selector: '[data-testid="delimited-table"]'
+    kind: display
+  - id: delimited-source
+    selector: '[data-testid="delimited-source"]'
+    kind: interactive
   - id: viewer-editor
     selector: '[data-testid="viewer-editor"]'
     kind: interactive
