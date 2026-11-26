@@ -156,3 +156,11 @@ macOS/WKWebView targets and supported architectures when claiming compatibility;
 the hosted `macos-15` ARM64 entry alone does not cover Intel or every OS version.
 Theme cycling does not prove system-theme live switching. DOM clearance does
 not measure traffic-light rectangles. State each missing boundary explicitly.
+
+
+A standalone Tab or Shift+Tab from the QA driver travels through the selected
+AppKit window's responder chain. WKWebView performs sequential focus navigation.
+The settings switch, build tools and Go to Line cases check the actual next
+control. Other `press` chords use WKWebView DOM events. They deliver each key
+release to the element that currently has focus, including a newly opened Find
+field. These transports exercise the app window only.

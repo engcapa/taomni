@@ -27,6 +27,23 @@ function formFixture(markup = '<input name="username"><input name="password" typ
 describe("macOS QA WebView keyboard defaults", () => {
   beforeEach(() => document.body.replaceChildren());
 
+  it("delivers keyup to a Find field opened during the preceding keydown", () => {
+    const emit = new Function("type", "event", "mods",
+      `${keyboardScript}\nreturn dispatchQaKeyToFocus(type, event.key, event, mods, createQaButtonKeyboard());`);
+    const { form, input } = formFixture();
+    const find = form.querySelectorAll("input")[1];
+    const released = vi.fn();
+    input.focus();
+    input.addEventListener("keydown", (event) => { event.preventDefault(); find.focus(); });
+    find.addEventListener("keyup", released);
+    const mods = { ...plain, Control: true, Shift: true };
+    for (const type of ["keydown", "keyup"]) {
+      emit(type, new KeyboardEvent(type, { key: "F", bubbles: true, cancelable: true }), mods);
+    }
+    expect(find).toHaveFocus();
+    expect(released).toHaveBeenCalledOnce();
+  });
+
   it("moves a range to each endpoint and emits exactly one change for each movement", () => {
     const { input } = formFixture('<input type="range" min="10" max="18" value="12">');
     const values: string[] = [];

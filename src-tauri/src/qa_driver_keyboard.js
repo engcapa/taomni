@@ -115,3 +115,12 @@ function createQaButtonKeyboard() {
     }
   };
 }
+
+// A keydown may open a search field or close a dialog. Its keyup belongs to
+// the element that currently owns focus, including when modifier keys follow.
+function dispatchQaKeyToFocus(type, key, event, modifiers, buttonDefault) {
+  const target = document.activeElement || document.body;
+  target.dispatchEvent(event);
+  buttonDefault(target, type, key, event, modifiers);
+  if (type === "keydown") dispatchQaKeyDefault(target, key, event, modifiers);
+}
