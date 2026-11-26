@@ -183,7 +183,7 @@ export function SocksCapMacosSetupGuide({
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto px-4 py-3">
+        <div className="min-h-0 flex-auto overflow-auto px-4 py-3">
           <div
             data-testid="sockscap-macos-setup-status"
             data-installer-source={installStatus?.resourceSource ?? undefined}

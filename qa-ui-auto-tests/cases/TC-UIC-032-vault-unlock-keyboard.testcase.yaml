@@ -15,7 +15,7 @@ steps:
 - click: '[data-testid="vault-setup-confirm"]'
 - wait_for: '[data-testid="vault-lock-button"]'
 - click: '[data-testid="vault-lock-button"]'
-- wait_for: '[data-testid="vault-unlock-button"]'
+- wait_for: '[data-testid="vault-unlock-button"]:enabled'
 - press: {selector: '[data-testid="vault-unlock-button"]', key: Enter}
 - wait_for: '[data-testid="vault-unlock-dialog"]:modal [data-testid="vault-unlock-pw"]'
 - assert_focus_on: '[data-testid="vault-unlock-pw"]'

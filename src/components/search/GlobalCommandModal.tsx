@@ -218,7 +218,7 @@ function OpenGlobalCommandModal() {
         />
         <span className="shrink-0 rounded px-1 text-ui-caption" style={{ border: "1px solid var(--taomni-divider)", color: "var(--taomni-text-muted)" }}>Ctrl+K</span>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-1.5" data-testid="global-search-results">
+      <div className="min-h-0 flex-auto overflow-auto p-1.5" data-testid="global-search-results">
         {results.length === 0 && (
           <div className="px-2 py-3 text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.globalSearchEmpty")}</div>
         )}

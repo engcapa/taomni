@@ -62,7 +62,7 @@ export function DbObjectDetailDialog({ detail, onClose, onStatus }: Props) {
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
-      <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-3">
+      <div className="flex-auto min-h-0 overflow-auto taomni-scroll-y p-3">
         {detail.kind === "ddl" ? (
           <pre
             className="text-ui-body font-mono whitespace-pre-wrap break-words m-0"

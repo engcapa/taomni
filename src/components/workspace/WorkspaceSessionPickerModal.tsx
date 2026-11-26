@@ -125,7 +125,7 @@ export function WorkspaceSessionPickerModal({ open, workspaceId, onClose }: Work
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-1.5" data-testid="workspace-session-picker-list">
+      <div className="min-h-0 flex-auto overflow-auto p-1.5" data-testid="workspace-session-picker-list">
         {visible.length === 0 && (
           <div className="px-2 py-3 text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.globalSearchEmpty")}</div>
         )}

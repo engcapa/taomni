@@ -211,7 +211,7 @@ export function WorkspaceGitCloneModal() {
         <p className="mt-0.5 text-ui-small text-[var(--taomni-text-muted)]">{t("gitClone.subtitle")}</p>
       </header>
 
-      <div data-testid="workspace-git-clone-body" className="min-h-0 flex-1 overflow-auto px-4 py-3">
+      <div data-testid="workspace-git-clone-body" className="min-h-0 flex-auto overflow-auto px-4 py-3">
         {showForm && (
           <>
             {defaultsStatus === "error" && (
