@@ -43,7 +43,7 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
       ref={state.toolbarRef}
       data-testid="screenshot-toolbar"
       data-drawing={state.drawing}
-      className={state.scrollResult ? "relative z-50 shrink-0 px-4 py-2" : "fixed z-50"}
+      className={state.scrollResult ? "relative z-[var(--taomni-z-capture-toolbar)] shrink-0 px-4 py-2" : "fixed z-[var(--taomni-z-capture-toolbar)]"}
       style={state.scrollResult ? { ...panelStyle, maxHeight: "40vh", overflowY: "auto" } : {
         left: state.toolbarPos?.left ?? -9999,
         top: state.toolbarPos?.top ?? -9999,
@@ -190,7 +190,7 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
                 ref={state.watermarkPanelRef}
                 data-testid="screenshot-watermark-panel"
                 className="fixed rounded-lg shadow-2xl p-3 overflow-y-auto"
-                style={{ zIndex: 65, width: Math.min(224, state.viewport.w - 16), maxHeight: state.viewport.h - 16, ...state.watermarkPos, ...panelStyle }}
+                style={{ zIndex: "var(--taomni-z-capture-tool-options)", width: Math.min(224, state.viewport.w - 16), maxHeight: state.viewport.h - 16, ...state.watermarkPos, ...panelStyle }}
               >
                 <input
                   type="text"
@@ -243,7 +243,7 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
                       state.setWatermarkOpen(false);
                     }}
                     className="flex-1 rounded px-2 py-1 text-ui-body"
-                    style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
+                    style={{ background: "var(--taomni-primary-bg)", color: "var(--taomni-primary-text)" }}
                   >
                     {state.t("screenshot.watermarkApply")}
                   </button>
@@ -285,7 +285,7 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
                 ref={state.recordMenuRef}
                 data-testid="screenshot-record-menu"
                 className="fixed rounded-xl p-2 shadow-2xl text-ui-body overflow-y-auto"
-                style={{ zIndex: 65, width: Math.min(320, state.viewport.w - 16), maxHeight: state.viewport.h - 16, ...state.recordPos, ...panelStyle }}
+                style={{ zIndex: "var(--taomni-z-capture-tool-options)", width: Math.min(320, state.viewport.w - 16), maxHeight: state.viewport.h - 16, ...state.recordPos, ...panelStyle }}
               >
                 <p data-testid="screenshot-record-hint" className="px-2 py-2 leading-relaxed whitespace-normal break-words text-[var(--taomni-text-muted)]">{state.t("screenshot.recordHint", { shortcut: state.stopShortcut || state.t("settings.screenshotDisabled") })}</p>
                 <button
@@ -321,7 +321,7 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
             title={`${state.t("screenshot.copy")} (Enter / Ctrl+C)`}
             onClick={() => void actions.handleCopy()}
             className="ml-1 h-8 shrink-0 rounded-lg px-3 flex items-center gap-1 text-ui-body font-medium"
-            style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
+            style={{ background: "var(--taomni-primary-bg)", color: "var(--taomni-primary-text)" }}
           >
             <Check size={15} />
             {state.t("screenshot.done")}

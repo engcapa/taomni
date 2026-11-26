@@ -84,8 +84,8 @@ export function ScrollCaptureBar() {
       <button data-testid="screenshot-scroll-switch-mode" type="button" disabled={finishing || changingMode} onClick={() => void changeMode()} className="px-2 py-1 rounded disabled:opacity-40">{t(mode === "auto" ? "screenshot.scrollUseManual" : "screenshot.scrollUseAuto")}</button>
       <button data-testid="screenshot-scroll-cancel" type="button" disabled={finishing} onClick={() => void finish(true)} className="px-3 py-1 rounded disabled:opacity-40">{t("screenshot.cancel")}</button>
       <button data-testid="screenshot-scroll-stop" type="button" disabled={finishing} onClick={() => void finish(false)} className="px-3 py-1 rounded disabled:opacity-40"
-        style={{ background: "var(--taomni-accent)", color: "#fff" }}>{t("screenshot.scrollFinish")}</button>
+        style={{ background: "var(--taomni-primary-bg)", color: "var(--taomni-primary-text)" }}>{t("screenshot.scrollFinish")}</button>
     </div>
-    {(error || inputError) && <p data-testid="screenshot-scroll-error" style={{ color: "#ff6b6b" }}>{error ?? inputError}</p>}
+    {(error || inputError) && <p data-testid="screenshot-scroll-error" role="alert" className="text-ui-danger">{error ?? inputError}</p>}
   </div>;
 }

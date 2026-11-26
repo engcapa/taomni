@@ -331,6 +331,7 @@ cases:
 - TC-UIC-033-terminal-settings-modal
 - TC-UIC-034-global-command-palette
 - TC-UIC-035-tab-overview-modal
+- TC-UIC-036-screenshot-keyboard-controls
 - TC-UIC-DLG-explorer-new-file
 - TC-UIC-DLG-mail-attachment-reminder
 - TC-UIC-DLG-workspace-build-tools

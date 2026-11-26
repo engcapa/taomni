@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useT } from "../../lib/i18n";
 import { MAX_RESIZE, NEUTRAL_ADJUST, type ImageEdit } from "../../lib/screenshotImage";
+import { Modal } from "../ui/Modal";
 
-export function ImageEditPanel({ width, height, busy, canUndo, canRedo, onApply, onUndo, onRedo, onExternal, onClose }: {
+export function ImageEditPanel({ width, height, busy, canUndo, canRedo, returnFocus, onApply, onUndo, onRedo, onExternal, onClose }: {
   width: number; height: number; busy: boolean; canUndo: boolean; canRedo: boolean;
+  returnFocus?: HTMLElement | null;
   onApply: (edit: ImageEdit) => void; onUndo: () => void; onRedo: () => void;
   onExternal: (choose: boolean) => void; onClose: () => void;
 }) {
@@ -13,16 +15,13 @@ export function ImageEditPanel({ width, height, busy, canUndo, canRedo, onApply,
   const [lock, setLock] = useState(true);
   const [crop, setCrop] = useState({ x: 0, y: 0, width, height });
   const [adjust, setAdjust] = useState(NEUTRAL_ADJUST);
-  const button = "rounded px-3 py-2 text-ui-body bg-[var(--taomni-hover)] disabled:opacity-40";
+  const button = "taomni-btn";
   const valid = Number.isFinite(w) && Number.isFinite(h) && w >= 1 && h >= 1 && w <= MAX_RESIZE && h <= MAX_RESIZE && w * h <= 64_000_000;
   const validCrop = Object.values(crop).every(Number.isFinite) && crop.x >= 0 && crop.y >= 0 && crop.width >= 1 && crop.height >= 1 && crop.x + crop.width <= width && crop.y + crop.height <= height;
-  return <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/40" onMouseDown={(e) => e.stopPropagation()}>
-    <section data-testid="screenshot-edit-panel" role="dialog" aria-modal="true" aria-label={t("screenshot.editImage")}
-      className="w-[480px] max-w-[calc(100vw-16px)] max-h-[calc(100vh-16px)] overflow-auto rounded-xl p-4 shadow-2xl"
-      style={{ background: "var(--taomni-panel-bg)", color: "var(--taomni-text)" }}>
-      <header className="flex items-center gap-2 mb-3"><h2 className="flex-1 text-ui-title font-medium">{t("screenshot.editImage")} · {width} × {height}</h2>
-        <button type="button" className={button} data-testid="screenshot-edit-close" onClick={onClose}>{t("screenshot.cancel")}</button></header>
-      <p className="text-ui-body mb-3 text-[var(--taomni-text-muted)]">{t("screenshot.editHint")}</p>
+  return <Modal title={t("screenshot.editImage")} testId="screenshot-edit-panel" size="wide"
+    initialFocus='[data-testid="screenshot-edit-width"]' returnFocus={returnFocus} onCancel={onClose}
+    footer={<button type="button" className={button} data-testid="screenshot-edit-close" onClick={onClose}>{t("common.close")}</button>}>
+      <p className="mb-3 text-[var(--taomni-text-muted)]">{width} × {height} · {t("screenshot.editHint")}</p>
       <fieldset disabled={busy} className="space-y-3">
         <div className="flex flex-wrap gap-2">
           <button type="button" className={button} data-testid="screenshot-edit-rotate" onClick={() => onApply({ kind: "rotate", quarterTurns: 1 })}>{t("screenshot.rotateRight")}</button>
@@ -55,6 +54,5 @@ export function ImageEditPanel({ width, height, busy, canUndo, canRedo, onApply,
           <button type="button" data-testid="screenshot-edit-choose" className={button} onClick={() => onExternal(true)}>{t("screenshot.chooseEditor")}</button>
         </div>
       </fieldset>
-    </section>
-  </div>;
+  </Modal>;
 }

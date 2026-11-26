@@ -13,6 +13,7 @@ export function tokenScopes(read = (path) => readFileSync(path, "utf8")) {
   const scopes = [
     [workspace, workspace + "hooks/useWorkspaceAppearance.ts"],
     [workspace + "ProjectTree.css", workspace + "FileTreePane.tsx"],
+    ["src/components/screenshot/", "src/styles/screenshot.css"],
   ];
   return { global, scoped: scopes.map(([path, owner]) => [path, localTokens(read(owner))]) };
 }

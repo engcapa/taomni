@@ -27,6 +27,7 @@
 @import "./styles/editor.css";
 @import "./styles/controls.css";
 @import "./styles/terminal.css";
+@import "./styles/screenshot.css";
 @import "./styles/compatibility.css";
 
 @source not "../src-tauri/plugins/vnc-client/renderer";

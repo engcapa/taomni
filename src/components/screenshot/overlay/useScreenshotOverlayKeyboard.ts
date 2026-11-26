@@ -19,14 +19,14 @@ export function useScreenshotOverlayKeyboard(context: UseScreenshotOverlayKeyboa
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target instanceof Element ? e.target : null;
+      if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
+      // Decisions and edits are owned by their modal in this WebView.
+      if (state.pinDoneOpen || state.editOpen || state.scrollConfirm) return;
       const typing = !!target?.closest("input, textarea, select, [contenteditable='true']");
       const mod = e.ctrlKey || e.metaKey;
       if (e.key === "Escape") {
-        if (state.pinDoneOpen) { e.preventDefault(); if (!state.busyRef.current) state.setPinDoneOpen(false); return; }
         e.preventDefault();
         if (state.scrollError) state.close();
-        else if (state.editOpen) state.setEditOpen(false);
-        else if (state.scrollConfirm) state.setScrollConfirm(false);
         else if (state.recordOpen) state.setRecordOpen(false);
         else if (state.watermarkOpen) state.setWatermarkOpen(false);
         else if (state.ocrOpen) state.setOcrOpen(false);
@@ -37,7 +37,8 @@ export function useScreenshotOverlayKeyboard(context: UseScreenshotOverlayKeyboa
         else state.close();
         return;
       }
-      if (state.pinDoneOpen || typing || state.editOpen || state.editBusy || (state.phase !== "annotate" && state.phase !== "preview")) return;
+      if (typing || state.editBusy || (state.phase !== "annotate" && state.phase !== "preview")) return;
+      if (e.key === "Enter" && target?.closest("button, a[href]")) return;
       if ((e.key === "Delete" || e.key === "Backspace") && state.tool === "move") {
         if (state.canvasRef.current?.deleteSelected()) e.preventDefault();
         return;

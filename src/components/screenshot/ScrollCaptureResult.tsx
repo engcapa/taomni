@@ -123,7 +123,7 @@ export function ScrollCaptureResult({ url, width, height, frames, toolbar, child
 
   const percent = Math.round(scale * 100);
   const button = "rounded-lg px-3 py-2 text-ui-body hover:bg-[var(--taomni-hover)]";
-  return <section data-testid="screenshot-scroll-result" className="fixed inset-0 z-[70] flex flex-col"
+  return <section data-testid="screenshot-scroll-result" className="fixed inset-0 z-[var(--taomni-z-capture-result)] flex flex-col"
     style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
     <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-[var(--taomni-divider)]">
       <div>
@@ -143,7 +143,7 @@ export function ScrollCaptureResult({ url, width, height, frames, toolbar, child
     </header>
     {toolbar}
     <div ref={viewportRef} tabIndex={0} aria-label={t("screenshot.scrollResult")} id="screenshot-scroll-result-viewport" data-testid="screenshot-scroll-result-viewport" className="relative flex-1 min-h-0 overflow-auto"
-      style={{ background: "#202124", padding: PADDING }} onMouseDown={onMouseDown} onKeyDown={onKeyDown}>
+      style={{ background: "var(--taomni-panel-bg)", padding: PADDING }} onMouseDown={onMouseDown} onKeyDown={onKeyDown}>
       <div style={{ position: "relative", width: width * scale, height: height * scale, margin: "0 auto", overflow: "hidden" }}>
         <div style={{ position: "relative", width, height, transform: `scale(${scale})`, transformOrigin: "top left" }}>
           <img data-testid="screenshot-scroll-result-image" src={url} alt={t("screenshot.scrollResult")} draggable={false}
@@ -156,7 +156,7 @@ export function ScrollCaptureResult({ url, width, height, frames, toolbar, child
       <button type="button" data-testid="screenshot-scroll-result-close" className={`${button} mr-auto`} onClick={onClose}>{t("screenshot.cancel")} (Esc)</button>
       <button type="button" data-testid="screenshot-scroll-result-pin" className={button} onClick={onPin}>{t("screenshot.pin")}</button>
       <button type="button" data-testid="screenshot-scroll-result-save" className={button} onClick={onSave}>{t("screenshot.save")}</button>
-      <button type="button" data-testid="screenshot-scroll-result-copy" title={t("screenshot.copy")} className={button} style={{ background: "var(--taomni-accent)", color: "#fff" }} onClick={onCopy}>{t("screenshot.done")}</button>
+      <button type="button" data-testid="screenshot-scroll-result-copy" title={t("screenshot.copy")} className={button} style={{ background: "var(--taomni-primary-bg)", color: "var(--taomni-primary-text)" }} onClick={onCopy}>{t("screenshot.done")}</button>
     </footer>
   </section>;
 }

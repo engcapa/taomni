@@ -56,7 +56,7 @@ export function Magnifier({
   return (
     <div
       data-testid="screenshot-magnifier"
-      style={{ position: "fixed", zIndex: 60, left, top, width: size, pointerEvents: "none" }}
+      style={{ position: "fixed", zIndex: "var(--taomni-z-capture-indicator)", left, top, width: size, pointerEvents: "none" }}
     >
       <div
         style={{
@@ -64,15 +64,15 @@ export function Magnifier({
           height: size,
           borderRadius: 8,
           overflow: "hidden",
-          border: "1px solid rgba(255, 255, 255, 0.65)",
-          boxShadow: "0 4px 18px rgba(0, 0, 0, 0.55)",
+          border: "1px solid var(--taomni-input-border)",
+          boxShadow: "var(--taomni-shadow-lg)",
         }}
       >
         <canvas ref={canvasRef} style={{ display: "block", width: size, height: size }} />
       </div>
       <div
         className="mt-1 rounded px-1.5 py-0.5 text-center font-mono text-ui-small"
-        style={{ background: "rgba(0,0,0,0.75)", color: "#fff" }}
+        style={{ background: "var(--taomni-panel-bg)", color: "var(--taomni-text)" }}
       >
         {Math.round(cursor.x * sx)}, {Math.round(cursor.y * sy)} {hex}
       </div>

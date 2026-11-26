@@ -14186,6 +14186,14 @@ controls:
     selector: '[data-testid="screenshot-edit-panel"]'
     kind: display
     optional: true
+  - id: screenshot-edit-close
+    selector: '[data-testid="screenshot-edit-close"]'
+    kind: interactive
+    optional: true
+  - id: screenshot-edit-width
+    selector: '[data-testid="screenshot-edit-width"]'
+    kind: interactive
+    optional: true
   - id: screenshot-edit-redo
     selector: '[data-testid="screenshot-edit-redo"]'
     kind: interactive

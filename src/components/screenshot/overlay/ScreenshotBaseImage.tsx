@@ -16,7 +16,7 @@ export function ScreenshotBaseImage({ image, width, height }: {
     image.dataset.testid = "screenshot-base-image";
     image.alt = "";
     image.draggable = false;
-    image.className = "fixed inset-0 z-0";
+    image.className = "fixed inset-0 z-[var(--taomni-z-content)]";
     host.current?.appendChild(image);
     return () => { image.remove(); };
   }, [image]);

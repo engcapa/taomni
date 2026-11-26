@@ -3532,6 +3532,8 @@
 - `[data-testid="screenshot-edit"]` — interactive [optional] — F27.1.screenshot-edit
 - `[data-testid="screenshot-edit-external"]` — interactive [optional] — F27.1.screenshot-edit-external
 - `[data-testid="screenshot-edit-panel"]` — display [optional] — F27.1.screenshot-edit-panel
+- `[data-testid="screenshot-edit-close"]` — interactive [optional] — F27.1.screenshot-edit-close
+- `[data-testid="screenshot-edit-width"]` — interactive [optional] — F27.1.screenshot-edit-width
 - `[data-testid="screenshot-edit-redo"]` — interactive [optional] — F27.1.screenshot-edit-redo
 - `[data-testid="screenshot-edit-rotate"]` — interactive [optional] — F27.1.screenshot-edit-rotate
 - `[data-testid="screenshot-edit-undo"]` — interactive [optional] — F27.1.screenshot-edit-undo

@@ -456,7 +456,7 @@ function MenuRow({
 
   if (item.sectionHeader) {
     return (
-      <div className="px-3 py-1 text-ui-caption font-semibold uppercase text-[var(--taomni-text-muted)]">
+      <div data-testid={item.testId} className="px-3 py-1 text-ui-caption font-semibold uppercase text-[var(--taomni-text-muted)]">
         {item.label}
       </div>
     );
