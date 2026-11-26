@@ -11,7 +11,7 @@ steps:
 - assert_attribute: {selector: html, name: data-app-theme, equals: light}
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
-- wait_for: {selector: '[data-testid="module-marketplace-loading"]', state: detached}
+- wait_for: {selector: '[data-testid="module-marketplace-loading"]', state: detached, timeout_sec: 30}
 - click: '[data-testid="module-offline-submit"]'
 - assert_text: {selector: '[data-testid="module-offline-error"][role="alert"]', contains: Choose a module package}
 - assert_attribute: {selector: '[data-testid="module-offline-archive"]', name: aria-invalid, equals: 'true'}
