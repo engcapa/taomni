@@ -100,8 +100,15 @@ export function ModalSurface({
       if (event.key !== "Escape") return;
       const openPopup = Array.from(
         document.querySelectorAll('[data-taomni-context-menu], [role="menu"], [role="listbox"]'),
-      ).some((node) => node !== panel && !node.contains(panel)
-        && !(node instanceof HTMLElement && (node.hidden || node.closest("[hidden]") || node.style.display === "none")));
+      ).some((node) => {
+        if (node === panel || node.contains(panel)) return false;
+        if (node instanceof HTMLElement && (node.hidden || node.closest("[hidden]") || node.style.display === "none")) return false;
+        if (node.getAttribute("role") !== "listbox") return true;
+        // A visible listbox can be part of a form. Its expanded trigger identifies a popup.
+        return Boolean(node.id && document.querySelector(
+          `[aria-expanded="true"][aria-controls~="${CSS.escape(node.id)}"]`,
+        ));
+      });
       if (openPopup) return;
       const modalLayers = document.querySelectorAll(
         '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"], [data-testid="sockscap-root-prompt-dialog"]',

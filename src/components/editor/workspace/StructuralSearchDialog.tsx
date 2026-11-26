@@ -1,6 +1,6 @@
 import { AnchoredMenu } from "../../ui/AnchoredMenu";
 import { ModalSurface } from "../../ui/ModalSurface";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import type { StructuralScope, StructuralSearchSession } from "./useStructuralSearchSession";
 import {
@@ -42,10 +42,14 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
     if (dialogOpen) setRecentTemplates(readRecentStructuralTemplates());
   }, [dialogOpen]);
 
-  useEffect(() => {
-    if (phase !== "running") return;
-    const dialog = templateRef.current?.closest("dialog");
-    if (dialog && !dialog.contains(document.activeElement)) templateRef.current?.focus();
+  useLayoutEffect(() => {
+    const template = templateRef.current;
+    if (phase !== "running" || !template) return;
+    const dialog = template.closest("dialog");
+    const active = document.activeElement;
+    if (dialog && (!dialog.contains(active) || active?.matches(":disabled"))) {
+      template.focus({ preventScroll: true });
+    }
   }, [phase]);
 
   useEffect(() => {
