@@ -93,3 +93,28 @@ it("light dismisses only when the same pointer starts and ends on the backdrop",
   fireEvent.pointerUp(panel, outside);
   expect(cancel).toHaveBeenCalledTimes(1);
 });
+
+it("routes window-level Escape only to the topmost open modal and ignores IME composition", () => {
+  const outerCancel = vi.fn();
+  const innerCancel = vi.fn();
+  render(
+    <>
+      <Modal title="Outer" testId="outer" initialFocus="button" onCancel={outerCancel}
+        footer={<button type="button">Outer close</button>}>
+        <p>Outer body</p>
+      </Modal>
+      <Modal title="Inner" testId="inner" initialFocus="button" onCancel={innerCancel}
+        footer={<button type="button">Inner close</button>}>
+        <p>Inner body</p>
+      </Modal>
+    </>,
+  );
+
+  fireEvent.keyDown(window, { key: "Escape", isComposing: true });
+  expect(innerCancel).not.toHaveBeenCalled();
+  expect(outerCancel).not.toHaveBeenCalled();
+
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(innerCancel).toHaveBeenCalledTimes(1);
+  expect(outerCancel).not.toHaveBeenCalled();
+});

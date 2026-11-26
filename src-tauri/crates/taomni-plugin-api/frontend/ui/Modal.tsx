@@ -11,7 +11,7 @@ interface ModalProps {
   initialFocus: string;
   returnFocus?: HTMLElement | null;
   closeLabel?: string;
-  size?: "default" | "wide";
+  size?: "default" | "wide" | "complex";
   dismissOnBackdrop?: boolean;
   onCancel: () => void;
   children: ReactNode;

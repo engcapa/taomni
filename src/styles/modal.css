@@ -27,3 +27,5 @@
 .taomni-modal-footer { display: flex; flex: none; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 
 .taomni-modal[data-size="wide"] { width: min(760px, calc(100vw - 32px)); }
+.taomni-modal[data-size="complex"] { width: min(960px, calc(100vw - 32px)); }
+.taomni-modal[data-bleed="true"] { padding: 0; gap: 0; overflow: hidden; }

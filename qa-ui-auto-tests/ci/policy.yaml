@@ -328,6 +328,7 @@ cases:
 - TC-UIC-030-session-protocol-appearance
 - TC-UIC-031-backup-restore-cancel
 - TC-UIC-032-vault-unlock-keyboard
+- TC-UIC-033-terminal-settings-modal
 - TC-UIC-DLG-explorer-new-file
 - TC-UIC-DLG-mail-attachment-reminder
 - TC-UIC-DLG-workspace-build-tools
