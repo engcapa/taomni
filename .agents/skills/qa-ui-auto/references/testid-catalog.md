@@ -3954,6 +3954,7 @@
 - `[data-testid="backup-local-includeMailOriginals"]` — interactive — F-BACKUP-1.backup-local-includeMailOriginals
 - `[data-testid="backup-local-includeMailAttachments"]` — interactive — F-BACKUP-1.backup-local-includeMailAttachments
 - `[data-testid="backup-local-restore"]` — interactive — F-BACKUP-1.local-completed-restore
+- `:nth-child(1 of [data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]) [data-testid="backup-local-restore"]` — interactive — F-BACKUP-1.first-completed-local-restore
 - `[data-testid="backup-destination-select"]` — interactive — F-BACKUP-1.destination-select
 
 ## settings/backup (F-BACKUP-2)

@@ -17,10 +17,11 @@ describe("Explorer tab icon", () => {
     expect(container.querySelectorAll("svg path")).toHaveLength(2);
   });
 
-  it("retains the existing blue SFTP folder", () => {
+  it("uses the themed accent for the SFTP folder", () => {
     const tab: Tab = { id: "sftp", title: "SFTP", type: "sftp", closable: true };
     const { container } = render(<TabIcon tab={tab} />);
-    expect(container.querySelector("svg")).toHaveStyle({ color: "#3b7ac2" });
+    expect(container.querySelector("svg")).toHaveClass("lucide-folder");
+    expect(container.querySelector("svg")).toHaveStyle({ color: "var(--taomni-accent)" });
     expect(container.querySelector("svg")).toHaveAttribute("fill", "none");
   });
 });

@@ -13529,6 +13529,9 @@ controls:
 - id: local-completed-restore
   selector: '[data-testid="backup-local-restore"]'
   kind: interactive
+- id: first-completed-local-restore
+  selector: ':nth-child(1 of [data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]) [data-testid="backup-local-restore"]'
+  kind: interactive
 - id: destination-select
   selector: '[data-testid="backup-destination-select"]'
   kind: interactive

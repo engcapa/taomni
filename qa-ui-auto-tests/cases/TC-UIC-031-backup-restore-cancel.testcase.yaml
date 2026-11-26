@@ -12,19 +12,19 @@ steps:
 - fill: {selector: '[data-testid="settings-search-input"]', value: backup}
 - set_check: {selector: '[data-testid="backup-local-select"]', checked: true}
 - click: '[data-testid="backup-selected-start"]'
-- wait_for: {selector: '[data-testid="backup-local-restore"]', timeout_sec: 90}
-- press: {selector: '[data-testid="backup-local-restore"]', key: Enter}
+- wait_for: {selector: &archiveRestore ':nth-child(1 of [data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]) [data-testid="backup-local-restore"]', timeout_sec: 90}
+- press: {selector: *archiveRestore, key: Enter}
 - wait_for: '[data-testid="backup-restore-dialog"]:modal [data-testid="backup-restore-files"]'
 - assert_focus_on: '[data-testid="backup-restore-cancel"]'
 - press: Enter
 - assert_not_visible: '[data-testid="backup-restore-dialog"]'
-- assert_focus_on: '[data-testid="backup-local-restore"]'
+- assert_focus_on: *archiveRestore
 - press: Enter
 - fill: {selector: '[data-testid="backup-restore-name"]', value: different-archive.taobak}
 - assert_attribute: {selector: '[data-testid="backup-restore-confirm"]', name: disabled, equals: ''}
 - press: Escape
 - assert_not_visible: '[data-testid="backup-restore-dialog"]'
-- assert_focus_on: '[data-testid="backup-local-restore"]'
+- assert_focus_on: *archiveRestore
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
