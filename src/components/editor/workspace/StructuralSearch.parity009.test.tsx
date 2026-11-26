@@ -161,10 +161,15 @@ describe("Structural Search session ED-PARITY-009", () => {
     expect(screen.getAllByTestId("structural-search-match").map((row) => row.dataset.line)).toEqual(["3", "4", "5"]);
     expect(screen.getByTestId("structural-search-backend")).toHaveTextContent("tree-sitter-java 0.23.5");
 
-    fireEvent.click(screen.getAllByTestId("structural-search-match")[1]!);
+    const [first, second, third] = screen.getAllByTestId("structural-search-match");
+    await waitFor(() => expect(first).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(second!);
+    await waitFor(() => expect(second).toHaveAttribute("aria-selected", "true"));
     expect(onOpenMatch).toHaveBeenLastCalledWith(THREE[1], { preview: true });
     const results = screen.getByTestId("structural-search-results");
+    results.focus();
     fireEvent.keyDown(results, { key: "ArrowDown" });
+    await waitFor(() => expect(third).toHaveAttribute("aria-selected", "true"));
     expect(onOpenMatch).toHaveBeenLastCalledWith(THREE[2], { preview: true });
     fireEvent.keyDown(results, { key: "Enter" });
     expect(onOpenMatch).toHaveBeenLastCalledWith(THREE[2], { preview: false });
