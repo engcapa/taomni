@@ -5,11 +5,13 @@ import { Modal } from "../../ui/Modal";
 
 export function CurrentTerminalSettingsDialog({
   profile,
+  returnFocus,
   onProfileChange,
   onSaveAsDefault,
   onClose,
 }: {
   profile: TerminalProfile;
+  returnFocus?: HTMLElement | null;
   onProfileChange: (profile: TerminalProfile) => void;
   onSaveAsDefault: () => void;
   onClose: () => void;
@@ -23,6 +25,7 @@ export function CurrentTerminalSettingsDialog({
       testId="terminal-current-settings-dialog"
       closeLabel={t("terminal.currentSettingsClose")}
       initialFocus='[data-testid="terminal-current-settings-footer-close"]'
+      returnFocus={returnFocus}
       dismissOnBackdrop={false}
       onCancel={onClose}
       footer={

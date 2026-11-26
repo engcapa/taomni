@@ -374,13 +374,18 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
       {panel.settingsDialogOpen && (
         <CurrentTerminalSettingsDialog
           profile={panel.currentTerminalProfileRef.current}
+          returnFocus={
+            panel.termRef.current?.textarea ??
+            panel.containerRef.current?.querySelector<HTMLElement>(".xterm-helper-textarea") ??
+            null
+          }
           onProfileChange={panel.commitTerminalProfilePatch}
           onSaveAsDefault={() => {
             void commands.saveCurrentProfileAsTerminalDefault();
           }}
           onClose={() => {
             panel.setSettingsDialogOpen(false);
-            interaction.focusTerminal();
+            queueMicrotask(() => interaction.focusTerminal());
           }}
         />
       )}

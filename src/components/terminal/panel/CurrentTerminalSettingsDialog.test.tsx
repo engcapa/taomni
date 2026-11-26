@@ -62,4 +62,26 @@ describe("CurrentTerminalSettingsDialog", () => {
     expect(trigger).toHaveFocus();
     trigger.remove();
   });
+
+  it("restores focus to an explicit returnFocus target when opened from a detached menu", () => {
+    const terminalInput = document.createElement("textarea");
+    const menuItem = document.createElement("button");
+    document.body.append(terminalInput, menuItem);
+    menuItem.focus();
+
+    const view = render(
+      <CurrentTerminalSettingsDialog
+        profile={{ ...DEFAULT_TERMINAL_PROFILE }}
+        returnFocus={terminalInput}
+        onProfileChange={vi.fn()}
+        onSaveAsDefault={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    menuItem.remove();
+    view.unmount();
+    expect(terminalInput).toHaveFocus();
+    terminalInput.remove();
+  });
 });
