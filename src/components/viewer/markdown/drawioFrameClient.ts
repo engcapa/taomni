@@ -27,8 +27,8 @@ function frameDocument(): string {
 }
 
 async function createFrame(): Promise<HTMLIFrameElement> {
-  // WKWebView can reject tauri: subresources from an opaque srcdoc. The
-  // desktop host returns a fixed loopback document in that environment.
+  // WKWebView and WebView2 use a real loopback document for the opaque frame
+  // so its bundled scripts load independently of the app asset protocol.
   const nativeUrl = isTauriRuntime() ? await invoke<string | null>("viewer_drawio_renderer_url") : null;
   if (nativeUrl) {
     const url = new URL(nativeUrl);

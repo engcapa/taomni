@@ -3,6 +3,7 @@ title: Markdown hover opens the image viewer and Live browse owns its context me
 covers: [F-FILEOPEN-1, F-EXPLORER-1]
 modes: [browser, native]
 tags: [p1, markdown, file-open, drawio]
+ui_standard: [UI-DLG-04, UI-DLG-07, UI-MNU-02, UI-MNU-03, UI-MNU-09, UI-MNU-10]
 fixtures: [reset_db, markdown_remote_images]
 timeout_sec: 180
 steps:
@@ -29,6 +30,7 @@ steps:
 - hover: '[data-testid="markdown-image-widget"] img'
 - click: '[data-testid="markdown-image-tools"] [data-testid="markdown-diagram-open"]'
 - wait_for: '[data-testid="markdown-diagram-stage"] img[alt="Remote fixture"]'
+- assert_focus_on: '[data-testid="markdown-diagram-stage"]'
 - click: '[data-testid="markdown-diagram-view-rotate-right"]'
 - assert_attribute:
     selector: '[data-testid="markdown-diagram-stage"]'
@@ -67,6 +69,14 @@ steps:
 - click: '[data-testid="markdown-outline-toggle"]'
 - assert_visible: '[data-testid="markdown-outline"]'
 - assert_not_visible: '[data-testid="markdown-diagram-menu"]'
+- press:
+    selector: '[data-testid="markdown-live"] .fv-md-drawio'
+    key: Shift+F10
+- assert_visible: '[data-testid="markdown-diagram-menu-copy-source"]'
+- assert_focus_within: '[data-testid="markdown-diagram-menu"]'
+- press: Escape
+- assert_not_visible: '[data-testid="markdown-diagram-menu"]'
+- assert_focus_on: '[data-testid="markdown-live"] .fv-md-drawio'
 - click: '[data-testid="markdown-mode-split"]'
 - eval_readonly:
     expression: document.querySelector('.fv-md-preview-pane img')?.naturalWidth === 96
@@ -79,8 +89,66 @@ steps:
     selector: '[data-testid="markdown-diagram-stage"]'
     key: Escape
 - assert_not_visible: '[data-testid="markdown-diagram-viewer"]'
+- assert_focus_on: '[data-testid="markdown-preview"] img[alt="Remote fixture"]'
 - assert_attribute:
     selector: '[data-testid="file-viewer"]'
     name: data-dirty
     equals: 'false'
 - assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: MARKDOWN-IMAGE-VIEWER-FOCUS
+    ui_standard: [UI-DLG-04, UI-DLG-07]
+    requirement: The image viewer opens with focus on the stage and returns focus to its source image after Escape.
+    actions: [13, 20, 52, 54]
+    checkpoints:
+    - step: 15
+      expectation: The viewer stage owns focus when the image appears.
+    - step: 21
+      expectation: The close button dismisses the image viewer.
+    - step: 55
+      expectation: Escape dismisses the image viewer in Split.
+    - step: 56
+      expectation: The original Split preview image regains focus.
+    - step: 57
+      expectation: Viewing and closing the image leaves the file clean.
+    results: [15, 21, 55, 56, 57]
+  - id: MARKDOWN-CONTEXT-MENU-OWNERSHIP
+    ui_standard: [UI-MNU-02, UI-MNU-03, UI-MNU-09, UI-MNU-10]
+    requirement: Markdown text and diagrams open their own menus and the draw.io keyboard menu returns focus to its diagram.
+    actions: [22, 23, 25, 27, 30, 32, 37, 40, 43, 46]
+    checkpoints:
+    - step: 24
+      expectation: Selecting all through the prose menu selects the rendered sentence.
+    - step: 26
+      expectation: Right-clicking selected prose exposes the enabled copy command.
+    - step: 28
+      expectation: Copying the selection closes the prose menu.
+    - step: 31
+      expectation: Right-clicking Mermaid exposes its diagram source command.
+    - step: 34
+      expectation: The outline button dismisses the Mermaid menu.
+    - step: 36
+      expectation: The mixed Markdown document displays the rendered draw.io SVG.
+    - step: 38
+      expectation: Right-clicking draw.io exposes the diagram source command.
+    - step: 42
+      expectation: The outline button dismisses the draw.io menu.
+    - step: 44
+      expectation: Shift+F10 on the draw.io diagram exposes the same source command.
+    - step: 45
+      expectation: The keyboard-opened menu owns focus.
+    - step: 47
+      expectation: Escape dismisses the diagram menu.
+    - step: 48
+      expectation: Focus returns to the draw.io diagram.
+    results: [24, 26, 28, 31, 34, 36, 38, 42, 44, 45, 47, 48]
+  visual:
+  - check: The remote image, Mermaid preview and draw.io SVG are visible in the mixed document.
+    method: automated
+    reason: Inspect the loaded image dimensions and rendered SVG elements.
+  native:
+  - check: A Markdown document with an image, Mermaid, and draw.io renders and remains interactive in the packaged WebView.
+    method: automated
+    reason: The native case exercises image loading and the bundled renderer with native WebView input.
