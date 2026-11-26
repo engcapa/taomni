@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { eventLogicalKey } from "../workspaceCommands";
 import {
   deriveEditableScheme,
   displaceStroke,
@@ -120,7 +121,7 @@ export function useKeymapRecorder(context: UseKeymapRecorderContext) {
       // Bare Tab/Space stay navigation keys so the Keyboard Shortcut dialog
       // (Second stroke checkbox, OK, Cancel) is reachable without a mouse.
       const bare = !event.ctrlKey && !event.altKey && !event.metaKey;
-      if (bare && (event.key === "Tab" || event.key === " ")) return;
+      if (bare && (eventLogicalKey(event) === "tab" || event.key === " ")) return;
       if (bare && event.key === "Enter" && event.target instanceof HTMLButtonElement) return;
       // §8.19.2 keystroke recording: Backspace removes the last stroke, Esc
       // cancels the capture, Enter confirms; modifier-only presses wait.

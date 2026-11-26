@@ -10,9 +10,15 @@ interface ModalSurfaceProps extends Omit<ComponentProps<"dialog">, "onCancel" | 
 const focusable = 'button:enabled, input:enabled:not([type="hidden"]), textarea:enabled, select:enabled, a[href], [tabindex="0"]';
 const openModalStack: HTMLDialogElement[] = [];
 
+function isTabNavigation(event: KeyboardEvent): boolean {
+  // WebKitGTK can leave the logical key unidentified for Shift+Tab.
+  return !event.ctrlKey && !event.metaKey && !event.altKey
+    && (event.key === "Tab" || (event.key === "Unidentified" && event.code === "Tab"));
+}
+
 function wrapModalTab(
   panel: HTMLDialogElement,
-  event: Pick<KeyboardEvent, "key" | "shiftKey" | "preventDefault">,
+  event: Pick<KeyboardEvent, "shiftKey" | "preventDefault">,
 ): void {
   const controls = Array.from(panel.querySelectorAll<HTMLElement>(`:is(${focusable})`))
     .filter((control) => control.tabIndex >= 0 && !control.closest("[hidden], [inert]") && control.checkVisibility?.() !== false);
@@ -87,7 +93,7 @@ export function ModalSurface({
       if (!panel || event.defaultPrevented) return;
       if (event.isComposing || event.keyCode === 229) return;
       if (openModalStack.at(-1) !== panel) return;
-      if (event.key === "Tab") {
+      if (isTabNavigation(event)) {
         if (panel.contains(document.activeElement)) wrapModalTab(panel, event);
         return;
       }
@@ -137,7 +143,7 @@ export function ModalSurface({
       if (event.key === "Escape") {
         event.preventDefault();
         onCancelRef.current();
-      } else if (event.key === "Tab") {
+      } else if (isTabNavigation(event.nativeEvent)) {
         wrapModalTab(event.currentTarget, event);
       }
     }}>{children}</dialog>;

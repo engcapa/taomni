@@ -32,6 +32,7 @@ steps:
 - press: Escape
 - assert_not_visible: '[data-testid="keymap-recorder"]'
 - assert_visible: '[data-testid="keymap-row-workspace.recentFiles"]'
+- assert_focus_on: '[data-testid="keymap-add-workspace.recentFiles"]'
 - assert_disabled: '[data-testid="keymap-settings-apply"]'
 - press: Escape
 - assert_not_visible: '[data-testid="workspace-keymap-settings-dialog"]'
@@ -42,8 +43,8 @@ verification:
   requirements:
   - id: recording-layer
     ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-07, UI-MNU-02, UI-KEY-07]
-    requirement: The shared Keymap menu and recorder own their keyboard actions. Reverse Tab reaches recorder Cancel. Escape dismisses one layer and leaves the selected action visible with no changes to apply.
-    actions: [9, 11, 14, 15, 17, 20, 22, 26]
+    requirement: The shared Keymap menu and recorder own their keyboard actions. Reverse Tab reaches recorder Cancel. Escape dismisses one layer and returns focus to the selected action with no changes to apply.
+    actions: [9, 11, 14, 15, 17, 20, 22, 27]
     checkpoints:
     - {step: 12, expectation: Keymap opens as a modal.}
     - {step: 13, expectation: The filter is the starting point.}
@@ -53,11 +54,12 @@ verification:
     - {step: 21, expectation: Reverse Tab wraps to Cancel.}
     - {step: 23, expectation: Escape dismisses the recorder.}
     - {step: 24, expectation: The original action is visible in Keymap.}
-    - {step: 25, expectation: Cancelling recording leaves the stored binding unchanged.}
-    - {step: 27, expectation: A second Escape dismisses Keymap.}
-    - {step: 28, expectation: The original editor stays open.}
-    - {step: 29, expectation: No runtime errors occur.}
-    results: [12, 13, 16, 18, 19, 21, 23, 24, 25, 27, 28, 29]
+    - {step: 25, expectation: Focus returns to the original action's Add button.}
+    - {step: 26, expectation: Cancelling recording leaves the stored binding unchanged.}
+    - {step: 28, expectation: A second Escape dismisses Keymap.}
+    - {step: 29, expectation: The original editor stays open.}
+    - {step: 30, expectation: No runtime errors occur.}
+    results: [12, 13, 16, 18, 19, 21, 23, 24, 25, 26, 28, 29, 30]
   visual:
   - {check: Menu and dialog layering, method: automated, reason: Checks the active element and modal presence on both layers.}
   native:
