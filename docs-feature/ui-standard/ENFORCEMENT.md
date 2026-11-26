@@ -327,4 +327,18 @@ AC-07 至 AC-12 将五项跨页面要求落实到页面清单、实际操作和�
 - Linux 浏览器，2026-11-25，产品提交 `70c62ebb7`。Sessions → 新建会话，读取已启用、未悬停的 `session-save` 按钮的计算样式。前景为白色。浅色渐变 `#3b82f6 → #1e40af` 两端分别为 **3.68∶1 / 8.72∶1**，深色渐变 `#8bbcff → #6aa6f8` 两端为 **1.96∶1 / 2.49∶1**。深色整段低于 4.5∶1。#31 从主按钮的前景/底色搭配修起，以 AC-10 复测文字位置和各交互状态。[会话按钮](../../src/components/session/editor/SessionEditorView.tsx) · [共用按钮样式](../../src/styles/components.css)
 - 同提交的 Linux Chromium 基线 `run-20261125-113325-721348745` 通过 5 项，0 失败、0 跳过。TC-015 覆盖主题模式与持久化，TC-WS-034 覆盖 Workspace 编辑器的 Settings 外观，TC-WS-010 覆盖业务菜单，TC-NP-004 通过查看菜单放大并从状态栏恢复，TC-NP-008 覆盖 Notepad 活动/失焦选区的明暗主题。逐步结果、截图及 runner receipt 位于本地 `qa-ui-auto-report/ui-standard-v04/`。
 - 6 个 Vitest 文件、54 项通过，涉及 shell 快捷键仲裁、工作区平台键位、DB 可见/隐藏时的字号键、HTML 预览、原生菜单定义及 Notepad 选区的合成对比度。对照更多既有场景可用 TC-007/019（终端）、TC-010（SFTP）、TC-013（会话树）、TC-MAIL-KEYS-01（邮件）、TC-153（VNC）及 TC-MAC-001/002/003。既有用例使用各自声明的平台和入口。[选区对比度断言](../../src/lib/notepad/cm6/notepadSelectionTheme.test.ts)
-- §11.1 各页的完整动作与状态，以及 Windows、Linux、macOS 原生窗口的实际投递、系统辅助点按、IME、剪贴板、跨窗外观和缩放仍待产品批次验证。每项记录具体平台、窗口、操作和可观察结果，沿用 §10 的原生验证流程。
+- 基线评审将 §11.1 的逐页动作和状态，以及原生按键、系统辅助点按、IME、剪贴板、跨窗外观和缩放留给产品批次验证。后续记录沿用 §10 的原生验证流程。
+
+### 11.4 规范化批次验收
+
+2026-11-27 验收产品提交 `c122e6de9e31b0491d85e5260270d0fb3eab05f8`。基座、核心、官方模块、截图和工作区的迁移已将桌面 UI lint 基线清零，`pnpm check:refactor` 和开发用例规则映射在阶段 4 强制执行。本次验证通过生产前端构建、355 项 Vitest、34 项 Rust 查看器单测、7 项 UI lint 单测、13 项 QA 工具单测及用例审计。[AGENTS.md](../../AGENTS.md) · [UI lint 基线](../../scripts/ui-standard-baseline.json)
+
+| 环境 | Browser | Native Release |
+|---|---:|---:|
+| 本机 Linux，Xvfb 和独立 D-Bus | 149 通过，2 跳过 | 131 通过，2 跳过 |
+| GitHub `windows-2025` X64 | 150 通过 | 124 通过 |
+| GitHub `macos-15` ARM64 | 150 通过 | 118 通过 |
+
+选集包含受影响用例、`ui-contract` 和 `crash-regression`，三平台均为零失败。Linux 的 `TC-FILE-OPEN-008`、`TC-WS-007` 因缺少 SSH 夹具跳过，两项均在 GitHub 通过。Linux 的 Browser 和 Native 主选集收据分别为 `receipt-run-20261127-004614-092285443` 和 `receipt-run-20261127-011538-008567843`，其余本机收据见 `fix-drawio-linux-qualification.json` 与压缩报告 `fix-drawio-linux-evidence.tar.gz`。GitHub 的 14 个分片在运行期间逐一取回，并核对源码、构建、用例摘要和收据。`qa-summary-135f4ead53ff48cfbf1402c398b1bd07` 保留选集和汇总，既有主题用例 `TC-015` 通过执行，汇总中的用例评审状态为 `unreviewed`。[GitHub Actions #45872870946](https://github.com/engcapa/taomni/actions/runs/45872870946)
+
+Windows WebView2 复用了带能力令牌的本地 draw.io 渲染文档。`TC-FILE-OPEN-039` 在两个原生平台验证了混排文档的实际 SVG、键盘菜单和 Escape 回焦。Windows 原始报告在 `qa-windows-native-shard-1-135f4ead53ff48cfbf1402c398b1bd07/run-20261126-183022-077400700/`，macOS 原始报告在 `qa-macos-native-shard-2-135f4ead53ff48cfbf1402c398b1bd07/run-20261126-183629-539616000/`。每个目录含 `summary.json` 和 `runner_receipt.json`。`TC-FILE-OPEN-036` 验证了原生保存的 PNG 像素和渲染隔离。[混排 Markdown 用例](../../qa-ui-auto-tests/cases/TC-FILE-OPEN-039-markdown-image-view-and-live-selection.testcase.yaml) · [原生 PNG 用例](../../qa-ui-auto-tests/cases/TC-FILE-OPEN-036-markdown-drawio-context-png-native.testcase.yaml)
