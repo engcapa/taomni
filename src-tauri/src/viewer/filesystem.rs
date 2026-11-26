@@ -64,6 +64,7 @@ pub(super) fn mime(path: &Path, sample: &[u8]) -> String {
         "htm" | "html" => Some("text/html"),
         "svg" => Some("image/svg+xml"),
         "png" => Some("image/png"),
+        "tif" | "tiff" => Some("image/tiff"),
         "jpg" | "jpeg" => Some("image/jpeg"),
         "gif" => Some("image/gif"),
         "webp" => Some("image/webp"),

@@ -74,6 +74,9 @@ export function viewerReadText(path: string, maxBytes = VIEWER_TEXT_EDIT_LIMIT, 
 export function viewerReadBytes(path: string, maxBytes = VIEWER_IMAGE_LIMIT): Promise<ViewerBytes> {
   return invoke("viewer_read_bytes", { path, maxBytes });
 }
+export function viewerTiffPreview(path: string): Promise<ViewerBytes> {
+  return invoke("viewer_tiff_preview", { path });
+}
 export function viewerReadTextChunk(path: string, offset: number, encoding?: string): Promise<ViewerTextChunk> {
   return invoke("viewer_read_text_chunk", { path, offset, maxBytes: VIEWER_TEXT_CHUNK_SIZE, encoding });
 }

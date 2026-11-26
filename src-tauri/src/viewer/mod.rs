@@ -13,6 +13,7 @@ mod network_rewrite;
 mod paths;
 mod temporary;
 mod text;
+pub(crate) mod tiff_preview;
 
 pub(crate) use assets::save_pasted_image;
 pub(crate) use chunks::read_text_chunk;

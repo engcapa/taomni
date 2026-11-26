@@ -209,6 +209,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "sdk_analyze_workspace"
         | "sdk_resolve_workspace" => sdk::handle(invoke),
         "viewer_stat"
+        | "viewer_tiff_preview"
         | "viewer_read_text"
         | "viewer_read_bytes"
         | "viewer_write_text"

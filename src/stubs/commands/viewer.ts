@@ -114,6 +114,10 @@ export async function invokeViewer(command: string, args: Record<string, unknown
       return { path: stat.path, size: stat.size, mtime: stat.mtime, mime: mime(path), isFile: stat.fileType === "file" };
     }
     case "viewer_read_text": return read(path, Number(args.maxBytes ?? VIEWER_TEXT_EDIT_LIMIT), args.encoding as string | undefined);
+    case "viewer_tiff_preview": {
+      const { renderTiffPreview } = await import("../tiffPreview");
+      return renderTiffPreview(await vfsReadBytes(path));
+    }
     case "viewer_read_bytes": {
       const bytes = new Uint8Array(await vfsReadBytes(path));
       if (bytes.length > Math.min(Number(args.maxBytes ?? VIEWER_IMAGE_LIMIT), VIEWER_IMAGE_LIMIT)) throw new Error("too_large: File exceeds byte limit");

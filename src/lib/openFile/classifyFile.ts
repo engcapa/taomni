@@ -2,7 +2,7 @@ import { officialDocumentFormats } from "./documentFormats";
 
 export type FileKind = "image" | "svg" | "text" | "markdown" | "html" | "pdf" | "document" | "source" | "binary";
 
-const images = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "avif"]);
+const images = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "avif", "tif", "tiff"]);
 const text = new Set(["txt", "text", "log", "ini", "conf", "config", "env", "json", "jsonc", "yaml", "yml", "toml", "xml", "csv", "tsv", "properties", "gitignore", "gitattributes", "editorconfig", "dockerignore"]);
 const source = new Set(["ts", "tsx", "js", "jsx", "mjs", "cjs", "rs", "py", "pyi", "go", "java", "kt", "kts", "c", "h", "cc", "cpp", "hpp", "cs", "swift", "m", "mm", "php", "rb", "sh", "bash", "zsh", "fish", "ps1", "bat", "cmd", "sql", "css", "scss", "less", "sass", "vue", "svelte", "gradle", "cmake", "make"]);
 const textNames = new Set(["readme", "license", "licence", "copying", "changelog", "authors"]);

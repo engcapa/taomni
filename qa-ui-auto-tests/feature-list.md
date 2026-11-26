@@ -16761,6 +16761,7 @@ components: [ViewerShell, TextEditor, ImageViewer, MarkdownEditor, HtmlPreview, 
 files:
   - src/components/viewer/ModuleDocumentPane.tsx
   - src/components/viewer/DelimitedDocumentPane.tsx
+  - src-tauri/src/viewer/tiff_preview.rs
   - src/lib/openFile/documentProvider.ts
   - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts

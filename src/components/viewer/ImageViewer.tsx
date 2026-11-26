@@ -8,12 +8,12 @@ import { writeImagePng, writeText } from "../../lib/clipboard";
 import { openExplorer } from "../../lib/explorer/openExplorer";
 import { openFile } from "../../lib/openFile";
 import { basename, formatBytes, parentPath, sftpOpenPath } from "../../lib/sftp";
-import { type ViewerDocument } from "../../lib/viewer";
+import { viewerReadBytes, type ViewerDocument } from "../../lib/viewer";
 import { useDocumentStore } from "../../stores/documentStore";
 import { EditorSurface } from "./EditorSurface";
 import { ImageViewerFilmstrip } from "./ImageViewerFilmstrip";
 import { saveImageCopy } from "./ImageViewerExport";
-import { imageExtension, imageToPng } from "./ImageViewerImage";
+import { imageExtension, imageToPng, isTiff } from "./ImageViewerImage";
 import { useImageDimensions, useImageResource, useImageSiblings } from "./ImageViewerResources";
 import { useImageTransform } from "./ImageViewerTransform";
 import { useViewerLabels } from "./viewerLabels";
@@ -107,7 +107,8 @@ function ImageViewerContent({ document, onError, workspaceId }: ImageViewerProps
   const saveAs = () => run(async () => {
     if (!resource) return;
     // SVG copies retain the user's source, never the sanitized rendering.
-    const blob = svg ? new Blob([document.content], { type: "image/svg+xml" }) : resource.blob;
+    const blob = svg ? new Blob([document.content], { type: "image/svg+xml" })
+      : isTiff(document.path) ? new Blob([Uint8Array.from((await viewerReadBytes(document.path)).bytes)], { type: "image/tiff" }) : resource.blob;
     const path = await saveImageCopy(blob, filename, document.path);
     if (path) setNotice(label("已另存副本", "Copy saved"));
   });

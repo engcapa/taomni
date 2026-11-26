@@ -13,6 +13,11 @@ async fn on_worker<T: Send + 'static>(
 }
 
 #[tauri::command]
+async fn viewer_tiff_preview(path: String) -> Result<BytesData, String> {
+    on_worker(move || viewer::tiff_preview::read(&path)).await
+}
+
+#[tauri::command]
 async fn viewer_stat(path: String) -> Result<FileStat, String> {
     on_worker(move || viewer::stat(&path)).await
 }
@@ -162,6 +167,7 @@ pub(super) fn handles(command: &str) -> bool {
     matches!(
         command,
         "viewer_stat"
+            | "viewer_tiff_preview"
             | "viewer_read_text"
             | "viewer_read_bytes"
             | "viewer_write_text"
@@ -182,6 +188,7 @@ pub(super) fn handles(command: &str) -> bool {
 pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
     let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
         crate::commands::viewer::viewer_stat,
+        crate::commands::viewer::viewer_tiff_preview,
         crate::commands::viewer::viewer_read_text,
         crate::commands::viewer::viewer_read_bytes,
         crate::commands::viewer::viewer_write_text,

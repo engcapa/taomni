@@ -282,7 +282,7 @@ if-addrs = "0.15.0"
 socket2 = { version = "0.6", features = ["all"] }
 tauri-plugin-notification = "2.4.0"
 xcap = { version = "0.9.6", optional = true }
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png", "tiff"] }
 # Clipboard export can copy the first frame of a GIF.
 gif = "0.13"
 tauri-plugin-dialog = "2.7.3"

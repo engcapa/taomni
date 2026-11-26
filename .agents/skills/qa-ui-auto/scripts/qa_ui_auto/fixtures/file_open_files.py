@@ -58,6 +58,12 @@ def setup(ctx: Any) -> None:
     }
     if ctx.case_id == "TC-TAOFFICE-002":
         files["records.tsv"] = 'City\tNote\r\nTokyo\t"Metro, East"\r\nParis\t"Line 1\nLine 2"\r\n'.encode()
+    if ctx.case_id == "TC-TAOFFICE-004":
+        # 4x3 LZW TIFF, every pixel RGB(29, 81, 144).
+        files["swatch.tif"] = base64.b64decode(
+            "SUkqABoAAACAB0opCBQSBwWEQeFQaGQlIQEKAAABAwABAAAABAAAAAEBAwABAAAAAwAAAAIBAwADAAAAmAAAAAMBAwAB"
+            "AAAABQAAAAYBAwABAAAAAgAAABEBBAABAAAACAAAABUBAwABAAAAAwAAABYBAwABAAAAAwAAABcBBAABAAAAEgAAABwBAwABAAAAAQAAAAAAAAAIAAgACAA="
+        )
     if ctx.case_id == "TC-TAOFFICE-001":
         for name in ("Build", "Review"):
             files[f"{name}.mppx"] = (
