@@ -1,8 +1,9 @@
 //! Local viewer IPC stays on blocking workers; handlers never own UI state.
+use crate::state::AppState;
 use crate::viewer::{
     self, BytesData, FileStat, HtmlSession, SavedImage, TempFile, TextChunk, TextData, WriteAck,
 };
-use tauri::Manager;
+use tauri::{Manager, State};
 
 async fn on_worker<T: Send + 'static>(
     operation: impl FnOnce() -> Result<T, String> + Send + 'static,
@@ -15,6 +16,55 @@ async fn on_worker<T: Send + 'static>(
 #[tauri::command]
 async fn viewer_tiff_preview(path: String) -> Result<BytesData, String> {
     on_worker(move || viewer::tiff_preview::read(&path)).await
+}
+
+#[tauri::command]
+async fn viewer_media_open(
+    path: String,
+    slug: String,
+    version: String,
+    state: State<'_, AppState>,
+) -> Result<viewer::media_stream::MediaStream, String> {
+    let registry = state.plugins.clone();
+    let profile = state.core.paths.clone();
+    on_worker(move || {
+        let path = viewer::document_access::approved_path(
+            &registry,
+            &[&profile.data, &profile.config, &profile.cache],
+            &path,
+            &slug,
+            &version,
+        )?;
+        viewer::media_stream::open(&viewer::display_path(&path))
+    })
+    .await
+}
+
+#[tauri::command]
+async fn viewer_document_read(
+    path: String,
+    slug: String,
+    version: String,
+    state: State<'_, AppState>,
+) -> Result<BytesData, String> {
+    let registry = state.plugins.clone();
+    let profile = state.core.paths.clone();
+    on_worker(move || {
+        let path = viewer::document_access::approved_path(
+            &registry,
+            &[&profile.data, &profile.config, &profile.cache],
+            &path,
+            &slug,
+            &version,
+        )?;
+        viewer::read_bytes(&viewer::display_path(&path), Some(32 * 1024 * 1024))
+    })
+    .await
+}
+
+#[tauri::command]
+fn viewer_media_close(token: String) {
+    viewer::media_stream::close(&token);
 }
 
 #[tauri::command]
@@ -168,6 +218,9 @@ pub(super) fn handles(command: &str) -> bool {
         command,
         "viewer_stat"
             | "viewer_tiff_preview"
+            | "viewer_media_open"
+            | "viewer_document_read"
+            | "viewer_media_close"
             | "viewer_read_text"
             | "viewer_read_bytes"
             | "viewer_write_text"
@@ -189,6 +242,9 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
     let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
         crate::commands::viewer::viewer_stat,
         crate::commands::viewer::viewer_tiff_preview,
+        crate::commands::viewer::viewer_media_open,
+        crate::commands::viewer::viewer_document_read,
+        crate::commands::viewer::viewer_media_close,
         crate::commands::viewer::viewer_read_text,
         crate::commands::viewer::viewer_read_bytes,
         crate::commands::viewer::viewer_write_text,

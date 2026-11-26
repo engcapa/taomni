@@ -8,7 +8,7 @@ import { usePluginFrontendStore } from "../../stores/pluginFrontendStore";
 import { useModuleMarketplaceStore } from "../../stores/moduleMarketplaceStore";
 import { openSettingsSection } from "../../lib/settingsNavigation";
 import { basename, sftpOpenPath } from "../../lib/sftp";
-import { viewerReadBytes } from "../../lib/viewer";
+import { openDocumentMedia, readModuleDocument, type MediaSourceLease } from "../../lib/openFile/mediaStream";
 import { PluginTabPane } from "../plugins/PluginTabPane";
 import { useViewerLabels } from "./viewerLabels";
 import "./moduleDocument.css";
@@ -20,6 +20,8 @@ export interface ModuleDocumentInput {
     extension: string;
     readOnly: boolean;
     read: () => Promise<Blob>;
+    openMedia: (mime: string) => Promise<MediaSourceLease>;
+    openSystem: () => Promise<void>;
   };
 }
 
@@ -35,7 +37,8 @@ export function ModuleDocumentPane({ viewer, active }: { viewer: FileViewerTabIn
   const record = state.records[slug];
   const epoch = state.epochs[slug] ?? 0;
   const version = record?.manifest?.version;
-  const enabled = state.status === "ready" && !state.pending.has(slug) && record?.lifecycle === "enabled"
+  const permitted = record?.manifest?.permissions.includes("fs.readUserFile") === true;
+  const enabled = permitted && state.status === "ready" && !state.pending.has(slug) && record?.lifecycle === "enabled"
     && record.manifest?.document?.extensions.includes(extension) === true;
   const [input, setInput] = useState<ModuleDocumentInput>();
   const [error, setError] = useState("");
@@ -44,7 +47,7 @@ export function ModuleDocumentPane({ viewer, active }: { viewer: FileViewerTabIn
 
   useEffect(() => {
     setError("");
-    if (!enabled) { setInput(undefined); return; }
+    if (!enabled || !version) { setInput(undefined); return; }
     let alive = true;
     const ensureCurrent = () => {
       const current = usePluginFrontendStore.getState();
@@ -53,13 +56,27 @@ export function ModuleDocumentPane({ viewer, active }: { viewer: FileViewerTabIn
         throw new DOMException("Document was closed or its module changed", "AbortError");
       }
     };
-    setInput({ document: { name, extension, readOnly, read: async () => {
+    const leases = new Set<MediaSourceLease>();
+    setInput({ document: { name, extension, readOnly, openMedia: async (mime) => {
       ensureCurrent();
-      const data = await viewerReadBytes(path);
+      const lease = await openDocumentMedia(path, mime, slug, version);
+      try { ensureCurrent(); } catch (error) { lease.close(); throw error; }
+      leases.add(lease);
+      return { url: lease.url, close: () => { if (leases.delete(lease)) lease.close(); } };
+    }, openSystem: async () => {
+      ensureCurrent();
+      await sftpOpenPath(path);
+    }, read: async () => {
+      ensureCurrent();
+      const data = await readModuleDocument(path, slug, version);
       ensureCurrent();
       return new Blob([Uint8Array.from(data.bytes)], { type: data.mime });
     } } });
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+      for (const lease of leases) lease.close();
+      leases.clear();
+    };
   }, [enabled, path, name, extension, slug, epoch, version, readOnly]);
 
   const systemAction = <button type="button" className="taomni-btn" data-testid="document-open-system"
@@ -68,6 +85,7 @@ export function ModuleDocumentPane({ viewer, active }: { viewer: FileViewerTabIn
   </button>;
   const loading = state.status === "idle" || state.status === "loading" || state.pending.has(slug);
   const unavailable = record?.lifecycle === "disabled" ? label("已禁用", "is disabled")
+    : record?.lifecycle === "enabled" && !permitted ? label("没有读取所选文件的权限", "does not have permission to read the selected file")
     : record?.lifecycle === "enabled" ? label("不支持此扩展名", "does not support this extension")
     : record?.lifecycle === "installed" ? label("尚未启用", "is not enabled") : label("尚未安装", "is not installed");
   return <section className="fv module-document" data-testid="file-viewer" data-active={active}

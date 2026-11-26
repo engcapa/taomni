@@ -1477,6 +1477,10 @@
 - `[data-testid="document-readonly"]` — display — F-FILEOPEN-1.document-readonly
 - `[data-testid="delimited-table"]` — display — F-FILEOPEN-1.delimited-table
 - `[data-testid="delimited-source"]` — interactive — F-FILEOPEN-1.delimited-source
+- `[data-testid="taoffice-media"]` — display — F-FILEOPEN-1.taoffice-media
+- `[data-testid="taoffice-media-player"]` — interactive — F-FILEOPEN-1.taoffice-media-player
+- `[data-testid="taoffice-media-error"]` — display — F-FILEOPEN-1.taoffice-media-error
+- `[data-testid="taoffice-media-retry"]` — interactive — F-FILEOPEN-1.taoffice-media-retry
 - `[data-testid="viewer-editor"]` — interactive — F-FILEOPEN-1.viewer-editor
 - `[data-testid="viewer-save"]` — interactive — F-FILEOPEN-1.viewer-save
 - `[data-testid="viewer-readonly"]` — display — F-FILEOPEN-1.viewer-readonly

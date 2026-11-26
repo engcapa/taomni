@@ -121,4 +121,5 @@ pub(crate) fn shutdown() {
         .unwrap_or_else(|error| error.into_inner())
         .clear();
     super::html::clear();
+    super::media_stream::clear();
 }

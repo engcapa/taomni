@@ -1,5 +1,6 @@
 import type { PluginManifest, PluginRecord } from "../lib/pluginRegistry";
 import voiceManifest from "../../src-tauri/plugins/ai-voice-local/module.json";
+import videoManifest from "../../src-tauri/plugins/taoffice-video/module.json";
 import mailManifest from "../../src-tauri/plugins/mail/module.json";
 import mfaManifest from "../../src-tauri/plugins/mfa/module.json";
 import rdpManifest from "../../src-tauri/plugins/rdp-client/module.json";
@@ -23,6 +24,7 @@ export const previewHelloManifest: PluginManifest = {
   legacyTables: [], vaultFixedKeys: [], snapshot: "rpc",
 };
 const previewModules = [
+  [videoManifest, "taoffice-video"],
   [vncManifest, "vnc"],
   [rdpManifest, "rdp"],
   [mailManifest, "mail"],

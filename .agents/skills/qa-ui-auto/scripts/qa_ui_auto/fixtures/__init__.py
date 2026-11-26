@@ -107,7 +107,7 @@ from . import java_real_project
 from . import dual_display_required
 from . import rdp_deferred_clipboard
 from . import module_offline_archive
-from . import module_signed_archive, module_backup_data, module_voice
+from . import module_signed_archive, module_backup_data, module_voice, taoffice_media
 from . import module_preview
 from . import module_upgrade
 from . import module_legacy_install, module_legacy_mfa
@@ -162,6 +162,7 @@ REGISTRY: dict[str, Fixture] = {
     "module_offline_archive": Fixture("module_offline_archive", module_offline_archive.setup),
     "module_backup_data": Fixture("module_backup_data", module_backup_data.setup, module_backup_data.teardown),
     "module_signed_archive": Fixture("module_signed_archive", module_signed_archive.setup),
+    "taoffice_signed_media": Fixture("taoffice_signed_media", taoffice_media.setup),
     "module_signed_mfa_archive": Fixture("module_signed_mfa_archive", module_signed_archive.setup_mfa),
     "module_signed_vnc_archive": Fixture("module_signed_vnc_archive", module_signed_archive.setup_vnc),
     "module_signed_rdp_archive": Fixture("module_signed_rdp_archive", module_signed_archive.setup_rdp),

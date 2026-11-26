@@ -24,13 +24,14 @@ pub(crate) fn installed_proof_paths(directory: &Path) -> (PathBuf, PathBuf) {
         proof.join("signature.minisig"),
     )
 }
-pub(super) const KNOWN_PERMISSIONS: [&str; 14] = [
+pub(super) const KNOWN_PERMISSIONS: [&str; 15] = [
     "vault.ref",
     "vault.session-secret",
     "vault.fixed-key",
     "session.read",
     "network.egress",
     "fs.dataDir",
+    "fs.readUserFile",
     "window.open",
     "capture.screen",
     "terminal.observe",
@@ -98,17 +99,18 @@ impl VerifiedPackage {
             &catalog.verifier,
             Some((&expected, asset.size)),
         )?;
-        if plugin
-            .kind
-            .as_ref()
-            .is_some_and(|kind| *kind != package.manifest.kind)
+        if plugin.document != package.manifest.document
+            || plugin
+                .kind
+                .as_ref()
+                .is_some_and(|kind| *kind != package.manifest.kind)
             || plugin
                 .permissions
                 .as_ref()
                 .is_some_and(|permissions| *permissions != package.manifest.permissions)
         {
             return Err(invalid(
-                "package permissions or category differ from the signed catalog",
+                "package document associations, permissions or category differ from the signed catalog",
             ));
         }
         Ok(package)

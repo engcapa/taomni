@@ -27,7 +27,7 @@ function install(lifecycle: "disabled" | "enabled") {
   const record = moduleRecord(lifecycle);
   record.slug = slug;
   record.manifest = { ...record.manifest!, slug, id: `taomni-plugin-${slug}`, name: "Excel",
-    document: { fileKinds: ["excel"], extensions: ["xlsx"] } };
+    document: { fileKinds: ["excel"], extensions: ["xlsx"] }, permissions: ["fs.readUserFile"] };
   usePluginFrontendStore.setState({ records: { [slug]: record } });
 }
 

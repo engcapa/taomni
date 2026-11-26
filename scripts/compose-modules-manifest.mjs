@@ -192,6 +192,7 @@ export function composeModulesManifest({
     const digest = sha256(packagePath);
     verifyChecksumSidecar(packagePath, digest);
     const assetName = basename(packagePath);
+    if (manifest.document && statSync(packagePath).size > 100_000_000) throw new Error(`Document module exceeds 100 MB: ${assetName}`);
     if (names.has(assetName)) throw new Error(`Conflicting plugin release asset filename: ${assetName}`);
     names.add(assetName);
     const published = manifests.get(manifest.id);
@@ -247,6 +248,14 @@ export function composeModulesManifest({
       if (allowedStatus && !module.description) {
         throw new Error(`Stable module ${module.id} needs a description for the module store`);
       }
+    }
+  }
+  // Older cores ignore the document-specific field. Supporting cores deserialize
+  // it as permissions and verify the signed package has exactly the same grants.
+  for (const plugin of plugins.values()) {
+    if (plugin.document && plugin.permissions?.includes("fs.readUserFile")) {
+      plugin.documentPermissions = plugin.permissions;
+      delete plugin.permissions;
     }
   }
   const manifest = {

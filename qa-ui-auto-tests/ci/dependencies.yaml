@@ -485,6 +485,8 @@ TC-NP-107: []
 TC-TAOFFICE-001: []
 TC-TAOFFICE-002: []
 TC-TAOFFICE-004: []
+TC-TAOFFICE-003: []
+TC-TAOFFICE-005: []
 # Issue #869 approval delivery cases own their isolated trigger state; neither
 # relies on a predecessor's app state.
 TC-AI-869-01-approval-window-routing-browser: []

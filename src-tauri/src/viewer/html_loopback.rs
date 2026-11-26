@@ -120,12 +120,17 @@ fn valid_host(headers: &HeaderMap, expected: &str) -> bool {
 }
 
 async fn handle_request(req: Request<Body>) -> Response<Body> {
-    if req.method() != Method::GET {
-        return plain_error(StatusCode::METHOD_NOT_ALLOWED, "permission: GET only");
-    }
     let srv = server();
     if !valid_host(req.headers(), &srv.host_header) {
         return plain_error(StatusCode::FORBIDDEN, "permission: Invalid preview host");
+    }
+    if let Some(token) = req.uri().path().strip_prefix("/media/")
+        && (req.method() == Method::GET || req.method() == Method::HEAD)
+    {
+        return super::media_stream::serve(&req, token);
+    }
+    if req.method() != Method::GET {
+        return plain_error(StatusCode::METHOD_NOT_ALLOWED, "permission: GET only");
     }
     #[cfg(any(target_os = "macos", test))]
     if let Some(response) = super::drawio_frame::serve(&srv.origin, req.uri().path()) {

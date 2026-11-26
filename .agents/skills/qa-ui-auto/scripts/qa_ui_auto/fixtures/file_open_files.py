@@ -4,6 +4,8 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import io
+import wave
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -64,6 +66,13 @@ def setup(ctx: Any) -> None:
             "SUkqABoAAACAB0opCBQSBwWEQeFQaGQlIQEKAAABAwABAAAABAAAAAEBAwABAAAAAwAAAAIBAwADAAAAmAAAAAMBAwAB"
             "AAAABQAAAAYBAwABAAAAAgAAABEBBAABAAAACAAAABUBAwABAAAAAwAAABYBAwABAAAAAwAAABcBBAABAAAAEgAAABwBAwABAAAAAQAAAAAAAAAIAAgACAA="
         )
+    if ctx.case_id in {"TC-TAOFFICE-003", "TC-TAOFFICE-005"}:
+        wav = io.BytesIO()
+        with wave.open(wav, "wb") as audio:
+            audio.setparams((1, 2, 8000, 0, "NONE", "not compressed"))
+            audio.writeframes(bytes(32000))
+        files["sample.wav"] = wav.getvalue()
+        files["damaged.wav"] = b"Invalid WAV fixture"
     if ctx.case_id == "TC-TAOFFICE-001":
         for name in ("Build", "Review"):
             files[f"{name}.mppx"] = (

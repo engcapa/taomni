@@ -1,12 +1,14 @@
 //! Local file viewer I/O. Policy is independent of any window/document lifetime.
 mod assets;
 mod chunks;
+pub(crate) mod document_access;
 #[cfg(any(target_os = "macos", test))]
 mod drawio_frame;
 mod filesystem;
 mod html;
 mod html_document;
 mod html_loopback;
+pub(crate) mod media_stream;
 pub(crate) mod markdown_images;
 mod network;
 mod network_rewrite;

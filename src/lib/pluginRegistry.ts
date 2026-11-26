@@ -19,6 +19,7 @@ export const PLUGIN_PERMISSION_NAMES = [
   "session.read",
   "network.egress",
   "fs.dataDir",
+  "fs.readUserFile",
   "window.open",
   "capture.screen",
   "terminal.observe",

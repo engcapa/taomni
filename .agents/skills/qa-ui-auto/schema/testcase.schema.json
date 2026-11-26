@@ -112,6 +112,7 @@
           "module_signed_vnc_server_archive",
           "module_signed_rdp_server_archive",
           "module_signed_servers_archive",
+          "taoffice_signed_media",
           "module_signed_voice_archive",
           "local_servers_http",
           "local_servers_ssh",

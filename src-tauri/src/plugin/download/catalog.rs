@@ -28,7 +28,7 @@ pub struct ModuleCatalogPlugin {
     pub kind: Option<taomni_plugin_api::PluginKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub document: Option<taomni_plugin_api::DocumentTypes>,
-    #[serde(default)]
+    #[serde(default, alias = "documentPermissions")]
     pub permissions: Option<std::collections::BTreeSet<String>>,
     #[serde(default)]
     pub description: String,
