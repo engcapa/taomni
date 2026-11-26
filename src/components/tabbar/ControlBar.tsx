@@ -120,7 +120,8 @@ export function ControlBar({
     previewNode,
   } = useSessionImportExport();
 
-  const openMainMenu = (event: React.MouseEvent) => {
+  const openMainMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const menuButton = event.currentTarget;
     // Opening a menu samples current ownership without subscribing the entire
     // window to every editor selection, mount and command-state publication.
     const commands = getWorkspaceCommands ? getWorkspaceCommands()?.items ?? [] : workspaceCommands;
@@ -225,7 +226,11 @@ export function ControlBar({
       },
       { label: t("menu.xserver"), testId: "context-menu-item-xserver", icon: <Monitor className="w-3 h-3" />, checked: xServerEnabled, onClick: () => onCommand("toggle-xserver") },
       { label: t("menu.settings"), testId: "context-menu-item-settings", icon: <Settings className="w-3 h-3" />, onClick: () => onCommand("settings") },
-      { label: t("menu.help"), testId: "context-menu-item-help", icon: <HelpCircle className="w-3 h-3" />, onClick: () => onCommand("help") },
+      { label: t("menu.help"), testId: "context-menu-item-help", icon: <HelpCircle className="w-3 h-3" />, onClick: () => {
+        // The selected item unmounts as About opens. Retain its keyboard return target.
+        menuButton.focus();
+        onCommand("help");
+      } },
       { label: "", separator: true, onClick: () => {} },
       { label: t("ribbon.exit"), testId: "context-menu-item-exit", icon: <Power className="w-3 h-3" />, onClick: () => onCommand("exit"), danger: true },
     ]);
@@ -364,7 +369,7 @@ function BarButton({
 }: {
   icon: React.ReactNode;
   title: string;
-  onClick?: (event: React.MouseEvent) => void;
+  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
   testId?: string;
   active?: boolean;
   expanded?: boolean;

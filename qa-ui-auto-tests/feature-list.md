@@ -1832,6 +1832,9 @@ controls:
   - id: about-check-update
     selector: '[data-testid="about-check-update"]'
     kind: interactive
+  - id: about-close
+    selector: '[data-testid="about-close"]'
+    kind: interactive
   - id: about-version
     selector: '[data-testid="about-version"]'
     kind: interactive

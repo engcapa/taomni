@@ -2172,6 +2172,7 @@
 ## main/menubar (F1.8)
 
 - `[data-testid="about-check-update"]` — interactive — F1.8.about-check-update
+- `[data-testid="about-close"]` — interactive — F1.8.about-close
 - `[data-testid="about-version"]` — interactive — F1.8.about-version
 - `[data-testid="app-main-menu"]` — interactive — F1.8.app-main-menu
 - `[data-testid="about-dialog"]` — display [optional] — F1.8.about-dialog
