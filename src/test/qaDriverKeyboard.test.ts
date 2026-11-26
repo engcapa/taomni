@@ -151,6 +151,22 @@ describe("macOS QA WebView keyboard defaults", () => {
     expect(submit).not.toHaveBeenCalled();
   });
 
+  it("toggles a focused checkbox on Space release without throwing InvalidStateError", () => {
+    const emit = new Function("type", "event", "mods", "buttonKeyboard",
+      `${keyboardScript}\nreturn dispatchQaKeyToFocus(type, event.key, event, mods, buttonKeyboard);`);
+    const buttonKeyboard = new Function(`${keyboardScript}\nreturn createQaButtonKeyboard();`)();
+    const { input } = formFixture('<input type="checkbox">');
+    const changes = vi.fn();
+    input.addEventListener("change", changes);
+    input.focus();
+
+    emit("keydown", new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true }), plain, buttonKeyboard);
+    expect(input.checked).toBe(false);
+    emit("keyup", new KeyboardEvent("keyup", { key: " ", bubbles: true, cancelable: true }), plain, buttonKeyboard);
+    expect(input.checked).toBe(true);
+    expect(changes).toHaveBeenCalledTimes(1);
+  });
+
   it("moves an input caret before inserting without appending to the end", () => {
     const input = document.createElement("input");
     document.body.append(input);

@@ -90,6 +90,7 @@ function dispatchQaKeyDefault(el, key, event, modifiers) {
     return;
   }
   if (el.disabled || el.readOnly || (key.length !== 1 && key !== "Enter")) return;
+  if (el instanceof HTMLInputElement && el.selectionStart === null) return;
   const start = el.selectionStart ?? el.value.length;
   const end = el.selectionEnd ?? start;
   const insert = key === "Enter" ? "\n" : key;
@@ -97,20 +98,23 @@ function dispatchQaKeyDefault(el, key, event, modifiers) {
   el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: insert }));
 }
 
-// Default button activation for constructed WKWebView keyboard events.
-// These are WebView actions, not physical macOS keyboard input.
+// Default button and checkable-input activation for constructed WKWebView
+// keyboard events. These are WebView actions, not physical macOS keyboard input.
 function createQaButtonKeyboard() {
   let spaceTarget = null;
   return (el, type, key, event, modifiers) => {
     const unmodified = !modifiers.Control && !modifiers.Meta && !modifiers.Alt;
-    const enabled = el instanceof HTMLButtonElement && !el.disabled && document.activeElement === el;
+    const isButton = el instanceof HTMLButtonElement ||
+      (el instanceof HTMLInputElement && ["button", "submit", "reset"].includes(el.type));
+    const isCheckable = el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio");
+    const enabled = (isButton || isCheckable) && !el.disabled && document.activeElement === el;
     if (type === "keydown" && key === " ") {
       spaceTarget = enabled && unmodified && !event.defaultPrevented ? el : null;
     } else if (type === "keyup" && key === " ") {
       const target = spaceTarget;
       spaceTarget = null;
       if (target === el && enabled && unmodified && !event.defaultPrevented) el.click();
-    } else if (type === "keydown" && key === "Enter" && enabled && unmodified && !event.defaultPrevented) {
+    } else if (type === "keydown" && key === "Enter" && isButton && enabled && unmodified && !event.defaultPrevented) {
       el.click();
     }
   };
