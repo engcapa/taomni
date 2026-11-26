@@ -16,7 +16,7 @@ steps:
 - click: '[data-testid="tao-home-history-tab-workspaces"]'
 - click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
-- press: {selector: '[data-testid="code-workspace-editor"] .cm-content', key: Control+Shift+a}
+- press: {selector: '[data-testid="code-workspace-editor"] .cm-content', key: Control+Shift+a, macos_key: Meta+Shift+a}
 - fill: {selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]', value: Keymap Settings}
 - press: Enter
 - wait_for: '[data-testid="workspace-keymap-settings-dialog"]:modal'

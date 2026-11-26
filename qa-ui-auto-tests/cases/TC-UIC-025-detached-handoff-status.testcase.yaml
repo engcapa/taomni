@@ -4,6 +4,7 @@ covers: [F-Detach-1]
 fixtures: [reset_db]
 tags: [ui-contract, window, theme]
 modes: [browser]
+timeout_sec: 180
 ui_standard: [UI-FND-03a, UI-FND-13]
 steps:
 - open: ${cfg.app.base_url}

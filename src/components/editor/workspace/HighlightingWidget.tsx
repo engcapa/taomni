@@ -1,5 +1,6 @@
 import { AnchoredMenu } from "../../ui/AnchoredMenu";
 import { useId, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   AlertCircle,
   AlertTriangle,
@@ -66,8 +67,10 @@ export function HighlightingWidget({
           : "No problems found";
 
   const selectLevel = (next: HighlightingLevel) => {
-    onChangeLevel(next);
-    setMenuOpen(false);
+    flushSync(() => {
+      onChangeLevel(next);
+      setMenuOpen(false);
+    });
     onRestoreEditorFocus?.();
   };
 
