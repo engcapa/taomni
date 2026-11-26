@@ -3,6 +3,7 @@ title: Native text save refuses stale hashes, compares/reloads and recovers unsa
 description: AC08/09/10/21/22. Uses real host files, production IPC, exact-byte oracle and genuine external host writes. Browser stubs cannot establish
   expected_hash, atomic writes or native recovery. Window reload is renderer recovery, not a process-crash simulation. Physical OS shortcuts/AppKit and
   process-restart recovery remain separate unrun checks.
+ui_standard: [UI-DLG-06]
 modes:
 - native
 covers:
@@ -74,7 +75,7 @@ steps:
     - My unsaved version
     - ''
 - click: '[data-testid="viewer-compare"]'
-- wait_for: '[data-testid="viewer-diff"]'
+- assert_focus_on: '[data-testid="viewer-diff"] footer button'
 - assert_text:
     selector: '[data-testid="viewer-diff"]'
     contains: External disk version
@@ -180,6 +181,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
+    ui_standard: [UI-DLG-06]
     requirement: Native save writes exact bytes and stale expected_hash never silently overwrites the external disk version; Compare and Keep are actionable.
     actions:
     - 12
@@ -198,6 +200,8 @@ verification:
       expectation: External version is still on disk after failed stale save.
     - step: 20
       expectation: Unsaved local editor version remains intact.
+    - step: 22
+      expectation: The read-only comparison opens with its Close action focused.
     - step: 23
       expectation: Comparison exposes actual external text.
     - step: 24
@@ -205,6 +209,7 @@ verification:
     - step: 29
       expectation: Explicit Keep then Save writes the chosen local version.
     results:
+    - 22
     - 14
     - 19
     - 20

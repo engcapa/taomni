@@ -70,7 +70,11 @@ describe("shared viewer lifecycle and close guard", () => {
     await screen.findByTestId("viewer-editor");
     act(() => { useDocumentStore.getState().edit(path, "draft"); useAppStore.getState().removeTab("viewer"); });
     expect(screen.getByTestId("viewer-close-dialog")).toBeVisible(); expect(useAppStore.getState().tabs).toHaveLength(1);
-    fireEvent.click(screen.getByTestId("viewer-close-cancel"));
+    const cancel = screen.getByTestId("viewer-close-cancel");
+    expect(cancel).toHaveFocus();
+    fireEvent.keyDown(cancel, { key: "Escape", isComposing: true });
+    expect(screen.getByTestId("viewer-close-dialog")).toBeVisible();
+    fireEvent.keyDown(cancel, { key: "Escape" });
     expect(useAppStore.getState().tabs).toHaveLength(1); expect(useDocumentStore.getState().documents[path].dirty).toBe(true);
     act(() => useAppStore.getState().removeTab("viewer"));
     fireEvent.click(screen.getByTestId("viewer-close-discard"));
