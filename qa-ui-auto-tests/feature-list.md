@@ -2796,6 +2796,9 @@ controls:
   - id: session-tree
     selector: '[data-testid="session-tree"]'
     kind: display
+  - id: session-protocol-label
+    selector: '[data-testid="session-protocol-label"]'
+    kind: display
   - id: session-tree-item       # individual row; pair with [data-session-name=...] / [data-session-type=...]
     selector: '[data-testid="session-tree-item"]'
     kind: interactive

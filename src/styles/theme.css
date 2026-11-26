@@ -42,6 +42,7 @@
   --taomni-titlebar-to: #cbd5e1;
   --taomni-menubar-bg: #f8fafc;
   --taomni-quick-bg: #f1f5f9;
+  --taomni-protocol-violet: #6b3491;
   --taomni-accent: #1e40af; /* More premium Royal Indigo Blue */
   --taomni-accent-soft: #3b82f6;
   --taomni-tab-active: #ffffff;
@@ -227,6 +228,7 @@ html[data-app-theme="dark"] {
   --taomni-titlebar-to: #191a1c;
   --taomni-menubar-bg: #191a1c;
   --taomni-quick-bg: #26282e;
+  --taomni-protocol-violet: #deb2fb;
   --taomni-accent: #6aa6f8;
   --taomni-accent-soft: #8bbcff;
   --taomni-tab-active: #1e1f22;

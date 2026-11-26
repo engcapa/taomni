@@ -3631,6 +3631,7 @@
 - `[data-testid="sidebar"]` — display — F6.2.sidebar
 - `[data-testid="side-tab-sessions"]` — interactive — F6.2.side-tab-sessions
 - `[data-testid="session-tree"]` — display — F6.2.session-tree
+- `[data-testid="session-protocol-label"]` — display — F6.2.session-protocol-label
 - `[data-testid="session-tree-item"]` — interactive — F6.2.session-tree-item
 - `[data-testid="session-tree-folder"]` — interactive — F6.2.session-tree-folder
 - `[data-testid="context-menu-item-move-to-folder"]` — interactive [optional] — F6.2.context-move-to-folder

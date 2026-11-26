@@ -325,6 +325,7 @@ cases:
 - TC-UIC-027-editor-go-to-line-native
 - TC-UIC-028-about-keyboard
 - TC-UIC-029-workspace-symbol-contrast
+- TC-UIC-030-session-protocol-appearance
 - TC-UIC-DLG-explorer-new-file
 - TC-UIC-DLG-mail-attachment-reminder
 - TC-UIC-DLG-workspace-build-tools
