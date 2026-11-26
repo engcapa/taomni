@@ -1,32 +1,25 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { explorerCancelOperation, localProperties, type LocalProperties } from "../../lib/explorer";
 import { formatBytes, formatPosixMode, type FileEntry } from "../../lib/sftp";
-import { useFocusReturn } from "../editor/workspace/useFocusReturn";
+import { ModalSurface } from "../ui/ModalSurface";
 import { useExplorerLabels } from "./explorerLabels";
 import type { ExplorerOperations } from "./useExplorerOperations";
 import { ExplorerNewFileDialog } from "./ExplorerNewFileDialog";
 
 function ExplorerDialog({ children, onClose, testId, focusTestId }: { children: React.ReactNode; onClose: () => void; testId: string; focusTestId?: string }) {
-  useFocusReturn(true);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const scoped = focusTestId ? ref.current?.querySelector<HTMLButtonElement>(`[data-testid="${focusTestId}"]`) : null;
-    (scoped ?? ref.current?.querySelector<HTMLButtonElement>("button"))?.focus();
-  }, [focusTestId]);
-  return <div className="ex-dialog-back" onPointerDown={(event) => event.stopPropagation()}>
-    <div ref={ref} className="ex-dialog" data-testid={testId} role="dialog" aria-labelledby={testId + "-title"} aria-modal="true" tabIndex={-1} onKeyDown={(event) => {
-      event.stopPropagation();
-      if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
-      if (event.key === "Escape") { event.preventDefault(); onClose(); }
-      if (event.key === "Tab") {
-        const buttons = Array.from(ref.current?.querySelectorAll<HTMLElement>("button:enabled,input:enabled,[tabindex='0']") ?? []);
-        if (!buttons.length) return;
-        const index = buttons.indexOf(document.activeElement as HTMLElement);
-        const next = event.shiftKey ? (index - 1 + buttons.length) % buttons.length : (index + 1) % buttons.length;
-        event.preventDefault(); buttons[next].focus();
-      }
-    }}>{children}</div>
-  </div>;
+  return createPortal(
+    <ModalSurface
+      className="ex-dialog taomni-modal"
+      data-testid={testId}
+      aria-labelledby={`${testId}-title`}
+      initialFocus={focusTestId ? `[data-testid="${focusTestId}"]` : "button:enabled"}
+      onCancel={onClose}
+    >
+      {children}
+    </ModalSurface>,
+    document.body,
+  );
 }
 function PropertiesDialog({ entries, onClose }: { entries: FileEntry[]; onClose: () => void }) {
   const label = useExplorerLabels();
@@ -57,11 +50,11 @@ function PropertiesDialog({ entries, onClose }: { entries: FileEntry[]; onClose:
       <dt>{label("大小", "Size")}</dt><dd data-testid="explorer-properties-size">{properties.length ? formatBytes(properties.reduce((sum, item) => sum + item.size, 0)) : label("正在计算…", "Calculating…")}{properties.some((item) => item.truncated) ? label("（已达统计上限）", " (limit reached)") : ""}</dd>
       <dt>{label("项目数", "Items")}</dt><dd>{properties.reduce((sum, item) => sum + item.itemCount, 0)}</dd>
       <dt>{label("修改日期", "Modified")}</dt><dd>{first.mtime ? new Date(first.mtime * 1000).toLocaleString() : "—"}</dd>
-      <dt>{label("权限", "Permissions")}</dt><dd style={{ fontFamily: "var(--ex-mono)" }}>{formatPosixMode(first.mode, first.fileType)} {first.owner}:{first.group}</dd>
+      <dt>{label("权限", "Permissions")}</dt><dd style={{ fontFamily: "var(--taomni-code-font-family)" }}>{formatPosixMode(first.mode, first.fileType)} {first.owner}:{first.group}</dd>
       {properties[0]?.createdAt != null && <><dt>{label("创建日期", "Created")}</dt><dd>{new Date(properties[0].createdAt * 1000).toLocaleString()}</dd></>}
       {first.symlinkTarget && <><dt>{label("链接目标", "Link target")}</dt><dd>{first.symlinkTarget}</dd></>}
     </dl>
-    {error && <p role="alert" style={{ whiteSpace: "pre-wrap", color: "#ef4444", marginTop: 10 }}>{error}</p>}
+    {error && <p role="alert" style={{ whiteSpace: "pre-wrap", color: "var(--taomni-danger-text)", marginTop: 10 }}>{error}</p>}
     <div className="ex-dialog-footer"><button type="button" data-testid="explorer-properties-close" onClick={onClose}>{label("关闭", "Close")}</button></div>
   </ExplorerDialog>;
 }
@@ -81,7 +74,7 @@ export function ExplorerDialogs({ operations }: { operations: ExplorerOperations
           "Choose how to delete: move the items to Trash to restore later, or delete them permanently. Permanent deletion bypasses Trash and cannot be undone.")}</p>
         <p>{label("移到回收站后可在提示中撤销，也可在系统回收站中恢复。", "Moved items can be undone from the prompt or restored from the system Trash.")}</p>
       </>}
-      <p style={{ fontFamily: "var(--ex-mono)", fontSize: 11, overflowWrap: "anywhere" }}>{prompt.entries.slice(0, 3).map((entry) => <span key={entry.path}>{entry.path}<br /></span>)}{prompt.entries.length > 3 ? "…" : ""}</p>
+      <p style={{ fontFamily: "var(--taomni-code-font-family)", fontSize: "var(--taomni-fs-small)", overflowWrap: "anywhere" }}>{prompt.entries.slice(0, 3).map((entry) => <span key={entry.path}>{entry.path}<br /></span>)}{prompt.entries.length > 3 ? "…" : ""}</p>
       <div className="ex-dialog-footer">
         <button type="button" data-testid="explorer-delete-cancel" onClick={() => operations.setDeletePrompt(null)}>{label("取消", "Cancel")}</button>
         {!prompt.reason && <button type="button" data-testid="explorer-delete-trash" className="primary" disabled={operations.busy} onClick={() => operations.trash(prompt.entries)}>{label("移到回收站", "Move to Trash")}</button>}

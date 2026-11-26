@@ -117,12 +117,13 @@
 .ex-progress { position:absolute; left:50%; bottom:34px; transform:translateX(-50%); background:var(--taomni-card-bg); color:var(--taomni-text); padding:8px 12px; border-radius:var(--taomni-radius-lg); z-index:var(--taomni-z-docked-overlay); display:flex; align-items:center; gap:12px; box-shadow:var(--taomni-shadow-sm); font-size:var(--taomni-fs-body); max-width:90%; }
 .ex-progress button { color:var(--taomni-accent); font-weight:600; }
 .ex-preview-overlay { position:absolute; top:0; right:0; bottom:0; z-index:var(--taomni-z-docked-overlay); box-shadow:var(--ex-shadow); display:flex; max-width:100%; }
-.ex-dialog-back { position:absolute; inset:0; background:var(--taomni-overlay); z-index:var(--taomni-z-modal); display:flex; align-items:center; justify-content:center; }
-.ex-dialog { width:420px; max-width:95%; max-height:90%; overflow:auto; background:var(--ex-card); border:1px solid var(--ex-card-b); border-radius:12px; box-shadow:var(--ex-shadow); padding:18px 20px; }
+.ex-dialog { width:min(420px, calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; background:var(--taomni-card-bg); border:1px solid var(--taomni-card-border); color:var(--taomni-text); border-radius:12px; box-shadow:var(--taomni-shadow-lg); padding:18px 20px; }
+.ex-dialog[open] { gap:0; }
 .ex-dialog h3 { font-size:var(--taomni-fs-title); font-weight:600; margin-bottom:8px; }
-.ex-dialog p { color:var(--ex-muted); line-height:1.6; margin-bottom:6px; }
+.ex-dialog p { color:var(--taomni-text-muted); line-height:1.6; margin-bottom:6px; }
 .ex-dialog-footer { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
-.ex-dialog-footer button { height:30px; padding:0 14px; border-radius:7px; border:1px solid var(--ex-input-b); background:var(--ex-card); }
+.ex-dialog-footer button { height:30px; padding:0 14px; border-radius:7px; border:1px solid var(--taomni-input-border); background:var(--taomni-card-bg); color:var(--taomni-text); }
+.ex-dialog-footer button.primary { background:var(--taomni-primary-bg); border-color:var(--taomni-primary-bg); color:var(--taomni-primary-text); }
 .ex-dialog-footer button.danger { background:var(--taomni-danger-bg); border-color:var(--taomni-danger-border); color:var(--taomni-danger-text); }
 .ex-shell [data-taomni-context-menu] { min-width:236px; padding:5px; border-radius:9px; background:var(--ex-card)!important; border-color:var(--ex-card-b)!important; color:var(--ex-text)!important; box-shadow:var(--ex-shadow); font-size:var(--taomni-fs-body); }
 .ex-shell [data-taomni-context-menu] button { min-height:28px; border-radius:5px; gap:9px; padding:0 9px; }
@@ -134,5 +135,5 @@
 @media(max-width:800px) { .ex-search { width:190px; } }
 @media(max-width:600px) { .ex-search { width:140px; } .ex-nav { max-width:160px; } .ex-name { min-width:100px; } .ex-result-path { display:none; } }
 .ex-new-file-field { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
-.ex-new-file-field input, .ex-new-file-field select { width: 100%; padding: 6px 8px; border: 1px solid var(--ex-input-b); border-radius: 4px; color: inherit; background: var(--ex-input); font: inherit; }
-.ex-dialog [role="alert"] { color: #ef4444; overflow-wrap: anywhere; }
+.ex-new-file-field input, .ex-new-file-field select { width: 100%; padding: 6px 8px; border: 1px solid var(--taomni-input-border); border-radius: 4px; color: var(--taomni-text); background: var(--taomni-input-bg); font: inherit; }
+.ex-dialog [role="alert"] { color: var(--taomni-danger-text); overflow-wrap: anywhere; }
