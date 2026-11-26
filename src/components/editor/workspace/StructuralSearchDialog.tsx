@@ -353,7 +353,7 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
             type="button"
             data-testid="structural-search-find"
             className="h-7 rounded px-3 text-ui-small disabled:opacity-50"
-            style={{ background: "var(--taomni-accent)", color: "#fff" }}
+            style={{ background: "var(--taomni-primary-bg)", color: "var(--taomni-primary-text)" }}
             disabled={findDisabled}
             onClick={runFind}
           >

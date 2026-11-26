@@ -145,7 +145,7 @@ export function WslCard({
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
-        <span style={{ color: "#0078d4" }}>
+        <span style={{ color: "var(--taomni-accent)" }}>
           <TerminalIcon className="w-5 h-5" />
         </span>
         <span className="font-semibold">{t("welcome.openWsl")}</span>

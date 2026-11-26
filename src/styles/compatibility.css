@@ -45,9 +45,9 @@ html[data-app-theme="dark"] .hover\:bg-white\/70:hover {
  * class — the explicit values keep stacking contexts predictable and let
  * automated tests (qa-ui-auto) assert the layering.
  */
-.ai-z-main    { z-index: 100; }
-.ai-z-drawer  { z-index: 200; }
-.ai-z-overlay { z-index: 300; }
-.ai-z-card    { z-index: 400; }
-.ai-z-privacy { z-index: 500; }
-.ai-z-toast   { z-index: 900; }
+.ai-z-main    { z-index: var(--taomni-z-sticky); }
+.ai-z-drawer  { z-index: calc(var(--taomni-z-sticky) + 100); }
+.ai-z-overlay { z-index: calc(var(--taomni-z-docked-overlay) - 200); }
+.ai-z-card    { z-index: calc(var(--taomni-z-docked-overlay) - 100); }
+.ai-z-privacy { z-index: var(--taomni-z-docked-overlay); }
+.ai-z-toast   { z-index: var(--taomni-z-popover); }

@@ -3429,6 +3429,7 @@ export const zhCN: DeepPartial<typeof en> = {
     backgroundDownload: "关闭窗口后下载会继续。取消会保留已下载数据，下次下载时自动续传。",
     batchRecognition: "录完识别",
     streamingRecognition: "边说边识别",
+    sensevoiceLocales: "中 / 粵 / EN / 日本語 / 한국어",
     modelsTitle: "语音模型",
     multilingual: "多语言",
     copyDownloadLink: "复制地址",

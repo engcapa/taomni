@@ -49,7 +49,7 @@ html[data-app-theme="dark"] .taomni-main-window {
   content: "";
   position: absolute;
   inset: -1px;
-  z-index: 40;
+  z-index: calc(var(--taomni-z-content) + 40);
   pointer-events: none;
   background:
     radial-gradient(circle at bottom right, transparent 8px, var(--taomni-chrome-border) 8px 9px, var(--taomni-chrome-bg) 9px) top left,

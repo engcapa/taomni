@@ -165,12 +165,12 @@ export function registerFileToolbarWiringLayout1Cases() {
       seedSession();
       const { unmount } = renderRemote();
       const remoteBadge = screen.getByText("REMOTE");
-      expect(remoteBadge).toHaveStyle({ background: "var(--taomni-accent)" });
+      expect(remoteBadge).toHaveStyle({ background: "var(--taomni-primary-bg)", color: "var(--taomni-primary-text)" });
       unmount();
 
       renderLocal();
       const localBadge = screen.getByText("LOCAL");
-      expect(localBadge).toHaveStyle({ background: "var(--taomni-text-muted)" });
+      expect(localBadge).toHaveStyle({ background: "var(--taomni-text-muted)", color: "var(--taomni-bg)" });
     });
 
     it("hides side-only buttons when their callbacks are not provided", () => {

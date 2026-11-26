@@ -32,7 +32,7 @@
 .taomni-tab[data-active="true"] {
   background: var(--taomni-tab-active);
   font-weight: 600;
-  z-index: 2;
+  z-index: calc(var(--taomni-z-content) + 2);
   box-shadow: 0 -2px 0 0 var(--taomni-accent) inset;
 }
 .taomni-tab:hover:not([data-active="true"]) {
@@ -57,7 +57,7 @@
   background: var(--taomni-accent);
   border-radius: 1px;
   pointer-events: none;
-  z-index: 3;
+  z-index: calc(var(--taomni-z-content) + 3);
 }
 .taomni-tab[data-drop-side="before"]::after {
   left: -2px;

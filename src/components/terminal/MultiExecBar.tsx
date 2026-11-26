@@ -110,7 +110,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
     // True modal backdrop — pointer events blocked, no click-to-close
     <div
       className="fixed inset-0 z-[var(--taomni-z-modal)] flex items-end justify-center"
-      style={{ background: "rgba(0,0,0,0.45)", pointerEvents: "all" }}
+      style={{ background: "var(--taomni-overlay)", pointerEvents: "all" }}
     >
       <div
         className="flex flex-col shadow-2xl overflow-hidden"
@@ -153,7 +153,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
             borderBottom: "1px solid var(--taomni-divider)",
           }}
         >
-          <Users className="w-3.5 h-3.5" style={{ color: "#7a3d9d" }} />
+          <Users className="w-3.5 h-3.5" style={{ color: "var(--taomni-protocol-violet)" }} />
           <span className="text-xs font-semibold" style={{ color: "var(--taomni-text)" }}>
             {t("multiExec.editorTitle")}
           </span>
@@ -418,7 +418,7 @@ export function MultiExecBar({
       >
         <Users
           className="w-3.5 h-3.5 flex-shrink-0 mt-1"
-          style={{ color: "#7a3d9d" }}
+          style={{ color: "var(--taomni-protocol-violet)" }}
         />
         <div className="flex-1 flex items-start gap-1 min-w-0">
           <textarea

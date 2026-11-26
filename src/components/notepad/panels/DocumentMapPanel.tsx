@@ -12,7 +12,7 @@ export function DocumentMapPanel({
   const lines = content.split("\n").slice(0, 400);
 
   return (
-    <div className="flex-1 overflow-auto p-1.5 font-mono text-[3px] leading-[5px] select-none" data-testid="notepad-doc-map">
+    <div className="flex-1 overflow-auto p-1.5 font-mono taomni-doc-minimap select-none" data-testid="notepad-doc-map">
       <div className="text-ui-caption text-[var(--taomni-text-muted)] mb-1 font-sans">
         {label(`缩略图（${content.split("\n").length} 行）`, `Minimap (${content.split("\n").length} lines)`)}
       </div>

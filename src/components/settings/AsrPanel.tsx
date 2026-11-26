@@ -192,7 +192,7 @@ export function AsrPanel() {
         <select className="taomni-input" data-testid="asr-realtime-provider" value={config?.asr.active ?? "local-auto"} disabled={blocked}
           onChange={(e) => { const id = e.target.value; void select({ active: id, mode: ["aliyun", "volcengine", "soniox", "deepgram", "gemini"].includes(id) ? "online" : "local" }); }}>
           <option value="local-auto">Auto local · SenseVoice + Whisper Small q8</option>
-          <option value="sensevoice-small">SenseVoice Small int8 · 中 / 粵 / EN / 日本語 / 한국어</option>
+          <option value="sensevoice-small">SenseVoice Small int8 · {t("voice.sensevoiceLocales")}</option>
           {["whisper-small-q8", "whisper-base-q8", "whisper-turbo-q5", ...models.filter((m) => ["whisper-base", "whisper-small", "whisper-medium", "whisper-medium-q8"].includes(m.id) && (m.installed || config?.asr.active === m.id)).map((m) => m.id)].map((id) => <option key={id} value={id}>{modelTitle(id)} · {t("voice.batchRecognition")}</option>)}
           <option value="sherpa-zipformer-zh-en">Zipformer · {t("voice.streamingRecognition")}</option>
           <option value="aliyun">Aliyun Paraformer Realtime</option>

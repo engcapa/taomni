@@ -220,6 +220,11 @@ html[data-app-theme="dark"] {
   --taomni-danger-bg: #450a0a;
   --taomni-danger-border: #f87171;
   --taomni-danger-text: #fecaca;
+  --taomni-danger-icon: var(--taomni-danger-text);
+  --taomni-info-bg: var(--taomni-selected);
+  --taomni-info-border: var(--taomni-primary-bg);
+  --taomni-info-text: var(--taomni-accent);
+  --taomni-info-icon: var(--taomni-info-text);
   --taomni-color-scheme: dark;
   --taomni-bg: #1e1f22;
   --taomni-chrome-bg: #191a1c;

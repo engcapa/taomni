@@ -164,7 +164,7 @@ export function DrivesPicker({ onSelect }: { onSelect: (path: string) => void; }
 }
 
 export function FileTypeIcon({ entry }: { entry: FileEntry; }) {
-  if (entry.fileType === "dir") return <Folder className="w-3.5 h-3.5 shrink-0" style={{ color: "#dab760" }} />;
+  if (entry.fileType === "dir") return <Folder className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--taomni-warning-icon)" }} />;
   if (entry.fileType === "symlink") return <LinkIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--taomni-accent)" }} />;
   return <FileIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--taomni-text-muted)" }} />;
 }

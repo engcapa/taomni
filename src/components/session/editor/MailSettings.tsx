@@ -385,7 +385,7 @@ export function MailSettings({
             {oauthStatus && (
               <span
                 className="ml-2"
-                style={{ color: oauthStatus.ok ? "#2f8a3e" : "#b22222" }}
+                style={{ color: oauthStatus.ok ? "var(--taomni-success-text)" : "var(--taomni-danger-text)" }}
               >
                 {oauthStatus.msg}
               </span>

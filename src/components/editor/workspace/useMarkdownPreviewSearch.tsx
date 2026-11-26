@@ -82,7 +82,7 @@ export function useMarkdownPreviewSearch(
           fragment.append(document.createTextNode(text.slice(start, found)));
           const mark = document.createElement("mark");
           mark.dataset.testid = "markdown-search-match";
-          mark.className = "rounded bg-yellow-200 text-black data-[current=true]:bg-orange-300";
+          mark.className = "rounded bg-[var(--taomni-code-selection-match-bg)] text-[var(--taomni-code-text)] ring-1 ring-[var(--taomni-code-selection-match-border)] data-[current=true]:bg-[var(--taomni-code-find-match-bg)] data-[current=true]:text-[var(--taomni-code-find-match-fg)] data-[current=true]:ring-[var(--taomni-code-find-match-border)]";
           mark.textContent = text.slice(found, found + query.length);
           matches.current.push(mark);
           fragment.append(mark);

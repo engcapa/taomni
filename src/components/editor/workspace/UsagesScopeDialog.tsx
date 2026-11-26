@@ -64,7 +64,7 @@ export function UsagesScopeDialog({ open, symbolHint, onConfirm, onCancel }: Usa
             type="button"
             data-testid="usages-scope-confirm"
             className="h-7 rounded px-2 text-ui-small"
-            style={{ background: "var(--taomni-accent)", color: "#fff" }}
+            style={{ background: "var(--taomni-primary-bg)", color: "var(--taomni-primary-text)" }}
             onClick={() => onConfirm(selection)}
           >
             Find Usages

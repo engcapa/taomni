@@ -343,7 +343,7 @@ export function ObjectStorageSettings({ value, onChange, saveInVault, setSaveInV
             className="text-ui-small min-w-0 max-w-[280px] truncate"
             title={test.msg}
             data-testid="oss-test-result-summary"
-            style={{ color: test.ok ? "#2f8a3e" : "#b22222" }}
+            style={{ color: test.ok ? "var(--taomni-success-text)" : "var(--taomni-danger-text)" }}
           >
             {test.msg}
           </span>

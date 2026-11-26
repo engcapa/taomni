@@ -350,8 +350,8 @@ function UpdateHint() {
           <Download className="w-4 h-4" />
           <span
             aria-hidden="true"
-            className="absolute -top-0.5 -right-0.5 w-[7px] h-[7px] rounded-full"
-            style={{ background: "#e5534b", boxShadow: "0 0 0 1.5px var(--taomni-chrome-bg)" }}
+            className="absolute -top-0.5 -right-0.5 w-[7px] h-[7px] rounded-full ring-[1.5px] ring-[var(--taomni-chrome-bg)]"
+            style={{ background: "var(--taomni-danger)" }}
           />
         </span>
       }

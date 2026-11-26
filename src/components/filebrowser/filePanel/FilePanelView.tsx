@@ -129,8 +129,8 @@ export function FilePanelView(inputs: FilePanelViewProps) {
         <span
           className="px-1.5 py-[1px] text-ui-caption font-bold tracking-wider rounded shrink-0"
           style={{
-            background: side === "remote" ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
-            color: "#fff",
+            background: side === "remote" ? "var(--taomni-primary-bg)" : "var(--taomni-text-muted)",
+            color: side === "remote" ? "var(--taomni-primary-text)" : "var(--taomni-bg)",
             letterSpacing: "0.08em",
           }}
         >
@@ -341,7 +341,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
         {draggingOver && (
           <div
             className="absolute inset-0 pointer-events-none border-2 border-dashed z-[var(--taomni-z-docked-overlay)] flex items-center justify-center"
-            style={{ borderColor: "var(--taomni-accent)", background: "rgba(43,93,139,0.08)" }}
+            style={{ borderColor: "var(--taomni-accent)", background: "color-mix(in srgb, var(--taomni-accent) 10%, transparent)" }}
           >
             <span className="text-xs font-semibold text-[var(--taomni-accent)]">
               {t("fileBrowser.dropToCopy")}

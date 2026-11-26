@@ -3452,6 +3452,7 @@ const dict = {
     backgroundDownload: "Closing this window keeps the download running. Cancel keeps downloaded data for the next attempt.",
     batchRecognition: "After recording",
     streamingRecognition: "While speaking",
+    sensevoiceLocales: "ZH / YUE / EN / JA / KO",
     modelsTitle: "Speech models",
     multilingual: "Multilingual",
     copyDownloadLink: "Copy link",

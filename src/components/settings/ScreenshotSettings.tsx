@@ -123,7 +123,7 @@ export function ScreenshotSettings() {
               : t("settings.screenshotStatusFallback", { error: status.error ?? "" })}
       </p>
       {error && (
-        <p data-testid="settings-screenshot-shortcut-error" role="alert" className="mt-1 text-ui-body" style={{ color: "#ff6b6b" }}>
+        <p data-testid="settings-screenshot-shortcut-error" role="alert" className="mt-1 text-ui-body" style={{ color: "var(--taomni-danger-text)" }}>
           {error}
         </p>
       )}

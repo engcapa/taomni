@@ -419,8 +419,8 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
           className="text-ui-small px-2 py-1 border-b shrink-0"
           style={{
             borderColor: "var(--taomni-divider)",
-            background: session?.error ? "#fde7e2" : "var(--taomni-quick-bg)",
-            color: session?.error ? "#7a1f0a" : "var(--taomni-text)",
+            background: session?.error ? "var(--taomni-danger-bg)" : "var(--taomni-quick-bg)",
+            color: session?.error ? "var(--taomni-danger-text)" : "var(--taomni-text)",
           }}
         >
           {banner}
