@@ -1478,6 +1478,11 @@
 - `[data-testid="delimited-table"]` — display — F-FILEOPEN-1.delimited-table
 - `[data-testid="delimited-source"]` — interactive — F-FILEOPEN-1.delimited-source
 - `[data-testid="taoffice-media"]` — display — F-FILEOPEN-1.taoffice-media
+- `[data-testid="archive-filter"]` — interactive — F-FILEOPEN-1.archive-filter
+- `[data-testid="archive-entry"]` — display — F-FILEOPEN-1.archive-entry
+- `[data-testid="archive-extract-here"]` — interactive — F-FILEOPEN-1.archive-extract-here
+- `[data-testid="archive-preview"]` — interactive — F-FILEOPEN-1.archive-preview
+- `[data-testid="archive-output"]` — display — F-FILEOPEN-1.archive-output
 - `[data-testid="taoffice-media-player"]` — interactive — F-FILEOPEN-1.taoffice-media-player
 - `[data-testid="taoffice-media-error"]` — display — F-FILEOPEN-1.taoffice-media-error
 - `[data-testid="taoffice-media-retry"]` — interactive — F-FILEOPEN-1.taoffice-media-retry

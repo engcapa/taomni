@@ -109,6 +109,13 @@ async function htmlOpen(path: string, allowScripts: boolean) {
 export async function invokeViewer(command: string, args: Record<string, unknown> = {}): Promise<unknown> {
   const path = String(args.path ?? "");
   switch (command) {
+    case "viewer_archive_list":
+    case "viewer_archive_extract":
+    case "viewer_archive_preview": {
+      const { invokeArchive } = await import("../archivePreview");
+      return invokeArchive(command, path, args, (fileName, data) =>
+        invokeViewer("viewer_create_temp", { fileName, bytes: new Uint8Array(data) }));
+    }
     case "viewer_stat": {
       const stat = await vfsStat(path);
       return { path: stat.path, size: stat.size, mtime: stat.mtime, mime: mime(path), isFile: stat.fileType === "file" };

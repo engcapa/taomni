@@ -19,6 +19,28 @@ async fn viewer_tiff_preview(path: String) -> Result<BytesData, String> {
 }
 
 #[tauri::command]
+async fn viewer_archive_list(path: String) -> Result<Vec<viewer::archive::Entry>, String> {
+    on_worker(move || viewer::archive::list(&path)).await
+}
+
+#[tauri::command]
+async fn viewer_archive_preview(
+    path: String,
+    entry: viewer::archive::Entry,
+) -> Result<TempFile, String> {
+    on_worker(move || viewer::archive::preview(&path, entry)).await
+}
+
+#[tauri::command]
+async fn viewer_archive_extract(
+    path: String,
+    destination: String,
+    entry: Option<viewer::archive::Entry>,
+) -> Result<String, String> {
+    on_worker(move || viewer::archive::extract(&path, &destination, entry)).await
+}
+
+#[tauri::command]
 async fn viewer_media_open(
     path: String,
     slug: String,
@@ -218,6 +240,9 @@ pub(super) fn handles(command: &str) -> bool {
         command,
         "viewer_stat"
             | "viewer_tiff_preview"
+            | "viewer_archive_list"
+            | "viewer_archive_preview"
+            | "viewer_archive_extract"
             | "viewer_media_open"
             | "viewer_document_read"
             | "viewer_media_close"
@@ -242,6 +267,9 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
     let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
         crate::commands::viewer::viewer_stat,
         crate::commands::viewer::viewer_tiff_preview,
+        crate::commands::viewer::viewer_archive_list,
+        crate::commands::viewer::viewer_archive_preview,
+        crate::commands::viewer::viewer_archive_extract,
         crate::commands::viewer::viewer_media_open,
         crate::commands::viewer::viewer_document_read,
         crate::commands::viewer::viewer_media_close,

@@ -1,6 +1,6 @@
 import { officialDocumentFormats } from "./documentFormats";
 
-export type FileKind = "image" | "svg" | "text" | "markdown" | "html" | "pdf" | "document" | "source" | "binary";
+export type FileKind = "image" | "svg" | "text" | "markdown" | "html" | "pdf" | "document" | "archive" | "source" | "binary";
 
 const images = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "avif", "tif", "tiff"]);
 const text = new Set(["txt", "text", "log", "ini", "conf", "config", "env", "json", "jsonc", "yaml", "yml", "toml", "xml", "csv", "tsv", "properties", "gitignore", "gitattributes", "editorconfig", "dockerignore"]);
@@ -26,11 +26,12 @@ export function classifyFile(path: string): FileKind {
   if (extension === "md" || extension === "markdown" || extension === "mdown") return "markdown";
   if (extension === "html" || extension === "htm") return "html";
   if (extension === "pdf") return "pdf";
+  if (extension === "zip" || extension === "cbz") return "archive";
   if (officialDocumentFormats.has(extension)) return "document";
   if (sourceNames.has(name) || source.has(extension)) return "source";
   if (textNames.has(name) || text.has(extension) || name.startsWith(".env.")) return "text";
   return "binary";
 }
 export function supportsFileViewer(kind: FileKind): boolean {
-  return ["image", "svg", "text", "markdown", "html", "pdf", "document"].includes(kind);
+  return ["image", "svg", "text", "markdown", "html", "pdf", "document", "archive"].includes(kind);
 }

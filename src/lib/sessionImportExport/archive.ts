@@ -16,6 +16,9 @@ export interface ZipCentralEntry {
   uncompressedSize: number;
   localHeaderOffset: number;
   isDirectory: boolean;
+  crc?: number;
+  encrypted?: boolean;
+  unixMode?: number;
 }
 
 
@@ -78,6 +81,9 @@ export function parseZipCentralDirectory(bytes: Uint8Array): ZipCentralEntry[] {
     const name = decodeZipName(bytes.slice(nameStart, nameEnd), flags);
     entries.push({
       name,
+      crc: view.getUint32(offset + 16, true),
+      encrypted: (flags & 1) !== 0,
+      unixMode: view.getUint32(offset + 38, true) >>> 16,
       method,
       compressedSize,
       uncompressedSize,
@@ -107,7 +113,7 @@ export function findZipEndOfCentralDirectory(bytes: Uint8Array): number {
 }
 
 
-export async function inflateZipEntry(bytes: Uint8Array, entry: ZipCentralEntry): Promise<Uint8Array> {
+export async function inflateZipEntry(bytes: Uint8Array, entry: ZipCentralEntry, limit?: number): Promise<Uint8Array> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const offset = entry.localHeaderOffset;
   if (offset + 30 > bytes.byteLength || view.getUint32(offset, true) !== 0x04034b50) {
@@ -120,13 +126,16 @@ export async function inflateZipEntry(bytes: Uint8Array, entry: ZipCentralEntry)
   if (dataEnd > bytes.byteLength) throw new Error("entry data is truncated");
   const compressed = bytes.slice(dataStart, dataEnd);
 
-  if (entry.method === 0) return compressed;
-  if (entry.method === 8) return inflateRawWithDecompressionStream(compressed);
+  if (entry.method === 0) {
+    if (limit !== undefined && compressed.length > limit) throw new Error("ZIP entry exceeds its declared size");
+    return compressed;
+  }
+  if (entry.method === 8) return inflateRawWithDecompressionStream(compressed, limit);
   throw new Error(`unsupported ZIP compression method ${entry.method}`);
 }
 
 
-export async function inflateRawWithDecompressionStream(bytes: Uint8Array): Promise<Uint8Array> {
+export async function inflateRawWithDecompressionStream(bytes: Uint8Array, limit?: number): Promise<Uint8Array> {
   const Decompression = globalThis.DecompressionStream;
   if (typeof Decompression !== "function") {
     throw new Error("this runtime cannot decompress deflated ZIP entries");
@@ -134,6 +143,23 @@ export async function inflateRawWithDecompressionStream(bytes: Uint8Array): Prom
 
   const source = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
   const stream = new Blob([source]).stream().pipeThrough(new Decompression("deflate-raw"));
+  if (limit !== undefined) {
+    const reader = stream.getReader();
+    const result = new Uint8Array(limit);
+    let offset = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return result.subarray(0, offset);
+        if (value.length > limit - offset) {
+          await reader.cancel();
+          throw new Error("ZIP entry exceeds its declared size");
+        }
+        result.set(value, offset);
+        offset += value.length;
+      }
+    } finally { reader.releaseLock(); }
+  }
   const buffer = await new Response(stream).arrayBuffer();
   return new Uint8Array(buffer);
 }

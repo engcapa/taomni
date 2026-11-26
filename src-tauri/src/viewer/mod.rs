@@ -1,5 +1,6 @@
 //! Local file viewer I/O. Policy is independent of any window/document lifetime.
 mod assets;
+pub(crate) mod archive;
 mod chunks;
 pub(crate) mod document_access;
 #[cfg(any(target_os = "macos", test))]

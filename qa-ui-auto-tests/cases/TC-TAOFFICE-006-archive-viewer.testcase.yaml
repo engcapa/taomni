@@ -1,0 +1,31 @@
+id: TC-TAOFFICE-006
+title: Filter, extract and preview entries in a core ZIP viewer
+description: Check file contents after extraction, preserve the first result after a collision and use a read-only text preview.
+modes: [browser, native]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, archive, core-only]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="bundle.zip"]'
+- wait_for: '[data-testid="archive-entry"][data-name="images/pixel.png"]'
+- fill: {selector: '[data-testid="archive-filter"]', value: readme}
+- assert_count: {selector: '[data-testid="archive-entry"]', equal: 1}
+- click: '[data-testid="archive-extract-here"]'
+- wait_for: '[data-testid="archive-output"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/bundle/notes/readme.txt', sha256: '${fixture.file_open_original_sha}'}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/bundle/images/pixel.png', sha256: '${fixture.file_open_png_sha}'}
+- click: '[data-testid="archive-extract-here"]'
+- wait_for: '[data-kind="archive"] [role="alert"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/bundle/notes/readme.txt', sha256: '${fixture.file_open_original_sha}'}
+- press: {selector: '[data-testid="archive-preview"]', key: Enter}
+- wait_for: '[data-testid="file-viewer"][data-kind="text"][data-active="true"] [data-testid="viewer-readonly"]'
+- assert_no_runtime_errors: null

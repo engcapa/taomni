@@ -157,7 +157,7 @@ pub(super) fn canonical_entry_path(path: &Path) -> OpResult<String> {
 /// Atomic no-replace is essential: a preflight `exists()` check alone can
 /// overwrite a file created by another process between the check and rename.
 #[cfg(target_os = "linux")]
-pub(super) fn rename_no_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
+pub(crate) fn rename_no_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
     use std::os::unix::ffi::OsStrExt;
     let source = std::ffi::CString::new(source.as_os_str().as_bytes())?;
     let destination = std::ffi::CString::new(destination.as_os_str().as_bytes())?;
@@ -178,7 +178,7 @@ pub(super) fn rename_no_replace(source: &Path, destination: &Path) -> std::io::R
 }
 
 #[cfg(target_os = "macos")]
-pub(super) fn rename_no_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
+pub(crate) fn rename_no_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
     use std::os::unix::ffi::OsStrExt;
     let source = std::ffi::CString::new(source.as_os_str().as_bytes())?;
     let destination = std::ffi::CString::new(destination.as_os_str().as_bytes())?;
@@ -192,7 +192,7 @@ pub(super) fn rename_no_replace(source: &Path, destination: &Path) -> std::io::R
 }
 
 #[cfg(windows)]
-pub(super) fn rename_no_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
+pub(crate) fn rename_no_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
     let source: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
     let destination: Vec<u16> = destination

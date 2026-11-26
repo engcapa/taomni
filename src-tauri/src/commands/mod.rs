@@ -210,6 +210,9 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "sdk_resolve_workspace" => sdk::handle(invoke),
         "viewer_stat"
         | "viewer_tiff_preview"
+        | "viewer_archive_list"
+        | "viewer_archive_preview"
+        | "viewer_archive_extract"
         | "viewer_media_open"
         | "viewer_document_read"
         | "viewer_media_close"

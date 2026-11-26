@@ -20,6 +20,7 @@ const ImageViewer = lazy(() => import("./ImageViewer").then((module) => ({ defau
 const HtmlPreview = lazy(() => import("./HtmlPreview").then((module) => ({ default: module.HtmlPreview })));
 const MarkdownEditor = lazy(() => import("./markdown/MarkdownEditor").then((module) => ({ default: module.MarkdownEditor })));
 const hosts = new Map<string, number>();
+const ArchiveViewer = lazy(() => import("./ArchiveViewer").then((module) => ({ default: module.ArchiveViewer })));
 
 interface ViewerShellProps { viewer: FileViewerTabInfo; active?: boolean; workspaceId?: string; host?: "explorer" }
 
@@ -40,6 +41,9 @@ export function ViewerShell(props: ViewerShellProps) {
       });
     };
   }, [key, viewer.path, temporary]);
+  if (viewer.kind === "archive" && viewer.mode !== "notepad" && viewer.mode !== "source") {
+    return <Suspense fallback={<span role="status">…</span>}><ArchiveViewer key={key} {...props} /></Suspense>;
+  }
   if ((viewer.kind === "document" || viewer.kind === "pdf") && viewer.mode !== "source" && viewer.mode !== "notepad") {
     return <ModuleDocumentPane key={viewer.path} viewer={viewer} active={active} />;
   }

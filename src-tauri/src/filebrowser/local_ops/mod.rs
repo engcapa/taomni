@@ -4,6 +4,7 @@ mod inspection;
 mod model;
 mod operation;
 mod paths;
+pub(crate) use paths::rename_no_replace;
 mod search;
 mod transfer;
 mod trash;

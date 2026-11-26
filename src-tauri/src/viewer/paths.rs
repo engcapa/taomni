@@ -182,6 +182,15 @@ impl ScopedRoot {
         }
     }
 
+    pub fn create_directory(&self, name: &str) -> Result<(), String> {
+        let relative = safe_relative(name)?.join(".taomni-directory-probe");
+        #[cfg(unix)]
+        self.parent(&relative, true)?;
+        #[cfg(windows)]
+        self.pin_windows_parents(&relative, true)?;
+        Ok(())
+    }
+
     #[cfg(windows)]
     fn pin_windows_parents(&self, relative: &Path, create: bool) -> Result<Vec<File>, String> {
         use std::os::windows::fs::{MetadataExt, OpenOptionsExt};

@@ -16762,6 +16762,7 @@ files:
   - src/components/viewer/ModuleDocumentPane.tsx
   - src/components/viewer/DelimitedDocumentPane.tsx
   - src-tauri/src/viewer/tiff_preview.rs
+  - src/components/viewer/ArchiveViewer.tsx
   - src-tauri/plugins/taoffice-video/frontend/index.js
   - src/lib/openFile/documentProvider.ts
   - src/components/viewer/markdown/MarkdownExportResultActions.tsx
@@ -16875,6 +16876,21 @@ controls:
     kind: interactive
   - id: taoffice-media
     selector: '[data-testid="taoffice-media"]'
+    kind: display
+  - id: archive-filter
+    selector: '[data-testid="archive-filter"]'
+    kind: interactive
+  - id: archive-entry
+    selector: '[data-testid="archive-entry"]'
+    kind: display
+  - id: archive-extract-here
+    selector: '[data-testid="archive-extract-here"]'
+    kind: interactive
+  - id: archive-preview
+    selector: '[data-testid="archive-preview"]'
+    kind: interactive
+  - id: archive-output
+    selector: '[data-testid="archive-output"]'
     kind: display
   - id: taoffice-media-player
     selector: '[data-testid="taoffice-media-player"]'

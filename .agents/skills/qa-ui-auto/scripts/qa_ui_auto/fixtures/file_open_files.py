@@ -6,6 +6,7 @@ import hashlib
 import json
 import io
 import wave
+import zipfile
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -66,6 +67,12 @@ def setup(ctx: Any) -> None:
             "SUkqABoAAACAB0opCBQSBwWEQeFQaGQlIQEKAAABAwABAAAABAAAAAEBAwABAAAAAwAAAAIBAwADAAAAmAAAAAMBAwAB"
             "AAAABQAAAAYBAwABAAAAAgAAABEBBAABAAAACAAAABUBAwABAAAAAwAAABYBAwABAAAAAwAAABcBBAABAAAAEgAAABwBAwABAAAAAQAAAAAAAAAIAAgACAA="
         )
+    if ctx.case_id == "TC-TAOFFICE-006":
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            bundle.writestr("notes/readme.txt", TEXT)
+            bundle.writestr("images/pixel.png", PNG)
+        files["bundle.zip"] = archive.getvalue()
     if ctx.case_id in {"TC-TAOFFICE-003", "TC-TAOFFICE-005"}:
         wav = io.BytesIO()
         with wave.open(wav, "wb") as audio:
