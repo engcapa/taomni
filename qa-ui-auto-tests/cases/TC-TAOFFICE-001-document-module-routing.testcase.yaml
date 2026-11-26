@@ -3,7 +3,7 @@ title: Explorer preserves separate document tabs when the Project module is abse
 description: Open two MSPDI files from the real file list, reopen the first, and enter the module store from its placeholder.
 modes: [browser, native]
 covers: [F-FILEOPEN-1, F-EXPLORER-1]
-tags: [p0, file-open, taoffice, crash-regression]
+tags: [p0, file-open, taoffice]
 fixtures: [reset_db, file_open_files]
 timeout_sec: 180
 steps:
