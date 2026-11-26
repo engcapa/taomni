@@ -160,10 +160,10 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
         bottom: floating.position.bottom,
         width: FLOATING_MFA_WIDTH,
         maxHeight: "min(70vh, 520px)",
-        zIndex: floating.pinned ? 960 : 950,
+        zIndex: floating.pinned ? "calc(var(--taomni-z-popover, 900) + 60)" : "calc(var(--taomni-z-popover, 900) + 50)",
         borderColor: "var(--taomni-card-border)",
         background: "var(--taomni-panel-bg)",
-        boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
+        boxShadow: "var(--taomni-shadow-lg)",
       }}
     >
       <div

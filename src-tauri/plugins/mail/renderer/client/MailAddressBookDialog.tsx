@@ -18,7 +18,6 @@ export interface MailAddressBookDialogContext {
 export function MailAddressBookDialog(context: MailAddressBookDialogContext) {
   const { addressBookOpen, setAddressBookOpen, info, contactDraft, setStatus, openCompose } = context;
   return addressBookOpen && (
-    <div className="absolute inset-0 taomni-dialog-backdrop flex items-center justify-center p-5">
       <MailDraggableDialog
         title="Address book"
         icon={<BookUser className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
@@ -39,6 +38,5 @@ export function MailAddressBookDialog(context: MailAddressBookDialogContext) {
           }}
         />
       </MailDraggableDialog>
-    </div>
   );
 }

@@ -571,12 +571,12 @@ export default function VncPanel({
         height: "100%",
         overflow: displaySize.scrolls ? "auto" : "hidden",
         display: "flex",
-        backgroundColor: "#1a1a2e",
+        backgroundColor: "var(--taomni-term-bg, #1a1a2e)",
         position: "relative",
         // Screen-level full screen covers the whole WebView (tab strip, title
         // bar and status bar included) while the OS window is full screen.
         ...(screenFullScreen
-          ? { position: "fixed", inset: 0, width: "100vw", height: "100vh", zIndex: 1000 }
+          ? { position: "fixed", inset: 0, width: "100vw", height: "100vh", zIndex: "var(--taomni-z-modal, 1000)" }
           : {}),
       }}
     >

@@ -1,5 +1,6 @@
-import { IconButton } from "../../../../crates/taomni-plugin-api/frontend/ui/IconButton";
 import { AlertCircle, AlertTriangle, CheckCircle2, Copy, X } from "lucide-react";
+import { Button } from "../../../../crates/taomni-plugin-api/frontend/ui/Button";
+import { Modal } from "../../../../crates/taomni-plugin-api/frontend/ui/Modal";
 import { type AppSelector, type ProcessInfo, type SocksCapConfig } from "../../../../../src/lib/sockscap";
 import { type UpstreamConfigIssue } from "../../../../../src/lib/sockscapPreflight";
 import { ElevationPasswordPrompt } from "../../../../../src/components/ElevationPasswordPrompt";
@@ -79,73 +80,63 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
   )}
 
     {showProcPicker && (
-      <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-20">
-        <div className="w-[min(520px,90vw)] max-h-[70vh] flex flex-col rounded-lg bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-xl">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--taomni-divider)]">
-            <div className="text-ui-body font-semibold">{t("sockscap.pickProcess")}</div>
-            <IconButton label={t("common.close")} type="button" className="p-1" onClick={() => setShowProcPicker(false)}>
-              <X className="w-4 h-4" />
-            </IconButton>
+      <Modal
+        testId="sockscap-proc-picker-dialog"
+        title={t("sockscap.pickProcess")}
+        closeLabel={t("common.close")}
+        dismissOnBackdrop
+        initialFocus="button"
+        onCancel={() => setShowProcPicker(false)}
+        footer={
+          <Button onClick={() => setShowProcPicker(false)}>
+            {t("common.close")}
+          </Button>
+        }
+      >
+        {processes.length === 0 ? (
+          <div className="text-ui-small text-[var(--taomni-text-muted)] p-2">
+            {t("sockscap.processesEmpty")}
           </div>
-          <div className="flex-1 overflow-auto p-2">
-            {processes.length === 0 ? (
-              <div className="text-ui-small text-[var(--taomni-text-muted)] p-2">
-                {t("sockscap.processesEmpty")}
-              </div>
-            ) : (
-              processes.map((p) => (
-                <button
-                  key={`${p.pid}-${p.path}`}
-                  type="button"
-                  className="w-full text-left px-2 py-1.5 rounded text-ui-small hover:bg-[var(--taomni-hover)]"
-                  onClick={() => {
-                    void addAppPath(p.path || p.name, p.name);
-                    setShowProcPicker(false);
-                  }}
-                >
-                  <div className="font-medium">{p.name || p.pid}</div>
-                  <div className="text-[var(--taomni-text-muted)] truncate">{p.path}</div>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
+        ) : (
+          processes.map((p) => (
+            <button
+              key={`${p.pid}-${p.path}`}
+              type="button"
+              className="w-full text-left px-2 py-1.5 rounded text-ui-small hover:bg-[var(--taomni-hover)]"
+              onClick={() => {
+                void addAppPath(p.path || p.name, p.name);
+                setShowProcPicker(false);
+              }}
+            >
+              <div className="font-medium">{p.name || p.pid}</div>
+              <div className="text-[var(--taomni-text-muted)] truncate">{p.path}</div>
+            </button>
+          ))
+        )}
+      </Modal>
     )}
 
     {runtime.tunWarningOpen && (
-      <div
-        className="absolute inset-0 bg-black/40 flex items-center justify-center z-30"
-        onClick={() => runtime.setTunWarningOpen(false)}
+      <Modal
+        role="alertdialog"
+        testId="sockscap-tun-warning-dialog"
+        title={t("sockscap.tunConflictTitle")}
+        dismissOnBackdrop
+        initialFocus='[data-testid="sockscap-tun-warning-close"]'
+        onCancel={() => runtime.setTunWarningOpen(false)}
+        footer={
+          <Button data-testid="sockscap-tun-warning-close" onClick={() => runtime.setTunWarningOpen(false)}>
+            {t("common.close")}
+          </Button>
+        }
       >
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="sockscap-tun-warning-title"
-          data-testid="sockscap-tun-warning-dialog"
-          className="w-[min(520px,92vw)] rounded-lg bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-xl"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--taomni-divider)]">
-            <AlertTriangle className="w-4 h-4 text-ui-warning shrink-0" />
-            <h2 id="sockscap-tun-warning-title" className="flex-1 text-ui-body font-semibold">
-              {t("sockscap.tunConflictTitle")}
-            </h2>
-            <button
-              type="button"
-              data-testid="sockscap-tun-warning-close"
-              className="p-1 rounded text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)]"
-              aria-label={t("common.close")}
-              onClick={() => runtime.setTunWarningOpen(false)}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="px-4 py-3 text-ui-body leading-5 text-[var(--taomni-text-muted)]">
+        <div className="flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-ui-warning shrink-0 mt-0.5" aria-hidden="true" />
+          <p className="text-ui-body leading-5 text-[var(--taomni-text-muted)]">
             {t("sockscap.tunConflictWarning", { adapters: runtime.tunConflicts.join(", ") })}
           </p>
         </div>
-      </div>
+      </Modal>
     )}
 
     {rootPromptIntent && (
@@ -170,147 +161,123 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
 
     {/* Pre-flight: an active profile's upstream is empty → cannot start. */}
     {configIssues && (
-      <div
-        className="absolute inset-0 bg-black/40 flex items-center justify-center z-30"
-        data-testid="sockscap-config-issue-dialog"
+      <Modal
+        role="alertdialog"
+        tone="error"
+        testId="sockscap-config-issue-dialog"
+        title={t("sockscap.configIssueTitle")}
+        initialFocus='[data-testid="sockscap-config-issue-ok"]'
+        onCancel={() => setConfigIssues(null)}
+        footer={
+          <Button
+            variant="primary"
+            data-testid="sockscap-config-issue-ok"
+            onClick={() => setConfigIssues(null)}
+          >
+            {t("common.ok")}
+          </Button>
+        }
       >
-        <div className="w-[min(480px,92vw)] flex flex-col rounded-lg bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-xl">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--taomni-divider)]">
-            <AlertCircle className="w-4 h-4 text-ui-danger shrink-0" />
-            <div className="text-ui-body font-semibold">
-              {t("sockscap.configIssueTitle")}
-            </div>
+        <div className="space-y-2 text-ui-body">
+          <div className="flex items-center gap-2 text-[var(--taomni-text-muted)]">
+            <AlertCircle className="w-4 h-4 text-ui-danger shrink-0" aria-hidden="true" />
+            <span>{t("sockscap.configIssueIntro")}</span>
           </div>
-          <div className="px-4 py-3 space-y-2 text-ui-body">
-            <div className="text-[var(--taomni-text-muted)]">
-              {t("sockscap.configIssueIntro")}
-            </div>
-            <ul className="space-y-1.5">
-              {configIssues.map((iss) => (
-                <li
-                  key={iss.profileId}
-                  className="flex items-start gap-1.5 px-2 py-1.5 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
-                >
-                  <X className="w-3.5 h-3.5 text-ui-danger mt-0.5 shrink-0" />
-                  <span>
-                    <span className="font-semibold">{iss.profileName}</span>
-                    {" — "}
-                    {t(`sockscap.${iss.reasonKey}`)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[var(--taomni-divider)]">
-            <button
-              type="button"
-              data-testid="sockscap-config-issue-ok"
-              className="px-3 py-1.5 rounded text-ui-body bg-[var(--taomni-accent)] text-white hover:opacity-90"
-              onClick={() => setConfigIssues(null)}
-            >
-              {t("common.ok")}
-            </button>
-          </div>
+          <ul className="space-y-1.5">
+            {configIssues.map((iss) => (
+              <li
+                key={iss.profileId}
+                className="flex items-start gap-1.5 px-2 py-1.5 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
+              >
+                <X className="w-3.5 h-3.5 text-ui-danger mt-0.5 shrink-0" />
+                <span>
+                  <span className="font-semibold">{iss.profileName}</span>
+                  {" — "}
+                  {t(`sockscap.${iss.reasonKey}`)}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
-      </div>
+      </Modal>
     )}
 
     {/* Pre-flight: upstream probe failed → force start or cancel. */}
     {probeFailures && (
-      <div
-        className="absolute inset-0 bg-black/40 flex items-center justify-center z-30"
-        data-testid="sockscap-probe-fail-dialog"
-      >
-        <div className="w-[min(560px,92vw)] max-h-[75vh] flex flex-col rounded-lg bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-xl">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--taomni-divider)]">
-            <AlertCircle className="w-4 h-4 text-ui-warning shrink-0" />
-            <div className="text-ui-body font-semibold">
-              {t("sockscap.probeFailTitle")}
-            </div>
-          </div>
-          <div className="px-4 py-3 space-y-2 text-ui-body overflow-auto">
-            <div className="text-[var(--taomni-text-muted)]">
-              {t("sockscap.probeFailIntro")}
-            </div>
-            <ul className="space-y-1.5">
-              {probeFailures.map((f, i) => (
-                <li
-                  key={`${f.profileName}-${i}`}
-                  className="px-2 py-1.5 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
-                >
-                  <div className="font-semibold flex items-center gap-1.5">
-                    <span>{f.profileName}</span>
-                    <span className="px-1.5 py-0.5 rounded text-ui-caption uppercase bg-[var(--taomni-hover)] font-mono">
-                      {f.kind}
-                    </span>
-                  </div>
-                  <div className="mt-1 font-mono text-ui-small text-ui-danger break-words whitespace-pre-wrap">
-                    {f.error}
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <div className="text-ui-small text-[var(--taomni-text-muted)]">
-              {t("sockscap.probeFailHint")}
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[var(--taomni-divider)]">
-            <button
-              type="button"
+      <Modal
+        role="alertdialog"
+        size="wide"
+        testId="sockscap-probe-fail-dialog"
+        title={t("sockscap.probeFailTitle")}
+        initialFocus='[data-testid="sockscap-probe-fail-cancel"]'
+        onCancel={() => setProbeFailures(null)}
+        footer={
+          <>
+            <Button
               data-testid="sockscap-probe-fail-cancel"
-              className="px-3 py-1.5 rounded text-ui-body border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
               onClick={() => setProbeFailures(null)}
             >
               {t("common.cancel")}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               data-testid="sockscap-probe-fail-force"
-              className="px-3 py-1.5 rounded text-ui-body border border-ui-warning-border bg-ui-warning-surface text-ui-warning hover:underline"
+              className="border-ui-warning-border bg-ui-warning-surface text-ui-warning"
               onClick={() => {
                 setProbeFailures(null);
                 void onStart();
               }}
             >
               {t("sockscap.probeFailForce")}
-            </button>
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-2 text-ui-body">
+          <div className="flex items-center gap-2 text-[var(--taomni-text-muted)]">
+            <AlertCircle className="w-4 h-4 text-ui-warning shrink-0" aria-hidden="true" />
+            <span>{t("sockscap.probeFailIntro")}</span>
+          </div>
+          <ul className="space-y-1.5">
+            {probeFailures.map((f, i) => (
+              <li
+                key={`${f.profileName}-${i}`}
+                className="px-2 py-1.5 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
+              >
+                <div className="font-semibold flex items-center gap-1.5">
+                  <span>{f.profileName}</span>
+                  <span className="px-1.5 py-0.5 rounded text-ui-caption uppercase bg-[var(--taomni-hover)] font-mono">
+                    {f.kind}
+                  </span>
+                </div>
+                <div className="mt-1 font-mono text-ui-small text-ui-danger break-words whitespace-pre-wrap">
+                  {f.error}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">
+            {t("sockscap.probeFailHint")}
           </div>
         </div>
-      </div>
+      </Modal>
     )}
 
     {/* Full test result — status bar only shows a summary; this shows the
           complete text and lets the user copy it. */}
     {testDetail && (
-      <div
-        className="absolute inset-0 bg-black/40 flex items-center justify-center z-20"
-        data-testid="sockscap-test-detail"
-      >
-        <div className="w-[min(620px,92vw)] max-h-[75vh] flex flex-col rounded-lg bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-xl">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--taomni-divider)]">
-            <div className="text-ui-body font-semibold truncate">{testDetail.title}</div>
-            <button
-              type="button"
-              className="p-1 rounded hover:bg-[var(--taomni-hover)]"
-              onClick={() => setTestDetail(null)}
-              aria-label={t("common.close")}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-auto p-3">
-            <pre
-              data-testid="sockscap-test-detail-body"
-              className="whitespace-pre-wrap break-words text-ui-small font-mono text-[var(--taomni-text)] leading-relaxed"
-            >
-              {testDetail.body}
-            </pre>
-          </div>
-          <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-[var(--taomni-divider)]">
-            <button
-              type="button"
+      <Modal
+        size="wide"
+        testId="sockscap-test-detail"
+        title={testDetail.title}
+        closeLabel={t("common.close")}
+        dismissOnBackdrop
+        initialFocus='[data-testid="sockscap-test-detail-close"]'
+        onCancel={() => setTestDetail(null)}
+        footer={
+          <>
+            <Button
               data-testid="sockscap-test-detail-copy"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+              className="inline-flex items-center gap-1.5"
               onClick={() => void copyTestDetail()}
             >
               {testCopied ? (
@@ -319,18 +286,24 @@ export function SocksCapDialogs(props: SocksCapDialogsProps) {
                 <Copy className="w-3.5 h-3.5" />
               )}
               {testCopied ? t("common.copied") : t("common.copy")}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="primary"
               data-testid="sockscap-test-detail-close"
-              className="px-3 py-1.5 rounded text-ui-body bg-[var(--taomni-accent)] text-white hover:opacity-90"
               onClick={() => setTestDetail(null)}
             >
               {t("common.close")}
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+          </>
+        }
+      >
+        <pre
+          data-testid="sockscap-test-detail-body"
+          className="whitespace-pre-wrap break-words text-ui-small font-mono text-[var(--taomni-text)] leading-relaxed"
+        >
+          {testDetail.body}
+        </pre>
+      </Modal>
     )}
   </>);
 }

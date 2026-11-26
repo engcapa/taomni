@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+import { useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { createPortal } from "react-dom";
+import { ModalSurface } from "../../../crates/taomni-plugin-api/frontend/ui/ModalSurface";
 import {
   CheckCircle2,
   HelpCircle,
@@ -54,7 +56,7 @@ function StepMarker({ index, state }: { index: number; state: StepState }) {
     <span
       className={`w-5 h-5 shrink-0 rounded-full inline-flex items-center justify-center text-ui-caption font-semibold border ${
         state === "current"
-          ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)] text-white"
+          ? "border-[var(--taomni-accent)] bg-[var(--taomni-primary-bg)] text-[var(--taomni-primary-text)]"
           : "border-[var(--taomni-divider)] text-[var(--taomni-text-muted)]"
       }`}
     >
@@ -76,14 +78,12 @@ export function SocksCapMacosSetupGuide({
   onContinueToStart,
 }: Props) {
   const t = useT();
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [busy, onClose]);
+  const backdropPointer = useRef<number | null>(null);
+  function onBackdrop(event: ReactPointerEvent<HTMLDialogElement>) {
+    if (event.target !== event.currentTarget) return false;
+    const box = event.currentTarget.getBoundingClientRect();
+    return event.clientX < box.left || event.clientX >= box.right || event.clientY < box.top || event.clientY >= box.bottom;
+  }
 
   const installed =
     installStatus?.state === "pendingSystemApproval" || installStatus?.state === "ready";
@@ -136,23 +136,24 @@ export function SocksCapMacosSetupGuide({
     },
   ];
 
-  return (
-    <div
-      className="absolute inset-0 z-40 flex items-center justify-center bg-black/45 p-4"
-      data-testid="sockscap-macos-setup-overlay"
-      onClick={() => {
-        if (!busy) onClose();
+  return createPortal(
+    <ModalSurface
+      aria-labelledby="sockscap-macos-setup-title"
+      data-testid="sockscap-macos-setup-dialog"
+      initialFocus='[data-testid="sockscap-macos-setup-install"], [data-testid="sockscap-macos-setup-refresh"], [data-testid="sockscap-macos-setup-continue"], [data-testid="sockscap-macos-setup-finish"], [data-testid="sockscap-macos-setup-close"]'
+      onCancel={() => { if (!busy) onClose(); }}
+      onPointerDown={(event) => {
+        backdropPointer.current = !busy && event.button === 0 && onBackdrop(event) ? event.pointerId : null;
       }}
+      onPointerCancel={() => { backdropPointer.current = null; }}
+      onPointerUp={(event) => {
+        const dismiss = !busy && backdropPointer.current === event.pointerId && onBackdrop(event);
+        backdropPointer.current = null;
+        if (dismiss) onClose();
+      }}
+      className="taomni-sockscap-popover m-auto w-[min(620px,94vw)] max-h-[86vh] max-w-none p-0 open:flex flex-col rounded-xl bg-[var(--taomni-panel-bg)] text-[var(--taomni-text)] border border-[var(--taomni-divider)] shadow-2xl backdrop:bg-[var(--taomni-overlay)]"
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="sockscap-macos-setup-title"
-        data-testid="sockscap-macos-setup-dialog"
-        className="w-[min(620px,94vw)] max-h-[86vh] flex flex-col rounded-xl bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[var(--taomni-divider)]">
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[var(--taomni-divider)]">
           {mode === "onboarding" ? (
             <Shield className="w-5 h-5 shrink-0 text-[var(--taomni-accent)]" />
           ) : (
@@ -260,7 +261,8 @@ export function SocksCapMacosSetupGuide({
             <button
               type="button"
               data-testid="sockscap-macos-setup-install"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-50"
+              data-primary="true"
+              className="taomni-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body"
               disabled={busy || !canInstall}
               onClick={onInstall}
             >
@@ -277,7 +279,8 @@ export function SocksCapMacosSetupGuide({
             <button
               type="button"
               data-testid="sockscap-macos-setup-refresh"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-50"
+              data-primary="true"
+              className="taomni-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body"
               disabled={busy}
               onClick={onRefreshApproval}
             >
@@ -294,7 +297,8 @@ export function SocksCapMacosSetupGuide({
             <button
               type="button"
               data-testid="sockscap-macos-setup-continue"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-50"
+              data-primary="true"
+              className="taomni-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-ui-body"
               disabled={busy}
               onClick={onContinueToStart}
             >
@@ -316,8 +320,8 @@ export function SocksCapMacosSetupGuide({
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </ModalSurface>,
+    document.body,
   );
 }
 

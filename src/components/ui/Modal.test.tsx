@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { ThemedSelect } from "../ThemedSelect";
 import { Modal } from "./Modal";
+import { ModalSurface } from "./ModalSurface";
 import { ConfirmDialog, TextInputDialog } from "../sidebar/ConfirmDialog";
 
 afterEach(cleanup);
@@ -117,4 +118,34 @@ it("routes window-level Escape only to the topmost open modal and ignores IME co
   fireEvent.keyDown(window, { key: "Escape" });
   expect(innerCancel).toHaveBeenCalledTimes(1);
   expect(outerCancel).not.toHaveBeenCalled();
+});
+
+it("composes custom onKeyDown shortcuts on ModalSurface while preserving Escape and Tab handling", () => {
+  const cancel = vi.fn();
+  const shortcut = vi.fn();
+  render(
+    <ModalSurface
+      aria-label="Custom shortcuts"
+      initialFocus="input"
+      onCancel={cancel}
+      onKeyDown={(event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+          event.preventDefault();
+          shortcut();
+        }
+      }}
+    >
+      <input type="text" aria-label="Search" />
+      <button type="button">Done</button>
+    </ModalSurface>,
+  );
+  const input = screen.getByRole("textbox", { name: "Search" });
+  expect(input).toHaveFocus();
+  fireEvent.keyDown(input, { key: "f", ctrlKey: true });
+  expect(shortcut).toHaveBeenCalledTimes(1);
+  expect(cancel).not.toHaveBeenCalled();
+  fireEvent.keyDown(input, { key: "Escape", isComposing: true });
+  expect(cancel).not.toHaveBeenCalled();
+  fireEvent.keyDown(input, { key: "Escape" });
+  expect(cancel).toHaveBeenCalledTimes(1);
 });

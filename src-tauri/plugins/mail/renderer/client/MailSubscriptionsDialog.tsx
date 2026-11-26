@@ -18,7 +18,6 @@ export interface MailSubscriptionsDialogContext {
 export function MailSubscriptionsDialog(context: MailSubscriptionsDialogContext) {
   const { subscriptionsOpen, setSubscriptionsOpen, subscribedOnly, setSubscribedOnly, displayFolders, subscriptionBusy, toggleSubscription } = context;
   return subscriptionsOpen && (
-    <div className="absolute inset-0 taomni-dialog-backdrop flex items-center justify-center p-5">
       <MailDraggableDialog
         title="Folder subscriptions"
         icon={<ListChecks className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
@@ -68,6 +67,5 @@ export function MailSubscriptionsDialog(context: MailSubscriptionsDialogContext)
           })}
         </div>
       </MailDraggableDialog>
-    </div>
   );
 }

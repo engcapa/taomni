@@ -10,7 +10,7 @@ const focusable = 'button:enabled, input:enabled:not([type="hidden"]), textarea:
 const openModalStack: HTMLDialogElement[] = [];
 
 /** The native top layer keeps the opener's theme scope and makes the background inert. */
-export function ModalSurface({ initialFocus, returnFocus, onCancel, role = "dialog", children, ...props }: ModalSurfaceProps) {
+export function ModalSurface({ initialFocus, returnFocus, onCancel, onKeyDown, role = "dialog", children, ...props }: ModalSurfaceProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const onCancelRef = useRef(onCancel);
   onCancelRef.current = onCancel;
@@ -68,6 +68,7 @@ export function ModalSurface({ initialFocus, returnFocus, onCancel, role = "dial
     onCancel={(event) => { event.preventDefault(); onCancelRef.current(); }}
     onKeyDown={(event) => {
       event.stopPropagation();
+      onKeyDown?.(event);
       if (event.defaultPrevented) return;
       if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
         if (event.key === "Escape") event.preventDefault();

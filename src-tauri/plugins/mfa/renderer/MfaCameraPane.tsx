@@ -137,7 +137,7 @@ export function MfaCameraPane({ onTexts }: { onTexts: (texts: string[]) => MfaTe
           </select>
         </label>
       ) : null}
-      <div className="relative overflow-hidden rounded" style={{ background: "#000", display: live ? "block" : "none" }}>
+      <div className="relative overflow-hidden rounded" style={{ background: "var(--taomni-term-bg, #000)", display: live ? "block" : "none" }}>
         <video
           ref={videoRef}
           data-testid="mfa-camera-video"

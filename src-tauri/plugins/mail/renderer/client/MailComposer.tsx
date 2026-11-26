@@ -54,7 +54,7 @@ export function MailComposer(viewProps: MailComposerProps) {
   const { addDraftAttachmentPaths, attachProgress, composeDragActive, composeRootRef, defaultMailDomain, discardCurrentDraft, draft, handleAddDraftAttachments, handleDropComposeFiles, handleInsertInlineImage, handlePasteImages, handleRecipientQueryChange, handleSendDraft, handleSendLater, identities, identityById, recipientSearch, recipientSuggestionsFor, removeDraftAttachment, saveCurrentAsTemplate, saveCurrentDraft, savingDraft, sendLaterAt, sendLaterOpen, sending, setComposeDragActive, setComposeOpen, setComposePrompt, setDraft, setSendLaterAt, setSendLaterOpen, tabId } = viewProps;
  return (<div
           ref={composeRootRef}
-          className="absolute inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
+          className="fixed inset-0 pointer-events-none flex items-center justify-center p-4"
           data-testid="mail-compose-dialog"
           onDragEnter={(event: ReactDragEvent<HTMLDivElement>) => {
             if (sending || !isOsFileDrag(event.dataTransfer)) return;

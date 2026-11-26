@@ -93,7 +93,7 @@ export function RdpPanelView(inputs: RdpPanelViewProps) {
         position: "relative",
         width: "100%",
         height: "100%",
-        background: "#000",
+        background: "var(--taomni-term-bg, #000)",
         display: "flex",
         flexDirection: "column",
       }}
@@ -228,7 +228,7 @@ export function RdpPanelView(inputs: RdpPanelViewProps) {
         ref={viewportRef}
         style={{
           flex: 1,
-          background: "#000",
+          background: "var(--taomni-term-bg, #000)",
           width: "100%",
           minHeight: 0,
           display: "flex",
@@ -259,7 +259,7 @@ export function RdpPanelView(inputs: RdpPanelViewProps) {
             maxWidth: scaleMode === "fit" ? "100%" : undefined,
             maxHeight: scaleMode === "fit" ? "100%" : undefined,
             imageRendering: "pixelated",
-            background: "#000",
+            background: "var(--taomni-term-bg, #000)",
             // IronRDP forwards the server-provided shape, while the WebView
             // moves this local cursor immediately without waiting for a remote
             // framebuffer update.

@@ -42,7 +42,7 @@ jobs:
             *) echo 'Unknown module frontend' >&2; exit 1 ;;
           esac
           case "$MODULE_SLUG" in
-            mail|mfa|sockscap) dependencies+=(src-tauri/crates/taomni-plugin-api/frontend/ui) ;;
+            mail|mfa|rdp-client|sockscap|vnc-client) dependencies+=(src-tauri/crates/taomni-plugin-api/frontend/ui) ;;
           esac
           case "$MODULE_SLUG" in
             mail|mfa|sockscap|vnc-client) dependencies+=(src/styles/ui-foundations.css src/styles/ui-typography.css src/styles/modal.css) ;;

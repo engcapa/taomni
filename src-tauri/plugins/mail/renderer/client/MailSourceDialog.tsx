@@ -11,7 +11,6 @@ export interface MailSourceDialogContext {
 export function MailSourceDialog(context: MailSourceDialogContext) {
   const { sourceView, setSourceView, copyText } = context;
   return sourceView && (
-    <div className="absolute inset-0 taomni-dialog-backdrop flex items-center justify-center p-5">
       <MailDraggableDialog
         title={`Source — ${sourceView.subject}`}
         icon={<Code className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
@@ -36,6 +35,5 @@ export function MailSourceDialog(context: MailSourceDialogContext) {
           </pre>
         </div>
       </MailDraggableDialog>
-    </div>
   );
 }

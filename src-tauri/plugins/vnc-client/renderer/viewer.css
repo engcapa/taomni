@@ -4,3 +4,4 @@
 @import "./VncConnectionOverlay.css";
 
 @source "./";
+@source "../../../crates/taomni-plugin-api/frontend/ui";

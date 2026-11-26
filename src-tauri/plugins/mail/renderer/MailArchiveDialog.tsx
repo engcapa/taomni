@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ModalSurface } from "../../../crates/taomni-plugin-api/frontend/ui/ModalSurface";
 import { mailArchiveAttachment, mailArchiveCleanup, mailArchiveExport, mailArchivePreviewCleanup, mailArchiveQuery, mailArchiveRead, type MailArchiveEntry, type MailArchiveKey, type MailArchivePage, type MailArchiveQuery, type MailCleanupPreview, type MailMessageBody } from "../../../../src/lib/mail";
 import { selectSaveFilePath } from "../../../../src/lib/ipc";
 import { folderLabel } from "../../../../src/lib/mailFolders";
@@ -39,7 +40,6 @@ export function MailArchiveDialog({ accountId, onClose, onChanged }: { accountId
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const dialog = useRef<HTMLDialogElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const request = useRef(0);
   const readVersion = useRef(0);
@@ -69,7 +69,6 @@ export function MailArchiveDialog({ accountId, onClose, onChanged }: { accountId
     finally { if (version === request.current) setLoading(false); }
   }, [accountId]);
   useEffect(() => {
-    dialog.current?.showModal(); search.current?.focus();
     return () => { ++request.current; ++readVersion.current; };
   }, []);
   useEffect(() => {
@@ -107,11 +106,11 @@ export function MailArchiveDialog({ accountId, onClose, onChanged }: { accountId
   });
   const disabled = busy || loading || !!input.error;
   const advancedCount = [filters.dateFrom, filters.dateTo, filters.storedFrom, filters.storedTo, filters.minSize, filters.maxSize].filter(Boolean).length;
-  return <dialog ref={dialog} aria-labelledby="mail-archive-title" data-testid="mail-archive-dialog"
-    className="m-auto w-[min(1440px,96vw)] h-[min(850px,92vh)] max-w-none max-h-none rounded-xl border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[var(--taomni-text)] p-0 shadow-2xl backdrop:bg-black/40"
-    onCancel={(e) => { if (busy) e.preventDefault(); else if (preview) { e.preventDefault(); setPreview(null); } }} onClose={onClose}
+  return <ModalSurface aria-labelledby="mail-archive-title" data-testid="mail-archive-dialog"
+    initialFocus='[data-testid="mail-archive-search"]'
+    className="m-auto w-[min(1440px,96vw)] h-[min(850px,92vh)] max-w-none max-h-none rounded-xl border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[var(--taomni-text)] p-0 shadow-2xl backdrop:bg-[var(--taomni-overlay)]"
+    onCancel={() => { if (busy) return; if (preview) setPreview(null); else onClose(); }}
     onKeyDown={(e) => {
-      e.stopPropagation();
       const editing = (e.target as HTMLElement).matches("input,textarea,select,[contenteditable=true]");
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") { e.preventDefault(); search.current?.focus(); search.current?.select(); }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a" && !editing && !disabled && !preview) { e.preventDefault(); select(page.entries, true); }
@@ -188,5 +187,5 @@ export function MailArchiveDialog({ accountId, onClose, onChanged }: { accountId
         <button type="button" className="taomni-btn" data-testid="mail-archive-next" disabled={disabled || !!preview || page.offset + page.entries.length >= page.total} onClick={() => void load(applied.current, page.offset + 200)}>Next</button>
       </footer>
     </div>
-  </dialog>;
+  </ModalSurface>;
 }

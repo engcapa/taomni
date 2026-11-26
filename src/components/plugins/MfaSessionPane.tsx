@@ -37,7 +37,7 @@ export function MfaFloatingPane({ onExpand }: { onExpand: () => void }) {
   if (!floating.open) return null;
 
   return <div data-testid="mfa-floating-entry" className="fixed rounded-lg bg-[var(--taomni-panel-bg)]"
-    aria-label={t("platform.mfaTitle")} style={{ ...floating.position, width: FLOATING_MFA_WIDTH, zIndex: floating.pinned ? 960 : 950 }}>
+    aria-label={t("platform.mfaTitle")} style={{ ...floating.position, width: FLOATING_MFA_WIDTH, zIndex: floating.pinned ? "calc(var(--taomni-z-popover, 900) + 60)" : "calc(var(--taomni-z-popover, 900) + 50)" }}>
     <MfaSessionPane tabId="mfa-floating" active view="floating" onExpand={onExpand} unavailableActions={
       <button type="button" className="taomni-btn px-3 py-1" onClick={close}>{t("platform.mfaClose")}</button>
     } />

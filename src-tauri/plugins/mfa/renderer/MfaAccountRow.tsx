@@ -116,7 +116,7 @@ export function MfaAccountRow({
           : dropActive
           ? "var(--taomni-selected)"
           : "var(--taomni-card-bg)",
-        boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.03)",
+        boxShadow: "var(--taomni-shadow-sm)",
         outline: dropActive ? "1px dashed var(--taomni-accent)" : undefined,
       }}
     >

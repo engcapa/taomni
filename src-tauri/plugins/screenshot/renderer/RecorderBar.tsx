@@ -258,7 +258,7 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
     >
       {initFailed ? (
         <div className="flex flex-col gap-2 py-1">
-          <p data-testid="screenshot-recorder-error" className="text-ui-body" style={{ color: "#ff6b6b" }}>
+          <p data-testid="screenshot-recorder-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-danger-text, #ff6b6b)" }}>
             {t("screenshot.noRecording")}
           </p>
           <button
@@ -266,14 +266,14 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
             data-testid="screenshot-recorder-cancel"
             onClick={() => void handleCancel()}
             className="rounded-lg px-3 py-1.5 text-ui-body self-end"
-            style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
+            style={{ background: "var(--taomni-primary-bg, var(--taomni-accent))", color: "var(--taomni-primary-text, #ffffff)" }}
           >
             {t("screenshot.cancel")}
           </button>
         </div>
       ) : preview ? (
         <>
-          <div className="flex-1 min-h-0 flex items-center justify-center rounded-lg overflow-hidden" style={{ background: "#000" }}>
+          <div className="flex-1 min-h-0 flex items-center justify-center rounded-lg overflow-hidden" style={{ background: "var(--taomni-term-bg, #000)" }}>
             {previewUrl &&
               (isMp4 ? (
                 <video
@@ -296,7 +296,7 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
           </p>
           {notice && <p data-testid="screenshot-recorder-notice" className="text-ui-small text-[var(--taomni-text-muted)]">{notice}</p>}
           {error && (
-            <p data-testid="screenshot-recorder-error" className="text-ui-body" style={{ color: "#ff6b6b" }}>
+            <p data-testid="screenshot-recorder-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-danger-text, #ff6b6b)" }}>
               {error}
             </p>
           )}
@@ -328,7 +328,7 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
               data-testid="screenshot-recorder-done"
               onClick={() => void closeAll()}
               className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-ui-body"
-              style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
+              style={{ background: "var(--taomni-primary-bg, var(--taomni-accent))", color: "var(--taomni-primary-text, #ffffff)" }}
             >
               <Check size={13} />
               {t("screenshot.done")}
@@ -339,7 +339,7 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
         <>
           <p data-testid="screenshot-recorder-range-hint" className="text-ui-small text-[var(--taomni-text-muted)]">{range ? `${range} · ` : ""}{t("screenshot.recordingRangeHint")}</p>
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full animate-pulse shrink-0" style={{ background: "#ff4d4f" }} />
+            <span className="w-2.5 h-2.5 rounded-full animate-pulse shrink-0" style={{ background: "var(--taomni-danger-border, #ff4d4f)" }} />
             <span data-testid="screenshot-recorder-timer" className="tabular-nums font-medium">
               {formatElapsed(elapsed)}
             </span>
@@ -352,7 +352,11 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
               onClick={() => void handleStop()}
               disabled={stopping || stopRef.current || !recordingId}
               className="h-8 px-2 gap-1 rounded-lg flex items-center justify-center disabled:opacity-40"
-              style={{ background: "#ff4d4f", color: "#ffffff" }}
+              style={{
+                background: "var(--taomni-danger-bg, #450a0a)",
+                color: "var(--taomni-danger-text, #fecaca)",
+                border: "1px solid var(--taomni-danger-border, #f87171)",
+              }}
             >
               <Square size={14} />
               {t("screenshot.stopRecording")}
@@ -372,7 +376,7 @@ export function RecorderBar({ signedRenderer = false }: { signedRenderer?: boole
           {stopping && <p className="text-ui-body text-[var(--taomni-text-muted)]">{t("screenshot.recordFinishing")}</p>}
           {notice && <p data-testid="screenshot-recorder-notice" className="text-ui-small text-[var(--taomni-text-muted)]">{notice}</p>}
           {error && (
-            <p data-testid="screenshot-recorder-error" className="text-ui-body" style={{ color: "#ff6b6b" }}>
+            <p data-testid="screenshot-recorder-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-danger-text, #ff6b6b)" }}>
               {error}
             </p>
           )}

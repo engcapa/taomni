@@ -409,7 +409,7 @@ export function SocksCapView(props: SocksCapViewProps) {
         {/* Resizable Handle / Splitter */}
         {!linuxLaunchOnly && !isRibbon && (
           <div
-            className="w-1 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/40 active:bg-[var(--taomni-accent)] transition-colors shrink-0 z-10 self-stretch"
+            className="w-1 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/40 active:bg-[var(--taomni-accent)] transition-colors shrink-0 z-[var(--taomni-z-sticky)] self-stretch"
             onMouseDown={handleMouseDownSplitter}
             title="Drag to resize panel"
           />
