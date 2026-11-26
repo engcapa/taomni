@@ -19,7 +19,6 @@
   "src/components/database/DbObjectDetailDialog.tsx": {"L02":1},
   "src/components/database/DbTableDetailPanel.tsx": {"L02":1},
   "src/components/database/QueryLibraryPanel.tsx": {"L02":1},
-  "src/components/database/grid/CellValueDialog.tsx": {"L02":1},
   "src/components/database/hbase/CommandMenus.tsx": {"L02":1},
   "src/components/editor/workspace/AutoImportCandidateDialog.tsx": {"L02":1},
   "src/components/editor/workspace/AutoImportSettingsDialog.tsx": {"L02":1},

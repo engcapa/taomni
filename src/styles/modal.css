@@ -25,3 +25,5 @@
 .taomni-modal-body { min-height: 0; overflow: auto; overflow-wrap: anywhere; }
 .taomni-modal-body p { white-space: pre-wrap; user-select: text; }
 .taomni-modal-footer { display: flex; flex: none; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+.taomni-modal[data-size="wide"] { width: min(760px, calc(100vw - 32px)); }

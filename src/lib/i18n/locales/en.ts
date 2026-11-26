@@ -194,6 +194,11 @@ const dict = {
     copyDetails: "Copy error details",
     copyFailed: "Could not copy the details. Select the message to copy it manually. {detail}",
   },
+  dbCellValue: {
+    title: "Full value for {column}",
+    wrap: "Wrap lines",
+    details: "Row {row} · {type} · {chars} characters · {lines} lines",
+  },
   common: {
     ok: "OK",
     cancel: "Cancel",

@@ -193,6 +193,11 @@ export const zhCN: DeepPartial<typeof en> = {
     copyDetails: "复制错误详情",
     copyFailed: "无法复制详情。请选择错误信息并手动复制。{detail}",
   },
+  dbCellValue: {
+    title: "{column} 的完整值",
+    wrap: "自动换行",
+    details: "第 {row} 行 · {type} · {chars} 个字符 · {lines} 行",
+  },
   common: {
     ok: "确定",
     cancel: "取消",

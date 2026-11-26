@@ -23,7 +23,7 @@ import {
   Table2,
   Trash2,
 } from "lucide-react";
-import { type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
+import { useRef, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
 import { type MenuItem } from "../../ContextMenu";
 import { GridSearchBar } from "./GridSearchBar";
 import type { useGridSearch } from "./useGridSearch";
@@ -146,6 +146,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
     setCellValueViewer,
     menu,
   } = inputs;
+  const listRef = useRef<HTMLDivElement>(null);
   return ((
     <div
       className="flex-1 min-h-0 flex flex-col"
@@ -631,6 +632,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
 
       {viewMode === "list" && (
         <div
+          ref={listRef}
           className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-2 text-ui-body"
           tabIndex={0}
           onKeyDown={handleGridKeyDown}
@@ -721,6 +723,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
       {cellValueViewer && (
         <CellValueDialog
           viewer={cellValueViewer}
+          returnFocus={viewMode === "list" ? listRef.current : containerRef.current}
           onCopy={() => void copyCellViewerValue(cellValueViewer)}
           onClose={() => setCellValueViewer(null)}
         />
