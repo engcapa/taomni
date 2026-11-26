@@ -130,12 +130,12 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
       </div>, window.document.body)}
     </div>
     {notice && <div className="fv-md-export-notice" role="status" data-testid="markdown-export-status" data-export-state={exportState} data-export-path={saved || undefined}><span>{notice}</span>{saved && savedFile && <MarkdownExportResultActions path={saved} filePath={savedFile} workspaceId={savedWorkspace} onError={onError} />}<button type="button" className="fv-icon-button" aria-label={label("关闭提示", "Dismiss")} onClick={() => setNotice("")}><X /></button></div>}
-    {dialog && createPortal(<div className="fv" style={{ display: "contents" }}>{dialog === "drawio" ? <DrawioExportSettings settings={settings} onChange={setSettings} onCancel={() => { setDialog(null); trigger.current?.focus(); }} onConfirm={(kind) => void run(kind)} /> : <ExportSettings kind={dialog} filename={markdownBasename(current.path)} settings={settings} onChange={setSettings} onCancel={() => { setDialog(null); trigger.current?.focus(); }} onConfirm={() => void run(dialog)} />}</div>, window.document.body)}
+    {dialog && createPortal(<div className="fv" style={{ display: "contents" }}>{dialog === "drawio" ? <DrawioExportSettings settings={settings} returnFocus={trigger.current} onChange={setSettings} onCancel={() => setDialog(null)} onConfirm={(kind) => void run(kind)} /> : <ExportSettings kind={dialog} filename={markdownBasename(current.path)} settings={settings} returnFocus={trigger.current} onChange={setSettings} onCancel={() => setDialog(null)} onConfirm={() => void run(dialog)} />}</div>, window.document.body)}
   </>;
 }
 
-function ExportSettings({ kind, filename, settings, onChange, onCancel, onConfirm }: {
-  kind: MarkdownExportKind; filename: string; settings: MarkdownExportSettings;
+function ExportSettings({ kind, filename, settings, returnFocus, onChange, onCancel, onConfirm }: {
+  kind: MarkdownExportKind; filename: string; settings: MarkdownExportSettings; returnFocus?: HTMLElement | null;
   onChange: (value: MarkdownExportSettings) => void; onCancel: () => void; onConfirm: () => void;
 }) {
   const label = useViewerLabels();
@@ -144,6 +144,7 @@ function ExportSettings({ kind, filename, settings, onChange, onCancel, onConfir
   return <ModalSurface
     dismissOnBackdrop
     initialFocus="[role=combobox], button:enabled"
+    returnFocus={returnFocus}
     onCancel={onCancel}
     className="fv-modal fv-md-export-settings"
     aria-labelledby="fv-md-export-title"

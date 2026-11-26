@@ -24,7 +24,7 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, ena
   const label = useViewerLabels();
   const [active, setActive] = useState<HTMLElement | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const [viewer, setViewer] = useState<{ snapshot: MarkdownVisualSnapshot; action: DiagramAction } | null>(null);
+  const [viewer, setViewer] = useState<{ snapshot: MarkdownVisualSnapshot; action: DiagramAction; returnFocus: HTMLElement | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [position, setPosition] = useState({ left: 0, top: 0, visible: false });
@@ -35,7 +35,7 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, ena
   const focus = useCallback(() => {
     (state.current.active?.isConnected ? state.current.active : root.current?.querySelector<HTMLElement>(".fv-md-main") || root.current)?.focus();
   }, [root]);
-  const closeViewer = () => { setViewer(null); focus(); };
+  const closeViewer = () => { setViewer(null); };
   const snapshot = (element: HTMLElement) => {
     const stem = markdownBasename(docPath).replace(/\.(md|markdown)$/i, "");
     const index = (selector: string) => Array.from(root.current?.querySelectorAll(selector) ?? []).indexOf(element) + 1;
@@ -44,8 +44,11 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, ena
       : snapshotDiagram(element, `${stem}-diagram-${index(MARKDOWN_DIAGRAM_SELECTOR)}`);
   };
   const open = (element: HTMLElement, action: DiagramAction = "open") => {
-    try { setActive(element); setMenu(null); setNotice(""); setViewer({ snapshot: snapshot(element), action }); }
-    catch (error) { onError(String(error)); }
+    try {
+      const returnFocus = element.isConnected ? element : root.current?.querySelector<HTMLElement>(".fv-md-main") || root.current;
+      setActive(element); setMenu(null); setNotice("");
+      setViewer({ snapshot: snapshot(element), action, returnFocus });
+    } catch (error) { onError(String(error)); }
   };
   const openMenu = (element: HTMLElement, x: number, y: number) => { setActive(element); setMenu({ x, y }); };
   const callbacks = useRef({ open, openMenu, onError }); callbacks.current = { open, openMenu, onError };
@@ -201,6 +204,6 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, ena
       />
     )}
     {notice && !viewer && <div className="fv-md-diagram-notice" role="status" data-testid="markdown-diagram-status">{notice}</div>}
-    {viewer && createPortal(<MarkdownDiagramViewer snapshot={viewer.snapshot} initialAction={viewer.action} busy={busy} notice={notice} label={label} onAction={(action, image, transform) => { void run(action, image, transform); }} onClose={closeViewer} />, document.body)}
+    {viewer && createPortal(<MarkdownDiagramViewer snapshot={viewer.snapshot} initialAction={viewer.action} busy={busy} notice={notice} label={label} returnFocus={viewer.returnFocus} onAction={(action, image, transform) => { void run(action, image, transform); }} onClose={closeViewer} />, document.body)}
   </>;
 }

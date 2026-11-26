@@ -137,7 +137,7 @@
 .fv-md-setting-check{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .fv-md-setting-check input{accent-color:var(--accent-s);width:14px;height:14px}
 .fv-md-export-hint{font-size:12px;line-height:1.7;color:var(--muted);border:1px dashed var(--divider);background:var(--hover);border-radius:6px;padding:8px 10px}
-.fv-md-paste-status,.fv-md-export-notice{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--divider);color:var(--muted);font-size:11.5px;line-height:1.6;padding:5px 10px;z-index:var(--taomni-z-toast, 1200)}
+.fv-md-paste-status,.fv-md-export-notice{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--divider);color:var(--muted);font-size:11.5px;line-height:1.6;padding:5px 10px;z-index:var(--taomni-z-docked-overlay, 500)}
 .fv-md-paste-status{flex:none}
 .fv-md-paste-status button{margin-left:auto;padding:0 3px}
 .fv-md-export-notice{position:absolute;top:calc(100% + 4px);right:12px;max-width:min(600px,calc(100% - 24px));box-shadow:var(--shadow);border-radius:6px}

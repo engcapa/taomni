@@ -4,8 +4,8 @@ import { useViewerLabels } from "../viewerLabels";
 import { DEFAULT_DRAWIO_OPTIONS, type DrawioExportOptions } from "./drawioExport";
 import type { MarkdownExportKind, MarkdownExportSettings } from "./exportModel";
 
-export function DrawioExportSettings({ settings, onChange, onCancel, onConfirm }: {
-  settings: MarkdownExportSettings; onChange: (value: MarkdownExportSettings) => void; onCancel: () => void;
+export function DrawioExportSettings({ settings, returnFocus, onChange, onCancel, onConfirm }: {
+  settings: MarkdownExportSettings; returnFocus?: HTMLElement | null; onChange: (value: MarkdownExportSettings) => void; onCancel: () => void;
   onConfirm: (kind: MarkdownExportKind) => void;
 }) {
   const label = useViewerLabels();
@@ -14,6 +14,7 @@ export function DrawioExportSettings({ settings, onChange, onCancel, onConfirm }
   return <ModalSurface
     dismissOnBackdrop
     initialFocus="[role=combobox], button:enabled"
+    returnFocus={returnFocus}
     onCancel={onCancel}
     className="fv-modal fv-md-export-settings"
     aria-labelledby="fv-drawio-export-title"

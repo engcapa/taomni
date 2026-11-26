@@ -50,7 +50,8 @@ export function ModalSurface({
 
   useLayoutEffect(() => {
     const panel = ref.current!;
-    const opener = returnFocus ?? document.activeElement;
+    const browserOpener = document.activeElement;
+    const opener = returnFocus ?? browserOpener;
     openModalStack.push(panel);
     if (typeof panel.showModal === "function") panel.showModal();
     else panel.setAttribute("open", "");
@@ -60,17 +61,23 @@ export function ModalSurface({
     return () => {
       const stackIndex = openModalStack.lastIndexOf(panel);
       if (stackIndex !== -1) openModalStack.splice(stackIndex, 1);
+      const ownedBeforeClose = document.activeElement === document.body || panel.contains(document.activeElement);
       if (panel.open && typeof panel.close === "function") panel.close();
-      const restore = () => {
-        if (opener instanceof HTMLElement && opener.isConnected &&
-            (document.activeElement === document.body || panel.contains(document.activeElement))) {
+      const restore = (allowBrowserOpener: boolean) => {
+        if (!(opener instanceof HTMLElement) || !opener.isConnected) return;
+        const active = document.activeElement;
+        if (
+          active === document.body ||
+          panel.contains(active) ||
+          (allowBrowserOpener && returnFocus != null && active === browserOpener)
+        ) {
           opener.focus({ preventScroll: true });
         }
       };
-      restore();
+      restore(ownedBeforeClose);
       // A parent and its portalled confirmation can unmount in one commit.
       // Retry after both cleanups, when the child no longer owns focus.
-      queueMicrotask(restore);
+      queueMicrotask(() => restore(ownedBeforeClose));
     };
   }, [initialFocus, returnFocus]);
 

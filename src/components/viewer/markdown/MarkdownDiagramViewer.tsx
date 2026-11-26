@@ -7,8 +7,9 @@ import type { MarkdownVisualSnapshot, DiagramTransform } from "./diagramModel";
 import { portableWordSvg } from "./wordSvg";
 import { useDiagramView } from "./useDiagramView";
 
-export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, notice, onAction, onClose }: {
+export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, notice, returnFocus, onAction, onClose }: {
   snapshot: MarkdownVisualSnapshot; initialAction: DiagramAction; label: DiagramLabel; busy: boolean; notice: string;
+  returnFocus?: HTMLElement | null;
   onAction: (action: DiagramAction, snapshot: MarkdownVisualSnapshot, transform: DiagramTransform) => void;
   onClose: () => void;
 }) {
@@ -45,6 +46,7 @@ export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, no
   return <ModalSurface
     dismissOnBackdrop
     initialFocus='[data-testid="markdown-diagram-stage"]'
+    returnFocus={returnFocus}
     onCancel={onClose}
     className="fv fv-md-diagram-viewer"
     aria-label={snapshot.kind === "image" ? label("图片查看器", "Image viewer") : label(`${name} 图片查看器`, `${name} image viewer`)}

@@ -64,3 +64,21 @@ it("rejects inserting into a document changed while its native chooser was open"
   expect(owner.dispatch).not.toHaveBeenCalled();
   await waitFor(() => expect(error).toHaveBeenCalledWith("Document changed; choose an import position again"));
 });
+
+it("restores focus to the import trigger on Escape even when another control held focus at open", async () => {
+  const owner = editor(), error = vi.fn();
+  vi.mocked(selectOnePath).mockResolvedValueOnce("/selected.drawio");
+  render(<>
+    <button type="button" data-testid="other-focus-target">Other</button>
+    <MarkdownDrawioImport view={() => owner as unknown as EditorView} readOnly={false} onError={error} />
+  </>);
+  screen.getByTestId("other-focus-target").focus();
+  const button = screen.getByTestId("markdown-import-drawio");
+  expect(button).not.toHaveFocus();
+  fireEvent.click(button);
+  const dialog = await screen.findByTestId("markdown-drawio-import-dialog");
+  fireEvent.keyDown(dialog, { key: "Escape" });
+  expect(screen.queryByTestId("markdown-drawio-import-dialog")).toBeNull();
+  await waitFor(() => expect(button).toHaveFocus());
+  expect(owner.dispatch).not.toHaveBeenCalled();
+});

@@ -130,16 +130,20 @@ describe("MarkdownEditor real host lifecycle", () => {
       + readFileSync("src/components/viewer/markdown/diagram.css", "utf8");
     const diagramTools = document.createElement("div");
     diagramTools.className = "fv fv-md-diagram-tools";
+    const exportNotice = document.createElement("div");
+    exportNotice.className = "fv-md-export-notice";
     document.head.append(viewerStyles);
-    document.body.append(diagramTools);
+    document.body.append(diagramTools, exportNotice);
     try {
       render(<Harness />);
       fireEvent.click(screen.getByTestId("markdown-export"));
       const menu = screen.getByTestId("markdown-export-menu");
       expect(resolveZIndex(menu)).toBeGreaterThan(resolveZIndex(diagramTools));
+      expect(resolveZIndex(menu)).toBeGreaterThan(resolveZIndex(exportNotice));
     } finally {
       viewerStyles.remove();
       diagramTools.remove();
+      exportNotice.remove();
     }
   });
   it("keeps one source/history across live/source/split/focus switches, with outline navigation", async () => {

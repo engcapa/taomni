@@ -189,3 +189,49 @@ it("supports dismissOnBackdrop, window Tab wrapping, and ignores hidden menus du
   fireEvent.keyDown(window, { key: "Escape" });
   expect(cancel).toHaveBeenCalledTimes(2);
 });
+
+it("restores explicit returnFocus even when native dialog.close focuses the pre-modal active element", () => {
+  const showDesc = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "showModal");
+  const closeDesc = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "close");
+  const preOpenEl = document.createElement("div");
+  preOpenEl.tabIndex = 0;
+  const explicitTrigger = document.createElement("button");
+  explicitTrigger.type = "button";
+  document.body.append(preOpenEl, explicitTrigger);
+
+  let dialogSavedOpener: Element | null = null;
+  HTMLDialogElement.prototype.showModal = function () {
+    dialogSavedOpener = document.activeElement;
+    this.setAttribute("open", "");
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute("open");
+    if (dialogSavedOpener instanceof HTMLElement) dialogSavedOpener.focus();
+  };
+
+  try {
+    preOpenEl.focus();
+    expect(preOpenEl).toHaveFocus();
+    const view = render(
+      <ModalSurface
+        aria-label="Explicit return focus"
+        initialFocus='[data-testid="erf-btn"]'
+        returnFocus={explicitTrigger}
+        onCancel={vi.fn()}
+      >
+        <button type="button" data-testid="erf-btn">Inside</button>
+      </ModalSurface>,
+    );
+    expect(screen.getByTestId("erf-btn")).toHaveFocus();
+    view.unmount();
+    expect(explicitTrigger).toHaveFocus();
+    expect(preOpenEl).not.toHaveFocus();
+  } finally {
+    if (showDesc) Object.defineProperty(HTMLDialogElement.prototype, "showModal", showDesc);
+    else delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>).showModal;
+    if (closeDesc) Object.defineProperty(HTMLDialogElement.prototype, "close", closeDesc);
+    else delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>).close;
+    preOpenEl.remove();
+    explicitTrigger.remove();
+  }
+});
