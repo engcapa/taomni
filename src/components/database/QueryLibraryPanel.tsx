@@ -6,6 +6,9 @@ import {
   useState,
   type MutableRefObject,
 } from "react";
+import { createPortal } from "react-dom";
+import { Button } from "../ui/Button";
+import { ModalSurface } from "../ui/ModalSurface";
 import {
   Archive,
   Clipboard,
@@ -148,19 +151,6 @@ export function QueryLibraryPanel({
       onAddTriggerRef.current = null;
     };
   }, [onAddTriggerRef, openCreate]);
-
-  useEffect(() => {
-    if (!modalOpen) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setModalOpen(false);
-      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-        event.preventDefault();
-        formRef.current?.requestSubmit();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [modalOpen]);
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
@@ -484,100 +474,106 @@ export function QueryLibraryPanel({
 
       {menu}
 
-      {modalOpen && (
-        <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={editingQuery ? "Edit saved query" : "Save query"}
-            data-testid="query-library-dialog"
-            className="rounded shadow-lg p-4 flex flex-col gap-3 w-[520px] h-[560px] max-h-[90vh] max-w-[95vw] overflow-hidden"
-            style={{
-              background: "var(--taomni-bg)",
-              border: "1px solid var(--taomni-card-border)",
-            }}
-          >
-            <div className="flex justify-between items-center pb-2 border-b border-[var(--taomni-divider)] shrink-0">
-              <span className="font-semibold text-ui-body">
-                {editingQuery ? "Edit Saved Query" : "Save Current Query"}
-              </span>
-              <button type="button" aria-label="Close" onClick={() => setModalOpen(false)}>
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <form ref={formRef} onSubmit={saveQuery} className="flex-1 flex flex-col gap-3 min-h-0">
-              <div className="grid grid-cols-[1fr_150px] gap-3 shrink-0">
-                <label className="flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)]">
-                  Name
-                  <input
-                    type="text"
-                    aria-label="Query name"
-                    data-testid="query-library-name"
-                    placeholder="Automatic: Query-N"
-                    className="taomni-input h-7 w-full text-ui-body px-2"
-                    value={modalName}
-                    onChange={(event) => setModalName(event.target.value)}
-                  />
-                </label>
-                <label className="flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)]">
-                  Scope
-                  <select
-                    aria-label="Query scope"
-                    data-testid="query-library-scope"
-                    className="taomni-input h-7 w-full text-ui-body px-2"
-                    value={modalScope}
-                    onChange={(event) => setModalScope(event.target.value as DbSavedQueryScope)}
-                  >
-                    <option value="connection">This connection</option>
-                    <option value="engine">All {engine}</option>
-                  </select>
-                </label>
-              </div>
-              <label className="flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)] shrink-0">
-                Remarks / Description
-                <textarea
-                  className="taomni-input w-full text-ui-body p-1.5 h-12 resize-none"
-                  value={modalRemarks}
-                  onChange={(event) => setModalRemarks(event.target.value)}
-                />
-              </label>
-              <label className="flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)] shrink-0">
-                Tags (comma separated)
+      {modalOpen && createPortal(
+        <ModalSurface
+          initialFocus='[data-testid="query-library-name"]'
+          onCancel={() => setModalOpen(false)}
+          aria-label={editingQuery ? "Edit saved query" : "Save query"}
+          data-testid="query-library-dialog"
+          className="m-auto rounded shadow-lg p-4 open:flex flex-col gap-3 w-[520px] h-[560px] max-h-[90vh] max-w-[95vw] overflow-hidden backdrop:bg-[var(--taomni-overlay)]"
+          style={{
+            background: "var(--taomni-bg)",
+            color: "var(--taomni-text)",
+            border: "1px solid var(--taomni-card-border)",
+          }}
+          onKeyDown={(event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+              event.preventDefault();
+              formRef.current?.requestSubmit();
+            }
+          }}
+        >
+          <div className="flex justify-between items-center pb-2 border-b border-[var(--taomni-divider)] shrink-0">
+            <span className="font-semibold text-ui-body">
+              {editingQuery ? "Edit Saved Query" : "Save Current Query"}
+            </span>
+            <button type="button" aria-label="Close" onClick={() => setModalOpen(false)}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <form ref={formRef} onSubmit={saveQuery} className="flex-1 flex flex-col gap-3 min-h-0">
+            <div className="grid grid-cols-[1fr_150px] gap-3 shrink-0">
+              <label className="flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)]">
+                Name
                 <input
                   type="text"
+                  aria-label="Query name"
+                  data-testid="query-library-name"
+                  placeholder="Automatic: Query-N"
                   className="taomni-input h-7 w-full text-ui-body px-2"
-                  value={modalTags}
-                  onChange={(event) => setModalTags(event.target.value)}
+                  value={modalName}
+                  onChange={(event) => setModalName(event.target.value)}
                 />
               </label>
-              <label className="flex-1 flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)] min-h-[120px]">
-                {contentLabel} content
-                <textarea
-                  aria-label={`${contentLabel} content`}
-                  data-testid="query-library-content"
-                  className="taomni-input w-full flex-1 text-ui-small taomni-mono p-2 resize-none taomni-scroll-y"
-                  value={modalContent}
-                  onChange={(event) => setModalContent(event.target.value)}
-                />
-              </label>
-              {error && <div className="text-ui-small text-ui-danger">{error}</div>}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--taomni-divider)] shrink-0">
-                <button type="button" className="taomni-btn h-8 px-4" onClick={() => setModalOpen(false)}>
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  data-testid="query-library-save"
-                  className="taomni-btn h-8 px-4"
-                  style={{ background: "var(--taomni-accent)", color: "white" }}
-                  disabled={saving}
+              <label className="flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)]">
+                Scope
+                <select
+                  aria-label="Query scope"
+                  data-testid="query-library-scope"
+                  className="taomni-input h-7 w-full text-ui-body px-2"
+                  value={modalScope}
+                  onChange={(event) => setModalScope(event.target.value as DbSavedQueryScope)}
                 >
-                  {saving ? "Saving..." : "Save Query"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+                  <option value="connection">This connection</option>
+                  <option value="engine">All {engine}</option>
+                </select>
+              </label>
+            </div>
+            <label className="flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)] shrink-0">
+              Remarks / Description
+              <textarea
+                className="taomni-input w-full text-ui-body p-1.5 h-12 resize-none"
+                value={modalRemarks}
+                onChange={(event) => setModalRemarks(event.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)] shrink-0">
+              Tags (comma separated)
+              <input
+                type="text"
+                className="taomni-input h-7 w-full text-ui-body px-2"
+                value={modalTags}
+                onChange={(event) => setModalTags(event.target.value)}
+              />
+            </label>
+            <label className="flex-1 flex flex-col gap-0.5 text-ui-small text-[var(--taomni-text-muted)] min-h-[120px]">
+              {contentLabel} content
+              <textarea
+                aria-label={`${contentLabel} content`}
+                data-testid="query-library-content"
+                className="taomni-input w-full flex-1 text-ui-small taomni-mono p-2 resize-none taomni-scroll-y"
+                value={modalContent}
+                onChange={(event) => setModalContent(event.target.value)}
+              />
+            </label>
+            {error && <div role="alert" className="text-ui-small text-ui-danger">{error}</div>}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--taomni-divider)] shrink-0">
+              <Button className="h-8 px-4" onClick={() => setModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                data-testid="query-library-save"
+                className="h-8 px-4"
+                disabled={saving}
+              >
+                {saving ? "Saving..." : "Save Query"}
+              </Button>
+            </div>
+          </form>
+        </ModalSurface>,
+        document.body,
       )}
     </div>
   );

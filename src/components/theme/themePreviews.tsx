@@ -122,17 +122,22 @@ export function SplitThemeLinePreview({
   );
 }
 
+const APP_PREVIEW_SWATCHES = {
+  light: { surface: { background: "#f8fafc", color: "#0f172a" }, borderColor: "#cbd5e1", accent: "#4f46e5" },
+  dark: { surface: { background: "#111827", color: "#f8fafc" }, borderColor: "#334155", accent: "#60a5fa" },
+} as const;
+
 export function AppThemeLinePreview({ mode }: { mode: AppThemeMode }) {
-  const light: CSSProperties = { background: "#f8fafc", color: "#0f172a" };
-  const dark: CSSProperties = { background: "#111827", color: "#f8fafc" };
+  const light = APP_PREVIEW_SWATCHES.light.surface;
+  const dark = APP_PREVIEW_SWATCHES.dark.surface;
   if (mode === "system") return <SplitThemeLinePreview left={light} right={dark} />;
-  const style = mode === "dark" ? dark : light;
+  const swatch = mode === "dark" ? APP_PREVIEW_SWATCHES.dark : APP_PREVIEW_SWATCHES.light;
   return (
     <span
       className="h-7 min-w-0 rounded border px-2 inline-flex items-center gap-2 overflow-hidden text-ui-small"
-      style={{ ...style, borderColor: mode === "dark" ? "#334155" : "#cbd5e1" }}
+      style={{ ...swatch.surface, borderColor: swatch.borderColor }}
     >
-      <span className="h-2.5 w-2.5 rounded-full" style={{ background: mode === "dark" ? "#60a5fa" : "#4f46e5" }} />
+      <span className="h-2.5 w-2.5 rounded-full" style={{ background: swatch.accent }} />
       <span className="font-semibold">Aa</span>
       <span className="truncate opacity-80">Inbox preview</span>
     </span>

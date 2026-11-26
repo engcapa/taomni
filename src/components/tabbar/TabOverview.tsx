@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Activity, LayoutGrid, Search, X } from "lucide-react";
+import { ModalSurface } from "../ui/ModalSurface";
 import { buildTabDetailSummary } from "../../lib/tabDetails";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
@@ -40,7 +41,6 @@ function OpenTabOverview() {
   const [all, setAll] = useState(mode !== "sessions" && mode !== "workspaces" && mode !== "explorer");
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const enlargedRef = useRef<HTMLDivElement>(null);
   const { preview, hover, clear: clearPreview } = useOverviewPreview();
@@ -50,24 +50,6 @@ function OpenTabOverview() {
     ...(all || mode === "workspaces" ? workspaces.filter((ws) => all || ws.id === activeWorkspaceId)
       .flatMap((ws) => ws.openTabs.map((tab) => tab.id)) : []),
   ]);
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    searchRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.isComposing || event.keyCode === 229) return;
-      if (event.key === "Escape") { event.preventDefault(); event.stopImmediatePropagation(); close(); }
-      if (event.key === "Tab") {
-        clearPreview();
-        const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button, input, [tabindex]") ?? [])
-          .filter((element) => element.tabIndex >= 0 && !element.hasAttribute("disabled") && !element.closest("[hidden]"));
-        const first = controls[0]; const last = controls[controls.length - 1];
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => { window.removeEventListener("keydown", onKey, true); if (previous?.isConnected) previous.focus(); };
-  }, [close, clearPreview]);
   useEffect(() => { clearPreview(); }, [all, mode, query, clearPreview]);
 
   const items: PreviewItem[] = [];
@@ -129,7 +111,19 @@ function OpenTabOverview() {
     close();
   };
   return createPortal(
-    <div ref={dialogRef} data-testid="tab-overview" data-scope={all ? "all" : mode} data-preview-delay-ms={OVERVIEW_PREVIEW_DELAY_MS} role="dialog" aria-modal="true" aria-labelledby="tab-overview-title" className="taomni-tab-overview" onScroll={clearPreview}>
+    <ModalSurface
+      initialFocus='[data-testid="tab-overview-search"]'
+      onCancel={close}
+      data-testid="tab-overview"
+      data-scope={all ? "all" : mode}
+      data-preview-delay-ms={OVERVIEW_PREVIEW_DELAY_MS}
+      aria-labelledby="tab-overview-title"
+      className="taomni-tab-overview"
+      onScroll={clearPreview}
+      onKeyDown={(event) => {
+        if (event.key === "Tab") clearPreview();
+      }}
+    >
       <div className="taomni-overview-header">
         <div><h2 id="tab-overview-title" className="flex items-center gap-2 text-ui-heading font-bold"><LayoutGrid className="h-4 w-4" />{t("platform.tabOverview")}<kbd className="text-ui-small font-normal">Ctrl/Cmd+Shift+E</kbd></h2><p className="mt-1 text-ui-body text-[var(--taomni-text-muted)]">{t("platform.overviewHint")}</p></div>
         <button type="button" data-testid="tab-overview-close" className="taomni-btn" onClick={close}><X className="mr-1 h-3 w-3" />{t("common.close")} (Esc)</button>
@@ -173,16 +167,17 @@ function OpenTabOverview() {
           <OverviewCardContents item={item} outputLabel={t("platform.overviewNewOutput")} />
         </button>)}
       </div>
-      {preview && previewItem && createPortal(
+      {preview && previewItem && (
         <div ref={enlargedRef} aria-hidden="true" data-testid="tab-overview-enlarged" data-tab-id={previewItem.id} className="taomni-overview-card taomni-overview-enlarged"
           onMouseLeave={clearPreview} onClick={() => activate(previewItem)}
           style={{ width: previewWidth,
             left: Math.max(12, Math.min(preview.bounds.left + (preview.bounds.width - previewWidth) / 2, window.innerWidth - previewWidth - 12)),
             top: Math.max(12, Math.min(preview.bounds.top, window.innerHeight - Math.min(460, window.innerHeight * 0.67) - 12)) }}>
           <OverviewCardContents item={previewItem} outputLabel={t("platform.overviewNewOutput")} />
-        </div>, document.body)}
+        </div>
+      )}
       {matching.length === 0 && <p data-testid="tab-overview-empty" className="p-12 text-center text-[var(--taomni-text-muted)]">{t(items.length ? "platform.overviewNoMatch" : "platform.overviewEmpty")}</p>}
-    </div>, document.body,
+    </ModalSurface>, document.body,
   );
 }
 

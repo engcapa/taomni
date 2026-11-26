@@ -1,4 +1,6 @@
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { ModalSurface } from "../../ui/ModalSurface";
 import { HBASE_COMMANDS, commandSupported, type HBaseCommandCategory, type HBaseTransport } from "../../../lib/hbaseCommands";
 import { useT } from "../../../lib/i18n";
 
@@ -83,49 +85,48 @@ export function HistoryDropdown({ history, onPick, onClose }: { history: string[
 
 export function HelpDialog({ transport, onClose }: { transport: HBaseTransport; onClose: () => void; }) {
   const t = useT();
-  return (
-    <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-label={t("hbaseObjects.helpTitle")}
-        aria-modal="true"
-        data-testid="hbase-help-dialog"
-        className="w-[640px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-auto taomni-scroll-y rounded shadow-lg p-4"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center mb-3">
-          <div className="text-sm font-semibold flex-1">{t("hbaseObjects.helpTitle")}</div>
-          <button type="button" className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={onClose} aria-label={t("hbaseObjects.helpClose")}>
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        {CATEGORY_ORDER.map((cat) => {
-          const cmds = HBASE_COMMANDS.filter((c) => c.category === cat);
-          return (
-            <div key={cat} className="mb-3">
-              <div className="text-ui-caption uppercase tracking-wide text-[var(--taomni-text-muted)] mb-1">{CATEGORY_LABEL[cat]}</div>
-              <table className="w-full text-ui-body border-collapse">
-                <tbody>
-                  {cmds.map((c) => {
-                    const supported = commandSupported(c.verb, transport);
-                    return (
-                      <tr key={c.verb} className="border-b" style={{ borderColor: "var(--taomni-divider)", opacity: supported ? 1 : 0.55 }}>
-                        <td className="py-1 pr-2 align-top taomni-mono font-semibold whitespace-nowrap">{c.verb}</td>
-                        <td className="py-1 pr-2 align-top taomni-mono text-ui-small text-[var(--taomni-text-muted)]">{c.syntax}</td>
-                        <td className="py-1 align-top text-ui-small">
-                          {c.description}
-                          {!supported && <div className="text-ui-caption" style={{ color: "var(--taomni-danger-text)" }}>{t("hbaseObjects.helpRestNote")}</div>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          );
-        })}
+  return createPortal(
+    <ModalSurface
+      dismissOnBackdrop
+      initialFocus='[data-testid="hbase-help-close"]'
+      onCancel={onClose}
+      aria-label={t("hbaseObjects.helpTitle")}
+      data-testid="hbase-help-dialog"
+      className="m-auto w-[640px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-auto taomni-scroll-y rounded shadow-lg p-4 backdrop:bg-[var(--taomni-overlay)]"
+      style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)", border: "1px solid var(--taomni-card-border)" }}
+    >
+      <div className="flex items-center mb-3">
+        <div className="text-sm font-semibold flex-1">{t("hbaseObjects.helpTitle")}</div>
+        <button type="button" data-testid="hbase-help-close" className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={onClose} aria-label={t("hbaseObjects.helpClose")}>
+          <X className="w-4 h-4" />
+        </button>
       </div>
-    </div>
+      {CATEGORY_ORDER.map((cat) => {
+        const cmds = HBASE_COMMANDS.filter((c) => c.category === cat);
+        return (
+          <div key={cat} className="mb-3">
+            <div className="text-ui-caption uppercase tracking-wide text-[var(--taomni-text-muted)] mb-1">{CATEGORY_LABEL[cat]}</div>
+            <table className="w-full text-ui-body border-collapse">
+              <tbody>
+                {cmds.map((c) => {
+                  const supported = commandSupported(c.verb, transport);
+                  return (
+                    <tr key={c.verb} className="border-b" style={{ borderColor: "var(--taomni-divider)", opacity: supported ? 1 : 0.55 }}>
+                      <td className="py-1 pr-2 align-top taomni-mono font-semibold whitespace-nowrap">{c.verb}</td>
+                      <td className="py-1 pr-2 align-top taomni-mono text-ui-small text-[var(--taomni-text-muted)]">{c.syntax}</td>
+                      <td className="py-1 align-top text-ui-small">
+                        {c.description}
+                        {!supported && <div className="text-ui-caption" style={{ color: "var(--taomni-danger-text)" }}>{t("hbaseObjects.helpRestNote")}</div>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+    </ModalSurface>,
+    document.body,
   );
 }

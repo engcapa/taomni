@@ -121,7 +121,8 @@ export function TaoAlertInbox({
       }
       style={{ background: "var(--taomni-panel-bg)", color: "var(--taomni-text)" }}
       data-testid="tao-alert-inbox"
-      role="menu"
+      role="region"
+      aria-label={t("tao.alertInboxTitle")}
     >
       <div className="flex items-center gap-2 px-2 h-7 border-b border-[var(--taomni-divider)] shrink-0">
         <Bell className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />

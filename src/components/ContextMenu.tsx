@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useLayoutEffect, useId, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { forwardRef, useCallback, useLayoutEffect, useId, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { ChevronRight } from "lucide-react";
 import { useFocusReturn } from "./editor/workspace/useFocusReturn";
@@ -6,12 +6,16 @@ import { useFocusReturn } from "./editor/workspace/useFocusReturn";
 export interface MenuItem {
   label: string;
   testId?: string;
+  title?: string;
   icon?: React.ReactNode;
   shortcut?: string;
   checked?: boolean;
   onClick?: () => void;
   danger?: boolean;
   separator?: boolean;
+  sectionHeader?: boolean;
+  keepOpen?: boolean;
+  preventMouseDownFocus?: boolean;
   disabled?: boolean;
   disabledReason?: string;
   children?: MenuItem[];
@@ -32,11 +36,32 @@ interface ContextMenuProps extends ContextMenuAppearance {
   onClose: (reason?: ContextMenuCloseReason) => void;
   /** Root test id override (popovers that are not a bare context menu). */
   testId?: string;
+  ariaLabel?: string;
+  className?: string;
+  autoFocus?: boolean;
+  handleKeyboard?: boolean;
+  closeOnTab?: boolean;
+  dismissOnFocusOut?: boolean;
+  anchorRef?: RefObject<HTMLElement | null>;
 }
 
 const MENU_MARGIN = 6;
 
-export function ContextMenu({ items, x, y, onClose, appearance, testId }: ContextMenuProps) {
+export function ContextMenu({
+  items,
+  x,
+  y,
+  onClose,
+  appearance,
+  testId,
+  ariaLabel,
+  className,
+  autoFocus,
+  handleKeyboard,
+  closeOnTab,
+  dismissOnFocusOut,
+  anchorRef,
+}: ContextMenuProps) {
   // ED-PARITY-021 A3 / DEC-ALIGN-11: closing (Esc, outside click, an action
   // that moves no focus) gives focus back to the element that opened the menu.
   useFocusReturn(true);
@@ -60,27 +85,50 @@ export function ContextMenu({ items, x, y, onClose, appearance, testId }: Contex
   useEffect(() => {
     // A blank press in a file list calls preventDefault() on its pointerdown to
     // start rubber-band selection; the browser then never dispatches the
-    // compatibility mousedown. Listen to both events so an outside press always
-    // dismisses the menu, and make the handler idempotent because a regular
-    // gesture dispatches both.
+    // compatibility mousedown. Listen in capture phase to both events so an
+    // outside press always dismisses even if a target widget calls stopPropagation.
     let closed = false;
+    const isInside = (target: EventTarget | null) => {
+      if (!(target instanceof Node)) return false;
+      if (target instanceof Element && target.closest("[data-taomni-context-menu]")) return true;
+      return !!anchorRef?.current?.contains(target);
+    };
     const handler = (e: Event) => {
       if (closed) return;
-      const target = e.target as HTMLElement | null;
       // Submenus and custom panels render in a portal outside `ref`, so test
       // against the shared marker attribute instead of DOM containment.
-      if (!target || !target.closest("[data-taomni-context-menu]")) {
+      if (!isInside(e.target)) {
         closed = true;
         onClose("outside");
       }
     };
-    document.addEventListener("pointerdown", handler);
-    document.addEventListener("mousedown", handler);
-    return () => {
-      document.removeEventListener("pointerdown", handler);
-      document.removeEventListener("mousedown", handler);
+    const handleFocusIn = (e: FocusEvent) => {
+      if (closed || !dismissOnFocusOut) return;
+      if (!isInside(e.target)) {
+        closed = true;
+        onClose("outside");
+      }
     };
-  }, [onClose]);
+    const handleBlur = () => {
+      if (closed || !dismissOnFocusOut) return;
+      closed = true;
+      onClose("outside");
+    };
+    document.addEventListener("pointerdown", handler, true);
+    document.addEventListener("mousedown", handler, true);
+    if (dismissOnFocusOut) {
+      document.addEventListener("focusin", handleFocusIn, true);
+      window.addEventListener("blur", handleBlur);
+    }
+    return () => {
+      document.removeEventListener("pointerdown", handler, true);
+      document.removeEventListener("mousedown", handler, true);
+      if (dismissOnFocusOut) {
+        document.removeEventListener("focusin", handleFocusIn, true);
+        window.removeEventListener("blur", handleBlur);
+      }
+    };
+  }, [anchorRef, dismissOnFocusOut, onClose]);
 
   const style: CSSProperties = {
     position: "fixed",
@@ -89,7 +137,21 @@ export function ContextMenu({ items, x, y, onClose, appearance, testId }: Contex
     zIndex: "var(--taomni-z-menu-over-modal, 1100)",
   };
 
-  return <MenuSurface ref={ref} appearance={appearance} items={items} onClose={onClose} style={style} testId={testId} />;
+  return (
+    <MenuSurface
+      ref={ref}
+      appearance={appearance}
+      items={items}
+      onClose={onClose}
+      style={style}
+      testId={testId}
+      ariaLabel={ariaLabel}
+      className={className}
+      autoFocus={autoFocus}
+      handleKeyboard={handleKeyboard}
+      closeOnTab={closeOnTab}
+    />
+  );
 }
 
 export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
@@ -99,13 +161,31 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   isSubmenu?: boolean;
   onBack?: () => void;
   testId?: string;
-}>(({ items, onClose, style, isSubmenu, onBack, appearance, testId }, forwardedRef) => {
+  ariaLabel?: string;
+  className?: string;
+  autoFocus?: boolean;
+  handleKeyboard?: boolean;
+  closeOnTab?: boolean;
+}>(({
+  items,
+  onClose,
+  style,
+  isSubmenu,
+  onBack,
+  appearance,
+  testId,
+  ariaLabel,
+  className,
+  autoFocus = true,
+  handleKeyboard = true,
+  closeOnTab = false,
+}, forwardedRef) => {
   const innerRef = useRef<HTMLDivElement | null>(null);
   const menuId = useId();
 
   const selectableIndices = useMemo(() => {
     return items
-      .map((item, idx) => (!item.separator && !item.disabled ? idx : -1))
+      .map((item, idx) => (!item.separator && !item.sectionHeader && !item.disabled ? idx : -1))
       .filter((idx) => idx !== -1);
   }, [items]);
 
@@ -128,11 +208,12 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   // Move focus into the menu so navigation keys are owned by the menu rather
   // than also being interpreted by the editor as cursor movement.
   useEffect(() => {
-    innerRef.current?.focus();
-  }, []);
+    if (autoFocus) innerRef.current?.focus();
+  }, [autoFocus]);
 
   // Keyboard navigation
   useEffect(() => {
+    if (!handleKeyboard) return undefined;
     const handleKeyDown = (e: KeyboardEvent) => {
       // If a submenu is currently open, let the child submenu handle the key event
       if (openSubmenuIndex !== null || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
@@ -168,7 +249,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
             setOpenSubmenuIndex(activeIndex);
           } else if (item.onClick) {
             item.onClick();
-            onClose("action");
+            if (!item.keepOpen) onClose("action");
           }
         }
       } else if (e.key === "ArrowRight") {
@@ -186,6 +267,10 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
           e.stopPropagation();
           onBack();
         }
+      } else if (e.key === "Tab" && closeOnTab && !isSubmenu) {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose("escape");
       } else if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
@@ -199,18 +284,19 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [activeIndex, isSubmenu, items, onBack, onClose, openSubmenuIndex, selectableIndices]);
+  }, [activeIndex, closeOnTab, handleKeyboard, isSubmenu, items, onBack, onClose, openSubmenuIndex, selectableIndices]);
 
   return (
     <div
       ref={setRef}
       role="menu"
+      aria-label={ariaLabel}
       aria-activedescendant={activeIndex >= 0 ? `${menuId}-${activeIndex}` : undefined}
       tabIndex={-1}
       data-testid={testId ?? "context-menu"}
       data-taomni-context-menu=""
       data-appearance={appearance}
-      className={`min-w-[220px] ${appearance === "code-candidates" ? "py-0" : "py-1"} rounded shadow-lg border text-ui-body outline-none`}
+      className={`min-w-[220px] ${appearance === "code-candidates" ? "py-0" : "py-1"} rounded shadow-lg border text-ui-body outline-none${className ? ` ${className}` : ""}`}
       style={{
         background: appearance === "code-candidates" ? "var(--taomni-code-tooltip-bg)" : "var(--taomni-panel-bg)",
         borderColor: appearance === "code-candidates" ? "var(--taomni-code-border)" : "var(--taomni-divider)",
@@ -362,6 +448,14 @@ function MenuRow({
     return <div role="separator" className="h-px mx-2 my-1" style={{ background: "var(--taomni-divider)" }} />;
   }
 
+  if (item.sectionHeader) {
+    return (
+      <div className="px-3 py-1 text-ui-caption font-semibold uppercase text-[var(--taomni-text-muted)]">
+        {item.label}
+      </div>
+    );
+  }
+
   const hasChildren = !!item.children?.length || !!item.customPanel;
   const semantics = {
     id,
@@ -369,7 +463,7 @@ function MenuRow({
     "aria-checked": item.checked,
     "aria-disabled": item.disabled || undefined,
     tabIndex: -1,
-    title: item.disabled ? item.disabledReason : undefined,
+    title: item.title ?? (item.disabled ? item.disabledReason : undefined),
   };
   const content = (
     <>
@@ -466,9 +560,10 @@ function MenuRow({
       style={item.danger ? { color: "var(--taomni-danger-text)" } : undefined}
       onMouseEnter={handleHover}
       onMouseMove={handleMouseMove}
+      onMouseDown={item.preventMouseDownFocus ? (e) => e.preventDefault() : undefined}
       onClick={() => {
         item.onClick?.();
-        onClose("action");
+        if (!item.keepOpen) onClose("action");
       }}
       disabled={item.disabled}
       type="button"

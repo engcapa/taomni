@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  Check,
   CheckCircle2,
   ChevronDown,
   CircleDashed,
@@ -22,6 +21,7 @@ import {
 } from "lucide-react";
 import type { GitChange } from "../../../lib/git";
 import { useT } from "../../../lib/i18n";
+import { ContextMenu, type MenuItem } from "../../ContextMenu";
 
 export type GitStageFilter = "unstaged" | "staged";
 export type GitStatusFilter = "modified" | "added" | "untracked" | "deleted" | "renamed" | "conflict";
@@ -108,11 +108,12 @@ export function ChangesListToolbar({
 }: ChangesListToolbarProps) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const filterMenuRef = useRef<HTMLDivElement | null>(null);
-  const moreMenuRef = useRef<HTMLDivElement | null>(null);
+  const filterButtonRef = useRef<HTMLButtonElement | null>(null);
+  const moreButtonRef = useRef<HTMLButtonElement | null>(null);
   const [compact, setCompact] = useState(false);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<{ kind: "filter" | "more"; x: number; y: number } | null>(null);
+  const filterOpen = openMenu?.kind === "filter";
+  const moreOpen = openMenu?.kind === "more";
   const activeFilterCount = filters.stage.size + filters.status.size;
   const hasFilters = hasActiveGitChangeFilters(filters);
   const filterLabel = hasFilters
@@ -134,15 +135,59 @@ export function ChangesListToolbar({
     return () => observer.disconnect();
   }, []);
 
-  useCloseOnOutside(filterOpen, filterMenuRef, () => setFilterOpen(false));
-  useCloseOnOutside(moreOpen, moreMenuRef, () => setMoreOpen(false));
+  const toggleMenu = (kind: "filter" | "more", button: HTMLButtonElement | null) => {
+    setOpenMenu((current) => {
+      if (current?.kind === kind) return null;
+      const rect = button?.getBoundingClientRect();
+      return {
+        kind,
+        x: rect ? (kind === "more" ? Math.max(8, rect.right - 220) : rect.left) : 8,
+        y: rect ? rect.bottom + 4 : 36,
+      };
+    });
+  };
 
   const stageVisibleLabel = t("git.workspaceChanges.stageVisible", { count: visibleCount });
   const unstageVisibleLabel = t("git.workspaceChanges.unstageVisible", { count: visibleStagedCount });
   const checkVisibleLabel = t("git.workspaceChanges.selectVisible", { count: visibleCount });
   const uncheckVisibleLabel = t("git.workspaceChanges.unselectVisible", { count: visibleCount });
 
-  const menuPlacementClass = compact ? "right-0" : "left-0";
+  const filterItems: MenuItem[] = [
+    { label: t("git.workspaceChanges.stageFilterSection"), sectionHeader: true },
+    ...STAGE_FILTERS.map((item) => ({
+      label: t(item.labelKey),
+      icon: item.icon,
+      checked: filters.stage.has(item.key),
+      keepOpen: true,
+      onClick: () => onToggleStageFilter(item.key),
+    })),
+    { label: "", separator: true },
+    { label: t("git.workspaceChanges.statusFilterSection"), sectionHeader: true },
+    ...STATUS_FILTERS.map((item) => ({
+      label: t(item.labelKey),
+      icon: item.icon,
+      checked: filters.status.has(item.key),
+      keepOpen: true,
+      onClick: () => onToggleStatusFilter(item.key),
+    })),
+    { label: "", separator: true },
+    {
+      label: t("git.workspaceChanges.clearFilters"),
+      icon: <ListFilter className="w-3.5 h-3.5" />,
+      disabled: !hasFilters,
+      onClick: onClearFilters,
+    },
+  ];
+
+  const moreItems: MenuItem[] = [
+    { label: t("git.workspaceChanges.selectionActions"), sectionHeader: true },
+    { label: checkVisibleLabel, icon: <ListChecks className="w-3.5 h-3.5" />, disabled: visibleCount === 0, onClick: onCheckVisible },
+    { label: uncheckVisibleLabel, icon: <ListX className="w-3.5 h-3.5" />, disabled: visibleCount === 0, onClick: onUncheckVisible },
+    { label: "", separator: true },
+    { label: t("git.workspaceChanges.stageActions"), sectionHeader: true },
+    ...(compact ? [{ label: stageVisibleLabel, icon: <CirclePlus className="w-3.5 h-3.5" />, disabled: busy || visibleCount === 0, onClick: onStageVisible }] : []),
+    { label: unstageVisibleLabel, icon: <CircleMinus className="w-3.5 h-3.5" />, disabled: busy || visibleStagedCount === 0, onClick: onUnstageVisible },
+  ];
 
   return (
     <div
@@ -161,64 +206,21 @@ export function ChangesListToolbar({
         />
       </div>
 
-      <div ref={filterMenuRef} className="relative shrink-0">
-        <button
-          type="button"
-          className={`taomni-btn h-7 w-8 p-0 inline-flex items-center justify-center gap-0.5 ${
-            hasFilters ? "bg-[var(--taomni-accent)] text-white border-[var(--taomni-accent)]" : ""
-          }`}
-          aria-haspopup="menu"
-          aria-expanded={filterOpen}
-          aria-label={filterLabel}
-          title={filterLabel}
-          onClick={() => {
-            setMoreOpen(false);
-            setFilterOpen((value) => !value);
-          }}
-        >
-          <ListFilter className="w-3.5 h-3.5" />
-          <ChevronDown className="w-2.5 h-2.5" />
-        </button>
-        {filterOpen ? (
-          <div
-            className={`absolute ${menuPlacementClass} top-[31px] z-[var(--taomni-z-popover)] w-52 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg`}
-            role="menu"
-            data-testid="git-change-filter-dropdown"
-          >
-            <MenuSectionLabel>{t("git.workspaceChanges.stageFilterSection")}</MenuSectionLabel>
-            {STAGE_FILTERS.map((item) => (
-              <FilterMenuItem
-                key={item.key}
-                label={t(item.labelKey)}
-                icon={item.icon}
-                active={filters.stage.has(item.key)}
-                onClick={() => onToggleStageFilter(item.key)}
-              />
-            ))}
-            <MenuDivider />
-            <MenuSectionLabel>{t("git.workspaceChanges.statusFilterSection")}</MenuSectionLabel>
-            {STATUS_FILTERS.map((item) => (
-              <FilterMenuItem
-                key={item.key}
-                label={t(item.labelKey)}
-                icon={item.icon}
-                active={filters.status.has(item.key)}
-                onClick={() => onToggleStatusFilter(item.key)}
-              />
-            ))}
-            <MenuDivider />
-            <MenuActionItem
-              label={t("git.workspaceChanges.clearFilters")}
-              icon={<ListFilter className="w-3.5 h-3.5" />}
-              disabled={!hasFilters}
-              onClick={() => {
-                onClearFilters();
-                setFilterOpen(false);
-              }}
-            />
-          </div>
-        ) : null}
-      </div>
+      <button
+        ref={filterButtonRef}
+        type="button"
+        className={`taomni-btn h-7 w-8 p-0 inline-flex items-center justify-center gap-0.5 shrink-0 ${
+          hasFilters ? "bg-[var(--taomni-primary-bg)] text-[var(--taomni-primary-text)] border-[var(--taomni-primary-bg)]" : ""
+        }`}
+        aria-haspopup="menu"
+        aria-expanded={filterOpen}
+        aria-label={filterLabel}
+        title={filterLabel}
+        onClick={() => toggleMenu("filter", filterButtonRef.current)}
+      >
+        <ListFilter className="w-3.5 h-3.5" />
+        <ChevronDown className="w-2.5 h-2.5" />
+      </button>
 
       {!compact ? (
         <ToolbarIconButton
@@ -241,96 +243,38 @@ export function ChangesListToolbar({
       >
         {treeMode ? <List className="w-3.5 h-3.5" /> : <ListTree className="w-3.5 h-3.5" />}
       </button>
-      <div ref={moreMenuRef} className="relative shrink-0">
-        <button
-          type="button"
-          className="taomni-btn h-7 w-8 p-0 inline-flex items-center justify-center gap-0.5"
-          aria-haspopup="menu"
-          aria-expanded={moreOpen}
-          aria-label={t("git.workspaceChanges.moreActions")}
-          title={t("git.workspaceChanges.moreActions")}
-          onClick={() => {
-            setFilterOpen(false);
-            setMoreOpen((value) => !value);
-          }}
-        >
-          <Ellipsis className="w-3.5 h-3.5" />
-          <ChevronDown className="w-2.5 h-2.5" />
-        </button>
-        {moreOpen ? (
-          <div
-            className="absolute right-0 top-[31px] z-[var(--taomni-z-popover)] w-52 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg"
-            role="menu"
-            data-testid="git-change-action-dropdown"
-          >
-            <MenuSectionLabel>{t("git.workspaceChanges.selectionActions")}</MenuSectionLabel>
-            <MenuActionItem
-              label={checkVisibleLabel}
-              icon={<ListChecks className="w-3.5 h-3.5" />}
-              disabled={visibleCount === 0}
-              onClick={() => {
-                onCheckVisible();
-                setMoreOpen(false);
-              }}
-            />
-            <MenuActionItem
-              label={uncheckVisibleLabel}
-              icon={<ListX className="w-3.5 h-3.5" />}
-              disabled={visibleCount === 0}
-              onClick={() => {
-                onUncheckVisible();
-                setMoreOpen(false);
-              }}
-            />
-            <MenuDivider />
-            <MenuSectionLabel>{t("git.workspaceChanges.stageActions")}</MenuSectionLabel>
-            {compact ? (
-              <MenuActionItem
-                label={stageVisibleLabel}
-                icon={<CirclePlus className="w-3.5 h-3.5" />}
-                disabled={busy || visibleCount === 0}
-                onClick={() => {
-                  onStageVisible();
-                  setMoreOpen(false);
-                }}
-              />
-            ) : null}
-            <MenuActionItem
-              label={unstageVisibleLabel}
-              icon={<CircleMinus className="w-3.5 h-3.5" />}
-              disabled={busy || visibleStagedCount === 0}
-              onClick={() => {
-                onUnstageVisible();
-                setMoreOpen(false);
-              }}
-            />
-          </div>
-        ) : null}
-      </div>
+
+      <button
+        ref={moreButtonRef}
+        type="button"
+        className="taomni-btn h-7 w-8 p-0 inline-flex items-center justify-center gap-0.5 shrink-0"
+        aria-haspopup="menu"
+        aria-expanded={moreOpen}
+        aria-label={t("git.workspaceChanges.moreActions")}
+        title={t("git.workspaceChanges.moreActions")}
+        onClick={() => toggleMenu("more", moreButtonRef.current)}
+      >
+        <Ellipsis className="w-3.5 h-3.5" />
+        <ChevronDown className="w-2.5 h-2.5" />
+      </button>
+
+      {openMenu && (
+        <ContextMenu
+          testId={filterOpen ? "git-change-filter-dropdown" : "git-change-action-dropdown"}
+          ariaLabel={filterOpen ? filterLabel : t("git.workspaceChanges.moreActions")}
+          x={openMenu.x}
+          y={openMenu.y}
+          anchorRef={filterOpen ? filterButtonRef : moreButtonRef}
+          items={filterOpen ? filterItems : moreItems}
+          onClose={() => setOpenMenu(null)}
+        />
+      )}
 
       <span className="shrink-0 min-w-10 text-center text-ui-small text-[var(--taomni-text-muted)]">
         {checkedCount}/{totalCount}
       </span>
     </div>
   );
-}
-
-function useCloseOnOutside(open: boolean, rootRef: RefObject<HTMLDivElement | null>, onClose: () => void) {
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) onClose();
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [onClose, open, rootRef]);
 }
 
 function ToolbarIconButton({
@@ -356,73 +300,6 @@ function ToolbarIconButton({
       {icon}
     </button>
   );
-}
-
-function FilterMenuItem({
-  label,
-  icon,
-  active,
-  onClick,
-}: {
-  label: string;
-  icon: ReactNode;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitemcheckbox"
-      aria-checked={active}
-      className={`flex h-7 w-full items-center gap-2 rounded px-2 text-left text-ui-small ${
-        active ? "bg-[var(--taomni-selected)] text-[var(--taomni-accent)]" : "hover:bg-[var(--taomni-hover)]"
-      }`}
-      title={label}
-      onClick={onClick}
-    >
-      <span className="w-3.5 shrink-0">{active ? <Check className="w-3.5 h-3.5" /> : null}</span>
-      <span className="w-3.5 shrink-0 text-[var(--taomni-text-muted)]">{icon}</span>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-    </button>
-  );
-}
-
-function MenuActionItem({
-  label,
-  icon,
-  disabled = false,
-  onClick,
-}: {
-  label: string;
-  icon: ReactNode;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      className="flex h-7 w-full items-center gap-2 rounded px-2 text-left text-ui-small hover:bg-[var(--taomni-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <span className="w-3.5 shrink-0 text-[var(--taomni-text-muted)]">{icon}</span>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-    </button>
-  );
-}
-
-function MenuSectionLabel({ children }: { children: ReactNode }) {
-  return (
-    <div className="px-2 py-1 text-ui-caption font-semibold uppercase text-[var(--taomni-text-muted)]">
-      {children}
-    </div>
-  );
-}
-
-function MenuDivider() {
-  return <div className="my-1 h-px bg-[var(--taomni-divider)]" role="separator" />;
 }
 
 function matchesStageFilters(change: GitChange, filters: Set<GitStageFilter>): boolean {

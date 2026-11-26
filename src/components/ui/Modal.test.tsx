@@ -149,3 +149,43 @@ it("composes custom onKeyDown shortcuts on ModalSurface while preserving Escape 
   fireEvent.keyDown(input, { key: "Escape" });
   expect(cancel).toHaveBeenCalledTimes(1);
 });
+
+it("supports dismissOnBackdrop, window Tab wrapping, and ignores hidden menus during window Escape on ModalSurface", () => {
+  const cancel = vi.fn();
+  render(
+    <>
+      <div data-taomni-context-menu="" hidden style={{ display: "none" }} />
+      <ModalSurface
+        aria-label="Direct modal surface"
+        initialFocus='[data-testid="ms-first"]'
+        dismissOnBackdrop
+        onCancel={cancel}
+      >
+        <button type="button" data-testid="ms-first">First</button>
+        <button type="button" data-testid="ms-last">Last</button>
+      </ModalSurface>
+    </>,
+  );
+
+  const panel = screen.getByRole("dialog", { name: "Direct modal surface" });
+  const first = screen.getByTestId("ms-first");
+  const last = screen.getByTestId("ms-last");
+  expect(first).toHaveFocus();
+
+  fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+  expect(last).toHaveFocus();
+  fireEvent.keyDown(window, { key: "Tab" });
+  expect(first).toHaveFocus();
+
+  vi.spyOn(panel, "getBoundingClientRect").mockReturnValue(new DOMRect(100, 100, 300, 200));
+  fireEvent.pointerDown(panel, { pointerId: 2, button: 0, clientX: 120, clientY: 120 });
+  fireEvent.pointerUp(panel, { pointerId: 2, button: 0, clientX: 20, clientY: 20 });
+  expect(cancel).not.toHaveBeenCalled();
+
+  fireEvent.pointerDown(panel, { pointerId: 3, button: 0, clientX: 20, clientY: 20 });
+  fireEvent.pointerUp(panel, { pointerId: 3, button: 0, clientX: 20, clientY: 20 });
+  expect(cancel).toHaveBeenCalledTimes(1);
+
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(cancel).toHaveBeenCalledTimes(2);
+});

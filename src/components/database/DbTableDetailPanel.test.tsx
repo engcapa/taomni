@@ -30,4 +30,25 @@ describe("DbTableDetailPanel", () => {
     await waitFor(() => expect(screen.getByTestId("db-detail-diagram")).toHaveTextContent("fk_users"));
     expect(ipc.dbExecute).toHaveBeenCalled();
   });
+
+  it("uses native top-layer dialog, ignores IME Escape, and restores opener focus on Escape", async () => {
+    const opener = document.createElement("button");
+    document.body.append(opener);
+    opener.focus();
+    const onClose = vi.fn();
+
+    const view = render(<DbTableDetailPanel sessionId="s1" schema="app" table="orders" engine="MySQL" onClose={onClose} />);
+    const panel = await screen.findByTestId("db-table-detail-panel");
+    expect(panel.tagName).toBe("DIALOG");
+    expect(screen.getByTestId("db-table-detail-close")).toHaveFocus();
+
+    fireEvent.keyDown(panel, { key: "Escape", isComposing: true });
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(panel, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    view.unmount();
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
 });

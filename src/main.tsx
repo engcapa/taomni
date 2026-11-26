@@ -59,15 +59,15 @@ function AppCrash({
         boxSizing: "border-box",
         padding: 24,
         fontFamily: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
-        background: "#ffffff",
-        color: "#1f2328",
+        background: "var(--taomni-bg, #ffffff)",
+        color: "var(--taomni-text, #1f2328)",
       }}
     >
       <div style={{ maxWidth: 760 }}>
         <h1 style={{ margin: "0 0 12px", fontSize: 20, fontWeight: 700 }}>
           {startup ? "Taomni failed to start" : "Taomni UI encountered an error"}
         </h1>
-        <p style={{ margin: "0 0 16px", color: "#59636e", fontSize: 13, lineHeight: 1.5 }}>
+        <p style={{ margin: "0 0 16px", color: "var(--taomni-text-muted, #59636e)", fontSize: 13, lineHeight: 1.5 }}>
           {startup
             ? "The app failed while loading in this WebView. Please include the details below when reporting it."
             : "The app hit a React UI error in this WebView. Please include the details below when reporting it."}
@@ -79,9 +79,9 @@ function AppCrash({
             padding: 12,
             overflow: "auto",
             whiteSpace: "pre-wrap",
-            border: "1px solid #d0d7de",
+            border: "1px solid var(--taomni-divider, #d0d7de)",
             borderRadius: 6,
-            background: "#f6f8fa",
+            background: "var(--taomni-panel-bg, #f6f8fa)",
             fontSize: 12,
             lineHeight: 1.45,
           }}

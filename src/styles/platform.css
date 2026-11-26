@@ -236,7 +236,8 @@ html[data-app-theme="dark"] .taomni-main-window {
 .taomni-toolbar-pill[data-primary="true"], .taomni-toolbar-pill[aria-pressed="true"] { background: var(--taomni-selected); color: var(--taomni-accent); border-color: var(--taomni-selected-border); }
 .taomni-main-window .taomni-titlebar-actions-overflow { display: flex; }
 .taomni-main-window .taomni-titlebar-actions-overflow .taomni-titlebar-tray-btn { height: 24px; width: 24px; border-radius: 5px; }
-.taomni-tab-overview { position: fixed; inset: 4px 6px 27px 42px; z-index: var(--taomni-z-modal); display: flex; flex-direction: column; overflow-y: auto; padding: 18px 24px; color: var(--taomni-text); background: color-mix(in srgb, var(--taomni-bg) 92%, transparent); backdrop-filter: blur(10px); }
+.taomni-tab-overview { position: fixed; inset: 4px 6px 27px 42px; margin: 0; border: 0; max-width: none; max-height: none; width: auto; height: auto; z-index: var(--taomni-z-modal); display: flex; flex-direction: column; overflow-y: auto; padding: 18px 24px; color: var(--taomni-text); background: color-mix(in srgb, var(--taomni-bg) 92%, transparent); backdrop-filter: blur(10px); }
+.taomni-tab-overview::backdrop { background: transparent; }
 .taomni-overview-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .taomni-overview-search-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .taomni-overview-search { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; border: 1px solid var(--taomni-card-border); border-radius: 6px; padding: 6px 10px; background: var(--taomni-card-bg); }

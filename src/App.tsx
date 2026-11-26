@@ -111,7 +111,7 @@ function App() {
   // capture backends.
   const overlayHash = routeHash;
   if (isScreenshotBoundaryWindow() || overlayHash.startsWith("#screenshot-boundary")) {
-    return <div data-testid="screenshot-recording-boundary" style={{ position: "fixed", inset: 0, background: "#ff4d4f", pointerEvents: "none" }} />;
+    return <div data-testid="screenshot-recording-boundary" style={{ position: "fixed", inset: 0, background: "var(--taomni-danger-border, #ff4d4f)", pointerEvents: "none" }} />;
   }
   if (isScreenshotScrollWindow() || overlayHash.startsWith("#screenshot-scroll")) return <ScrollCaptureBar />;
   if (

@@ -11,6 +11,7 @@ steps:
 - assert_attribute: {selector: html, name: data-app-theme, equals: light}
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: {selector: '[data-testid="module-marketplace-loading"]', state: detached}
 - click: '[data-testid="module-offline-submit"]'
 - assert_text: {selector: '[data-testid="module-offline-error"][role="alert"]', contains: Choose a module package}
 - assert_attribute: {selector: '[data-testid="module-offline-archive"]', name: aria-invalid, equals: 'true'}
@@ -32,24 +33,24 @@ verification:
   - id: themed-error
     ui_standard: [UI-FND-03a]
     requirement: A readable error explains the required input in the current theme and survives an appearance change.
-    actions: [2, 6, 11]
+    actions: [2, 7, 12]
     checkpoints:
-    - {step: 7, expectation: The alert explains how to correct the empty form.}
-    - {step: 10, expectation: Light mode error text meets the contrast threshold.}
-    - {step: 13, expectation: The dark mode foreground meets contrast on the new error surface.}
-    results: [7, 10, 13]
+    - {step: 8, expectation: The alert explains how to correct the empty form.}
+    - {step: 11, expectation: Light mode error text meets the contrast threshold.}
+    - {step: 14, expectation: The dark mode foreground meets contrast on the new error surface.}
+    results: [8, 11, 14]
   - id: missing-fields
     ui_standard: [UI-INP-02]
     requirement: Validation identifies individual missing fields, clears on edit and preserves the package path on retry.
-    actions: [6, 14, 16]
+    actions: [7, 15, 17]
     checkpoints:
-    - {step: 8, expectation: An empty archive path is marked invalid.}
-    - {step: 9, expectation: The signature references the visible error.}
-    - {step: 15, expectation: Editing clears the earlier error.}
-    - {step: 17, expectation: Submitting again identifies the missing signature.}
-    - {step: 18, expectation: The filled archive field is valid on retry.}
-    - {step: 19, expectation: The invalid signature uses the dark theme error border.}
-    results: [8, 9, 15, 17, 18, 19]
+    - {step: 9, expectation: An empty archive path is marked invalid.}
+    - {step: 10, expectation: The signature references the visible error.}
+    - {step: 16, expectation: Editing clears the earlier error.}
+    - {step: 18, expectation: Submitting again identifies the missing signature.}
+    - {step: 19, expectation: The filled archive field is valid on retry.}
+    - {step: 20, expectation: The invalid signature uses the dark theme error border.}
+    results: [9, 10, 16, 18, 19, 20]
   visual:
   - {check: Actual error contrast, method: automated, reason: Measures foreground against the opaque alert background in both themes.}
   native:

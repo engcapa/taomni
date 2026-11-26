@@ -168,12 +168,21 @@ describe("HBaseShellTab workspace", () => {
   it("opens a command-reference help dialog and gates admin commands on REST", async () => {
     render(<HBaseShellTab tabId="t1" info={info} visible />);
     await waitFor(() => expect(ipcMock.hbaseConnect).toHaveBeenCalled());
-    fireEvent.click(await screen.findByText("Help"));
+    const helpBtn = await screen.findByRole("button", { name: /Help/ });
+    helpBtn.focus();
+    fireEvent.click(helpBtn);
     const dialog = await screen.findByTestId("hbase-help-dialog");
+    expect(dialog.tagName).toBe("DIALOG");
+    expect(screen.getByTestId("hbase-help-close")).toHaveFocus();
     expect(dialog).toHaveTextContent("count");
     expect(dialog).toHaveTextContent("enable");
     // REST transport => admin verbs carry the unsupported note.
     expect(dialog).toHaveTextContent("Not available on the REST transport");
+    fireEvent.keyDown(dialog, { key: "Escape", isComposing: true });
+    expect(screen.getByTestId("hbase-help-dialog")).toBeInTheDocument();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByTestId("hbase-help-dialog")).not.toBeInTheDocument();
+    expect(helpBtn).toHaveFocus();
   });
 
   it("opens the shared query library with the stable HBase session scope", async () => {

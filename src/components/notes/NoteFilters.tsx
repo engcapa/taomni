@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, ListFilter } from "lucide-react";
+import { useRef, useState } from "react";
+import { ChevronDown, ListFilter } from "lucide-react";
 import type { NoteFilter, NoteTag } from "../../lib/notes";
 import { useT } from "../../lib/i18n";
+import { ContextMenu, type MenuItem } from "../ContextMenu";
 
 const FILTERS: NoteFilter[] = [
   "recent_incomplete",
@@ -39,42 +40,34 @@ interface NoteTagFiltersProps {
 
 export function NoteStatusFilter({ filters, onToggleFilter, className = "", prefix = "notes" }: NoteStatusFilterProps) {
   const t = useT();
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const selected: NoteFilter[] = filters.length > 0 ? filters : ["recent_incomplete"];
   const summary =
     selected.length === 1
       ? t(`notes.filters.${selected[0]}`)
       : t("notes.statusCount", { count: selected.length });
   const buttonLabel = `${t("notes.status")}: ${summary}`;
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  const open = menuPos !== null;
 
   return (
     <div
-      ref={rootRef}
       className={`relative shrink-0 ${className}`}
       data-testid={`${prefix}-filters`}
       aria-label={t("notes.title")}
     >
       <button
+        ref={buttonRef}
         type="button"
         className="taomni-btn h-6 w-8 p-0 inline-flex items-center justify-center gap-0.5"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (open) {
+            setMenuPos(null);
+            return;
+          }
+          const rect = buttonRef.current?.getBoundingClientRect();
+          setMenuPos(rect ? { x: rect.left, y: rect.bottom + 4 } : { x: 8, y: 36 });
+        }}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={buttonLabel}
@@ -84,33 +77,22 @@ export function NoteStatusFilter({ filters, onToggleFilter, className = "", pref
         <ListFilter className="w-3.5 h-3.5" />
         <ChevronDown className="w-2.5 h-2.5" />
       </button>
-      {open && (
-        <div
-          className="absolute left-0 top-[30px] z-[var(--taomni-z-popover)] w-44 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg"
-          role="menu"
-          data-testid={`${prefix}-filter-dropdown`}
-        >
-          {FILTERS.map((f) => {
-            const active = selected.includes(f);
-            return (
-              <button
-                key={f}
-                type="button"
-                role="menuitemcheckbox"
-                aria-checked={active}
-                data-testid={`${prefix}-filter-${f}`}
-                className={`flex h-7 w-full items-center gap-2 rounded px-2 text-left text-ui-small ${
-                  active ? "bg-[var(--taomni-selected)] text-[var(--taomni-accent)]" : "hover:bg-[var(--taomni-hover)]"
-                }`}
-                title={t(`notes.filters.${f}`)}
-                onClick={() => onToggleFilter(f)}
-              >
-                <span className="w-3.5 shrink-0">{active && <Check className="w-3.5 h-3.5" />}</span>
-                <span className="truncate">{t(`notes.filters.${f}`)}</span>
-              </button>
-            );
-          })}
-        </div>
+      {menuPos && (
+        <ContextMenu
+          testId={`${prefix}-filter-dropdown`}
+          ariaLabel={buttonLabel}
+          x={menuPos.x}
+          y={menuPos.y}
+          anchorRef={buttonRef}
+          onClose={() => setMenuPos(null)}
+          items={FILTERS.map((f): MenuItem => ({
+            label: t(`notes.filters.${f}`),
+            testId: `${prefix}-filter-${f}`,
+            checked: selected.includes(f),
+            keepOpen: true,
+            onClick: () => onToggleFilter(f),
+          }))}
+        />
       )}
     </div>
   );

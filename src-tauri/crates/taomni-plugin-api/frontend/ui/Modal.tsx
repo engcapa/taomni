@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useId, useRef, type PointerEvent, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { ModalSurface } from "./ModalSurface";
@@ -25,23 +25,8 @@ interface ModalProps {
 export function Modal({ title, testId, initialFocus, returnFocus, closeLabel, size, dismissOnBackdrop, onCancel, children, footer, role = "dialog", tone }: ModalProps) {
   const titleId = useId();
   const bodyId = useId();
-  const backdropPointer = useRef<number | null>(null);
-  function onBackdrop(event: PointerEvent<HTMLDialogElement>) {
-    if (event.target !== event.currentTarget) return false;
-    const box = event.currentTarget.getBoundingClientRect();
-    return event.clientX < box.left || event.clientX >= box.right || event.clientY < box.top || event.clientY >= box.bottom;
-  }
   return createPortal(
-    <ModalSurface role={role} initialFocus={initialFocus} returnFocus={returnFocus} onCancel={onCancel}
-      onPointerDown={(event) => {
-        backdropPointer.current = dismissOnBackdrop && event.button === 0 && onBackdrop(event) ? event.pointerId : null;
-      }}
-      onPointerCancel={() => { backdropPointer.current = null; }}
-      onPointerUp={(event) => {
-        const dismiss = dismissOnBackdrop && backdropPointer.current === event.pointerId && onBackdrop(event);
-        backdropPointer.current = null;
-        if (dismiss) onCancel();
-      }}
+    <ModalSurface role={role} initialFocus={initialFocus} returnFocus={returnFocus} dismissOnBackdrop={dismissOnBackdrop} onCancel={onCancel}
       aria-labelledby={titleId} aria-describedby={bodyId}
       className="taomni-modal" data-testid={testId} data-tone={tone} data-size={size}>
       {closeLabel ? <header className="taomni-modal-header">

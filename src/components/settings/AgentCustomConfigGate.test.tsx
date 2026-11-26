@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -136,7 +136,14 @@ describe("agent custom config vault gate", () => {
 
     await user.click(screen.getByRole("button", { name: /Manage Profiles/i }));
 
-    expect(await screen.findByText("Claude Code Settings Profiles")).toBeInTheDocument();
+    const title = await screen.findByText("Claude Code Settings Profiles");
+    expect(title).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Claude Code Settings Profiles" });
+    expect(dialog.tagName).toBe("DIALOG");
+    fireEvent.keyDown(dialog, { key: "Escape", isComposing: true });
+    expect(screen.getByRole("dialog", { name: "Claude Code Settings Profiles" })).toBeInTheDocument();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Claude Code Settings Profiles" })).not.toBeInTheDocument();
   });
 
   it("does not open Codex custom config when the vault gate is cancelled", async () => {
@@ -160,5 +167,11 @@ describe("agent custom config vault gate", () => {
     await user.click(screen.getByRole("button", { name: /Manage Profiles/i }));
 
     expect(await screen.findByText("Codex Config Profiles")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Codex Config Profiles" });
+    expect(dialog.tagName).toBe("DIALOG");
+    fireEvent.keyDown(dialog, { key: "Escape", isComposing: true });
+    expect(screen.getByRole("dialog", { name: "Codex Config Profiles" })).toBeInTheDocument();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Codex Config Profiles" })).not.toBeInTheDocument();
   });
 });

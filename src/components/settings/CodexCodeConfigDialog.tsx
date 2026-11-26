@@ -1,7 +1,9 @@
 import { IconButton } from "../ui/IconButton";
 import { Button } from "../ui/Button";
+import { ModalSurface } from "../ui/ModalSurface";
 import { confirmAppDialog } from "../../lib/appDialogs";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { AlertTriangle, Loader2, Plus, Shield, Sliders, Trash2, X } from "lucide-react";
@@ -277,26 +279,26 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center">
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
-        style={{
-          width: "min(860px, 96vw)",
-          height: "min(640px, 85vh)",
-          minWidth: "min(640px, 96vw)",
-          minHeight: "min(420px, 85vh)",
-          maxWidth: "96vw",
-          maxHeight: "85vh",
-          resize: "both",
-          background: "var(--taomni-panel-bg)",
-          borderColor: "var(--taomni-chrome-border)",
-          color: "var(--taomni-text)",
-        }}
-      >
-        <div className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none" style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}>
+  return createPortal(
+    <ModalSurface
+      initialFocus="input:enabled, button:enabled"
+      onCancel={onClose}
+      aria-label={t("aiSettings.codexCustomModalTitle")}
+      className="m-auto p-0 open:flex flex-col rounded-[6px] shadow-2xl border overflow-hidden backdrop:bg-[var(--taomni-overlay)]"
+      style={{
+        width: "min(860px, 96vw)",
+        height: "min(640px, 85vh)",
+        minWidth: "min(640px, 96vw)",
+        minHeight: "min(420px, 85vh)",
+        maxWidth: "96vw",
+        maxHeight: "85vh",
+        resize: "both",
+        background: "var(--taomni-panel-bg)",
+        borderColor: "var(--taomni-chrome-border)",
+        color: "var(--taomni-text)",
+      }}
+    >
+      <div className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none" style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}>
           <Sliders className="w-3.5 h-3.5 mr-1.5" />
           <div className="text-ui-body font-semibold">{t("aiSettings.codexCustomModalTitle")}</div>
           <IconButton className="ml-auto hover:bg-[var(--taomni-control-hover)] rounded p-0.5" onClick={onClose} type="button" label={t("common.close")}>
@@ -446,7 +448,7 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
 
         <div className="h-10 px-3 flex items-center gap-2 border-t shrink-0" style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}>
           {error && (
-            <span className="text-ui-small text-ui-danger flex items-center gap-1">
+            <span role="alert" className="text-ui-small text-ui-danger flex items-center gap-1">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate max-w-[400px]">{error}</span>
             </span>
@@ -459,7 +461,7 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
             {t("common.save")}
           </Button>
         </div>
-      </div>
-    </div>
+    </ModalSurface>,
+    document.body,
   );
 }

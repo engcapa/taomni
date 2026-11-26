@@ -1,6 +1,9 @@
+import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
+import { ModalSurface } from "../ui/ModalSurface";
 import { confirmAppDialog } from "../../lib/appDialogs";
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Sliders, Loader2, X, Plus, Trash2, Shield, AlertTriangle } from "lucide-react";
 import { useAiStore, CcCustomSettingsProfile } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
@@ -127,17 +130,6 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
       }
     }
   };
-
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
 
   // Load on mount
   useEffect(() => {
@@ -389,29 +381,26 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
     }
   };
 
-  return (
-    <div
-      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
+  return createPortal(
+    <ModalSurface
+      initialFocus="input:enabled, button:enabled"
+      onCancel={onClose}
+      aria-label={t("aiSettings.ccCustomModalTitle")}
+      className="m-auto p-0 open:flex flex-col rounded-[6px] shadow-2xl border overflow-hidden backdrop:bg-[var(--taomni-overlay)]"
+      style={{
+        width: "min(860px, 96vw)",
+        height: "min(640px, 85vh)",
+        minWidth: "min(640px, 96vw)",
+        minHeight: "min(420px, 85vh)",
+        maxWidth: "96vw",
+        maxHeight: "85vh",
+        resize: "both",
+        background: "var(--taomni-panel-bg)",
+        borderColor: "var(--taomni-chrome-border)",
+        color: "var(--taomni-text)",
+      }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
-        style={{
-          width: "min(860px, 96vw)",
-          height: "min(640px, 85vh)",
-          minWidth: "min(640px, 96vw)",
-          minHeight: "min(420px, 85vh)",
-          maxWidth: "96vw",
-          maxHeight: "85vh",
-          resize: "both",
-          background: "var(--taomni-panel-bg)",
-          borderColor: "var(--taomni-chrome-border)",
-          color: "var(--taomni-text)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Titlebar */}
+      {/* Titlebar */}
         <div
           className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none"
           style={{
@@ -646,7 +635,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
           style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}
         >
           {error && (
-            <span className="text-ui-small text-ui-danger flex items-center gap-1">
+            <span role="alert" className="text-ui-small text-ui-danger flex items-center gap-1">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate max-w-[400px]">{error}</span>
             </span>
@@ -654,26 +643,14 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
 
           <div className="flex-1" />
 
-          <button
-            className="taomni-btn"
-            onClick={onClose}
-            disabled={saving}
-            type="button"
-          >
+          <Button onClick={onClose} disabled={saving}>
             {t("common.cancel")}
-          </button>
-          <button
-            className="taomni-btn"
-            data-primary="true"
-            onClick={handleSave}
-            disabled={saving}
-            type="button"
-          >
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1 inline" /> : null}
+          </Button>
+          <Button variant="primary" onClick={handleSave} busy={saving}>
             {t("common.save")}
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+    </ModalSurface>,
+    document.body,
   );
 }

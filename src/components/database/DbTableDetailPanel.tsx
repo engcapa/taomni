@@ -1,5 +1,7 @@
 import { IconButton } from "../ui/IconButton";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ModalSurface } from "../ui/ModalSurface";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Copy, Database, RefreshCw, X } from "lucide-react";
 import {
   dbDescribeTable,
@@ -44,7 +46,6 @@ const emptyMetadata: Metadata = { columns: [], foreignKeys: [], indexes: [], sta
 /** DBeaver-style table object inspector built on the existing metadata IPC. */
 export function DbTableDetailPanel({ sessionId, schema, table, kind = "table", engine, catalog, onClose, onStatus, onOpenData }: Props) {
   const t = useT();
-  const closeRef = useRef<HTMLButtonElement>(null);
   const sqlEngine = asSqlEngine(engine);
   const [tab, setTab] = useState<DetailTab>("properties");
   const [metadata, setMetadata] = useState<Metadata>(emptyMetadata);
@@ -86,7 +87,6 @@ export function DbTableDetailPanel({ sessionId, schema, table, kind = "table", e
   };
 
   useEffect(() => {
-    closeRef.current?.focus();
     void loadMetadata();
   }, [sessionId, schema, table, kind, catalog]);
 
@@ -157,16 +157,23 @@ export function DbTableDetailPanel({ sessionId, schema, table, kind = "table", e
     </div>
   );
 
-  return (
-    <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center" onClick={onClose} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } }}>
-      <div role="dialog" aria-modal="true" aria-label={t("dbObjects.detailTitle", { name: table })} data-testid="db-table-detail-panel" className="w-[900px] max-w-[94vw] h-[min(720px,88vh)] flex flex-col rounded shadow-lg" style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }} onClick={(event) => event.stopPropagation()}>
-        <div className="h-10 shrink-0 flex items-center gap-2 px-3" style={{ borderBottom: "1px solid var(--taomni-divider)" }}><Database className="w-4 h-4 text-[var(--taomni-accent)]" /><span className="font-semibold text-ui-body truncate flex-1">{table}</span><span className="text-ui-small text-[var(--taomni-text-muted)]">{schema ?? ""}</span><button ref={closeRef} type="button" className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={onClose} aria-label={t("common.close")}><X className="w-3.5 h-3.5" /></button></div>
-        <div className="h-9 shrink-0 flex items-center gap-1 px-3" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>{(["properties", "data", "diagram"] as DetailTab[]).map((item) => <button key={item} type="button" className="h-7 px-3 rounded text-ui-body" style={{ background: tab === item ? "var(--taomni-selected)" : undefined }} onClick={() => setTab(item)} data-testid={`db-detail-tab-${item}`}>{t(`dbObjects.detailTab${item[0].toUpperCase()}${item.slice(1)}` as "dbObjects.detailTabProperties" | "dbObjects.detailTabData" | "dbObjects.detailTabDiagram")}</button>)}<IconButton type="button" className="ml-auto h-7 px-2 rounded hover:bg-[var(--taomni-hover)]" onClick={() => { if (tab === "data") void loadData(); else void loadMetadata(); }} label={t("dbObjects.refresh")}><RefreshCw className="w-3.5 h-3.5" /></IconButton></div>
-        {error && <div className="px-3 py-1 text-ui-small" style={{ color: "var(--taomni-danger-text)" }}>{error}</div>}
-        {loading && <div className="px-3 py-1 text-ui-small text-[var(--taomni-text-muted)]">Loading…</div>}
-        {tab === "properties" ? renderProperties() : tab === "data" ? renderData() : renderDiagram()}
-      </div>
-    </div>
+  return createPortal(
+    <ModalSurface
+      dismissOnBackdrop
+      initialFocus='[data-testid="db-table-detail-close"]'
+      onCancel={onClose}
+      aria-label={t("dbObjects.detailTitle", { name: table })}
+      data-testid="db-table-detail-panel"
+      className="m-auto p-0 w-[900px] max-w-[94vw] h-[min(720px,88vh)] open:flex flex-col rounded shadow-lg backdrop:bg-[var(--taomni-overlay)]"
+      style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)", border: "1px solid var(--taomni-card-border)" }}
+    >
+      <div className="h-10 shrink-0 flex items-center gap-2 px-3" style={{ borderBottom: "1px solid var(--taomni-divider)" }}><Database className="w-4 h-4 text-[var(--taomni-accent)]" /><span className="font-semibold text-ui-body truncate flex-1">{table}</span><span className="text-ui-small text-[var(--taomni-text-muted)]">{schema ?? ""}</span><button type="button" data-testid="db-table-detail-close" className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={onClose} aria-label={t("common.close")}><X className="w-3.5 h-3.5" /></button></div>
+      <div className="h-9 shrink-0 flex items-center gap-1 px-3" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>{(["properties", "data", "diagram"] as DetailTab[]).map((item) => <button key={item} type="button" className="h-7 px-3 rounded text-ui-body" style={{ background: tab === item ? "var(--taomni-selected)" : undefined }} onClick={() => setTab(item)} data-testid={`db-detail-tab-${item}`}>{t(`dbObjects.detailTab${item[0].toUpperCase()}${item.slice(1)}` as "dbObjects.detailTabProperties" | "dbObjects.detailTabData" | "dbObjects.detailTabDiagram")}</button>)}<IconButton type="button" className="ml-auto h-7 px-2 rounded hover:bg-[var(--taomni-hover)]" onClick={() => { if (tab === "data") void loadData(); else void loadMetadata(); }} label={t("dbObjects.refresh")}><RefreshCw className="w-3.5 h-3.5" /></IconButton></div>
+      {error && <div role="alert" className="px-3 py-1 text-ui-small" style={{ color: "var(--taomni-danger-text)" }}>{error}</div>}
+      {loading && <div className="px-3 py-1 text-ui-small text-[var(--taomni-text-muted)]">Loading…</div>}
+      {tab === "properties" ? renderProperties() : tab === "data" ? renderData() : renderDiagram()}
+    </ModalSurface>,
+    document.body,
   );
 }
 
