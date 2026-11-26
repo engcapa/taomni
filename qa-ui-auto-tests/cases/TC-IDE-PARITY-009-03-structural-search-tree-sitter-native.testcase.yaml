@@ -12,6 +12,7 @@ tags: [code-workspace, structural-search, parity009, native-gate, p2]
 modes: [native]
 native_platforms: [Windows, Linux]
 fixtures: [reset_db, parity009_ssr]
+ui_standard: [UI-DLG-04]
 timeout_sec: 420
 steps:
   - open: ${cfg.app.base_url}
@@ -96,7 +97,6 @@ steps:
   - click: '[data-testid="structural-search-scope-workspace"]'
   - click: '[data-testid="structural-search-find"]'
   - wait_for: '[data-testid="structural-search-running"]'
-  - wait: 1
   - press: Escape
   - assert_not_visible: '[data-testid="structural-search-dialog"]'
   - wait_for:
@@ -150,13 +150,14 @@ verification:
     - 36
     - 37
   - id: ED-PARITY-009-N2
+    ui_standard: [UI-DLG-04]
     requirement: 无效模板为类型化错误；大工作区 In Project 运行中 Esc 取消，后端 active requests 回到 0；源文件 SHA-256 不变、编辑器不 dirty。
     actions:
     - 40
     - 41
     - 46
     - 47
-    - 50
+    - 49
     checkpoints:
     - step: 42
       expectation: '{wait_for: ''[data-testid="structural-search-error"]''}'
@@ -164,26 +165,28 @@ verification:
       expectation: '{assert_text: {contains: ''not a single Java statement, expression or class member'', selector: ''[data-testid="structural-search-error"]''}}'
     - step: 48
       expectation: '{wait_for: ''[data-testid="structural-search-running"]''}'
-    - step: 51
+    - step: 50
       expectation: '{assert_not_visible: ''[data-testid="structural-search-dialog"]''}'
-    - step: 52
+    - step: 51
       expectation: '{wait_for: {selector: ''[data-testid="structural-search-panel"][data-phase="cancelled"][data-active-requests="0"]'',
         timeout_sec: 60}}'
-    - step: 53
+    - step: 52
       expectation: '{assert_visible: ''[data-testid="structural-search-cancelled"]''}'
-    - step: 55
+    - step: 54
       expectation: '{assert_count: {equal: 0, selector: ''[data-editor-tab-key][data-dirty="true"]''}}'
-    - step: 56
+    - step: 55
       expectation: '{assert_file_sha256: {equals: ''${fixture.parity009_target_sha256}'', path: ''${fixture.parity009_target}''}}'
     results:
-    - 53
+    - 50
+    - 51
+    - 52
+    - 54
     - 55
-    - 56
   visual:
   - check: 截图中标题、n/N 导航、两侧标签/结果树与高亮无截断遮挡；与 IDEA 参照的视觉差异单独记录于 comparison record。
     method: manual
     reason: 像素与视觉 parity 不能由 DOM 断言替代。
   native:
-  - check: 当前平台 Windows/WebView2 真实 Tauri IPC 与主机文件 SHA-256；Linux/macOS 未在本机执行。
+  - check: Windows/WebView2 或 Linux/WebKitGTK 的真实 Tauri IPC 与主机文件 SHA-256。
     method: automated
     reason: assert_file_sha256 由 harness 在主机侧独立读取字节。
