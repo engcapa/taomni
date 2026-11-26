@@ -194,6 +194,12 @@ const dict = {
     copyDetails: "Copy error details",
     copyFailed: "Could not copy the details. Select the message to copy it manually. {detail}",
   },
+  workspaceLsp: {
+    dismissMessage: "Dismiss language server message",
+    messageTitle: "Language server message",
+    messageWarning: "Language server warning",
+    messageError: "Language server error",
+  },
   workspaceUndo: {
     title: "Undo",
     question: "Undo {edit}?",

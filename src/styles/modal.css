@@ -29,3 +29,14 @@
 .taomni-modal[data-size="wide"] { width: min(760px, calc(100vw - 32px)); }
 .taomni-modal[data-size="complex"] { width: min(960px, calc(100vw - 32px)); }
 .taomni-modal[data-bleed="true"] { padding: 0; gap: 0; overflow: hidden; }
+
+.taomni-workspace-modal {
+  background: var(--taomni-code-bg);
+  border-color: var(--taomni-code-border);
+  color: var(--taomni-code-text);
+}
+
+.taomni-workspace-modal[data-position="top"] {
+  margin: max(16px, 12vh) auto auto;
+  max-height: calc(88vh - 16px);
+}

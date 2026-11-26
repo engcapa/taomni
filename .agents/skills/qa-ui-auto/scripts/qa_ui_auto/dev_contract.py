@@ -1,8 +1,7 @@
 """Development-time QA case contract checks for pull requests.
 
-The hosted platform workflow uses this module as an advisory reminder when
-product code changes without an executable QA case change. Catalog drift is a
-hard error because it makes the planner unable to produce a trustworthy matrix.
+The hosted platform workflow requires rule-mapped cases for desktop UI changes.
+Catalog drift is a hard error because it prevents a reproducible selection.
 """
 from __future__ import annotations
 
@@ -17,7 +16,8 @@ import yaml
 
 CASE_ROOT = Path("qa-ui-auto-tests/cases")
 POLICY_PATH = Path("qa-ui-auto-tests/ci/policy.yaml")
-PRODUCT_PREFIXES = ("src/", "src-tauri/src/", "vite-plugins/", "src-tauri/plugins/")
+PRODUCT_PREFIXES = ("src/", "src-tauri/src/", "vite-plugins/", "src-tauri/plugins/",
+                    "src-tauri/crates/taomni-plugin-api/frontend/")
 UNIT_TEST_PREFIXES = ("src/", "src-tauri/tests/", ".agents/skills/qa-ui-auto/scripts/")
 
 
@@ -48,6 +48,13 @@ def is_product_path(path: str) -> bool:
     return not is_unit_test_path(path)
 
 
+def is_desktop_ui_path(path: str) -> bool:
+    parts = Path(path).parts
+    if set(parts) & {"__fixtures__", "__tests__", "tests", "fixtures", "locales", "stubs"}:
+        return False
+    return Path(path).suffix in {".tsx", ".jsx", ".css"}
+
+
 def load_case_ids() -> set[str]:
     ids: set[str] = set()
     for path in CASE_ROOT.rglob("*.testcase.yaml"):
@@ -76,18 +83,18 @@ def evaluate(paths: list[str], *, case_ids: set[str], policy_ids: set[str]) -> d
             "QA case catalog differs from policy.yaml: "
             f"new={missing}, removed={removed}. Add/remove IDs in the same change."
         )
-    if product_paths and not case_paths:
+    ui_paths = [path for path in product_paths if is_desktop_ui_path(path)]
+    if ui_paths and not any(
+        Path(path).is_file() and (yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}).get("ui_standard")
+        for path in case_paths
+    ):
+        errors.append("Desktop UI changed. Map applicable UI-STANDARD rules to observed results in a changed case.")
+    elif product_paths and not case_paths:
         warnings.append(
             "Product files changed without a qa-ui-auto case change. "
             "Add or update a focused case in qa-ui-auto-tests/cases/ and register its ID "
             "in qa-ui-auto-tests/ci/policy.yaml, or record a concrete reason in the design/PR."
         )
-    ui_paths = [Path(path) for path in product_paths if path.endswith((".tsx", ".jsx", ".css"))]
-    if ui_paths and case_paths and not any(
-        Path(path).is_file() and (yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}).get("ui_standard")
-        for path in case_paths
-    ):
-        warnings.append("Desktop UI changed. Map applicable UI-STANDARD rules to observed results in a changed case.")
     return {
         "product_paths": product_paths,
         "case_paths": case_paths,

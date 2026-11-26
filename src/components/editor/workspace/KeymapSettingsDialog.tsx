@@ -79,9 +79,6 @@ export function KeymapSettingsDialog({
   capturedStrokesRef.current = capturedStrokes;
   const secondStrokeEnabledRef = useRef(false);
   secondStrokeEnabledRef.current = secondStrokeEnabled;
-  const overlayStateRef = useRef({ mouse: false, menu: false, findField: false });
-  overlayStateRef.current.mouse = mouseCapture !== null;
-  overlayStateRef.current.menu = rowMenu !== null;
   const recorderFieldRef = useRef<HTMLDivElement | null>(null);
   const shortcutFilterFieldRef = useRef<HTMLDivElement | null>(null);
 
@@ -176,10 +173,6 @@ export function KeymapSettingsDialog({
     baseBindings,
     open,
     captureRef,
-    overlayStateRef,
-    shortcutFilterFieldRef,
-    setRowMenu,
-    setMouseCapture,
     capturedStrokesRef,
     secondStrokeEnabledRef,
   });
@@ -239,7 +232,6 @@ export function KeymapSettingsDialog({
   const toggleShortcutFilter = () => {
     if (shortcutFilter) {
       setShortcutFilter(null);
-      overlayStateRef.current.findField = false;
       return;
     }
     setShortcutFilter([]);
@@ -429,7 +421,6 @@ export function KeymapSettingsDialog({
     corruptDiagnostic={corruptDiagnostic}
     shortcutFilter={shortcutFilter}
     shortcutFilterFieldRef={shortcutFilterFieldRef}
-    overlayStateRef={overlayStateRef}
     handleShortcutFilterKeyDown={handleShortcutFilterKeyDown}
     filter={filter}
     setFilter={setFilter}

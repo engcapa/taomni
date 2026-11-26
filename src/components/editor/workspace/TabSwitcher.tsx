@@ -1,3 +1,4 @@
+import { ModalSurface } from "../../ui/ModalSurface";
 import { useEffect, useRef } from "react";
 import { File, PanelBottom } from "lucide-react";
 
@@ -67,73 +68,36 @@ export function TabSwitcher({
   // IDEA Switcher layout: tool windows on the left, files on the right, the
   // selected file path underneath. Left/Right move between the columns.
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Switcher"
+    <ModalSurface
       data-testid="workspace-tab-switcher"
-      className="fixed inset-0 taomni-dialog-backdrop flex items-start justify-center pt-[12vh]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onCancel();
-      }}
+      initialFocus="[data-testid=workspace-tab-switcher-files]"
+      onCancel={onCancel}
+      dismissOnBackdrop
+      aria-label="Switcher"
+      className="taomni-modal taomni-workspace-modal"
+      data-bleed="true"
+      data-position="top"
+      style={{ width: "min(640px, calc(100vw - 32px))" }}
     >
-      <div className="flex w-[640px] max-w-[90vw] flex-col overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body shadow-2xl text-[var(--taomni-code-text)]">
-        <div ref={listRef} className="flex max-h-[50vh] min-h-0">
-          {toolWindows.length > 0 && (
-            <div
-              role="listbox"
-              aria-label="Tool windows"
-              data-testid="workspace-tab-switcher-tool-windows"
-              className="w-[200px] shrink-0 overflow-y-auto border-r border-[var(--taomni-code-border)] py-1"
-            >
-              {toolWindows.map((toolWindow, toolIndex) => {
-                const index = entries.length + toolIndex;
-                const selected = index === selectedIndex;
-                return (
-                  <div
-                    key={`tool:${toolWindow.id}`}
-                    role="option"
-                    aria-selected={selected}
-                    data-switcher-index={index}
-                    data-switcher-selected={selected ? "true" : undefined}
-                    data-testid={`workspace-tab-switcher-tool-${toolWindow.id}`}
-                    className={`flex items-center gap-2 px-3 py-1 ${
-                      selected
-                        ? "bg-[var(--taomni-accent)] text-white"
-                        : "text-[var(--taomni-code-text)]"
-                    }`}
-                    onMouseEnter={() => onHover(index)}
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                      onCommit(index);
-                    }}
-                  >
-                    <PanelBottom className="h-3.5 w-3.5 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{toolWindow.label}</span>
-                    {toolWindow.open && (
-                      <span className="shrink-0 text-ui-caption opacity-70">open</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+      <div ref={listRef} className="flex max-h-[50vh] min-h-0">
+        {toolWindows.length > 0 && (
           <div
             role="listbox"
-            aria-label="Recent files"
-            data-testid="workspace-tab-switcher-files"
-            className="min-w-0 flex-1 overflow-y-auto py-1"
+            aria-label="Tool windows"
+            data-testid="workspace-tab-switcher-tool-windows"
+            className="w-[200px] shrink-0 overflow-y-auto border-r border-[var(--taomni-code-border)] py-1"
           >
-            {entries.map((entry, index) => {
+            {toolWindows.map((toolWindow, toolIndex) => {
+              const index = entries.length + toolIndex;
               const selected = index === selectedIndex;
               return (
                 <div
-                  key={entry.key}
+                  key={`tool:${toolWindow.id}`}
                   role="option"
                   aria-selected={selected}
                   data-switcher-index={index}
                   data-switcher-selected={selected ? "true" : undefined}
-                  data-testid={`workspace-tab-switcher-item-${entry.key}`}
+                  data-testid={`workspace-tab-switcher-tool-${toolWindow.id}`}
                   className={`flex items-center gap-2 px-3 py-1 ${
                     selected
                       ? "bg-[var(--taomni-accent)] text-white"
@@ -145,29 +109,66 @@ export function TabSwitcher({
                     onCommit(index);
                   }}
                 >
-                  <File className="h-3.5 w-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">
-                    {entry.pinned && <span className="mr-1" title="Pinned">📌</span>}
-                    {entry.title}
-                    {entry.dirty && <span className="ml-1">*</span>}
-                  </span>
+                  <PanelBottom className="h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">{toolWindow.label}</span>
+                  {toolWindow.open && (
+                    <span className="shrink-0 text-ui-caption opacity-70">open</span>
+                  )}
                 </div>
               );
             })}
-            {entries.length === 0 && (
-              <div className="px-3 py-1 text-[var(--taomni-code-muted)]">No open files</div>
-            )}
           </div>
-        </div>
+        )}
         <div
-          data-testid="workspace-tab-switcher-path"
-          className="min-w-0 truncate border-t border-[var(--taomni-code-border)] px-3 py-1 text-ui-caption text-[var(--taomni-code-muted)]"
-          title={selectedEntry?.subtitle ?? selectedTool?.label ?? ""}
+          role="listbox"
+          aria-label="Recent files"
+          data-testid="workspace-tab-switcher-files"
+            tabIndex={0}
+          className="min-w-0 flex-1 overflow-y-auto py-1"
         >
-          {selectedEntry?.subtitle ?? (selectedTool ? `${selectedTool.label} tool window` : "")}
+          {entries.map((entry, index) => {
+            const selected = index === selectedIndex;
+            return (
+              <div
+                key={entry.key}
+                role="option"
+                aria-selected={selected}
+                data-switcher-index={index}
+                data-switcher-selected={selected ? "true" : undefined}
+                data-testid={`workspace-tab-switcher-item-${entry.key}`}
+                className={`flex items-center gap-2 px-3 py-1 ${
+                  selected
+                    ? "bg-[var(--taomni-accent)] text-white"
+                    : "text-[var(--taomni-code-text)]"
+                }`}
+                onMouseEnter={() => onHover(index)}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  onCommit(index);
+                }}
+              >
+                <File className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">
+                  {entry.pinned && <span className="mr-1" title="Pinned">📌</span>}
+                  {entry.title}
+                  {entry.dirty && <span className="ml-1">*</span>}
+                </span>
+              </div>
+            );
+          })}
+          {entries.length === 0 && (
+            <div className="px-3 py-1 text-[var(--taomni-code-muted)]">No open files</div>
+          )}
         </div>
       </div>
-    </div>
+      <div
+        data-testid="workspace-tab-switcher-path"
+        className="min-w-0 truncate border-t border-[var(--taomni-code-border)] px-3 py-1 text-ui-caption text-[var(--taomni-code-muted)]"
+        title={selectedEntry?.subtitle ?? selectedTool?.label ?? ""}
+      >
+        {selectedEntry?.subtitle ?? (selectedTool ? `${selectedTool.label} tool window` : "")}
+      </div>
+    </ModalSurface>
   );
 }
 

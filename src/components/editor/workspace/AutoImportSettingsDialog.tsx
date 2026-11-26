@@ -1,3 +1,4 @@
+import { ModalSurface } from "../../ui/ModalSurface";
 import { IconButton } from "../../ui/IconButton";
 import { memo, useEffect, useId, useState } from "react";
 import { Import, RotateCcw, Save, X } from "lucide-react";
@@ -57,168 +58,159 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
     setTimeout(() => setSavedNotice(false), 2000);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
-    }
-  };
-
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
-      onKeyDown={handleKeyDown}
+    <ModalSurface
       data-testid="auto-import-settings-dialog"
+      initialFocus="[data-testid=auto-import-on-the-fly-checkbox]"
+      onCancel={onClose}
+      aria-labelledby={titleId}
+      className="taomni-modal taomni-workspace-modal"
+      style={{ width: "min(512px, calc(100vw - 32px))" }}
     >
-      <div className="relative w-full max-w-lg rounded-xl border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-6 shadow-2xl text-[var(--taomni-code-text)] flex flex-col gap-4">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] pb-3">
-          <div className="flex items-center gap-2">
-            <Import className="w-5 h-5 text-[var(--taomni-accent)]" />
-            <h2 id={titleId} className="text-base font-semibold">
-              Auto Import Settings
-            </h2>
-          </div>
-          <IconButton
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
-            labelKey="closeEsc"
-            data-testid="auto-import-close-button"
-          >
-            <X className="w-4 h-4" />
-          </IconButton>
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] pb-3">
+        <div className="flex items-center gap-2">
+          <Import className="w-5 h-5 text-[var(--taomni-accent)]" />
+          <h2 id={titleId} className="text-base font-semibold">
+            Auto Import Settings
+          </h2>
         </div>
+        <IconButton
+          type="button"
+          onClick={onClose}
+          className="p-1 rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
+          labelKey="closeEsc"
+          data-testid="auto-import-close-button"
+        >
+          <X className="w-4 h-4" />
+        </IconButton>
+      </div>
 
-        {/* Form Controls */}
-        <div className="flex flex-col gap-4 text-xs">
-          {/* On-the-fly section */}
-          <div className="flex flex-col gap-2 rounded-lg border border-[var(--taomni-code-border)] p-3 bg-[var(--taomni-panel-bg)]">
-            <span className="font-semibold text-ui-body text-[var(--taomni-code-text)]">Java / On The Fly</span>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={settings.addUnambiguousImportsOnTheFly}
-                onChange={(e) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    addUnambiguousImportsOnTheFly: e.target.checked,
-                  }))
-                }
-                className="rounded border-[var(--taomni-code-border)] bg-[var(--taomni-input-bg)] text-[var(--taomni-accent)] focus:ring-0"
-                data-testid="auto-import-on-the-fly-checkbox"
-              />
-              <span>Add unambiguous imports on the fly</span>
-            </label>
-
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={settings.optimizeImportsOnTheFly}
-                onChange={(e) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    optimizeImportsOnTheFly: e.target.checked,
-                  }))
-                }
-                className="rounded border-[var(--taomni-code-border)] bg-[var(--taomni-input-bg)] text-[var(--taomni-accent)] focus:ring-0"
-                data-testid="auto-import-optimize-on-the-fly-checkbox"
-              />
-              <span>Optimize imports on the fly (for current project or module)</span>
-            </label>
-          </div>
-
-          {/* Paste section */}
-          <div className="flex flex-col gap-2 rounded-lg border border-[var(--taomni-code-border)] p-3 bg-[var(--taomni-panel-bg)]">
-            <span className="font-semibold text-ui-body text-[var(--taomni-code-text)]">Paste</span>
-            <div className="flex items-center justify-between gap-4">
-              <label htmlFor="auto-import-paste-mode" className="text-[var(--taomni-code-muted)]">
-                Insert imports on paste:
-              </label>
-              <select
-                id="auto-import-paste-mode"
-                value={settings.pasteImportMode}
-                onChange={(e) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    pasteImportMode: e.target.value as "all" | "ask" | "none",
-                  }))
-                }
-                className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-input-bg)] px-2 py-1 text-xs text-[var(--taomni-code-text)] focus:outline-hidden"
-                data-testid="auto-import-paste-mode-select"
-              >
-                <option value="all">All</option>
-                <option value="ask">Ask</option>
-                <option value="none">None</option>
-              </select>
-            </div>
-            <p className="text-ui-small text-[var(--taomni-code-muted)]">
-              {settings.pasteImportMode === "all"
-                ? "Unambiguous imports will be inserted automatically with the paste."
-                : settings.pasteImportMode === "ask"
-                ? "Prompt when candidates or unresolved symbols are detected in pasted code."
-                : "No imports will be inserted during paste."}
-            </p>
-          </div>
-
-          {/* Excluded packages section */}
-          <div className="flex flex-col gap-1.5">
-            <label className="font-semibold text-[var(--taomni-code-text)]">
-              Exclude from import and completion:
-            </label>
-            <textarea
-              rows={3}
-              value={excludedPackagesText}
-              onChange={(e) => setExcludedPackagesText(e.target.value)}
-              placeholder="e.g. com.sun.*, sun.*, jdk.internal.*"
-              className="w-full rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-input-bg)] p-2 font-mono text-xs text-[var(--taomni-code-text)] focus:outline-hidden focus:border-[var(--taomni-accent)] resize-none"
-              data-testid="auto-import-excluded-packages-input"
+      {/* Form Controls */}
+      <div className="flex flex-col gap-4 text-xs">
+        {/* On-the-fly section */}
+        <div className="flex flex-col gap-2 rounded-lg border border-[var(--taomni-code-border)] p-3 bg-[var(--taomni-panel-bg)]">
+          <span className="font-semibold text-ui-body text-[var(--taomni-code-text)]">Java / On The Fly</span>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={settings.addUnambiguousImportsOnTheFly}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  addUnambiguousImportsOnTheFly: e.target.checked,
+                }))
+              }
+              className="rounded border-[var(--taomni-code-border)] bg-[var(--taomni-input-bg)] text-[var(--taomni-accent)] focus:ring-0"
+              data-testid="auto-import-on-the-fly-checkbox"
             />
-            <span className="text-ui-small text-[var(--taomni-code-muted)]">
-              Packages matching wildcards (e.g. <code>sun.*</code>) will never be auto-imported.
-            </span>
-          </div>
+            <span>Add unambiguous imports on the fly</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={settings.optimizeImportsOnTheFly}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  optimizeImportsOnTheFly: e.target.checked,
+                }))
+              }
+              className="rounded border-[var(--taomni-code-border)] bg-[var(--taomni-input-bg)] text-[var(--taomni-accent)] focus:ring-0"
+              data-testid="auto-import-optimize-on-the-fly-checkbox"
+            />
+            <span>Optimize imports on the fly (for current project or module)</span>
+          </label>
         </div>
 
-        {/* Footer actions */}
-        <div className="flex items-center justify-between pt-2 border-t border-[var(--taomni-code-border)]">
-          <button
-            type="button"
-            onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)] hover:bg-[var(--taomni-hover)] rounded transition-colors"
-            data-testid="auto-import-reset-button"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset Defaults
-          </button>
-
-          <div className="flex items-center gap-2">
-            {savedNotice && (
-              <span className="text-xs text-ui-success">Settings saved!</span>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 text-xs border border-[var(--taomni-code-border)] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-hover)] rounded transition-colors"
+        {/* Paste section */}
+        <div className="flex flex-col gap-2 rounded-lg border border-[var(--taomni-code-border)] p-3 bg-[var(--taomni-panel-bg)]">
+          <span className="font-semibold text-ui-body text-[var(--taomni-code-text)]">Paste</span>
+          <div className="flex items-center justify-between gap-4">
+            <label htmlFor="auto-import-paste-mode" className="text-[var(--taomni-code-muted)]">
+              Insert imports on paste:
+            </label>
+            <select
+              id="auto-import-paste-mode"
+              value={settings.pasteImportMode}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  pasteImportMode: e.target.value as "all" | "ask" | "none",
+                }))
+              }
+              className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-input-bg)] px-2 py-1 text-xs text-[var(--taomni-code-text)] focus:outline-hidden"
+              data-testid="auto-import-paste-mode-select"
             >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              data-primary="true"
-              className="taomni-btn flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors"
-              data-testid="auto-import-save-button"
-            >
-              <Save className="w-3.5 h-3.5" />
-              Save
-            </button>
+              <option value="all">All</option>
+              <option value="ask">Ask</option>
+              <option value="none">None</option>
+            </select>
           </div>
+          <p className="text-ui-small text-[var(--taomni-code-muted)]">
+            {settings.pasteImportMode === "all"
+              ? "Unambiguous imports will be inserted automatically with the paste."
+              : settings.pasteImportMode === "ask"
+              ? "Prompt when candidates or unresolved symbols are detected in pasted code."
+              : "No imports will be inserted during paste."}
+          </p>
+        </div>
+
+        {/* Excluded packages section */}
+        <div className="flex flex-col gap-1.5">
+          <label className="font-semibold text-[var(--taomni-code-text)]">
+            Exclude from import and completion:
+          </label>
+          <textarea
+            rows={3}
+            value={excludedPackagesText}
+            onChange={(e) => setExcludedPackagesText(e.target.value)}
+            placeholder="e.g. com.sun.*, sun.*, jdk.internal.*"
+            className="w-full rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-input-bg)] p-2 font-mono text-xs text-[var(--taomni-code-text)] focus:outline-hidden focus:border-[var(--taomni-accent)] resize-none"
+            data-testid="auto-import-excluded-packages-input"
+          />
+          <span className="text-ui-small text-[var(--taomni-code-muted)]">
+            Packages matching wildcards (e.g. <code>sun.*</code>) will never be auto-imported.
+          </span>
         </div>
       </div>
-    </div>
+
+      {/* Footer actions */}
+      <div className="flex items-center justify-between pt-2 border-t border-[var(--taomni-code-border)]">
+        <button
+          type="button"
+          onClick={handleReset}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)] hover:bg-[var(--taomni-hover)] rounded transition-colors"
+          data-testid="auto-import-reset-button"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          Reset Defaults
+        </button>
+
+        <div className="flex items-center gap-2">
+          {savedNotice && (
+            <span className="text-xs text-ui-success">Settings saved!</span>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-xs border border-[var(--taomni-code-border)] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-hover)] rounded transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            data-primary="true"
+            className="taomni-btn flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors"
+            data-testid="auto-import-save-button"
+          >
+            <Save className="w-3.5 h-3.5" />
+            Save
+          </button>
+        </div>
+      </div>
+    </ModalSurface>
   );
 }, (previous, next) => !previous.open && !next.open);

@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { useT } from "../../../lib/i18n";
+import { Modal } from "../../ui/Modal";
 import type { LspShowMessageRequest } from "../../../lib/editor/lsp";
 
 interface LspMessageRequestDialogProps {
@@ -7,94 +7,28 @@ interface LspMessageRequestDialogProps {
   onSelect: (actionIndex: number | null) => void;
 }
 
-function messageTone(messageType: number): { border: string; label: string } {
-  if (messageType === 1) return { border: "#b22222", label: "Language server error" };
-  if (messageType === 2) return { border: "#b7791f", label: "Language server warning" };
-  return { border: "var(--taomni-accent)", label: "Language server message" };
-}
-
-/** Modal for an LSP window/showMessageRequest. Actions are server-provided and
- * may be more than the usual two-button shape, so keep the list data-driven. */
-export function LspMessageRequestDialog({
-  request,
-  onSelect,
-}: LspMessageRequestDialogProps) {
-  const firstActionRef = useRef<HTMLButtonElement>(null);
-  const tone = messageTone(request.messageType);
-
-  useEffect(() => {
-    firstActionRef.current?.focus();
-  }, [request.requestId]);
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      onSelect(null);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
-      onClick={() => onSelect(null)}
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={tone.label}
-        data-testid="lsp-message-request-dialog"
-        className="w-[min(560px,calc(100vw-32px))] max-h-[min(80vh,520px)] overflow-auto rounded shadow-xl p-4"
-        style={{
-          background: "var(--taomni-bg)",
-          border: `1px solid ${tone.border}`,
-        }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start gap-2 mb-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold truncate">{request.serverLabel}</div>
-            <div
-              data-testid="lsp-message-request-message"
-              className="mt-2 text-ui-body whitespace-pre-wrap break-words"
-              style={{ color: "var(--taomni-text)" }}
-            >
-              {request.message}
-            </div>
-          </div>
-          <button
-            type="button"
-            aria-label="Dismiss language server message"
-            title="Dismiss"
-            className="shrink-0 rounded p-1 hover:bg-[var(--taomni-hover)]"
-            onClick={() => onSelect(null)}
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          {request.actions.map((action, index) => (
-            <button
-              key={`${request.requestId}-${index}`}
-              ref={index === 0 ? firstActionRef : undefined}
-              type="button"
-              className="max-w-full rounded px-3 py-1.5 text-ui-body font-medium whitespace-normal break-words hover:brightness-110"
-              style={{ background: "var(--taomni-accent)", color: "white" }}
-              onClick={() => onSelect(index)}
-            >
-              {action.title}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="rounded px-3 py-1.5 text-ui-body hover:bg-[var(--taomni-hover)]"
-            style={{ border: "1px solid var(--taomni-divider)" }}
-            onClick={() => onSelect(null)}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+/** Server-provided actions retain their order and their original indices. */
+export function LspMessageRequestDialog({ request, onSelect }: LspMessageRequestDialogProps) {
+  const t = useT();
+  const initialFocus = request.actions.length ? "[data-lsp-message-first-action]" : "[data-lsp-message-cancel]";
+  const title = request.messageType === 1 ? t("workspaceLsp.messageError")
+    : request.messageType === 2 ? t("workspaceLsp.messageWarning") : t("workspaceLsp.messageTitle");
+  return <Modal key={request.requestId} title={title} testId="lsp-message-request-dialog"
+    closeLabel={t("workspaceLsp.dismissMessage")}
+    initialFocus={initialFocus} tone={request.messageType === 1 ? "error" : undefined}
+    onCancel={() => onSelect(null)} footer={<>
+      <button type="button" data-lsp-message-cancel className="taomni-btn" onClick={() => onSelect(null)}>
+        {t("common.cancel")}
+      </button>
+      {request.actions.map((action, index) => (
+        <button key={index} type="button" data-lsp-message-first-action={index === 0 ? "" : undefined}
+          className="taomni-btn max-w-full whitespace-normal break-words" data-primary={index === 0}
+          onClick={() => onSelect(index)}>
+          {action.title}
+        </button>
+      ))}
+    </>}>
+    <p className="font-semibold">{request.serverLabel}</p>
+    <p data-testid="lsp-message-request-message" className="mt-2">{request.message}</p>
+  </Modal>;
 }

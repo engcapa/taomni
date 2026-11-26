@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { ModalSurface } from "../../ui/ModalSurface";
+import { useState } from "react";
 import { ArrowLeftRight, Check, Copy, X } from "lucide-react";
 import { writeText } from "../../../lib/clipboard";
 import type { CompareDocumentDescriptor, EditorCompareSession } from "./editorCompareModel";
@@ -42,12 +43,6 @@ function lineRows(leftText: string, rightText: string): Array<{
             : "changed",
     };
   });
-}
-
-function focusableElements(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(
-    "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
-  ));
 }
 
 function CompareSide({
@@ -134,7 +129,6 @@ export function EditorCompareDialog({
   onClose,
   onApplyRight,
 }: EditorCompareDialogProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const [copyStatus, setCopyStatus] = useState<Record<"left" | "right", string | null>>({
     left: null,
     right: null,
@@ -146,41 +140,6 @@ export function EditorCompareDialog({
     && !session.left.unavailable
     && !session.right.unavailable
     && !session.right.readOnly;
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const initial = dialog.querySelector<HTMLElement>("[data-compare-autofocus='true']")
-      ?? focusableElements(dialog)[0];
-    initial?.focus();
-  }, [session.id]);
-
-  useEffect(() => {
-    const handleEscape = (event: WindowEventMap["keydown"]) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      onClose();
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
-
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Tab") return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusable = focusableElements(dialog);
-    if (focusable.length === 0) {
-      event.preventDefault();
-      return;
-    }
-    const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
-    const nextIndex = event.shiftKey
-      ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1)
-      : (currentIndex + 1) % focusable.length;
-    event.preventDefault();
-    focusable[nextIndex]?.focus();
-  };
 
   const copySide = async (side: "left" | "right") => {
     const document = side === "left" ? session.left : session.right;
@@ -209,15 +168,14 @@ export function EditorCompareDialog({
   };
 
   return (
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
+    <ModalSurface
+      key={session.id}
+      initialFocus={canApply ? '[data-testid="compare-apply-left-to-right"]' : '[data-testid="compare-dialog-close"]'}
+      onCancel={() => { if (!applying) onClose(); }}
       aria-label={session.title}
-      tabIndex={-1}
       data-testid="code-workspace-compare-dialog"
-      onKeyDown={handleKeyDown}
-      className="fixed inset-0 z-[var(--taomni-z-modal)] flex min-h-0 flex-col bg-[var(--taomni-code-bg)]/95 p-4 text-[var(--taomni-code-text)] backdrop-blur-sm"
+      className="taomni-modal taomni-workspace-modal min-h-0"
+      style={{ width: "calc(100vw - 32px)", height: "calc(100vh - 32px)" }}
     >
       <div className="flex min-w-0 shrink-0 items-start justify-between gap-3 border-b border-[var(--taomni-code-border)] pb-3">
         <div className="min-w-0">
@@ -276,6 +234,6 @@ export function EditorCompareDialog({
           copyStatus={copyStatus.right}
         />
       </div>
-    </div>
+    </ModalSurface>
   );
 }

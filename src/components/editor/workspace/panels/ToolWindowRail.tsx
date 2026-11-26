@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
-import { createPortal } from "react-dom";
+import { AnchoredMenu } from "../../../ui/AnchoredMenu";
 import { MoreHorizontal } from "../icons";
 import { ContextMenu, type MenuItem } from "../../../ContextMenu";
 import { useLatestHandlers } from "../useLatestHandlers";
@@ -337,29 +337,6 @@ export function MoreToolWindowsButton({
 }) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target) || buttonRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      setOpen(false);
-      buttonRef.current?.focus();
-    };
-    document.addEventListener("mousedown", onPointer);
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [open]);
-  const rect = open ? buttonRef.current?.getBoundingClientRect() : null;
   return (
     <div className="relative">
       <button
@@ -371,38 +348,19 @@ export function MoreToolWindowsButton({
         aria-expanded={open}
         title="More tool windows"
         className={toolWindowRailButtonClass}
-        onClick={() => setOpen((value) => !value)}
+        onClick={(event) => {
+          event.currentTarget.focus({ preventScroll: true });
+          setOpen((value) => !value);
+        }}
       >
         <MoreHorizontal className="h-[16px] w-[16px]" />
       </button>
-      {open && rect && createPortal(
-        <div
-          ref={menuRef}
-          role="menu"
-          aria-label="More tool windows"
-          data-testid="code-workspace-bottom-tab-overflow-menu"
-          style={{ position: "fixed", left: rect.right + 4, bottom: Math.max(8, window.innerHeight - rect.bottom) }}
-          className="z-[var(--taomni-z-popover)] min-w-48 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 shadow-lg"
-        >
-          {tools.map((tool) => (
-            <button
-              key={tool.id}
-              type="button"
-              role="menuitem"
-              data-testid={`code-workspace-bottom-tab-overflow-${tool.id}`}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
-              onClick={() => {
-                setOpen(false);
-                onPick(tool.id);
-              }}
-            >
-              <span className="shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5">{tool.icon}</span>
-              <span className="flex-1 truncate text-left">{tool.label}</span>
-            </button>
-          ))}
-        </div>,
-        document.body,
-      )}
+      {open && <AnchoredMenu anchor={buttonRef} side="right"
+        testId="code-workspace-bottom-tab-overflow-menu" ariaLabel="More tool windows"
+        onClose={() => setOpen(false)} items={tools.map((tool) => ({
+          label: tool.label, testId: `code-workspace-bottom-tab-overflow-${tool.id}`,
+          icon: tool.icon, onClick: () => onPick(tool.id),
+        }))} />}
     </div>
   );
 }

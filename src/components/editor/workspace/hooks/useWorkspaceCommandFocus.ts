@@ -28,6 +28,9 @@ export function useWorkspaceCommandFocus(context: UseWorkspaceCommandFocusContex
     // In that case the focused popup still owns the key.
     const node = target === window || target === document ? document.activeElement : target;
     const element = node instanceof Element ? node : null;
+    const dialog = element?.closest('dialog[open][aria-modal="true"]');
+    // The held-modifier Switcher keys still belong to the workspace router.
+    if (dialog && dialog.getAttribute("data-testid") !== "workspace-tab-switcher") return true;
     return Boolean(element?.closest?.(
       '[data-testid="code-workspace-editor-search"], [data-testid="markdown-preview-search"], [data-testid="code-workspace-breadcrumbs"], [data-testid="code-workspace-highlighting-widget"], [data-testid="code-workspace-todos-panel"], [data-taomni-context-menu], [data-testid="code-workspace-search-everywhere"]'
       // ED-PARITY-004 S7/A3.5: the Keymap settings + Cheat Sheet surfaces own

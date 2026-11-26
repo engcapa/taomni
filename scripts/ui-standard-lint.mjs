@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -125,27 +125,20 @@ function run() {
     for (const token of unresolvedTokens(path, source, scopes)) missingTokens.push(`${path} L03: ${token}`);
     if (Object.keys(counts).length) observed[path] = counts;
   }
-  const initial = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, "utf8")) : {};
-  const violations = [...missingTokens, ...increases(observed, initial)];
+  const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
+  const violations = [...missingTokens, ...increases(observed, {})];
+  if (Object.keys(baseline).length > 0) violations.push("The desktop UI lint baseline must stay empty.");
   const baseIndex = process.argv.indexOf("--base");
   if (baseIndex !== -1) {
     const base = process.argv[baseIndex + 1];
     if (!base || base.startsWith("-")) throw new Error("--base requires a commit");
     violations.push(...sourceIncreases(base, observed));
   }
-  if (process.argv.includes("--reduce") && (!violations.length || !existsSync(baselinePath))) {
-    const lines = Object.entries(observed).map(([path, counts]) => `  ${JSON.stringify(path)}: ${JSON.stringify(counts)}`);
-    writeFileSync(baselinePath, "{\n" + lines.join(",\n") + "\n}\n");
-    return;
-  }
   if (violations.length) {
     console.error(violations.join("\n"));
     process.exitCode = 1;
-  } else if (increases(initial, observed).length) {
-    console.error("Reduce the repaired per-file UI debt with node scripts/ui-standard-lint.mjs --reduce.");
-    process.exitCode = 1;
   } else {
-    console.log(`Desktop UI lint passed. ${Object.keys(observed).length} files retain recorded findings.`);
+    console.log("Desktop UI lint passed with an empty exception baseline.");
   }
 }
 

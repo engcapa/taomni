@@ -193,6 +193,12 @@ export const zhCN: DeepPartial<typeof en> = {
     copyDetails: "复制错误详情",
     copyFailed: "无法复制详情。请选择错误信息并手动复制。{detail}",
   },
+  workspaceLsp: {
+    dismissMessage: "关闭语言服务器消息",
+    messageTitle: "语言服务器消息",
+    messageWarning: "语言服务器警告",
+    messageError: "语言服务器错误",
+  },
   workspaceUndo: {
     title: "撤销",
     question: "撤销“{edit}”？",

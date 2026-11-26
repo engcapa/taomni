@@ -1,3 +1,4 @@
+import { ModalSurface } from "../../ui/ModalSurface";
 import { useState, useMemo, useEffect } from "react";
 import { Clock, Search, X, Code2, Edit3 } from "lucide-react";
 import {
@@ -66,10 +67,8 @@ export function RecentLocationsDialog({
   if (!open) return null;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
-    } else if (e.key === "ArrowDown") {
+    if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelectedIndex((idx) => (idx + 1) % Math.max(1, locations.length));
     } else if (e.key === "ArrowUp") {
@@ -104,156 +103,157 @@ export function RecentLocationsDialog({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="recent-locations-title"
+    <ModalSurface
       data-testid="recent-locations-dialog"
+      initialFocus="[data-testid=recent-locations-search-input]"
+      onCancel={onClose}
+      dismissOnBackdrop
       onKeyDown={handleKeyDown}
-      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
+      aria-labelledby="recent-locations-title"
+      className="taomni-modal taomni-workspace-modal"
+      data-bleed="true"
+      style={{ width: "min(720px, calc(100vw - 32px))" }}
     >
-      <div className="flex h-[75vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-text)]">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-ui-info" />
-            <div>
-              <h2 id="recent-locations-title" className="text-ui-title font-semibold">
-                Recent Locations
-              </h2>
-              <p className="text-ui-small text-[var(--taomni-code-muted)] mt-0.5">
-                Navigate to recently visited and edited code positions with context preview
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              data-testid="recent-locations-toggle-changed"
-              onClick={() => setChangedOnly((v) => !v)}
-              className={`flex items-center gap-1 rounded px-2.5 py-1 text-ui-small font-medium border transition-colors ${
-                changedOnly
-                  ? "bg-ui-info-surface text-ui-info border-ui-info-border font-semibold"
-                  : "border-[var(--taomni-code-border)] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
-              }`}
-            >
-              <Edit3 className="h-3.5 w-3.5" />
-              <span>Show Edited Only</span>
-            </button>
-            <button
-              type="button"
-              data-testid="recent-locations-close"
-              onClick={onClose}
-              aria-label="Close"
-              className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
-            >
-              <X className="h-4 w-4" />
-            </button>
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Clock className="h-5 w-5 text-ui-info" />
+          <div>
+            <h2 id="recent-locations-title" className="text-ui-title font-semibold">
+              Recent Locations
+            </h2>
+            <p className="text-ui-small text-[var(--taomni-code-muted)] mt-0.5">
+              Navigate to recently visited and edited code positions with context preview
+            </p>
           </div>
         </div>
-
-        {/* Search */}
-        <div className="border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/30 px-4 py-2">
-          <div className="relative flex items-center">
-            <Search className="absolute left-2.5 h-4 w-4 text-[var(--taomni-code-muted)]" />
-            <input
-              type="text"
-              autoFocus
-              data-testid="recent-locations-search-input"
-              placeholder="Search in recent locations and code snippets..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-9 pr-3 text-ui-body text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-[var(--taomni-focus-ring)]"
-            />
-          </div>
-        </div>
-
-        {/* List of locations with code preview */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
-          {locations.length === 0 ? (
-            <div className="p-12 text-center text-[var(--taomni-code-muted)]">
-              No recent locations recorded yet.
-            </div>
-          ) : (
-            locations.map((loc, idx) => {
-              const isSelected = idx === selectedIndex;
-              return (
-                <div
-                  key={loc.id}
-                  data-testid={`recent-location-item-${loc.id}`}
-                  onClick={() => {
-                    onSelectLocation(loc);
-                    onClose();
-                  }}
-                  onMouseEnter={() => setSelectedIndex(idx)}
-                  className={`cursor-pointer rounded-lg border p-3 transition-colors ${
-                    isSelected
-                      ? "border-ui-info-border bg-ui-info-surface shadow-sm"
-                      : "border-[var(--taomni-code-border)]/60 bg-[var(--taomni-code-active-line-bg)]/20 hover:border-ui-info-border"
-                  }`}
-                >
-                  <div className="flex items-center justify-between pb-1.5 border-b border-[var(--taomni-code-border)]/40 mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Code2 className="h-4 w-4 text-ui-info shrink-0" />
-                      <span className="font-medium text-ui-body text-[var(--taomni-code-text)]">
-                        {loc.title}
-                      </span>
-                      <span className="font-mono text-ui-small text-[var(--taomni-code-muted)]">
-                        :{loc.line + 1}
-                      </span>
-                      {loc.symbolName && (
-                        <span className="rounded bg-ui-info-surface text-ui-info px-1.5 py-0.2 text-ui-caption font-mono">
-                          {loc.symbolName}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {loc.state === "relocated" && (
-                        <span className="rounded bg-ui-info-surface text-ui-info px-1.5 py-0.2 text-ui-caption font-medium border border-ui-info-border" title="File moved or renamed">
-                          Relocated
-                        </span>
-                      )}
-                      {loc.state === "stale" && (
-                        <span className="rounded bg-ui-warning-surface text-ui-warning px-1.5 py-0.2 text-ui-caption font-medium border border-ui-warning-border" title={loc.staleReason ?? "Content modified externally"}>
-                          Stale
-                        </span>
-                      )}
-                      {loc.state === "missing" && (
-                        <span className="rounded bg-ui-danger-surface text-ui-danger px-1.5 py-0.2 text-ui-caption font-medium border border-ui-danger-border" title="File no longer exists on disk">
-                          Missing
-                        </span>
-                      )}
-                      {loc.isEditLocation && (
-                        <span className="rounded bg-ui-warning-surface text-ui-warning px-1.5 py-0.2 text-ui-caption font-medium border border-ui-warning-border">
-                          Edited
-                        </span>
-                      )}
-                      <span className="text-ui-caption text-[var(--taomni-code-muted)] truncate max-w-[200px]">
-                        {loc.filePath}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Code snippet preview */}
-                  <div className="rounded bg-[var(--taomni-code-bg)] p-2 border border-[var(--taomni-code-border)]/40 font-mono text-ui-small text-[var(--taomni-code-text)] whitespace-pre overflow-x-auto leading-relaxed">
-                    {loc.contextSnippet || loc.lineText}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/20 px-4 py-2 text-ui-small text-[var(--taomni-code-muted)]">
-          <div className="flex items-center gap-3">
-            <span>↑↓ Navigate</span>
-            <span>↵ Select</span>
-            <span>Esc Close</span>
-          </div>
-          <span>{locations.length} locations available</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-testid="recent-locations-toggle-changed"
+            onClick={() => setChangedOnly((v) => !v)}
+            className={`flex items-center gap-1 rounded px-2.5 py-1 text-ui-small font-medium border transition-colors ${
+              changedOnly
+                ? "bg-ui-info-surface text-ui-info border-ui-info-border font-semibold"
+                : "border-[var(--taomni-code-border)] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            }`}
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            <span>Show Edited Only</span>
+          </button>
+          <button
+            type="button"
+            data-testid="recent-locations-close"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       </div>
-    </div>
+
+      {/* Search */}
+      <div className="border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/30 px-4 py-2">
+        <div className="relative flex items-center">
+          <Search className="absolute left-2.5 h-4 w-4 text-[var(--taomni-code-muted)]" />
+          <input
+            type="text"
+
+            data-testid="recent-locations-search-input"
+            placeholder="Search in recent locations and code snippets..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-9 pr-3 text-ui-body text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-[var(--taomni-focus-ring)]"
+          />
+        </div>
+      </div>
+
+      {/* List of locations with code preview */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+        {locations.length === 0 ? (
+          <div className="p-12 text-center text-[var(--taomni-code-muted)]">
+            No recent locations recorded yet.
+          </div>
+        ) : (
+          locations.map((loc, idx) => {
+            const isSelected = idx === selectedIndex;
+            return (
+              <div
+                key={loc.id}
+                data-testid={`recent-location-item-${loc.id}`}
+                onClick={() => {
+                  onSelectLocation(loc);
+                  onClose();
+                }}
+                onMouseEnter={() => setSelectedIndex(idx)}
+                className={`cursor-pointer rounded-lg border p-3 transition-colors ${
+                  isSelected
+                    ? "border-ui-info-border bg-ui-info-surface shadow-sm"
+                    : "border-[var(--taomni-code-border)]/60 bg-[var(--taomni-code-active-line-bg)]/20 hover:border-ui-info-border"
+                }`}
+              >
+                <div className="flex items-center justify-between pb-1.5 border-b border-[var(--taomni-code-border)]/40 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Code2 className="h-4 w-4 text-ui-info shrink-0" />
+                    <span className="font-medium text-ui-body text-[var(--taomni-code-text)]">
+                      {loc.title}
+                    </span>
+                    <span className="font-mono text-ui-small text-[var(--taomni-code-muted)]">
+                      :{loc.line + 1}
+                    </span>
+                    {loc.symbolName && (
+                      <span className="rounded bg-ui-info-surface text-ui-info px-1.5 py-0.2 text-ui-caption font-mono">
+                        {loc.symbolName}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {loc.state === "relocated" && (
+                      <span className="rounded bg-ui-info-surface text-ui-info px-1.5 py-0.2 text-ui-caption font-medium border border-ui-info-border" title="File moved or renamed">
+                        Relocated
+                      </span>
+                    )}
+                    {loc.state === "stale" && (
+                      <span className="rounded bg-ui-warning-surface text-ui-warning px-1.5 py-0.2 text-ui-caption font-medium border border-ui-warning-border" title={loc.staleReason ?? "Content modified externally"}>
+                        Stale
+                      </span>
+                    )}
+                    {loc.state === "missing" && (
+                      <span className="rounded bg-ui-danger-surface text-ui-danger px-1.5 py-0.2 text-ui-caption font-medium border border-ui-danger-border" title="File no longer exists on disk">
+                        Missing
+                      </span>
+                    )}
+                    {loc.isEditLocation && (
+                      <span className="rounded bg-ui-warning-surface text-ui-warning px-1.5 py-0.2 text-ui-caption font-medium border border-ui-warning-border">
+                        Edited
+                      </span>
+                    )}
+                    <span className="text-ui-caption text-[var(--taomni-code-muted)] truncate max-w-[200px]">
+                      {loc.filePath}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Code snippet preview */}
+                <div className="rounded bg-[var(--taomni-code-bg)] p-2 border border-[var(--taomni-code-border)]/40 font-mono text-ui-small text-[var(--taomni-code-text)] whitespace-pre overflow-x-auto leading-relaxed">
+                  {loc.contextSnippet || loc.lineText}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/20 px-4 py-2 text-ui-small text-[var(--taomni-code-muted)]">
+        <div className="flex items-center gap-3">
+          <span>↑↓ Navigate</span>
+          <span>↵ Select</span>
+          <span>Esc Close</span>
+        </div>
+        <span>{locations.length} locations available</span>
+      </div>
+    </ModalSurface>
   );
 }

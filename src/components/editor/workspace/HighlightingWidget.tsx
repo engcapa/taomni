@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { AnchoredMenu } from "../../ui/AnchoredMenu";
+import { useId, useRef, useState } from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -47,7 +48,6 @@ export function HighlightingWidget({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = `highlighting-widget-menu-${useId().replace(/:/g, "")}`;
   const levelButtonRef = useRef<HTMLButtonElement | null>(null);
-  const optionRefs = useRef<Partial<Record<HighlightingLevel, HTMLButtonElement | null>>>({});
   const levels: HighlightingLevel[] = ["all", "syntax", "none"];
 
   const errors = diagnostics.filter((item) => item.severity === 1).length;
@@ -65,20 +65,10 @@ export function HighlightingWidget({
           ? `${errors} error(s), ${warnings} warning(s)`
           : "No problems found";
 
-  useEffect(() => {
-    if (menuOpen) optionRefs.current[level]?.focus();
-  }, [level, menuOpen]);
-
   const selectLevel = (next: HighlightingLevel) => {
     onChangeLevel(next);
     setMenuOpen(false);
     onRestoreEditorFocus?.();
-  };
-
-  const moveLevelFocus = (current: HighlightingLevel, offset: number) => {
-    const index = levels.indexOf(current);
-    const next = levels[(index + offset + levels.length) % levels.length];
-    optionRefs.current[next]?.focus();
   };
 
   return (
@@ -160,7 +150,10 @@ export function HighlightingWidget({
         aria-expanded={menuOpen}
         aria-controls={menuId}
         data-testid="highlighting-widget-level-button"
-        onClick={() => setMenuOpen((open) => !open)}
+        onClick={(event) => {
+          event.currentTarget.focus({ preventScroll: true });
+          setMenuOpen((open) => !open);
+        }}
         onKeyDown={(event) => {
           if (event.key === "Escape" && menuOpen) {
             event.preventDefault();
@@ -178,90 +171,26 @@ export function HighlightingWidget({
         <span>{levelLabel}</span>
       </button>
 
-      {/* Dropdown menu */}
       {menuOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-[var(--taomni-z-popover)]"
-            onClick={() => setMenuOpen(false)}
-          />
-          <div
-            id={menuId}
-            role="menu"
-            aria-label="Highlighting level options"
-            data-testid="highlighting-widget-menu"
-            className="absolute right-0 top-full z-[var(--taomni-z-popover)] mt-1 min-w-[200px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-1.5 shadow-lg text-ui-small"
-          >
-            <div className="px-2 py-1 font-semibold text-[var(--taomni-code-muted)] uppercase tracking-wider text-ui-caption">
-              Highlighting Level
-            </div>
-            {levels.map((lvl) => (
-              <button
-                key={lvl}
-                type="button"
-                role="menuitemradio"
-                aria-checked={level === lvl}
-                data-testid={`highlighting-level-option-${lvl}`}
-                ref={(element) => { optionRefs.current[lvl] = element; }}
-                onClick={() => selectLevel(lvl)}
-                onKeyDown={(event) => {
-                  if (event.key === "ArrowDown") {
-                    event.preventDefault();
-                    moveLevelFocus(lvl, 1);
-                  } else if (event.key === "ArrowUp") {
-                    event.preventDefault();
-                    moveLevelFocus(lvl, -1);
-                  } else if (event.key === "Home") {
-                    event.preventDefault();
-                    optionRefs.current[levels[0]]?.focus();
-                  } else if (event.key === "End") {
-                    event.preventDefault();
-                    optionRefs.current[levels[levels.length - 1]]?.focus();
-                  } else if (event.key === "Escape") {
-                    event.preventDefault();
-                    setMenuOpen(false);
-                    levelButtonRef.current?.focus();
-                  } else if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    selectLevel(lvl);
-                  }
-                }}
-                className={`flex w-full items-center justify-between rounded px-2 py-1 text-left ${
-                  level === lvl
-                    ? "bg-[var(--taomni-selected)] text-[var(--taomni-accent)] font-semibold"
-                    : "hover:bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-text)]"
-                }`}
-              >
-                <span>{lvl === "all" ? "All Problems" : lvl === "syntax" ? "Syntax" : "None"}</span>
-                {level === lvl && <CheckCircle2 className="h-3 w-3 text-[var(--taomni-accent)]" />}
-              </button>
-            ))}
-
-            <div className="my-1 border-t border-[var(--taomni-code-border)]" />
-
-            <div className="px-2 py-1 text-ui-caption text-[var(--taomni-code-muted)]">
-              <span className="block font-medium text-[var(--taomni-code-text)]">
-                <span data-testid="highlighting-widget-provider">Scope: {providerLabel}</span>
-              </span>
-              <span data-testid="highlighting-widget-diagnostic-status">{diagnosticsStatus}</span>
-            </div>
-
-            {onOpenSettings && (
-              <button
-                type="button"
-                data-testid="highlighting-widget-open-settings"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onOpenSettings();
-                }}
-                className="mt-1 flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
-              >
-                <Settings className="h-3 w-3" />
-                <span>Configure Inspections…</span>
-              </button>
-            )}
-          </div>
-        </>
+        <AnchoredMenu anchor={levelButtonRef} id={menuId}
+          testId="highlighting-widget-menu" ariaLabel="Highlighting level options"
+          rovingFocus onClose={() => setMenuOpen(false)} items={[
+            { label: "Highlighting Level", sectionHeader: true },
+            ...levels.map((value) => ({
+              label: value === "all" ? "All Problems" : value === "syntax" ? "Syntax" : "None",
+              testId: `highlighting-level-option-${value}`,
+              role: "menuitemradio" as const,
+              checked: level === value,
+              onClick: () => selectLevel(value),
+            })),
+            { label: "", separator: true },
+            { label: `Scope: ${providerLabel}`, testId: "highlighting-widget-provider", sectionHeader: true },
+            { label: diagnosticsStatus, testId: "highlighting-widget-diagnostic-status", sectionHeader: true },
+            ...(onOpenSettings ? [{
+              label: "Configure Inspections…", icon: <Settings className="h-3.5 w-3.5" />,
+              testId: "highlighting-widget-open-settings", onClick: onOpenSettings,
+            }] : []),
+          ]} />
       )}
     </div>
   );

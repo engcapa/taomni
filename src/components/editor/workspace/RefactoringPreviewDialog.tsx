@@ -1,3 +1,4 @@
+import { ModalSurface } from "../../ui/ModalSurface";
 import { useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -146,295 +147,295 @@ export function RefactoringPreviewDialog({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="refactoring-preview-dialog-title"
+    <ModalSurface
       data-testid="refactoring-preview-dialog"
-      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
+      initialFocus="[data-testid=refactoring-preview-cancel]"
+      onCancel={onCancel}
+      aria-labelledby="refactoring-preview-dialog-title"
+      className="taomni-modal taomni-workspace-modal"
+      data-bleed="true"
+      style={{ width: "min(768px, calc(100vw - 32px))", height: "80vh" }}
     >
-      <div className="flex h-[80vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-text)]">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 id="refactoring-preview-dialog-title" className="text-ui-title font-semibold">
-                {title}
-              </h2>
-              {plan && (() => {
-                const compVal: string = typeof plan.completeness === "object" && plan.completeness !== null
-                  ? (plan.completeness as any).value
-                  : String(plan.completeness);
-                const isComplete = compVal === "complete" || compVal === "provider-complete";
-                const isPartial = compVal === "partial" || compVal === "provider-partial";
-                const source = typeof plan.completeness === "object" && plan.completeness !== null ? plan.completeness.source : null;
-
-                return (
-                  <span
-                    data-testid="refactoring-preview-completeness"
-                    title={source ? `Completeness source: ${source}` : undefined}
-                    className={`rounded px-1.5 py-0.5 text-ui-caption font-medium ${
-                      isComplete
-                        ? "bg-ui-success-surface text-ui-success border border-ui-success-border"
-                        : isPartial
-                        ? "bg-ui-warning-surface text-ui-warning border border-ui-warning-border"
-                        : "bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-muted)] border border-[var(--taomni-code-border)]"
-                    }`}
-                  >
-                    {isComplete
-                      ? "Provider Complete"
-                      : isPartial
-                      ? "Provider Partial"
-                      : "Completeness Unknown"}
-                  </span>
-                );
-              })()}
-            </div>
-            <p className="text-ui-small text-[var(--taomni-code-muted)] mt-0.5">
-              {preview.affectedFileCount} file(s) affected · {includedCount} of {totalUsages} change(s) selected
-              {preview.resourceOperationCount > 0 && ` · ${preview.resourceOperationCount} resource operation(s)`}
-            </p>
-          </div>
-          <button
-            type="button"
-            data-testid="refactoring-preview-close"
-            onClick={onCancel}
-            aria-label="Close"
-            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Conflicts Banner */}
-        {errorConflicts.length > 0 && (
-          <div
-            data-testid="refactoring-preview-error-conflicts"
-            className="mx-4 mt-2 flex items-start gap-2 rounded border border-ui-danger-border bg-ui-danger-surface px-3 py-2 text-ui-small text-ui-danger"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-ui-danger" />
-            <div>
-              <div className="font-semibold">Refactoring Blocked by Conflicts:</div>
-              <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
-                {errorConflicts.map((c, i) => (
-                  <li key={i}>{c.message}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-        {warningConflicts.length > 0 && errorConflicts.length === 0 && (
-          <div
-            data-testid="refactoring-preview-warning-conflicts"
-            className="mx-4 mt-2 flex items-start gap-2 rounded border border-ui-warning-border bg-ui-warning-surface px-3 py-2 text-ui-small text-ui-warning"
-          >
-            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-ui-warning" />
-            <div>
-              <div className="font-semibold">Warnings:</div>
-              <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
-                {warningConflicts.map((c, i) => (
-                  <li key={i}>{c.message}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-        {errorConflicts.length === 0 && warningConflicts.length === 0 && plan && (
-          <div
-            data-testid="refactoring-preview-conflict-status"
-            className="mx-4 mt-2 flex items-center gap-1.5 px-1 text-ui-small text-[var(--taomni-code-muted)]"
-          >
-            <span>Conflict analysis unavailable from provider</span>
-          </div>
-        )}
-
-        {/* Toolbar */}
-        <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/40 px-4 py-2 text-ui-small">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-3">
+        <div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              data-testid="refactoring-preview-select-all"
-              onClick={selectAll}
-              className="flex items-center gap-1 rounded px-2 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)]"
-            >
-              <CheckSquare className="h-3.5 w-3.5 text-ui-success" />
-              <span>Select All</span>
-            </button>
-            <button
-              type="button"
-              data-testid="refactoring-preview-select-none"
-              onClick={selectNone}
-              className="flex items-center gap-1 rounded px-2 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)]"
-            >
-              <Square className="h-3.5 w-3.5 text-[var(--taomni-code-muted)]" />
-              <span>Deselect All</span>
-            </button>
+            <h2 id="refactoring-preview-dialog-title" className="text-ui-title font-semibold">
+              {title}
+            </h2>
+            {plan && (() => {
+              const compVal: string = typeof plan.completeness === "object" && plan.completeness !== null
+                ? (plan.completeness as any).value
+                : String(plan.completeness);
+              const isComplete = compVal === "complete" || compVal === "provider-complete";
+              const isPartial = compVal === "partial" || compVal === "provider-partial";
+              const source = typeof plan.completeness === "object" && plan.completeness !== null ? plan.completeness.source : null;
+
+              return (
+                <span
+                  data-testid="refactoring-preview-completeness"
+                  title={source ? `Completeness source: ${source}` : undefined}
+                  className={`rounded px-1.5 py-0.5 text-ui-caption font-medium ${
+                    isComplete
+                      ? "bg-ui-success-surface text-ui-success border border-ui-success-border"
+                      : isPartial
+                      ? "bg-ui-warning-surface text-ui-warning border border-ui-warning-border"
+                      : "bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-muted)] border border-[var(--taomni-code-border)]"
+                  }`}
+                >
+                  {isComplete
+                    ? "Provider Complete"
+                    : isPartial
+                    ? "Provider Partial"
+                    : "Completeness Unknown"}
+                </span>
+              );
+            })()}
           </div>
-          <input
-            type="text"
-            data-testid="refactoring-preview-filter"
-            placeholder="Filter files or text..."
-            value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value)}
-            className="h-6 w-52 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 text-ui-small"
-          />
+          <p className="text-ui-small text-[var(--taomni-code-muted)] mt-0.5">
+            {preview.affectedFileCount} file(s) affected · {includedCount} of {totalUsages} change(s) selected
+            {preview.resourceOperationCount > 0 && ` · ${preview.resourceOperationCount} resource operation(s)`}
+          </p>
         </div>
-
-        {/* Usages Tree */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-2 divide-y divide-[var(--taomni-code-border)]/40">
-          {fileList.length === 0 && (
-            <div className="p-4 text-center text-[var(--taomni-code-muted)]">
-              No individual text changes to preview
-            </div>
-          )}
-
-          {fileList.map((path) => {
-            const usages = usagesByFile.get(path) ?? [];
-            const filteredUsages = searchFilter
-              ? usages.filter(
-                  (u) =>
-                    path.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                    u.newText.toLowerCase().includes(searchFilter.toLowerCase()),
-                )
-              : usages;
-
-            if (searchFilter && filteredUsages.length === 0) return null;
-
-            const isCollapsed = collapsedFiles.has(path);
-            const allSelected = usages.every((u) => !excludedIds.has(u.id));
-            const someSelected = usages.some((u) => !excludedIds.has(u.id));
-
-            return (
-              <div key={path} className="py-1">
-                {/* File Header */}
-                <div className="flex items-center gap-2 rounded px-2 py-1 hover:bg-[var(--taomni-code-active-line-bg)]">
-                  <button
-                    type="button"
-                    onClick={() => toggleCollapseFile(path)}
-                    aria-label={`Toggle collapse for ${path}`}
-                    className="p-0.5 text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
-                  >
-                    {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                  </button>
-                  <input
-                    type="checkbox"
-                    data-testid={`refactoring-preview-file-${path}`}
-                    checked={allSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = someSelected && !allSelected;
-                    }}
-                    onChange={() => toggleFile(path)}
-                    className="rounded border-[var(--taomni-code-border)]"
-                  />
-                  <FileCode className="h-3.5 w-3.5 text-[var(--taomni-code-muted)] shrink-0" />
-                  <span className="font-mono text-ui-small font-medium truncate flex-1">{path}</span>
-                  <span className="text-ui-caption text-[var(--taomni-code-muted)] shrink-0">
-                    {usages.length} change(s)
-                  </span>
-                </div>
-
-                {/* Usages list under file */}
-                {!isCollapsed && (
-                  <div className="ml-8 space-y-0.5 mt-0.5">
-                    {filteredUsages.map((usage) => {
-                      const isIncluded = !excludedIds.has(usage.id);
-                      const isRequired = requiredUsageIds.has(usage.id);
-                      const source = sourceTexts ? sourceTexts[usage.path] : undefined;
-                      const images = typeof source === "string" ? usageLineImages(source, usage) : null;
-                      return (
-                        <div key={usage.id} data-testid="refactoring-preview-row" data-path={usage.path}>
-                        <label
-                          className={`flex items-center gap-2 rounded px-2 py-1 hover:bg-[var(--taomni-code-active-line-bg)] font-mono text-ui-small ${
-                            isRequired ? "cursor-not-allowed opacity-80" : "cursor-pointer"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            data-testid={`refactoring-preview-usage-${usage.id}`}
-                            checked={isIncluded}
-                            disabled={isRequired}
-                            title={isRequired ? "Required refactoring change (cannot be excluded)" : undefined}
-                            onChange={() => toggleUsage(usage.id)}
-                            className="rounded border-[var(--taomni-code-border)] disabled:opacity-60"
-                          />
-                          <span className="text-[var(--taomni-code-muted)] shrink-0 w-16">
-                            L{usage.range.start.line + 1}:{usage.range.start.character + 1}
-                          </span>
-                          <span className="text-ui-success font-semibold shrink-0">
-                            → {usage.newText || "(empty)"}
-                          </span>
-                          {usage.annotationLabel && (
-                            <span className="rounded bg-ui-info-surface px-1.5 py-0.2 text-ui-caption text-ui-info">
-                              {usage.annotationLabel}
-                            </span>
-                          )}
-                          {isRequired && (
-                            <span className="rounded bg-ui-warning-surface px-1.5 py-0.2 text-ui-caption text-ui-warning font-sans">
-                              required
-                            </span>
-                          )}
-                        </label>
-                        {sourceTexts && (images ? (
-                          <div className="ml-6 mb-1 rounded border border-[var(--taomni-code-border)] font-mono text-ui-small">
-                            <pre
-                              data-testid="refactoring-preview-before"
-                              aria-label="Before"
-                              className="m-0 whitespace-pre-wrap break-all bg-ui-danger-surface px-2 py-0.5 text-[var(--taomni-code-text)]"
-                            >{images.before.map((line) => `- ${line}`).join("\n")}</pre>
-                            <pre
-                              data-testid="refactoring-preview-after"
-                              aria-label="After"
-                              className="m-0 whitespace-pre-wrap break-all bg-ui-success-surface px-2 py-0.5 text-[var(--taomni-code-text)]"
-                            >{images.after.map((line) => `+ ${line}`).join("\n")}</pre>
-                          </div>
-                        ) : (
-                          <div
-                            data-testid="refactoring-preview-source-unavailable"
-                            className="ml-6 mb-1 text-ui-small text-[var(--taomni-code-muted)]"
-                          >
-                            Source unavailable: the current file text could not be read for this change
-                          </div>
-                        ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/20 px-4 py-3">
-          <button
-            type="button"
-            data-testid="refactoring-preview-cancel"
-            onClick={onCancel}
-            className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-3 py-1.5 hover:bg-[var(--taomni-code-active-line-bg)]"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            data-testid="refactoring-preview-apply"
-            onClick={handleApply}
-            disabled={
-              (includedCount === 0 && preview.resourceOperationCount === 0) ||
-              errorConflicts.length > 0
-            }
-            title={
-              errorConflicts.length > 0
-                ? "Cannot apply refactoring with unresolved conflicts"
-                : undefined
-            }
-            data-primary="true"
-            className="taomni-btn rounded px-4 py-1.5 font-medium disabled:opacity-50"
-          >
-            Do Refactor ({includedCount})
-          </button>
-        </div>
+        <button
+          type="button"
+          data-testid="refactoring-preview-close"
+          onClick={onCancel}
+          aria-label="Close"
+          className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
-    </div>
+
+      {/* Conflicts Banner */}
+      {errorConflicts.length > 0 && (
+        <div
+          data-testid="refactoring-preview-error-conflicts"
+          className="mx-4 mt-2 flex items-start gap-2 rounded border border-ui-danger-border bg-ui-danger-surface px-3 py-2 text-ui-small text-ui-danger"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-ui-danger" />
+          <div>
+            <div className="font-semibold">Refactoring Blocked by Conflicts:</div>
+            <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+              {errorConflicts.map((c, i) => (
+                <li key={i}>{c.message}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+      {warningConflicts.length > 0 && errorConflicts.length === 0 && (
+        <div
+          data-testid="refactoring-preview-warning-conflicts"
+          className="mx-4 mt-2 flex items-start gap-2 rounded border border-ui-warning-border bg-ui-warning-surface px-3 py-2 text-ui-small text-ui-warning"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-ui-warning" />
+          <div>
+            <div className="font-semibold">Warnings:</div>
+            <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+              {warningConflicts.map((c, i) => (
+                <li key={i}>{c.message}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+      {errorConflicts.length === 0 && warningConflicts.length === 0 && plan && (
+        <div
+          data-testid="refactoring-preview-conflict-status"
+          className="mx-4 mt-2 flex items-center gap-1.5 px-1 text-ui-small text-[var(--taomni-code-muted)]"
+        >
+          <span>Conflict analysis unavailable from provider</span>
+        </div>
+      )}
+
+      {/* Toolbar */}
+      <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/40 px-4 py-2 text-ui-small">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-testid="refactoring-preview-select-all"
+            onClick={selectAll}
+            className="flex items-center gap-1 rounded px-2 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)]"
+          >
+            <CheckSquare className="h-3.5 w-3.5 text-ui-success" />
+            <span>Select All</span>
+          </button>
+          <button
+            type="button"
+            data-testid="refactoring-preview-select-none"
+            onClick={selectNone}
+            className="flex items-center gap-1 rounded px-2 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)]"
+          >
+            <Square className="h-3.5 w-3.5 text-[var(--taomni-code-muted)]" />
+            <span>Deselect All</span>
+          </button>
+        </div>
+        <input
+          type="text"
+          data-testid="refactoring-preview-filter"
+          placeholder="Filter files or text..."
+          value={searchFilter}
+          onChange={(e) => setSearchFilter(e.target.value)}
+          className="h-6 w-52 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 text-ui-small"
+        />
+      </div>
+
+      {/* Usages Tree */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-2 divide-y divide-[var(--taomni-code-border)]/40">
+        {fileList.length === 0 && (
+          <div className="p-4 text-center text-[var(--taomni-code-muted)]">
+            No individual text changes to preview
+          </div>
+        )}
+
+        {fileList.map((path) => {
+          const usages = usagesByFile.get(path) ?? [];
+          const filteredUsages = searchFilter
+            ? usages.filter(
+                (u) =>
+                  path.toLowerCase().includes(searchFilter.toLowerCase()) ||
+                  u.newText.toLowerCase().includes(searchFilter.toLowerCase()),
+              )
+            : usages;
+
+          if (searchFilter && filteredUsages.length === 0) return null;
+
+          const isCollapsed = collapsedFiles.has(path);
+          const allSelected = usages.every((u) => !excludedIds.has(u.id));
+          const someSelected = usages.some((u) => !excludedIds.has(u.id));
+
+          return (
+            <div key={path} className="py-1">
+              {/* File Header */}
+              <div className="flex items-center gap-2 rounded px-2 py-1 hover:bg-[var(--taomni-code-active-line-bg)]">
+                <button
+                  type="button"
+                  onClick={() => toggleCollapseFile(path)}
+                  aria-label={`Toggle collapse for ${path}`}
+                  className="p-0.5 text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
+                >
+                  {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </button>
+                <input
+                  type="checkbox"
+                  data-testid={`refactoring-preview-file-${path}`}
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected && !allSelected;
+                  }}
+                  onChange={() => toggleFile(path)}
+                  className="rounded border-[var(--taomni-code-border)]"
+                />
+                <FileCode className="h-3.5 w-3.5 text-[var(--taomni-code-muted)] shrink-0" />
+                <span className="font-mono text-ui-small font-medium truncate flex-1">{path}</span>
+                <span className="text-ui-caption text-[var(--taomni-code-muted)] shrink-0">
+                  {usages.length} change(s)
+                </span>
+              </div>
+
+              {/* Usages list under file */}
+              {!isCollapsed && (
+                <div className="ml-8 space-y-0.5 mt-0.5">
+                  {filteredUsages.map((usage) => {
+                    const isIncluded = !excludedIds.has(usage.id);
+                    const isRequired = requiredUsageIds.has(usage.id);
+                    const source = sourceTexts ? sourceTexts[usage.path] : undefined;
+                    const images = typeof source === "string" ? usageLineImages(source, usage) : null;
+                    return (
+                      <div key={usage.id} data-testid="refactoring-preview-row" data-path={usage.path}>
+                      <label
+                        className={`flex items-center gap-2 rounded px-2 py-1 hover:bg-[var(--taomni-code-active-line-bg)] font-mono text-ui-small ${
+                          isRequired ? "cursor-not-allowed opacity-80" : "cursor-pointer"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          data-testid={`refactoring-preview-usage-${usage.id}`}
+                          checked={isIncluded}
+                          disabled={isRequired}
+                          title={isRequired ? "Required refactoring change (cannot be excluded)" : undefined}
+                          onChange={() => toggleUsage(usage.id)}
+                          className="rounded border-[var(--taomni-code-border)] disabled:opacity-60"
+                        />
+                        <span className="text-[var(--taomni-code-muted)] shrink-0 w-16">
+                          L{usage.range.start.line + 1}:{usage.range.start.character + 1}
+                        </span>
+                        <span className="text-ui-success font-semibold shrink-0">
+                          → {usage.newText || "(empty)"}
+                        </span>
+                        {usage.annotationLabel && (
+                          <span className="rounded bg-ui-info-surface px-1.5 py-0.2 text-ui-caption text-ui-info">
+                            {usage.annotationLabel}
+                          </span>
+                        )}
+                        {isRequired && (
+                          <span className="rounded bg-ui-warning-surface px-1.5 py-0.2 text-ui-caption text-ui-warning font-sans">
+                            required
+                          </span>
+                        )}
+                      </label>
+                      {sourceTexts && (images ? (
+                        <div className="ml-6 mb-1 rounded border border-[var(--taomni-code-border)] font-mono text-ui-small">
+                          <pre
+                            data-testid="refactoring-preview-before"
+                            aria-label="Before"
+                            className="m-0 whitespace-pre-wrap break-all bg-ui-danger-surface px-2 py-0.5 text-[var(--taomni-code-text)]"
+                          >{images.before.map((line) => `- ${line}`).join("\n")}</pre>
+                          <pre
+                            data-testid="refactoring-preview-after"
+                            aria-label="After"
+                            className="m-0 whitespace-pre-wrap break-all bg-ui-success-surface px-2 py-0.5 text-[var(--taomni-code-text)]"
+                          >{images.after.map((line) => `+ ${line}`).join("\n")}</pre>
+                        </div>
+                      ) : (
+                        <div
+                          data-testid="refactoring-preview-source-unavailable"
+                          className="ml-6 mb-1 text-ui-small text-[var(--taomni-code-muted)]"
+                        >
+                          Source unavailable: the current file text could not be read for this change
+                        </div>
+                      ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/20 px-4 py-3">
+        <button
+          type="button"
+          data-testid="refactoring-preview-cancel"
+          onClick={onCancel}
+          className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-3 py-1.5 hover:bg-[var(--taomni-code-active-line-bg)]"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          data-testid="refactoring-preview-apply"
+          onClick={handleApply}
+          disabled={
+            (includedCount === 0 && preview.resourceOperationCount === 0) ||
+            errorConflicts.length > 0
+          }
+          title={
+            errorConflicts.length > 0
+              ? "Cannot apply refactoring with unresolved conflicts"
+              : undefined
+          }
+          data-primary="true"
+          className="taomni-btn rounded px-4 py-1.5 font-medium disabled:opacity-50"
+        >
+          Do Refactor ({includedCount})
+        </button>
+      </div>
+    </ModalSurface>
   );
 }

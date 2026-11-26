@@ -1,3 +1,5 @@
+import { ContextMenu } from "../../../ContextMenu";
+import { ModalSurface } from "../../../ui/ModalSurface";
 import { t } from "../../../../lib/i18n";
 import { promptAppDialog } from "../../../../lib/appDialogs";
 import { ChevronDown, ChevronRight, Keyboard, X } from "lucide-react";
@@ -21,7 +23,6 @@ export interface KeymapSettingsViewProps {
   corruptDiagnostic: string | null | undefined;
   shortcutFilter: ShortcutStroke[] | null;
   shortcutFilterFieldRef: import("react").RefObject<HTMLDivElement | null>;
-  overlayStateRef: import("react").RefObject<{ mouse: boolean; menu: boolean; findField: boolean; }>;
   handleShortcutFilterKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   filter: string;
   setFilter: import("react").Dispatch<import("react").SetStateAction<string>>;
@@ -73,7 +74,6 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
     corruptDiagnostic,
     shortcutFilter,
     shortcutFilterFieldRef,
-    overlayStateRef,
     handleShortcutFilterKeyDown,
     filter,
     setFilter,
@@ -111,24 +111,17 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
     captureConflicts,
     dirty,
   } = inputs;
+  const returnToAction = (actionId: string) =>
+    document.querySelector<HTMLElement>(`[data-testid="workspace-keymap-settings-dialog"][open] [data-testid="keymap-add-${CSS.escape(actionId)}"]`);
   return ((
-    <div
-      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
-      onMouseDown={(event) => {
-        // DEC-03: overlay click is a Cancel path — discards the draft.
-        if (event.target === event.currentTarget) onClose();
-      }}
+    <ModalSurface data-testid="workspace-keymap-settings-dialog"
+      initialFocus='[data-testid="keymap-action-filter"]' onCancel={onClose}
+      aria-labelledby="workspace-keymap-settings-title"
+      className="taomni-modal taomni-workspace-modal" data-bleed="true"
+      style={{ width: "min(720px, calc(100vw - 32px))", height: "min(80vh, 680px)" }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Workspace keymap settings"
-        data-testid="workspace-keymap-settings-dialog"
-        className="relative flex max-h-[80vh] w-[720px] max-w-[calc(100vw-32px)] flex-col rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-xl"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3">
-          <span className="font-medium">Keymap</span>
+          <h2 id="workspace-keymap-settings-title" className="font-medium">Keymap</h2>
           <select
             aria-label="Keymap scheme"
             data-testid="keymap-scheme-select"
@@ -236,8 +229,6 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
               aria-label="Find actions by shortcut"
               data-testid="keymap-shortcut-filter"
               className="min-w-0 flex-1 rounded border border-[var(--taomni-code-accent,#4b9edd)] px-2 py-1 text-sm focus-visible:keyboard-outline"
-              onFocus={() => { overlayStateRef.current.findField = true; }}
-              onBlur={() => { overlayStateRef.current.findField = false; }}
               onKeyDown={handleShortcutFilterKeyDown}
             >
               {shortcutFilter.length === 0
@@ -313,57 +304,31 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           const item = snapshot.find((entry) => entry.id === rowMenu.actionId);
           const row = rowBindings.get(rowMenu.actionId);
           if (!item) return null;
-          const menuItemClass = "block w-full px-3 py-1 text-left hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40";
-          return (
-            <>
-              <div className="fixed inset-0 z-[var(--taomni-z-menu-over-modal)]" onMouseDown={() => setRowMenu(null)} />
-              <div
-                role="menu"
-                aria-label={`${item.title} shortcuts`}
-                data-testid="keymap-row-menu"
-                className="fixed z-[var(--taomni-z-menu-over-modal)] min-w-[220px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] py-1 text-ui-body shadow-lg"
-                style={{
-                  left: Math.min(rowMenu.x, (typeof window === "undefined" ? 1200 : window.innerWidth) - 240),
-                  top: Math.min(rowMenu.y, (typeof window === "undefined" ? 800 : window.innerHeight) - 160),
-                }}
-              >
-                <button type="button" role="menuitem" data-testid="keymap-row-menu-add-keyboard" className={menuItemClass}
-                  onClick={() => startKeyboardCapture(item.id, null)}>
-                  Add Keyboard Shortcut
-                </button>
-                <button type="button" role="menuitem" data-testid="keymap-row-menu-add-mouse" className={menuItemClass}
-                  onClick={() => startMouseCapture(item.id)}>
-                  Add Mouse Shortcut
-                </button>
-                {(row?.shortcuts ?? []).length > 0 && <div role="separator" className="my-1 border-t border-[var(--taomni-code-border)]" />}
-                {(row?.shortcuts ?? []).map((shortcut, index) => (
-                  <button key={index} type="button" role="menuitem" data-testid={`keymap-row-menu-remove-${index}`} className={menuItemClass}
-                    onClick={() => {
-                      setRowMenu(null);
-                      removeShortcut(item.id, index);
-                    }}>
-                    Remove {formatShortcutLabel(shortcut)}
-                  </button>
-                ))}
-                <div role="separator" className="my-1 border-t border-[var(--taomni-code-border)]" />
-                <button type="button" role="menuitem" data-testid="keymap-row-menu-reset" className={menuItemClass}
-                  disabled={row?.source !== "user"}
-                  onClick={() => {
-                    setRowMenu(null);
-                    resetActionShortcuts(item.id);
-                  }}>
-                  Reset Shortcuts
-                </button>
-              </div>
-            </>
-          );
+          return <ContextMenu x={rowMenu.x} y={rowMenu.y}
+            ariaLabel={`${item.title} shortcuts`} testId="keymap-row-menu" closeOnTab
+            onClose={() => setRowMenu(null)} items={[
+              { label: "Add Keyboard Shortcut", testId: "keymap-row-menu-add-keyboard",
+                onClick: () => startKeyboardCapture(item.id, null) },
+              { label: "Add Mouse Shortcut", testId: "keymap-row-menu-add-mouse",
+                onClick: () => startMouseCapture(item.id) },
+              ...(row?.shortcuts.length ? [{ label: "", separator: true }] : []),
+              ...(row?.shortcuts ?? []).map((shortcut, index) => ({
+                label: `Remove ${formatShortcutLabel(shortcut)}`,
+                testId: `keymap-row-menu-remove-${index}`,
+                onClick: () => removeShortcut(item.id, index),
+              })),
+              { label: "", separator: true },
+              { label: "Reset Shortcuts", testId: "keymap-row-menu-reset",
+                disabled: row?.source !== "user", disabledReason: "No custom shortcuts to reset",
+                onClick: () => resetActionShortcuts(item.id) },
+            ]} />;
         })()}
         {mouseCapture && (
-          <div className="absolute inset-0 taomni-dialog-backdrop flex items-center justify-center rounded-md">
-            <div role="dialog" aria-modal="true" aria-label="Mouse Shortcut" data-testid="keymap-mouse-recorder"
-              className="w-[400px] max-w-[calc(100%-32px)] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-3 text-ui-small shadow-xl">
+          <ModalSurface data-testid="keymap-mouse-recorder" aria-labelledby="keymap-mouse-recorder-title"
+            initialFocus='[data-testid="keymap-mouse-recorder-cancel"]' returnFocus={returnToAction(mouseCapture.actionId)} onCancel={() => setMouseCapture(null)}
+            className="taomni-modal taomni-workspace-modal">
               <div className="mb-2 text-ui-body font-medium">
-                Mouse Shortcut · {snapshot.find((item) => item.id === mouseCapture.actionId)?.title ?? mouseCapture.actionId}
+                <span id="keymap-mouse-recorder-title">Mouse Shortcut</span> · {snapshot.find((item) => item.id === mouseCapture.actionId)?.title ?? mouseCapture.actionId}
               </div>
               <div
                 data-testid="keymap-mouse-recorder-pad"
@@ -410,8 +375,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
                   Cancel
                 </button>
               </div>
-            </div>
-          </div>
+          </ModalSurface>
         )}
 
         {/*
@@ -420,16 +384,11 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           names EVERY action holding the stroke.
         */}
         {capture && (
-          <div className="absolute inset-0 taomni-dialog-backdrop flex items-center justify-center rounded-md">
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Keyboard Shortcut"
-              data-testid="keymap-recorder"
-              className="w-[440px] max-w-[calc(100%-32px)] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-3 text-ui-small shadow-xl"
-            >
+          <ModalSurface data-testid="keymap-recorder" aria-labelledby="keymap-recorder-title"
+            initialFocus='[aria-label="Press shortcut keys"]' returnFocus={returnToAction(capture.actionId)} onCancel={recorder.closeRecorder}
+            className="taomni-modal taomni-workspace-modal">
               <div className="mb-2 text-ui-body font-medium">
-                Keyboard Shortcut · {snapshot.find((item) => item.id === capture.actionId)?.title ?? capture.actionId}
+                <span id="keymap-recorder-title">Keyboard Shortcut</span> · {snapshot.find((item) => item.id === capture.actionId)?.title ?? capture.actionId}
               </div>
               <div className="mb-1 opacity-70">First stroke</div>
               <div
@@ -510,8 +469,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
                   Cancel
                 </button>
               </div>
-            </div>
-          </div>
+          </ModalSurface>
         )}
 
         {/* DEC-03: Apply/OK is the only commit edge; both discard-free closes do nothing. */}
@@ -542,7 +500,6 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
             Apply
           </button>
         </div>
-      </div>
-    </div>
+    </ModalSurface>
   ));
 }

@@ -11357,7 +11357,7 @@ controls:
     selector: '[data-testid="keymap-no-shortcut-editor.find"]'
     kind: display
     optional: true
-  - id: keymap-recorder               # inline keystroke recorder (never a modal)
+  - id: keymap-recorder               # keyboard recorder in the Keymap dialog's top layer
     selector: '[data-testid="keymap-recorder"]'
     kind: display
     optional: true       # only while recording

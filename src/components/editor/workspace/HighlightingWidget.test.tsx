@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HighlightingWidget } from "./HighlightingWidget";
 import type { DiagnosticScope } from "./diagnosticScopeModel";
@@ -174,7 +174,7 @@ describe("HighlightingWidget", () => {
     expect(screen.getByTestId("highlighting-widget-next-error")).toBeDisabled();
   });
 
-  it("moves through level options with the keyboard and returns focus on escape", () => {
+  it("moves through level options with the keyboard and returns focus on escape", async () => {
     render(
       <HighlightingWidget
         diagnostics={[]}
@@ -198,6 +198,6 @@ describe("HighlightingWidget", () => {
     expect(document.activeElement).toBe(allOption);
     fireEvent.keyDown(allOption, { key: "Escape" });
     expect(screen.queryByTestId("highlighting-widget-menu")).not.toBeInTheDocument();
-    expect(document.activeElement).toBe(levelButton);
+    await waitFor(() => expect(levelButton).toHaveFocus());
   });
 });

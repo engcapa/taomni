@@ -1,6 +1,7 @@
+import { AnchoredMenu } from "../../ui/AnchoredMenu";
 import { IconButton } from "../../ui/IconButton";
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, ChevronDown, GraduationCap, Languages, Sparkles, WandSparkles, X } from "lucide-react";
+import { BookOpen, ChevronDown, GraduationCap, Languages, Sparkles, WandSparkles, X } from "lucide-react";
 import { useT } from "../../../lib/i18n";
 import { AI_ANSWER_LANGUAGES, answerLanguageLabelKey } from "../../../lib/ai/answerLanguage";
 import type { AiAnswerLanguage, EditorAiAction } from "./editorAiPrompts";
@@ -38,21 +39,10 @@ export function EditorSelectionAiToolbar({
 }: EditorSelectionAiToolbarProps) {
   const t = useT();
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
-  const languageRef = useRef<HTMLDivElement>(null);
+  const languageRef = useRef<HTMLButtonElement>(null);
 
   // Close the picker on an outside click so it does not outlive the selection
   // it belongs to.
-  useEffect(() => {
-    if (!languageMenuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (target && languageRef.current?.contains(target)) return;
-      setLanguageMenuOpen(false);
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    return () => window.removeEventListener("pointerdown", onPointerDown);
-  }, [languageMenuOpen]);
-
   // A fresh selection should not inherit the previous one's open menu.
   useEffect(() => {
     if (!visible) setLanguageMenuOpen(false);
@@ -120,47 +110,34 @@ export function EditorSelectionAiToolbar({
         Ask AI
       </button>
       {onSetAnswerLanguage && (
-        <div className="relative" ref={languageRef}>
+        <div className="relative">
           <button
             type="button"
+            ref={languageRef}
             data-testid="code-workspace-ai-answer-language"
             aria-haspopup="menu"
             aria-expanded={languageMenuOpen}
             className="h-7 inline-flex items-center gap-1 rounded border-l border-[var(--taomni-code-border)] pl-2 pr-1.5 text-ui-caption text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
             title={t("codeWorkspaceAi.answerLanguageTooltip", { current: languageBadge })}
-            onClick={() => setLanguageMenuOpen((open) => !open)}
+            onClick={(event) => {
+              event.currentTarget.focus({ preventScroll: true });
+              setLanguageMenuOpen((open) => !open);
+            }}
           >
             <Languages className="h-3.5 w-3.5" />
             {languageBadge}
             <ChevronDown className="h-3 w-3" />
           </button>
           {languageMenuOpen && (
-            <div
-              role="menu"
-              data-testid="code-workspace-ai-answer-language-menu"
-              className="absolute right-0 top-full z-[var(--taomni-z-popover)] mt-1 min-w-[168px] overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] py-0.5 shadow-xl"
-            >
-              {AI_ANSWER_LANGUAGES.map((language) => (
-                <button
-                  key={language}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={language === answerLanguage}
-                  data-testid={`code-workspace-ai-answer-language-${language}`}
-                  className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-ui-small text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
-                  onClick={() => {
-                    setLanguageMenuOpen(false);
-                    onSetAnswerLanguage(language);
-                  }}
-                >
-                  <Check
-                    className="h-3 w-3 shrink-0"
-                    style={{ opacity: language === answerLanguage ? 1 : 0 }}
-                  />
-                  {t(answerLanguageLabelKey(language))}
-                </button>
-              ))}
-            </div>
+            <AnchoredMenu anchor={languageRef} testId="code-workspace-ai-answer-language-menu"
+              ariaLabel={t("codeWorkspaceAi.answerLanguageTooltip", { current: languageBadge })}
+              onClose={() => setLanguageMenuOpen(false)} items={AI_ANSWER_LANGUAGES.map((language) => ({
+                label: t(answerLanguageLabelKey(language)),
+                testId: `code-workspace-ai-answer-language-${language}`,
+                role: "menuitemradio",
+                checked: language === answerLanguage,
+                onClick: () => onSetAnswerLanguage(language),
+              }))} />
           )}
         </div>
       )}

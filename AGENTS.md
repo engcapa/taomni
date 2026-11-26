@@ -134,8 +134,9 @@ Apply the same rules to detached windows, overlays and standalone desktop entry 
 - Declare `ui_standard` on changed UI cases and map each ID to requirement steps
   with observable results. Run affected unit, browser and native cases together
   with `ui-contract` and `crash-regression`. Record platform, mode, source and receipt.
-- Run `pnpm check:refactor` and reduce the per-file UI lint baseline as legacy
-  controls migrate. New code must meet the applicable rules.
+- Keep the desktop UI lint baseline empty and run `pnpm check:refactor`. The
+  development case check fails desktop renderer changes without a changed
+  rule-mapped case.
 
 ## External Network Access & Downloads
 

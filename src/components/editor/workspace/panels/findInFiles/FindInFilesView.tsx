@@ -477,23 +477,21 @@ export function FindInFilesView(props: FindInFilesViewProps) {
         })}
       </div>
       {replacePreview && (
-        <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4">
-          <ReplacePreviewDialog
-            edit={replacePreview.edit}
-            replacement={replacePreview.replacement}
-            scopeLabel={replaceScopeLabel(replacePreview.snapshot)}
-            query={replacePreview.snapshot.query.query}
-            initialExcludedKeys={replacePreview.initialExcludedKeys}
-            committing={replaceCommitting}
-            commitError={replaceCommitError}
-            onCommit={(excluded) => void replace.commitReplacePreview(excluded)}
-            onCancel={() => {
-              restoreReplaceButtonFocusRef.current = true;
-              setReplacePreview(null);
-              setReplaceCommitError(null);
-            }}
-          />
-        </div>
+        <ReplacePreviewDialog
+          edit={replacePreview.edit}
+          replacement={replacePreview.replacement}
+          scopeLabel={replaceScopeLabel(replacePreview.snapshot)}
+          query={replacePreview.snapshot.query.query}
+          initialExcludedKeys={replacePreview.initialExcludedKeys}
+          committing={replaceCommitting}
+          commitError={replaceCommitError}
+          onCommit={(excluded) => void replace.commitReplacePreview(excluded)}
+          onCancel={() => {
+            restoreReplaceButtonFocusRef.current = true;
+            setReplacePreview(null);
+            setReplaceCommitError(null);
+          }}
+        />
       )}
       {contextMenu && contextMenuMatch && contextMenuItems.length > 0 && (
         <ContextMenu

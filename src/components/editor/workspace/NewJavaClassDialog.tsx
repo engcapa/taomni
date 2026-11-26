@@ -1,3 +1,4 @@
+import { ModalSurface } from "../../ui/ModalSurface";
 import { IconButton } from "../../ui/IconButton";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { FileCode, AlertCircle, X, Settings2 } from "lucide-react";
@@ -49,9 +50,6 @@ export function NewJavaClassDialog({
       setName("");
       setKind("class");
       setSubmitting(false);
-      requestAnimationFrame(() => {
-        inputRef.current?.focus();
-      });
     }
   }, [open]);
 
@@ -97,10 +95,8 @@ export function NewJavaClassDialog({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
-    } else if (e.key === "Enter" && plan?.valid && !submitting) {
+    if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+    if (e.key === "Enter" && e.target === inputRef.current && plan?.valid && !submitting) {
       e.preventDefault();
       void handleSubmit();
     }
@@ -110,134 +106,135 @@ export function NewJavaClassDialog({
   const error = hasName && plan && !plan.valid ? plan.error : null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
+    <ModalSurface
       data-testid="new-java-class-dialog"
+      initialFocus="[data-testid=new-java-class-name-input]"
+      onCancel={() => { if (!submitting) onClose(); }}
       onKeyDown={handleKeyDown}
-      className="fixed inset-0 taomni-dialog-backdrop flex items-start justify-center p-4 pt-[12vh]"
+      aria-labelledby={titleId}
+      className="taomni-modal taomni-workspace-modal"
+      data-bleed="true"
+      data-position="top"
+      style={{ width: "min(448px, calc(100vw - 32px))" }}
     >
-      <div className="flex w-full max-w-md flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
-          <div className="flex items-center gap-2 font-medium">
-            <FileCode className="h-4 w-4 text-ui-info" />
-            <span id={titleId}>New Java Class</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {onOpenSettings && (
-              <IconButton
-                type="button"
-                onClick={onOpenSettings}
-                labelKey="editFileTemplates"
-                data-testid="new-java-class-edit-templates"
-                className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
-              >
-                <Settings2 className="h-4 w-4" />
-              </IconButton>
-            )}
-            <IconButton labelKey="close"
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
+        <div className="flex items-center gap-2 font-medium">
+          <FileCode className="h-4 w-4 text-ui-info" />
+          <span id={titleId}>New Java Class</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {onOpenSettings && (
+            <IconButton
               type="button"
-              onClick={onClose}
-              data-testid="new-java-class-cancel"
+              onClick={onOpenSettings}
+              labelKey="editFileTemplates"
+              data-testid="new-java-class-edit-templates"
               className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
             >
-              <X className="h-4 w-4" />
+              <Settings2 className="h-4 w-4" />
             </IconButton>
-          </div>
+          )}
+          <IconButton labelKey="close"
+            type="button"
+            onClick={onClose}
+            data-testid="new-java-class-cancel"
+            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
+          >
+            <X className="h-4 w-4" />
+          </IconButton>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex flex-col gap-3 p-4">
+        {/* Name & Kind inputs */}
+        <div className="flex flex-col gap-1">
+          <label htmlFor="new-java-class-name" className="text-ui-small font-semibold text-[var(--taomni-code-muted)]">
+            Name:
+          </label>
+          <input
+            id="new-java-class-name"
+            ref={inputRef}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. MyService"
+            data-testid="new-java-class-name-input"
+            className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-[var(--taomni-focus-ring)]"
+          />
         </div>
 
-        {/* Body */}
-        <div className="flex flex-col gap-3 p-4">
-          {/* Name & Kind inputs */}
-          <div className="flex flex-col gap-1">
-            <label htmlFor="new-java-class-name" className="text-ui-small font-semibold text-[var(--taomni-code-muted)]">
-              Name:
-            </label>
-            <input
-              id="new-java-class-name"
-              ref={inputRef}
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. MyService"
-              data-testid="new-java-class-name-input"
-              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-[var(--taomni-focus-ring)]"
-            />
-          </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="new-java-class-kind" className="text-ui-small font-semibold text-[var(--taomni-code-muted)]">
+            Kind:
+          </label>
+          <select
+            id="new-java-class-kind"
+            value={kind}
+            onChange={(e) => setKind(e.target.value as JavaTemplateKind)}
+            data-testid="new-java-class-kind-select"
+            className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-[var(--taomni-focus-ring)]"
+          >
+            {TEMPLATE_KIND_OPTIONS.map((opt) => (
+              <option key={opt.kind} value={opt.kind}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="new-java-class-kind" className="text-ui-small font-semibold text-[var(--taomni-code-muted)]">
-              Kind:
-            </label>
-            <select
-              id="new-java-class-kind"
-              value={kind}
-              onChange={(e) => setKind(e.target.value as JavaTemplateKind)}
-              data-testid="new-java-class-kind-select"
-              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-[var(--taomni-focus-ring)]"
-            >
-              {TEMPLATE_KIND_OPTIONS.map((opt) => (
-                <option key={opt.kind} value={opt.kind}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+        {/* Package and Facts Information */}
+        <div className="rounded bg-[var(--taomni-code-active-line-bg)]/40 px-3 py-2 text-ui-small space-y-1">
+          <div className="flex items-center justify-between" data-testid="new-java-class-package">
+            <span className="text-[var(--taomni-code-muted)]">Package:</span>
+            <span className="font-mono text-[var(--taomni-code-text)]">
+              {packageName || "(default package)"}
+            </span>
           </div>
-
-          {/* Package and Facts Information */}
-          <div className="rounded bg-[var(--taomni-code-active-line-bg)]/40 px-3 py-2 text-ui-small space-y-1">
-            <div className="flex items-center justify-between" data-testid="new-java-class-package">
-              <span className="text-[var(--taomni-code-muted)]">Package:</span>
-              <span className="font-mono text-[var(--taomni-code-text)]">
-                {packageName || "(default package)"}
-              </span>
-            </div>
-            {projectFactsStatus && projectFactsStatus !== "ready" && (
-              <div
-                className="flex items-center gap-1.5 text-ui-warning"
-                data-testid="new-java-class-facts-status"
-              >
-                <AlertCircle className="h-3 w-3 shrink-0" />
-                <span>Project facts not ready ({projectFactsStatus})</span>
-              </div>
-            )}
-          </div>
-
-          {/* Error message */}
-          {error && (
+          {projectFactsStatus && projectFactsStatus !== "ready" && (
             <div
-              className="flex items-center gap-1.5 rounded bg-ui-danger-surface border border-ui-danger-border p-2 text-ui-small text-ui-danger"
-              data-testid="new-java-class-error"
+              className="flex items-center gap-1.5 text-ui-warning"
+              data-testid="new-java-class-facts-status"
             >
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              <span>{error}</span>
+              <AlertCircle className="h-3 w-3 shrink-0" />
+              <span>Project facts not ready ({projectFactsStatus})</span>
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-4 py-2.5">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded px-3 py-1 text-ui-small text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
+        {/* Error message */}
+        {error && (
+          <div
+            className="flex items-center gap-1.5 rounded bg-ui-danger-surface border border-ui-danger-border p-2 text-ui-small text-ui-danger"
+            data-testid="new-java-class-error"
           >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleSubmit()}
-            disabled={!plan?.valid || submitting}
-            data-testid="new-java-class-submit"
-            data-primary="true"
-            className="taomni-btn rounded px-3 py-1 font-medium text-ui-small disabled:opacity-50 disabled:pointer-events-none"
-          >
-            {submitting ? "Creating..." : "OK"}
-          </button>
-        </div>
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
       </div>
-    </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-4 py-2.5">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded px-3 py-1 text-ui-small text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleSubmit()}
+          disabled={!plan?.valid || submitting}
+          data-testid="new-java-class-submit"
+          data-primary="true"
+          className="taomni-btn rounded px-3 py-1 font-medium text-ui-small disabled:opacity-50 disabled:pointer-events-none"
+        >
+          {submitting ? "Creating..." : "OK"}
+        </button>
+      </div>
+    </ModalSurface>
   );
 }

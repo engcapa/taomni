@@ -143,7 +143,8 @@ describe("RefactorRecoveryReviewDialog (RC-02/AC-02/07)", () => {
       expect(label?.className).toContain("break-all");
     }
     const dialog = screen.getByTestId("refactor-recovery-review");
-    expect(dialog.className).toContain("w-[min(640px,92vw)]");
-    expect(dialog.className).toContain("max-h-[90vh]");
+    expect(dialog).toBeInstanceOf(HTMLDialogElement);
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveClass("taomni-workspace-modal");
   });
 });

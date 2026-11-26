@@ -10,6 +10,8 @@ export interface MenuItem {
   icon?: React.ReactNode;
   shortcut?: string;
   checked?: boolean;
+  role?: "menuitemradio";
+  detail?: ReactNode;
   onClick?: () => void;
   danger?: boolean;
   separator?: boolean;
@@ -43,6 +45,8 @@ interface ContextMenuProps extends ContextMenuAppearance {
   closeOnTab?: boolean;
   dismissOnFocusOut?: boolean;
   anchorRef?: RefObject<HTMLElement | null>;
+  id?: string;
+  rovingFocus?: boolean;
 }
 
 const MENU_MARGIN = 6;
@@ -61,6 +65,8 @@ export function ContextMenu({
   closeOnTab,
   dismissOnFocusOut,
   anchorRef,
+  id,
+  rovingFocus,
 }: ContextMenuProps) {
   // ED-PARITY-021 A3 / DEC-ALIGN-11: closing (Esc, outside click, an action
   // that moves no focus) gives focus back to the element that opened the menu.
@@ -140,6 +146,7 @@ export function ContextMenu({
   return (
     <MenuSurface
       ref={ref}
+      id={id}
       appearance={appearance}
       items={items}
       onClose={onClose}
@@ -147,7 +154,8 @@ export function ContextMenu({
       testId={testId}
       ariaLabel={ariaLabel}
       className={className}
-      autoFocus={autoFocus}
+      autoFocus={autoFocus ?? !rovingFocus}
+      rovingFocus={rovingFocus}
       handleKeyboard={handleKeyboard}
       closeOnTab={closeOnTab}
     />
@@ -167,6 +175,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   handleKeyboard?: boolean;
   closeOnTab?: boolean;
   rovingFocus?: boolean;
+  id?: string;
 }>(({
   items,
   onClose,
@@ -181,6 +190,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   handleKeyboard = true,
   closeOnTab = false,
   rovingFocus = false,
+  id,
 }, forwardedRef) => {
   const innerRef = useRef<HTMLDivElement | null>(null);
   const menuId = useId();
@@ -191,7 +201,9 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
       .filter((idx) => idx !== -1);
   }, [items]);
 
-  const [activeIndex, setActiveIndex] = useState<number>(() => selectableIndices[0] ?? -1);
+  const [activeIndex, setActiveIndex] = useState<number>(() =>
+    selectableIndices.find((index) => items[index]?.role === "menuitemradio" && items[index]?.checked)
+      ?? selectableIndices[0] ?? -1);
   const [openSubmenuIndex, setOpenSubmenuIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -291,6 +303,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   return (
     <div
       ref={setRef}
+      id={id}
       role="menu"
       aria-label={ariaLabel}
       aria-activedescendant={activeIndex >= 0 ? `${menuId}-${activeIndex}` : undefined}
@@ -465,7 +478,7 @@ function MenuRow({
   const hasChildren = !!item.children?.length || !!item.customPanel;
   const semantics = {
     id,
-    role: item.checked === undefined ? "menuitem" : "menuitemcheckbox",
+    role: item.role ?? (item.checked === undefined ? "menuitem" : "menuitemcheckbox"),
     "aria-checked": item.checked,
     "aria-disabled": item.disabled || undefined,
     tabIndex: -1,
@@ -475,6 +488,7 @@ function MenuRow({
     <>
       <span className="w-4 flex-shrink-0 text-center">{item.checked ? "✓" : item.icon}</span>
       <span className="flex-1 truncate">{item.label}</span>
+      {item.detail && <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">{item.detail}</span>}
       {item.shortcut && (
         <span className="ml-6 flex-shrink-0 text-ui-small text-[var(--taomni-text-muted)]">{item.shortcut}</span>
       )}
