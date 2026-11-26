@@ -5,22 +5,22 @@ import { File } from "lucide-react";
  * letter glyph per language family, falling back to the generic file icon.
  */
 const BADGES: Record<string, { label: string; className: string; title: string }> = {
-  java: { label: "C", className: "bg-sky-500/15 text-sky-500", title: "Java" },
-  kt: { label: "K", className: "bg-violet-500/15 text-violet-500", title: "Kotlin" },
-  kts: { label: "K", className: "bg-violet-500/15 text-violet-500", title: "Kotlin script" },
-  ts: { label: "TS", className: "bg-blue-500/15 text-blue-500", title: "TypeScript" },
-  tsx: { label: "TS", className: "bg-blue-500/15 text-blue-500", title: "TypeScript JSX" },
-  js: { label: "JS", className: "bg-amber-500/15 text-amber-600", title: "JavaScript" },
-  jsx: { label: "JS", className: "bg-amber-500/15 text-amber-600", title: "JavaScript JSX" },
-  json: { label: "{}", className: "bg-emerald-500/15 text-emerald-600", title: "JSON" },
-  md: { label: "M↓", className: "bg-slate-500/15 text-slate-500", title: "Markdown" },
-  py: { label: "Py", className: "bg-yellow-500/15 text-yellow-600", title: "Python" },
-  rs: { label: "Rs", className: "bg-orange-500/15 text-orange-600", title: "Rust" },
-  go: { label: "Go", className: "bg-cyan-500/15 text-cyan-600", title: "Go" },
-  xml: { label: "<>", className: "bg-orange-500/15 text-orange-600", title: "XML" },
-  yaml: { label: "Y", className: "bg-rose-500/15 text-rose-500", title: "YAML" },
-  yml: { label: "Y", className: "bg-rose-500/15 text-rose-500", title: "YAML" },
-  sql: { label: "SQL", className: "bg-indigo-500/15 text-indigo-500", title: "SQL" },
+  java: { label: "C", className: "text-[var(--taomni-code-syntax-function)]", title: "Java" },
+  kt: { label: "K", className: "text-[var(--taomni-code-syntax-property)]", title: "Kotlin" },
+  kts: { label: "K", className: "text-[var(--taomni-code-syntax-property)]", title: "Kotlin script" },
+  ts: { label: "TS", className: "text-[var(--taomni-code-syntax-heading)]", title: "TypeScript" },
+  tsx: { label: "TS", className: "text-[var(--taomni-code-syntax-heading)]", title: "TypeScript JSX" },
+  js: { label: "JS", className: "text-[var(--taomni-code-syntax-atom)]", title: "JavaScript" },
+  jsx: { label: "JS", className: "text-[var(--taomni-code-syntax-atom)]", title: "JavaScript JSX" },
+  json: { label: "{}", className: "text-[var(--taomni-code-syntax-type)]", title: "JSON" },
+  md: { label: "M↓", className: "text-[var(--taomni-code-syntax-variable)]", title: "Markdown" },
+  py: { label: "Py", className: "text-[var(--taomni-code-syntax-number)]", title: "Python" },
+  rs: { label: "Rs", className: "text-[var(--taomni-code-syntax-keyword)]", title: "Rust" },
+  go: { label: "Go", className: "text-[var(--taomni-code-syntax-function)]", title: "Go" },
+  xml: { label: "<>", className: "text-[var(--taomni-code-syntax-keyword)]", title: "XML" },
+  yaml: { label: "Y", className: "text-[var(--taomni-code-syntax-escape)]", title: "YAML" },
+  yml: { label: "Y", className: "text-[var(--taomni-code-syntax-escape)]", title: "YAML" },
+  sql: { label: "SQL", className: "text-[var(--taomni-code-syntax-property)]", title: "SQL" },
 };
 
 export function fileTypeKey(path: string): string {
@@ -39,7 +39,7 @@ export function FileTypeIcon({ path }: { path: string }) {
       data-file-type={fileTypeKey(path)}
       title={badge.title}
       aria-hidden="true"
-      className={`inline-flex h-3.5 min-w-3.5 shrink-0 items-center justify-center rounded-sm px-0.5 text-ui-caption font-bold leading-none ${badge.className}`}
+      className={`inline-flex h-3.5 min-w-3.5 shrink-0 items-center justify-center rounded-sm bg-[var(--taomni-code-bg)] px-0.5 text-ui-caption font-bold leading-none ${badge.className}`}
     >
       {badge.label}
     </span>

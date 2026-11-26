@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LspDocumentSymbol } from "../../../lib/editor/lsp";
+import { setLocale } from "../../../lib/i18n";
 import { StructurePopup, symbolKindBadge } from "./StructurePopup";
 
 function symbol(
@@ -70,6 +71,23 @@ describe("StructurePopup", () => {
     expect(screen.getByText("path")).toBeInTheDocument();
     expect(screen.queryByText("OpenFileState")).not.toBeInTheDocument();
     expect(screen.queryByText("openFile")).not.toBeInTheDocument();
+  });
+
+  it("localizes syntax-only status, filtering and symbol counts in Chinese", () => {
+    setLocale("zh-CN");
+    try {
+      render(<StructurePopup open fileTitle="App.java" syntaxOnly symbols={symbols} loading={false}
+        onClose={vi.fn()} onPick={vi.fn()} />);
+      expect(screen.getByText("仅语法")).toHaveAttribute("title", expect.stringContaining("语言服务器"));
+      const input = screen.getByRole("searchbox", { name: "文件结构" });
+      expect(input).toHaveAttribute("placeholder", "App.java 的结构（输入以筛选）");
+      expect(screen.getByText("3 个符号")).toBeVisible();
+      fireEvent.change(input, { target: { value: "nothing-matches" } });
+      expect(screen.getByText("没有匹配的符号")).toBeVisible();
+    } finally {
+      cleanup();
+      setLocale("en");
+    }
   });
 
   it("explains why the list is empty when the server is unavailable", () => {
