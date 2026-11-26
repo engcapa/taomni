@@ -20,6 +20,7 @@ native_platforms:
 fixtures:
 - reset_db
 - parity006_replace
+ui_standard: [UI-DLG-03]
 timeout_sec: 600
 steps:
 - open: ${cfg.app.base_url}
@@ -131,7 +132,7 @@ steps:
 - press:
     key: Mod+z
     selector: '[data-testid="code-workspace-find-match-row"]'
-- wait_for: '[data-testid="code-workspace-undo-confirm"]'
+- wait_for: '[data-testid="code-workspace-undo-confirm"]:modal'
 - click: '[data-testid="code-workspace-undo-confirm-cancel"]'
 - assert_file_sha256:
     path: ${fixture.parity006_src_a_txt}
@@ -141,7 +142,7 @@ steps:
     equals: ${fixture.parity006_src_b_txt_committed_sha256}
 - click: '[data-testid="code-workspace-find-match-row"]'
 - press: Mod+z
-- wait_for: '[data-testid="code-workspace-undo-confirm"]'
+- wait_for: '[data-testid="code-workspace-undo-confirm"]:modal'
 - click: '[data-testid="code-workspace-undo-confirm-ok"]'
 - assert_file_sha256:
     path: ${fixture.parity006_src_a_txt}
@@ -221,6 +222,7 @@ verification:
   review: reviewed
   requirements:
   - id: ED-PARITY-006-V4
+    ui_standard: [UI-DLG-03]
     requirement: Native preflight blocks external and dirty conflicts without writing, recovery commits succeed,
       input undo and confirmation Cancel preserve disk bytes, and one confirmed undo restores both files.
     actions:

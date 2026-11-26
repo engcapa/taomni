@@ -193,6 +193,11 @@ export const zhCN: DeepPartial<typeof en> = {
     copyDetails: "复制错误详情",
     copyFailed: "无法复制详情。请选择错误信息并手动复制。{detail}",
   },
+  workspaceUndo: {
+    title: "撤销",
+    question: "撤销“{edit}”？",
+    edit: "工作区编辑",
+  },
   dbCellValue: {
     title: "{column} 的完整值",
     wrap: "自动换行",

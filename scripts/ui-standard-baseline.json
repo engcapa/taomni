@@ -41,7 +41,6 @@
   "src/components/editor/workspace/StructuralSearchDialog.tsx": {"L02":1,"L13":1,"L04-inline":1},
   "src/components/editor/workspace/SurroundWithDialog.tsx": {"L02":1},
   "src/components/editor/workspace/TabSwitcher.tsx": {"L02":1},
-  "src/components/editor/workspace/UndoWorkspaceEditConfirmDialog.tsx": {"L02":1},
   "src/components/editor/workspace/UsagesScopeDialog.tsx": {"L04-inline":1},
   "src/components/editor/workspace/WorkspaceEditorAppearanceSettingsDialog.tsx": {"L02":1},
   "src/components/editor/workspace/WorkspaceIntelligenceSettingsDialog.tsx": {"L02":1},

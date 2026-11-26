@@ -194,6 +194,11 @@ const dict = {
     copyDetails: "Copy error details",
     copyFailed: "Could not copy the details. Select the message to copy it manually. {detail}",
   },
+  workspaceUndo: {
+    title: "Undo",
+    question: "Undo {edit}?",
+    edit: "workspace edit",
+  },
   dbCellValue: {
     title: "Full value for {column}",
     wrap: "Wrap lines",

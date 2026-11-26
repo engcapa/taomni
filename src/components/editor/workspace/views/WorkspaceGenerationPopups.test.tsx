@@ -85,7 +85,12 @@ describe("generation popup lifecycle", () => {
     view.rerender(tree(latest));
     view.rerender(tree({ ...latest, workspaceUndoConfirmOpen: true }));
     expect(screen.getByText("Undo Latest edit?")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("code-workspace-undo-confirm-ok"));
+    const primary = screen.getByTestId("code-workspace-undo-confirm-ok");
+    expect(primary).toHaveFocus();
+    fireEvent.keyDown(primary, { key: "Escape", isComposing: true });
+    expect(latest.closeWorkspaceUndoConfirmation).not.toHaveBeenCalled();
+    fireEvent.click(primary);
+    fireEvent.click(primary);
     expect(latest.undoWorkspaceEdit).toHaveBeenCalledOnce();
     expect(initial.undoWorkspaceEdit).not.toHaveBeenCalled();
     view.rerender(tree(latest));
