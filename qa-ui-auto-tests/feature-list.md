@@ -13433,6 +13433,9 @@ controls:
 - id: restore-dialog
   selector: '[data-testid="backup-restore-dialog"]'
   kind: display
+- id: restore-name
+  selector: '[data-testid="backup-restore-name"]'
+  kind: interactive
 - id: restore-vault-password
   selector: '[data-testid="backup-restore-vault-password"]'
   kind: interactive

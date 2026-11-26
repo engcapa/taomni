@@ -4150,6 +4150,8 @@ const dict = {
     restoreAction: "Restore",
     deleteAction: "Delete",
     confirmDelete: "Are you sure you want to delete this backup file? This cannot be undone.",
+    restartError: "Restore staged. Restart Taomni to apply it. The last restart failed ({reason}).",
+    typeArchiveName: "Type the archive name {name} to confirm the restore.",
     restoreModalTitle: "Restore Confirmation",
     restoreModalWarning: "⚠️ Warning: Restoring will stage and overwrite current local data and settings. This cannot be undone, and Taomni will restart immediately to apply physical files.",
     archiveVersion: "App Version",

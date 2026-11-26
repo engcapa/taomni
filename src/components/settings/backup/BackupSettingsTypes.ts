@@ -23,7 +23,8 @@ export interface BackupSettingsViewProps {
   refreshHistory: () => Promise<void>;
   handleDeleteItem: (fileName: string) => Promise<void>;
   restoreModalOpen: boolean;
-  setRestoreModalOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  archiveName: string;
+  dismissRestore: () => void;
   inspecting: boolean;
   manifest: BackupManifest | null;
   vaultState: import("../../../lib/ipc").VaultStateKind;
@@ -34,7 +35,9 @@ export interface BackupSettingsViewProps {
   restorePassword: string;
   setRestorePassword: import("react").Dispatch<import("react").SetStateAction<string>>;
   handleRetryInspectWithPassword: () => Promise<void>;
+  relaunchError: string | null;
+  restartAfterRestore: () => Promise<void>;
   restoreStaged: boolean;
   restoring: boolean;
-  handleConfirmRestore: () => Promise<void>;
+  handleConfirmRestore: (confirmation: string) => Promise<void>;
 }

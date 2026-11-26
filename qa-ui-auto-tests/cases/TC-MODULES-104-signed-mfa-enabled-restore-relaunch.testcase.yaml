@@ -79,6 +79,7 @@ steps:
 - assert_text: {selector: '[data-testid="backup-restore-files"]', contains: plugins/mfa/data/mfa.db}
 - assert_text: {selector: '[data-testid="backup-restore-files"]', contains: databases/vault.db}
 - fill: {selector: '[data-testid="backup-restore-vault-password"]', value: qa-signed-mfa-restore-original}
+- fill: {selector: '[data-testid="backup-restore-name"]', value: '${fixture.restore_archive_name}'}
 - click: '[data-testid="backup-restore-confirm"]'
 - assert_text_equals: {selector: '[data-testid="backup-restore-error"]', equals: Incorrect vault master password. Verification failed.}
 - assert_not_visible: '[data-testid="backup-restore-staged"]'
@@ -120,29 +121,29 @@ verification:
     results: [29, 30, 40]
   - id: R2
     requirement: Advancing HOTP and rekeying Vault precede restore confirmation, where the old current password is rejected without staging.
-    actions: [46, 57, 61, 66]
+    actions: [46, 57, 61, 67]
     checkpoints:
     - {step: 47, expectation: "HOTP advances to 287 082."}
     - {step: 58, expectation: "Vault master password updates."}
     - {step: 63, expectation: "Restore dialog lists plugins/mfa/data/mfa.db."}
     - {step: 64, expectation: "Restore dialog lists databases/vault.db."}
-    - {step: 67, expectation: "Incorrect old master password fails verification."}
-    - {step: 68, expectation: "Failed verification does not stage pending restore state."}
-    - {step: 70, expectation: "Archive, mutated counter 1 and unchanged generation are ready before confirmation."}
-    - {step: 71, expectation: "Original renderer emits no runtime errors."}
-    results: [47, 58, 63, 64, 67, 68, 70, 71]
+    - {step: 68, expectation: "Incorrect old master password fails verification."}
+    - {step: 69, expectation: "Failed verification does not stage pending restore state."}
+    - {step: 71, expectation: "Archive, mutated counter 1 and unchanged generation are ready before confirmation."}
+    - {step: 72, expectation: "Original renderer emits no runtime errors."}
+    results: [47, 58, 63, 64, 68, 69, 71, 72]
   - id: R3
     requirement: Valid restore confirmation automatically relaunches the desktop and restores original enabled MFA, Vault and HOTP continuity.
-    actions: [72, 77, 81, 89]
+    actions: [73, 78, 82, 90]
     checkpoints:
-    - {step: 72, expectation: "Single confirmation exits original desktop at 0 and reattaches to new QA desktop PID."}
-    - {step: 74, expectation: "Generation advances, active pointer stays intact, old host exits, and module SQLite returns to counter 0."}
-    - {step: 78, expectation: "Changed password is rejected after restore."}
-    - {step: 88, expectation: "Original password unlocks Vault and decrypts restored HOTP 755 224."}
-    - {step: 90, expectation: "Reopened signed host advances restored account to 287 082."}
-    - {step: 91, expectation: "Reopened signed MFA host holds the writer lease on the relaunched desktop."}
-    - {step: 92, expectation: "Complete automatic restore produces no runtime errors."}
-    results: [72, 74, 78, 88, 90, 91, 92]
+    - {step: 73, expectation: "Single confirmation exits original desktop at 0 and reattaches to new QA desktop PID."}
+    - {step: 75, expectation: "Generation advances, active pointer stays intact, old host exits, and module SQLite returns to counter 0."}
+    - {step: 79, expectation: "Changed password is rejected after restore."}
+    - {step: 89, expectation: "Original password unlocks Vault and decrypts restored HOTP 755 224."}
+    - {step: 91, expectation: "Reopened signed host advances restored account to 287 082."}
+    - {step: 92, expectation: "Reopened signed MFA host holds the writer lease on the relaunched desktop."}
+    - {step: 93, expectation: "Complete automatic restore produces no runtime errors."}
+    results: [73, 75, 79, 89, 91, 92, 93]
   visual:
   - check: Restored enabled signed MFA pane showing HOTP 287 082 after advancing from 755 224.
     method: manual

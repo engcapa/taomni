@@ -29,6 +29,6 @@ export function BackupSettingsView(props: BackupSettingsViewProps) {
       <button type="button" className="rounded border border-theme-border px-3 py-2 text-xs text-theme-text" onClick={props.handleSelectRestoreFile}>{t("backupSettings.chooseFile")}</button>
     </section>
     <BackupLocalHistory {...props} />
-    <BackupRestoreDialog {...props} />
+    {props.restoreModalOpen && <BackupRestoreDialog key={props.archiveName} {...props} />}
   </div>;
 }

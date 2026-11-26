@@ -91,7 +91,6 @@
   "src/components/settings/ClaudeCodeSettingsDialog.tsx": {"L02":1},
   "src/components/settings/CodexCodeConfigDialog.tsx": {"L02":1},
   "src/components/settings/ScreenshotSettings.tsx": {"L04-inline":1},
-  "src/components/settings/backup/BackupRestoreDialog.tsx": {"L02":1},
   "src/components/tabbar/ControlBar.tsx": {"L04-inline":1},
   "src/components/tabbar/TabOverview.tsx": {"L02":1},
   "src/components/tao/TaoAlertInbox.tsx": {"L13":1},

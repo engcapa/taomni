@@ -3921,6 +3921,7 @@
 - `[data-testid="backup-restore-password"]` — interactive — F-BACKUP-1.restore-password
 - `[data-testid="backup-restore-unlock"]` — interactive — F-BACKUP-1.restore-unlock
 - `[data-testid="backup-restore-dialog"]` — display — F-BACKUP-1.restore-dialog
+- `[data-testid="backup-restore-name"]` — interactive — F-BACKUP-1.restore-name
 - `[data-testid="backup-restore-vault-password"]` — interactive — F-BACKUP-1.restore-vault-password
 - `[data-testid="backup-restore-confirm"]` — interactive — F-BACKUP-1.restore-confirm
 - `[data-testid="backup-restore-error"]` — display — F-BACKUP-1.restore-error

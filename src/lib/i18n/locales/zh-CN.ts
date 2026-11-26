@@ -4127,6 +4127,8 @@ export const zhCN: DeepPartial<typeof en> = {
     restoreAction: "恢复",
     deleteAction: "删除",
     confirmDelete: "确认删除该备份文件吗？此操作不可撤销。",
+    restartError: "备份已准备好，重启 Taomni 后会应用。上次重启失败（{reason}）。",
+    typeArchiveName: "输入备份文件名 {name} 以确认恢复。",
     restoreModalTitle: "备份恢复确认",
     restoreModalWarning: "⚠️ 警告：恢复备份将解压并准备覆盖当前的数据和配置。该操作不可逆，且需要立即重启 Taomni 应用以完成物理替换。",
     archiveVersion: "应用版本",
