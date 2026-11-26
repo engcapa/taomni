@@ -303,6 +303,12 @@ fn validate_manifest(
         return Err(invalid("module.json exceeds 2 MiB"));
     }
     let manifest: ModuleManifest = serde_json::from_slice(raw_manifest)?;
+    if let Some(types) = &manifest.document {
+        types.validate().map_err(invalid)?;
+        if manifest.entry.frontend.is_none() {
+            return Err(invalid("document renderer requires a frontend"));
+        }
+    }
     if manifest.id != verified.id
         || manifest.slug != verified.slug
         || manifest.version != verified.version

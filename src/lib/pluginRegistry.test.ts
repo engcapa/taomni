@@ -23,6 +23,16 @@ const manifest = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("plugin manifest validation", () => {
+  it("preserves document associations on renderer modules and rejects invalid suffixes", () => {
+    const document = { fileKinds: ["excel"], extensions: ["xls", "xlsx"] };
+    expect(validatePluginManifest(manifest({ document })).manifest?.document).toEqual(document);
+    expect(validatePluginManifest(manifest()).manifest?.document).toBeUndefined();
+    expect(validatePluginManifest(manifest({ document, entry: { host: "reader", protocol: 1 } })).ok).toBe(false);
+    for (const extensions of [[], ["*.xls"], [".xlsx"], ["XLSX"], ["xls", "xls"], ["doc/x"], ["x".repeat(25)]]) {
+      expect(validatePluginManifest(manifest({ document: { ...document, extensions } })).ok).toBe(false);
+    }
+  });
+
   it("accepts a signed module shape and rejects paths that escape its directory", () => {
     expect(validatePluginManifest(manifest(), { coreApiVersion: "1", platform: "linux-x86_64" }).ok).toBe(true);
     const result = validatePluginManifest(manifest({ entry: { frontend: "../index.js", protocol: 1 } }));

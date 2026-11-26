@@ -316,7 +316,7 @@ fn verify_asset(
         status_ok && !description.is_empty(),
         "release module must be stable and described: {id}"
     );
-    for key in ["id", "slug", "version", "name", "coreApiVersion", "kind"] {
+    for key in ["id", "slug", "version", "name", "coreApiVersion", "kind", "document"] {
         ensure!(
             manifest[key] == plugin[key],
             "signed package metadata differs for {id}/{key}"

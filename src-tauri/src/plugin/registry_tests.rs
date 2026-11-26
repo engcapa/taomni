@@ -10,6 +10,7 @@ fn manifest(slug: &str) -> ModuleManifest {
         version: "1.0.0".into(),
         core_api_version: CORE_API_VERSION.into(),
         kind: PluginKind::Auth,
+        document: None,
         status: PluginStatus::Stable,
         removal_candidate: false,
         platforms: [current_platform().into()].into_iter().collect(),

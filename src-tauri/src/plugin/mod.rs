@@ -101,6 +101,8 @@ pub struct ModuleManifest {
     #[serde(rename = "coreApiVersion")]
     pub core_api_version: String,
     pub kind: PluginKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub document: Option<taomni_plugin_api::DocumentTypes>,
     pub status: PluginStatus,
     #[serde(default, rename = "removalCandidate")]
     pub removal_candidate: bool,
@@ -476,6 +478,16 @@ impl PluginRegistry {
 
     fn validate_manifest_fields(&self, manifest: &ModuleManifest) -> Result<(), PluginError> {
         services::manifest_grants(manifest)?;
+        if let Some(types) = &manifest.document {
+            types
+                .validate()
+                .map_err(|reason| PluginError::InvalidManifest(reason.into()))?;
+            if manifest.entry.frontend.is_none() {
+                return Err(PluginError::InvalidManifest(
+                    "document renderer requires a frontend".into(),
+                ));
+            }
+        }
         if !valid_slug(&manifest.slug) || manifest.id != format!("taomni-plugin-{}", manifest.slug)
         {
             return Err(PluginError::InvalidManifest("id/slug is invalid".into()));
@@ -601,6 +613,7 @@ fn placeholder_manifest(slug: &str) -> ModuleManifest {
         version: "0.0.0".into(),
         core_api_version: CORE_API_VERSION.into(),
         kind: PluginKind::Media,
+        document: None,
         status: PluginStatus::Provisional,
         removal_candidate: false,
         platforms: BTreeSet::new(),

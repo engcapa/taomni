@@ -80,6 +80,7 @@ export interface ModuleCatalogPlugin {
   version: string;
   coreApiVersion: string;
   kind?: PluginManifest["kind"] | null;
+  document?: PluginManifest["document"];
   permissions?: PluginManifest["permissions"] | null;
   description?: string;
   platforms: Record<string, ModuleCatalogAsset>;

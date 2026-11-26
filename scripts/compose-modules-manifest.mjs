@@ -100,7 +100,15 @@ function validateModuleManifest(input, coreApiVersion) {
   if (input.description !== undefined && typeof input.description !== "string") {
     throw new Error(`module ${slug} has an invalid description`);
   }
+  if (input.document !== undefined) {
+    const declarations = input.document;
+    if (!declarations || Object.keys(declarations).some((key) => !["extensions", "fileKinds"].includes(key)) ||
+        ![declarations.extensions, declarations.fileKinds].every((list) => Array.isArray(list) && list.length > 0 &&
+          list.length <= 64 && new Set(list).size === list.length && list.every((item) => typeof item === "string" && /^[a-z0-9]{1,24}$/.test(item))) ||
+        !input.entry?.frontend) throw new Error(`module ${slug} has invalid document associations`);
+  }
   return { id, slug, version, name: typeof input.name === "string" ? input.name : slug, coreApiVersion, platforms: input.platforms,
+    document: input.document,
     kind: input.kind, permissions: input.permissions?.slice().sort(), description: input.description?.trim(), status: input.status };
 }
 
@@ -199,12 +207,14 @@ export function composeModulesManifest({
       version: manifest.version,
       coreApiVersion: manifest.coreApiVersion,
       ...(manifest.kind !== undefined ? { kind: manifest.kind } : {}),
+      ...(manifest.document ? { document: manifest.document } : {}),
       ...(manifest.permissions !== undefined ? { permissions: manifest.permissions } : {}),
       ...(manifest.description ? { description: manifest.description } : {}),
       platforms: {},
     };
     if (plugin.version !== manifest.version) throw new Error(`Plugin ${manifest.slug} has multiple versions in one release`);
-    if (plugin.name !== manifest.name || plugin.kind !== manifest.kind || JSON.stringify(plugin.permissions) !== JSON.stringify(manifest.permissions)) {
+    if (plugin.name !== manifest.name || plugin.kind !== manifest.kind || JSON.stringify(plugin.permissions) !== JSON.stringify(manifest.permissions)
+      || JSON.stringify(plugin.document) !== JSON.stringify(manifest.document)) {
       throw new Error(`Plugin ${manifest.slug} has inconsistent metadata across platforms`);
     }
     if (plugin.platforms[platform]) throw new Error(`Duplicate plugin target: ${manifest.id}/${platform}`);
