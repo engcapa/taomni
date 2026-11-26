@@ -1,6 +1,8 @@
 """Pure contracts for official artifact identity and the limited native oracle."""
 import hashlib
 import json
+import os
+import subprocess
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -13,7 +15,7 @@ import yaml
 from qa_ui_auto.behavior_contract import is_check
 from qa_ui_auto.ci import capabilities
 from qa_ui_auto.fixtures import sockscap_legacy
-from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key, setup, setup_mfa
+from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key, restore_package_source, setup, setup_mfa
 from qa_ui_auto.module_qa_versions import (
     MAIL_LIFECYCLE_CASE,
     MFA_LIFECYCLE_CASE,
@@ -34,6 +36,23 @@ ROOT = Path(__file__).resolve().parents[4]
 
 
 class OfficialModuleArtifactTests(unittest.TestCase):
+    def test_local_retained_restore_preserves_the_actual_module_revision(self):
+        ctx = SimpleNamespace(case_id="TC-MODULES-104", cfg={})
+        current, retained = "a" * 40, "b" * 40
+        self.assertEqual(restore_package_source(ctx, current, "mfa"), current)
+        ctx.cfg["fixtures"] = {"retained_restore_module_sha": retained}
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}), patch("subprocess.run") as run:
+            self.assertEqual(restore_package_source(ctx, current, "mfa"), retained)
+            self.assertIn("src-tauri/plugins/mfa", run.call_args.args[0])
+            run.side_effect = subprocess.CalledProcessError(1, "git")
+            with self.assertRaises(subprocess.CalledProcessError):
+                restore_package_source(ctx, current, "mfa")
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), self.assertRaises(RuntimeError):
+            restore_package_source(ctx, current, "mfa")
+        ctx.case_id = "TC-MODULES-038"
+        with self.assertRaises(RuntimeError):
+            restore_package_source(ctx, current, "mfa")
+
     def artifact(self, root, slug="hello-plugin"):
         name = f"taomni-plugin-{slug}-0.1.0-linux-x86_64.taomni-plugin"
         archive = root / name
