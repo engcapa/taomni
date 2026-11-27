@@ -71,7 +71,8 @@ def observe_mobile(executable, work, evidence, source):
                 server.server_close()
             if owner.poll() is not None:
                 raise RuntimeError("Installed desktop exited during the Mobile permission checks")
-            record["passed"] = True
+            # The installed core checks macOS Accessibility before sending window input.
+            record.update(passed=True, accessibility="granted")
             return record
     finally:
         write_json(evidence / "installed-macos-mobile.json", record)

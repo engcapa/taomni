@@ -107,10 +107,6 @@ def exercise_desktop_contracts(candidate, desktop_profile, stages, args, identit
             stages["candidatePermissions"] = observe_permissions(
                 candidate, report, "candidate", work=work, screenshot_only=first_release is None,
             )
-            if permission_failure is None:
-                stages["permissionContinuity"] = compare_permissions(
-                    stages["originalPermissions"], stages["candidatePermissions"],
-                )
         except Exception as error:
             permission_failure = permission_failure or error
             stages["candidatePermissions"] = {"error": str(error)}
@@ -125,12 +121,20 @@ def exercise_desktop_contracts(candidate, desktop_profile, stages, args, identit
         except Exception as error:
             permission_failure = permission_failure or error
             stages["mfaScreenScan"] = {"passed": False, "error": str(error)}
-    if system == "Darwin" and first_release is not None:
+    if system == "Darwin":
         try:
             stages["mobileDesktop"] = observe_mobile(candidate, work, report, identity["producerSource"])
         except Exception as error:
             permission_failure = permission_failure or error
             stages["mobileDesktop"] = {"passed": False, "error": str(error)}
+        if permission_failure is None:
+            candidate_permissions = stages["candidatePermissions"]
+            if first_release is None:
+                mobile = stages["mobileDesktop"]
+                if mobile["installedBinarySha256"] != candidate_permissions["binarySha256"]:
+                    return recovery_failure, RuntimeError("The Mobile input and Screen Recording checks used different installed binaries")
+                candidate_permissions = {**candidate_permissions, "accessibility": mobile["accessibility"]}
+            stages["permissionContinuity"] = compare_permissions(stages["originalPermissions"], candidate_permissions)
     return recovery_failure, permission_failure
 
 
@@ -281,7 +285,7 @@ def execute(args):
         continuity = stages.get("permissionContinuity")
         if continuity and continuity["lostGrants"]:
             raise RuntimeError("The installed upgrade lost a previously granted macOS permission")
-        if origin and system == "Darwin" and not (continuity and continuity["retainedBothGrants"]):
+        if system == "Darwin" and not (continuity and continuity["retainedBothGrants"]):
             raise RuntimeError("The installed upgrade did not establish both macOS grants under the same identity")
         if resource_failures:
             raise RuntimeError(f"Installed core resource samples are incomplete: {resource_failures}")

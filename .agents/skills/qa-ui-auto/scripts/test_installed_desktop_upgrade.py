@@ -117,14 +117,18 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
         desktop = {"profile": str(profile), "desktopOwnerPid": 21, "generation": "candidate"}
         receipt = {"passed": True, "desktopModeLease": desktop}
         initial = {"screenRecording": "granted", "accessibility": "granted", "requirement": "fixed"}
+        screenshot = {"screenRecording": "granted", "requirement": "fixed", "binarySha256": "candidate"}
+        input_receipt = {"passed": True, "accessibility": "granted", "installedBinarySha256": "candidate"}
         stages = {"originalPermissions": initial}
         with patch("installed_desktop_upgrade.platform.system", return_value="Darwin"), patch(
             "installed_desktop_upgrade.verify_crash_recovery", return_value=receipt,
         ) as migrate, patch("installed_desktop_upgrade.check_mode_lease") as fresh_mode, patch(
             "installed_desktop_upgrade.finish_first_release_mode_lease",
         ) as mode, patch(
-            "installed_desktop_upgrade.observe_permissions", return_value=initial,
-        ) as permissions, patch("installed_desktop_upgrade.observe_hosted_screen_scan"):
+            "installed_desktop_upgrade.observe_permissions", return_value=screenshot,
+        ) as permissions, patch("installed_desktop_upgrade.observe_hosted_screen_scan"), patch(
+            "installed_desktop_upgrade.observe_mobile", return_value=input_receipt,
+        ) as mobile:
             order = Mock()
             order.attach_mock(migrate, "migrate")
             order.attach_mock(mode, "open")
@@ -137,6 +141,9 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
         fresh_mode.assert_not_called()
         mode.assert_called_once_with("app", "work", "evidence", desktop)
         permissions.assert_called_once_with("app", "evidence", "candidate", work="work", screenshot_only=True)
+        mobile.assert_called_once_with("app", "work", "evidence", "source")
+        self.assertEqual(stages["mobileDesktop"], input_receipt)
+        self.assertTrue(stages["permissionContinuity"]["retainedBothGrants"])
 
     def test_windows_retries_inspection_after_timeout_with_one_msi_install(self):
         with TemporaryDirectory() as directory:
