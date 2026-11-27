@@ -3,6 +3,7 @@ pub(crate) mod archive;
 mod assets;
 mod chunks;
 pub(crate) mod document_access;
+pub(crate) mod document_copy;
 #[cfg(any(target_os = "macos", test))]
 mod drawio_frame;
 mod filesystem;

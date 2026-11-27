@@ -118,6 +118,9 @@ def setup(ctx: Any) -> None:
         files["damaged.pdf"] = b"This is not a PDF."
         ctx.values["taoffice_pdf_sha"] = hashlib.sha256(files["report.pdf"]).hexdigest()
         ctx.values["taoffice_locked_pdf_sha"] = hashlib.sha256(files["locked.pdf"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-017", "TC-TAOFFICE-018"}:
+        files["order-form.pdf"] = (TAOFFICE_ASSETS / "order-form.pdf").read_bytes()
+        ctx.values["taoffice_pdf_form_sha"] = hashlib.sha256(files["order-form.pdf"]).hexdigest()
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative

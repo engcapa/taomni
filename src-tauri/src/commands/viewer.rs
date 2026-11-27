@@ -85,6 +85,33 @@ async fn viewer_document_read(
 }
 
 #[tauri::command]
+async fn viewer_document_save_copy(
+    path: String,
+    slug: String,
+    version: String,
+    bytes: Vec<u8>,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let registry = state.plugins.clone();
+    let profile = state.core.paths.clone();
+    on_worker(move || {
+        let protected = [&*profile.data, &*profile.config, &*profile.cache];
+        let source =
+            viewer::document_access::approved_path(&registry, &protected, &path, &slug, &version)?;
+        viewer::document_copy::validate(&source, &bytes)?;
+        let name = viewer::document_copy::suggested_name(&source)?;
+        let parent = source.parent().map(viewer::display_path);
+        let Some(selected) = crate::config::select_save_file_path(Some(name), parent)? else {
+            return Ok(None);
+        };
+        let source =
+            viewer::document_access::approved_path(&registry, &protected, &path, &slug, &version)?;
+        viewer::document_copy::write(&source, &selected, &protected, &bytes).map(Some)
+    })
+    .await
+}
+
+#[tauri::command]
 fn viewer_media_close(token: String) {
     viewer::media_stream::close(&token);
 }
@@ -245,6 +272,7 @@ pub(super) fn handles(command: &str) -> bool {
             | "viewer_archive_extract"
             | "viewer_media_open"
             | "viewer_document_read"
+            | "viewer_document_save_copy"
             | "viewer_media_close"
             | "viewer_read_text"
             | "viewer_read_bytes"
@@ -272,6 +300,7 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::commands::viewer::viewer_archive_extract,
         crate::commands::viewer::viewer_media_open,
         crate::commands::viewer::viewer_document_read,
+        crate::commands::viewer::viewer_document_save_copy,
         crate::commands::viewer::viewer_media_close,
         crate::commands::viewer::viewer_read_text,
         crate::commands::viewer::viewer_read_bytes,

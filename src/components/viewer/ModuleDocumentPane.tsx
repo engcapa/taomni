@@ -9,7 +9,9 @@ import { useModuleMarketplaceStore } from "../../stores/moduleMarketplaceStore";
 import { openSettingsSection } from "../../lib/settingsNavigation";
 import { getAppPlatform, type AppPlatform } from "../../lib/runtime";
 import { basename, sftpOpenPath } from "../../lib/sftp";
-import { openDocumentMedia, readModuleDocument, type MediaSourceLease } from "../../lib/openFile/mediaStream";
+import { openDocumentMedia, readModuleDocument, saveModuleDocumentCopy, type MediaSourceLease } from "../../lib/openFile/mediaStream";
+import { trackModuleDocumentDraft } from "../../lib/openFile/closeGuard";
+import type { ModuleDocumentDraft } from "../../stores/documentStore";
 import { PluginTabPane } from "../plugins/PluginTabPane";
 import { useViewerLabels } from "./viewerLabels";
 import "./moduleDocument.css";
@@ -22,6 +24,8 @@ export interface ModuleDocumentInput {
     platform: AppPlatform;
     readOnly: boolean;
     read: () => Promise<Blob>;
+    saveCopy?: (bytes: Uint8Array) => Promise<string | null>;
+    trackDraft?: (draft: Omit<ModuleDocumentDraft, "path">) => () => void;
     openMedia: (mime: string) => Promise<MediaSourceLease>;
     openSystem: () => Promise<void>;
   };
@@ -59,7 +63,17 @@ export function ModuleDocumentPane({ viewer, active }: { viewer: FileViewerTabIn
       }
     };
     const leases = new Set<MediaSourceLease>();
-    setInput({ document: { name, extension, platform: getAppPlatform(), readOnly, openMedia: async (mime) => {
+    const drafts = new Set<() => void>();
+    const trackDraft = readOnly ? undefined : (draft: Omit<ModuleDocumentDraft, "path">) => {
+      ensureCurrent();
+      const release = trackModuleDocumentDraft({ path, ...draft });
+      drafts.add(release);
+      return () => { if (drafts.delete(release)) release(); };
+    };
+    setInput({ document: { name, extension, platform: getAppPlatform(), readOnly, trackDraft, saveCopy: readOnly ? undefined : async (bytes) => {
+      ensureCurrent();
+      return saveModuleDocumentCopy(path, name, slug, version, bytes);
+    }, openMedia: async (mime) => {
       ensureCurrent();
       const lease = await openDocumentMedia(path, mime, slug, version);
       try { ensureCurrent(); } catch (error) { lease.close(); throw error; }
@@ -78,6 +92,8 @@ export function ModuleDocumentPane({ viewer, active }: { viewer: FileViewerTabIn
       alive = false;
       for (const lease of leases) lease.close();
       leases.clear();
+      for (const release of drafts) release();
+      drafts.clear();
     };
   }, [enabled, path, name, extension, slug, epoch, version, readOnly]);
 

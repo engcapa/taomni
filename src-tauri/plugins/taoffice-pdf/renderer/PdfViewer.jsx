@@ -3,6 +3,7 @@ import { MAX_PAGE_SCALE, MIN_PAGE_SCALE, pageNumber, stepPageScale } from "./pdf
 import { PdfPage } from "./PdfPage.jsx";
 import { PdfOutline, PdfSearch } from "./PdfNavigation.jsx";
 import { PdfPassword } from "./PdfPassword.jsx";
+import { PdfForms } from "./PdfForms.jsx";
 import styles from "./pdfViewer.css?inline";
 
 const { React, i18n } = globalThis.__taomniHost;
@@ -25,10 +26,13 @@ export default function PdfViewer({ document: source, active }) {
   const [viewportWidth, setViewportWidth] = useState(0);
   const [navigation, setNavigation] = useState(null);
   const [highlight, setHighlight] = useState("");
+  const [hasForms, setHasForms] = useState(false);
+  const saveForm = useRef(null);
   const viewport = useRef(null);
   const searchInput = useRef(null);
   const searchReturnFocus = useRef(null);
   const outlineButton = useRef(null);
+  const formButton = useRef(null);
   const isMac = source.platform === "macos";
   const modifier = isMac ? "⌘" : "Ctrl";
 
@@ -38,6 +42,7 @@ export default function PdfViewer({ document: source, active }) {
     setPdf(null);
     setFailure("");
     setChallenge(null);
+    setHasForms(false);
     if (cancelled) return;
     async function load() {
       const bytes = await (await source.read()).arrayBuffer();
@@ -97,6 +102,7 @@ export default function PdfViewer({ document: source, active }) {
     const mod = isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
     if (!mod) return;
     if (event.key === "f" && !event.shiftKey) openSearch(event.currentTarget);
+    else if (event.key === "s" && !event.shiftKey && saveForm.current) void saveForm.current().catch(() => {});
     else if (!scale) return;
     else if (event.key === "+" || event.key === "=" || event.code === "NumpadAdd") changeZoom(1);
     else if (event.key === "-" || event.code === "NumpadSubtract") changeZoom(-1);
@@ -153,6 +159,10 @@ export default function PdfViewer({ document: source, active }) {
         disabled={!pdf} aria-expanded={navigation === "outline"} onClick={() => changeNavigation("outline")}>
         {label("大纲", "Outline")}
       </button>
+      {hasForms && <button ref={formButton} type="button" className="taomni-btn" data-testid="taoffice-pdf-form-toggle"
+        aria-expanded={navigation === "form"} onClick={() => changeNavigation("form")}>
+        {label("表单字段", "Form fields")}
+      </button>}
     </div>
     {pageError && <p role="alert" data-testid="taoffice-pdf-page-error">
       {label("请输入文档范围内的页码。", "Enter a page number within the document.")}</p>}
@@ -161,6 +171,9 @@ export default function PdfViewer({ document: source, active }) {
       onClose={closeSearch} />}
     {pdf && navigation === "outline" && <PdfOutline pdf={pdf} label={label} onGo={go}
       onClose={() => { changeNavigation(null); outlineButton.current?.focus(); }} />}
+    {pdf && <PdfForms pdf={pdf} source={source} label={label} active={active} expanded={navigation === "form"}
+      onForms={setHasForms} saveAction={saveForm} onPage={go}
+      onClose={() => { changeNavigation(null); formButton.current?.focus(); }} />}
     <div className="taoffice-pdf-viewport" ref={viewport} tabIndex={0} aria-label={source.name}
       data-testid="taoffice-pdf-viewport" onKeyDown={onViewportKey}>
       {failure && <div className="taoffice-pdf-error">

@@ -8,10 +8,12 @@ import { documentPathKey } from "../../lib/openFile/pathIdentity";
 import { useViewerLabels } from "./viewerLabels";
 import "./viewer.css";
 import { useFocusReturn } from "../editor/workspace/useFocusReturn";
+import { discardViewerChanges, saveViewerChanges } from "../../lib/openFile/closeGuard";
 
 export function ViewerCloseDialog() {
   const label = useViewerLabels();
   const request = useDocumentStore((state) => state.closeRequest);
+  const moduleDrafts = useDocumentStore((state) => state.moduleDrafts ?? {});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
@@ -37,6 +39,21 @@ export function ViewerCloseDialog() {
   }, [request, busy]);
   if (!request) return null;
   const finish = () => { useDocumentStore.setState({ closeRequest: undefined }); request.proceed(); };
+  const savesCopy = request.paths.some((path) => moduleDrafts[documentPathKey(path)]);
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      for (const path of request.paths) {
+        if (!(await saveViewerChanges(path))) return;
+      }
+      finish();
+    } catch (failure) {
+      setError(String(failure));
+    } finally {
+      setBusy(false);
+    }
+  };
   const keepDraft = () => {
     // Persist the recovery copy before the close callback releases the viewer.
     // Small buffers go to localStorage, oversized/unstorable buffers to the
@@ -63,7 +80,15 @@ export function ViewerCloseDialog() {
     <p>{request.paths.map((path) => <span style={{ display: "block" }} key={path}>{path}</span>)}</p>
     {request.paths.some((path) => useDocumentStore.getState().documents[documentPathKey(path)]?.external) && <p>{label("磁盘版本已更改。取消关闭后可在文件横幅比较差异、重新加载或保留我的版本。", "The disk version changed. Cancel closing to compare, reload or keep your version in the file banner.")}</p>}
     {error && <p role="alert" data-testid="viewer-close-error">{error}</p>}
-    <footer><button className="fv-button outline" data-testid="viewer-close-cancel" disabled={busy} onClick={cancel}>{label("取消", "Cancel")}</button><button className="fv-button" data-testid="viewer-close-discard" disabled={busy} onClick={() => { request.paths.forEach((path) => useDocumentStore.getState().discard(path)); finish(); }}>{label("不保存", "Discard")}</button><button className="fv-button outline" data-testid="viewer-close-keep-draft" disabled={busy} onClick={keepDraft}>{label("保留草稿", "Keep draft")}</button><button autoFocus className="fv-button primary" data-testid="viewer-close-save" disabled={busy} onClick={() => { setBusy(true); setError(null); void (async () => { try { for (const path of request.paths) await useDocumentStore.getState().save(path); finish(); } catch (failure) { setError(String(failure)); } finally { setBusy(false); } })(); }}>{label("保存", "Save")}</button></footer>
+    <footer>
+      <button className="fv-button outline" data-testid="viewer-close-cancel" disabled={busy} onClick={cancel}>{label("取消", "Cancel")}</button>
+      <button className="fv-button" data-testid="viewer-close-discard" disabled={busy}
+        onClick={() => { request.paths.forEach(discardViewerChanges); finish(); }}>{label("不保存", "Discard")}</button>
+      {!savesCopy && <button className="fv-button outline" data-testid="viewer-close-keep-draft" disabled={busy} onClick={keepDraft}>{label("保留草稿", "Keep draft")}</button>}
+      <button autoFocus className="fv-button primary" data-testid="viewer-close-save" disabled={busy} onClick={() => void save()}>
+        {savesCopy ? label("保存更改…", "Save changes…") : label("保存", "Save")}
+      </button>
+    </footer>
   </div></div></div>, document.body);
 }
 

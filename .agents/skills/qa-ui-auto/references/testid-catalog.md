@@ -1488,6 +1488,11 @@
 - `[data-testid="taoffice-media-player"]` — display — F-FILEOPEN-1.taoffice-media-player
 - `[data-testid="taoffice-media-error"]` — display — F-FILEOPEN-1.taoffice-media-error
 - `[data-testid="taoffice-media-retry"]` — interactive — F-FILEOPEN-1.taoffice-media-retry
+- `[data-testid="taoffice-pdf-form-toggle"]` — interactive — F-FILEOPEN-1.taoffice-pdf-form-toggle
+- `[data-testid="taoffice-pdf-form"]` — display — F-FILEOPEN-1.taoffice-pdf-form
+- `[data-testid="taoffice-pdf-form-field"]` — interactive — F-FILEOPEN-1.taoffice-pdf-form-field
+- `[data-testid="taoffice-pdf-save-copy"]` — interactive — F-FILEOPEN-1.taoffice-pdf-save-copy
+- `[data-testid="taoffice-pdf-copy-output"]` — display — F-FILEOPEN-1.taoffice-pdf-copy-output
 - `[data-testid="taoffice-pdf-page"]` — display — F-FILEOPEN-1.taoffice-pdf-page
 - `[data-testid="taoffice-pdf-viewport"]` — interactive — F-FILEOPEN-1.taoffice-pdf-viewport
 - `[data-testid="taoffice-pdf-find"]` — interactive — F-FILEOPEN-1.taoffice-pdf-find

@@ -1,0 +1,49 @@
+id: TC-TAOFFICE-017
+title: Fill PDF fields and save a copy from the shared close dialog
+description: Edit real AcroForm text and a checkbox, restore focus when closing the form, and export a new PDF through the viewer's dirty-close dialog.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-pdf]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 160
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-pdf.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="order-form.pdf"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="order-form.pdf"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"]'
+- click: '[data-testid="taoffice-pdf-form-toggle"]'
+- wait_for: '[data-testid="taoffice-pdf-form"]:focus'
+- assert_attribute: {selector: '[data-testid="taoffice-pdf-form-field"][data-field="Contact"]', name: value, equals: Rowan}
+- fill: {selector: '[data-testid="taoffice-pdf-form-field"][data-field="Contact"]', value: Avery}
+- click: '[data-testid="taoffice-pdf-form-field"][data-field="Approved"]'
+- eval_readonly:
+    expression: document.querySelector('input[data-field]:checked')?.dataset.field === "Approved"
+    expect_truthy: true
+- wait_for: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
+- screenshot: taoffice-pdf-form.png
+- press: {selector: '[data-testid="taoffice-pdf-form-field"][data-field="Contact"]', key: Escape}
+- wait_for: '[data-testid="taoffice-pdf-form-toggle"]:focus'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="viewer-close-dialog"]'
+- click: '[data-testid="viewer-close-cancel"]'
+- wait_for: {selector: '[data-testid="viewer-close-dialog"]', state: detached}
+- click: '[data-testid="taoffice-pdf-form-toggle"]'
+- assert_attribute: {selector: '[data-testid="taoffice-pdf-form-field"][data-field="Contact"]', name: value, equals: Avery}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- assert_download:
+    trigger: '[data-testid="viewer-close-save"]'
+    filename: order-form - copy.pdf
+    contains: ['%PDF-', Avery]
+- wait_for: {selector: '[data-testid="taoffice-pdf-page"]', state: detached}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/order-form.pdf', sha256: '${fixture.taoffice_pdf_form_sha}'}
+- assert_no_runtime_errors: null

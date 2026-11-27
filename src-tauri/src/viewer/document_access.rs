@@ -9,16 +9,7 @@ pub(crate) fn approved_path(
     version: &str,
 ) -> Result<PathBuf, String> {
     let path = super::paths::absolute(path)?;
-    for root in protected {
-        match root.canonicalize() {
-            Ok(root) if path.starts_with(&root) => {
-                return Err("permission: Application profile files are private".into());
-            }
-            Ok(_) => (),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
-            Err(error) => return Err(super::paths::io_error("resolve profile directory", error)),
-        }
-    }
+    reject_profile_paths(protected, &path)?;
     let extension = path
         .extension()
         .and_then(|ext| ext.to_str())
@@ -36,4 +27,18 @@ pub(crate) fn approved_path(
         return Err("permission: Module is not enabled for this document".into());
     }
     Ok(path)
+}
+
+pub(super) fn reject_profile_paths(protected: &[&Path], path: &Path) -> Result<(), String> {
+    for root in protected {
+        match root.canonicalize() {
+            Ok(root) if path.starts_with(&root) => {
+                return Err("permission: Application profile files are private".into());
+            }
+            Ok(_) => (),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+            Err(error) => return Err(super::paths::io_error("resolve profile directory", error)),
+        }
+    }
+    Ok(())
 }

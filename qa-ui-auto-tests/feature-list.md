@@ -16759,6 +16759,7 @@ TC-TAOFFICE-009 验证核心查看器打开 gzip TAR、清除筛选与恢复焦�
 TC-TAOFFICE-010 验证单文件 gzip 预览、直接解压成文件，以及重复解压时保留原有内容。
 TC-TAOFFICE-011 验证原生 7z 固实压缩包的预览和解压，TC-TAOFFICE-012 验证浏览器预览显示桌面打开提示。
 TC-TAOFFICE-013 覆盖原生固实 RAR4/RAR5 解码、只读预览、准确解压和加密包提示。TC-TAOFFICE-014 覆盖浏览器桌面打开提示。
+TC-TAOFFICE-017/018 覆盖 PDF 表单填写、关闭守卫、保存副本和原生文件重新打开。
 
 <!-- feature
 id: F-FILEOPEN-1
@@ -16923,6 +16924,21 @@ controls:
   - id: taoffice-media-retry
     selector: '[data-testid="taoffice-media-retry"]'
     kind: interactive
+  - id: taoffice-pdf-form-toggle
+    selector: '[data-testid="taoffice-pdf-form-toggle"]'
+    kind: interactive
+  - id: taoffice-pdf-form
+    selector: '[data-testid="taoffice-pdf-form"]'
+    kind: display
+  - id: taoffice-pdf-form-field
+    selector: '[data-testid="taoffice-pdf-form-field"]'
+    kind: interactive
+  - id: taoffice-pdf-save-copy
+    selector: '[data-testid="taoffice-pdf-save-copy"]'
+    kind: interactive
+  - id: taoffice-pdf-copy-output
+    selector: '[data-testid="taoffice-pdf-copy-output"]'
+    kind: display
   - id: taoffice-pdf-page
     selector: '[data-testid="taoffice-pdf-page"]'
     kind: display

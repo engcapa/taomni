@@ -13,8 +13,14 @@ import { useNotepadPreferences } from "./notepadPreferences";
 import { useNotepadStore } from "./notepadStore";
 
 export interface ViewerCloseRequest { paths: string[]; proceed: () => void; cancel?: () => void }
+export interface ModuleDocumentDraft {
+  path: string;
+  save: () => Promise<boolean>;
+  discard: () => void;
+}
 interface DocumentState {
   documents: Record<string, ViewerDocument>;
+  moduleDrafts: Record<string, ModuleDocumentDraft>;
   closeRequest?: ViewerCloseRequest;
   draftError?: string;
   open: (path: string, readOnlyReason?: string, forceEdit?: boolean) => Promise<void>;
@@ -80,6 +86,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
   });
   return {
     documents: {},
+    moduleDrafts: {},
     createUntitled(docId, options) {
       const key = documentPathKey(docId);
       const existing = get().documents[key];

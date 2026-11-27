@@ -215,6 +215,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "viewer_archive_extract"
         | "viewer_media_open"
         | "viewer_document_read"
+        | "viewer_document_save_copy"
         | "viewer_media_close"
         | "viewer_read_text"
         | "viewer_read_bytes"
