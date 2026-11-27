@@ -1,6 +1,6 @@
 [package]
 name = "taomni-plugin-vnc-server"
-version = "0.1.2"
+version = "0.1.3"
 description = "Supervised system VNC server for Taomni"
 edition = "2024"
 rust-version = "1.94"
