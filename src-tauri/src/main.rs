@@ -7,6 +7,9 @@ mod windows_update_relaunch;
 fn main() {
     let mut args = std::env::args_os().skip(1);
     let first = args.next();
+    if first.as_deref().and_then(std::ffi::OsStr::to_str) == Some(taomni_lib::PLUGIN_WATCHDOG_ARG) {
+        std::process::exit(taomni_lib::run_plugin_watchdog(args));
+    }
     let maintenance = match first.as_deref().and_then(std::ffi::OsStr::to_str) {
         Some(taomni_lib::MAIL_MAINTENANCE_ARG) => Some(taomni_lib::run_mail_maintenance(args)),
         Some(taomni_lib::MFA_MAINTENANCE_ARG) => Some(taomni_lib::run_mfa_maintenance(args)),
@@ -34,5 +37,6 @@ fn main() {
     if windows_update_relaunch::handoff_to_desktop() {
         return;
     }
+    taomni_lib::enable_plugin_watchdog_exec();
     taomni_lib::run();
 }

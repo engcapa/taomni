@@ -78,6 +78,8 @@ pub(crate) const QA_APP_ID: &str = "com.taomni.app.qa";
 static QA_PROFILE_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[doc(hidden)]
+pub use plugin::host::{PLUGIN_WATCHDOG_ARG, enable_plugin_watchdog_exec, run_plugin_watchdog};
+#[doc(hidden)]
 pub use runtime::mail_maintenance::{MAIL_MAINTENANCE_ARG, run_mail_maintenance};
 #[doc(hidden)]
 pub use runtime::mfa_maintenance::{MFA_MAINTENANCE_ARG, run_mfa_maintenance};
