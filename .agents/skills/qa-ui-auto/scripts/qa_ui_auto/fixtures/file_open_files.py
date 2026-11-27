@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from . import platform_workspace_root, mail_server
 from .taoffice_pdf import document as pdf_fixture
+from .taoffice_tar import archives as tar_fixtures
 from .explorer_files import PNG
 
 TEXT = "File open original\nSecond line\n中文\n"
@@ -79,6 +80,9 @@ def setup(ctx: Any) -> None:
             bundle.writestr("file.txt", "First entry is safe.")
             bundle.writestr("../notes.txt", "This entry must be rejected.")
         files["unsafe.zip"] = rejected.getvalue()
+    if ctx.case_id == "TC-TAOFFICE-009":
+        files.update(tar_fixtures(TEXT.encode(), PNG))
+        ctx.values["taoffice_tar_sha"] = hashlib.sha256(files["quarterly.TAR.GZ"]).hexdigest()
     if ctx.case_id in {"TC-TAOFFICE-003", "TC-TAOFFICE-005"}:
         wav = io.BytesIO()
         with wave.open(wav, "wb") as audio:

@@ -23,6 +23,7 @@ export function ArchiveViewer({ viewer, active = true, workspaceId, host }: {
   const [error, setError] = useState("");
   const [output, setOutput] = useState("");
   const [working, setWorking] = useState(false);
+  const filterInput = useRef<HTMLInputElement>(null);
   const busy = useRef(false);
   const alive = useRef(true);
   useEffect(() => {
@@ -71,12 +72,27 @@ export function ArchiveViewer({ viewer, active = true, workspaceId, host }: {
   }
   const matching = (entries ?? []).filter((item) => item.name.toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
   const visible = matching.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  function clearFilter() {
+    setFilter("");
+    setPage(0);
+    filterInput.current?.focus();
+  }
   return <section className="fv archive-viewer" data-testid="file-viewer" data-kind="archive" data-active={active} data-path={path}>
     <header>
       <h2>{basename(path)}</h2>
-      <input type="search" className="taomni-input" aria-label={label("筛选条目", "Filter entries")}
+      <input ref={filterInput} type="search" className="taomni-input" aria-label={label("筛选条目", "Filter entries")}
         data-testid="archive-filter" placeholder={label("筛选条目", "Filter entries")} value={filter}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && filter && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            event.stopPropagation();
+            clearFilter();
+          }
+        }}
         onChange={(event) => { setFilter(event.target.value); setPage(0); }} />
+      {filter && <button type="button" className="taomni-btn" data-testid="archive-filter-clear" onClick={clearFilter}>
+        {label("清除筛选", "Clear filter")}
+      </button>}
       <button className="taomni-btn" disabled={working} onClick={() => setRevision((n) => n + 1)}>{label("重新加载", "Reload")}</button>
       {!viewer.readOnlyReason && viewer.source !== "remote-temp" && viewer.source !== "mail-attachment" &&
         <button className="taomni-btn" disabled={working || !entries?.length} data-testid="archive-extract-here"

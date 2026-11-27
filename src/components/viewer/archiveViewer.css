@@ -8,6 +8,7 @@
 .archive-list { flex: 1; min-height: 0; overflow: auto; }
 .archive-list table { border-collapse: collapse; width: 100%; }
 .archive-list :is(td, th) { text-align: start; padding: .4em .55em; border-bottom: 1px solid var(--taomni-card-border); }
+.archive-list th { position: sticky; top: 0; background: var(--taomni-panel-bg); }
 .archive-list td { overflow-wrap: anywhere; user-select: text; }
 .archive-list td:nth-child(2) { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .archive-list td button { margin: .15em; }

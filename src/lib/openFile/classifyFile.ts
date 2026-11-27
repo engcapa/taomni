@@ -1,4 +1,5 @@
 import { officialDocumentFormats } from "./documentFormats";
+import { isArchiveName } from "./archiveFormats";
 
 export type FileKind = "image" | "svg" | "text" | "markdown" | "html" | "pdf" | "document" | "archive" | "source" | "binary";
 
@@ -26,7 +27,7 @@ export function classifyFile(path: string): FileKind {
   if (extension === "md" || extension === "markdown" || extension === "mdown") return "markdown";
   if (extension === "html" || extension === "htm") return "html";
   if (extension === "pdf") return "pdf";
-  if (extension === "zip" || extension === "cbz") return "archive";
+  if (isArchiveName(name)) return "archive";
   if (officialDocumentFormats.has(extension)) return "document";
   if (sourceNames.has(name) || source.has(extension)) return "source";
   if (textNames.has(name) || text.has(extension) || name.startsWith(".env.")) return "text";

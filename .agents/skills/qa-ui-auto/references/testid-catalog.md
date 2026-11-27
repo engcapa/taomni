@@ -1479,6 +1479,7 @@
 - `[data-testid="delimited-source"]` — interactive — F-FILEOPEN-1.delimited-source
 - `[data-testid="taoffice-media"]` — display — F-FILEOPEN-1.taoffice-media
 - `[data-testid="archive-filter"]` — interactive — F-FILEOPEN-1.archive-filter
+- `[data-testid="archive-filter-clear"]` — interactive — F-FILEOPEN-1.archive-filter-clear
 - `[data-testid="archive-entry"]` — display — F-FILEOPEN-1.archive-entry
 - `[data-testid="archive-extract-here"]` — interactive — F-FILEOPEN-1.archive-extract-here
 - `[data-testid="archive-preview"]` — interactive — F-FILEOPEN-1.archive-preview

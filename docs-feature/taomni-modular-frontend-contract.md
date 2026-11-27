@@ -20,6 +20,8 @@
 
 TaOffice PDF 与 TaOffice Media 声明了独立版本和四个包平台，两者均为纯前端模块。PDF.js、worker、字体和解码资产随 PDF 包签名。媒体模块使用平台 WebView 解码。模块自身不写入用户文件或持有业务数据，清单中的备份路径和旧表迁移列表均为空。
 
+核心归档查看器支持 ZIP/CBZ、TAR 和 gzip、bzip2、xz、Zstandard 压缩的 TAR。原生命令按条目读取并校验展开范围，在目标目录下暂存结果，校验完成后以禁止覆盖的方式提交。TC-TAOFFICE-006/009 覆盖核心归档视图和实际文件字节，TC-TAOFFICE-009 同时进入纯核心崩溃回归。浏览器预览支持常规 USTAR 和 gzip TAR，其他 TAR 编码及扩展头由桌面应用处理。
+
 PDF 工具栏使用应用按钮和字号。文档区域聚焦时，Windows/Linux 使用 Ctrl+F、Ctrl+=、Ctrl+-、Ctrl+0，macOS 使用 ⌘F、⌘=、⌘-、⌘0。查找输入接受 Enter 和 ↑/↓，在匹配页之间移动时保留输入焦点。Esc 回到原按钮或文档区域。按钮提示显示对应平台键位。TC-TAOFFICE-007 覆盖 UI-FND-13、UI-PAT-05/15 和 UI-ZOOM-02/03，TC-TAOFFICE-008 在原生 WebView 中验证查找、大纲跳转及缩放。媒体模块播放地址被 WebView 拒绝时，通过同一文档授权读取上限为 32 MiB 的本地 Blob，再尝试播放一次。
 
 核心在求值 ESM 前安装只读的 `globalThis.__taomniHost`。模块不能打包第二份 React；共享 hooks 必须使用该对象里的 React 实例。

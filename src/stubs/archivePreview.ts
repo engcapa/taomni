@@ -1,11 +1,10 @@
 import { inflateZipEntry, parseZipCentralDirectory } from "../lib/sessionImportExport/archive";
 import type { ArchiveEntry } from "../lib/openFile/archive";
+import { archiveFolderName, tarSuffix } from "../lib/openFile/archiveFormats";
 import { basenameOf, vfsMkdir, vfsReadBytes, vfsRemove, vfsRename, vfsStat, vfsWriteBytes } from "./localVfs";
+import { tarDirectory } from "./tarPreview";
 
-async function directory(path: string) {
-  const stat = await vfsStat(path);
-  if (stat.size > 64 * 1024 * 1024) throw new Error("ZIP input exceeds 64 MiB");
-  const bytes = new Uint8Array(await vfsReadBytes(path));
+async function zipDirectory(bytes: Uint8Array) {
   const records = parseZipCentralDirectory(bytes);
   if (records.length > 4096) throw new Error("ZIP directory exceeds 4,096 entries");
   let total = 0;
@@ -31,7 +30,11 @@ async function directory(path: string) {
 
 export async function invokeArchive(command: string, path: string, args: Record<string, unknown>,
   createTemp: (name: string, data: ArrayBuffer) => Promise<unknown>) {
-  const { entries, content } = await directory(path);
+  const stat = await vfsStat(path);
+  if (stat.size > 64 * 1024 * 1024) throw new Error("Archive input exceeds 64 MiB");
+  const bytes = await vfsReadBytes(path);
+  const suffix = tarSuffix(basenameOf(path));
+  const { entries, content } = suffix ? await tarDirectory(bytes, suffix) : await zipDirectory(new Uint8Array(bytes));
   if (command === "viewer_archive_list") return entries;
   const selected = args.entry as ArchiveEntry | undefined;
   const entry = selected && entries[selected.index];
@@ -42,7 +45,7 @@ export async function invokeArchive(command: string, path: string, args: Record<
   if (command !== "viewer_archive_extract") throw new Error("Expected an archive extraction");
   const dest = String(args.destination);
   const folder = dest + "/.taomni-extract-" + crypto.randomUUID();
-  const target = dest + "/" + (entry ? basenameOf(entry.name) : basenameOf(path).replace(/\.[^.]+$/, ""));
+  const target = dest + "/" + (entry ? basenameOf(entry.name) : archiveFolderName(basenameOf(path)));
   await vfsMkdir(folder);
   try {
     const created = new Set([folder]);
