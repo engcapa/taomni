@@ -1,12 +1,14 @@
 import { TextLayer } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { canvasScale, fitPageScale } from "./pdfGeometry.js";
+import { normalizePdfText } from "./pdfNavigation.js";
 
 const { React } = globalThis.__taomniHost;
 const { useEffect, useRef, useState } = React;
 
-export function PdfPage({ pdf, number, zoom, rotation, viewportWidth, label }) {
+export function PdfPage({ pdf, number, zoom, rotation, viewportWidth, highlight, onScale, label }) {
   const canvas = useRef(null);
   const layer = useRef(null);
+  const textSpans = useRef([]);
   const [dimensions, setDimensions] = useState(null);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
@@ -27,10 +29,14 @@ export function PdfPage({ pdf, number, zoom, rotation, viewportWidth, label }) {
       surface.width = Math.max(1, Math.floor(viewport.width * output));
       surface.height = Math.max(1, Math.floor(viewport.height * output));
       setDimensions({ width: viewport.width, height: viewport.height, "--total-scale-factor": scale });
+      onScale(scale);
       render = page.render({ canvas: surface, viewport, transform: [output, 0, 0, output, 0, 0] });
       text = new TextLayer({ textContentSource: page.streamTextContent(), container: textContainer, viewport });
       await Promise.all([render.promise, text.render()]);
-      if (!cancelled) setReady(true);
+      if (!cancelled) {
+        textSpans.current = text.textDivs;
+        setReady(true);
+      }
     }
     void draw().catch((reason) => { if (!cancelled) setError(String(reason)); });
     return () => {
@@ -39,12 +45,19 @@ export function PdfPage({ pdf, number, zoom, rotation, viewportWidth, label }) {
       text?.cancel();
     };
   }, [pdf, number, zoom, rotation, viewportWidth]);
+  useEffect(() => {
+    if (!ready) return;
+    for (const span of textSpans.current) {
+      span.toggleAttribute("data-search-hit", Boolean(highlight && normalizePdfText(span.textContent ?? "").includes(highlight)));
+    }
+  }, [ready, highlight]);
 
   return <>
     {error && <p role="alert" className="taoffice-pdf-error">{error}</p>}
     {!error && !ready && <p role="status">{label("正在渲染页面…", "Rendering page…")}</p>}
     <div className="taoffice-pdf-page" style={dimensions ?? undefined}
-      data-testid="taoffice-pdf-page" data-page={number} data-rotation={rotation} data-ready={ready}>
+      data-testid="taoffice-pdf-page" data-page={number} data-rotation={rotation}
+      data-scale={dimensions?.["--total-scale-factor"]} data-ready={ready}>
       <canvas ref={canvas} aria-hidden="true" />
       <div ref={layer} className="textLayer" data-testid="taoffice-pdf-text" />
     </div>

@@ -7,6 +7,7 @@ import { usePluginFrontendRegistry } from "../../lib/usePluginFrontendRegistry";
 import { usePluginFrontendStore } from "../../stores/pluginFrontendStore";
 import { useModuleMarketplaceStore } from "../../stores/moduleMarketplaceStore";
 import { openSettingsSection } from "../../lib/settingsNavigation";
+import { getAppPlatform, type AppPlatform } from "../../lib/runtime";
 import { basename, sftpOpenPath } from "../../lib/sftp";
 import { openDocumentMedia, readModuleDocument, type MediaSourceLease } from "../../lib/openFile/mediaStream";
 import { PluginTabPane } from "../plugins/PluginTabPane";
@@ -18,6 +19,7 @@ export interface ModuleDocumentInput {
   document: {
     name: string;
     extension: string;
+    platform: AppPlatform;
     readOnly: boolean;
     read: () => Promise<Blob>;
     openMedia: (mime: string) => Promise<MediaSourceLease>;
@@ -57,7 +59,7 @@ export function ModuleDocumentPane({ viewer, active }: { viewer: FileViewerTabIn
       }
     };
     const leases = new Set<MediaSourceLease>();
-    setInput({ document: { name, extension, readOnly, openMedia: async (mime) => {
+    setInput({ document: { name, extension, platform: getAppPlatform(), readOnly, openMedia: async (mime) => {
       ensureCurrent();
       const lease = await openDocumentMedia(path, mime, slug, version);
       try { ensureCurrent(); } catch (error) { lease.close(); throw error; }

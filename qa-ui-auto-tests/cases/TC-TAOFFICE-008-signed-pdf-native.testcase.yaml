@@ -26,8 +26,15 @@ steps:
 - dblclick: '[data-testid="explorer-file-row"][data-name="report.pdf"]'
 - wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"]'
 - assert_text: {selector: '[data-testid="taoffice-pdf-text"]', contains: Quarterly report}
-- press: {selector: '[data-testid="taoffice-pdf-next"]', key: Enter}
+- click: '[data-testid="taoffice-pdf-outline-toggle"]'
+- assert_text: {selector: '[data-testid="taoffice-pdf-outline"]', contains: Revenue appendix}
+- press: {selector: '[data-testid="taoffice-pdf-outline-item"]', key: Enter}
 - wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-ready="true"]'
 - assert_text: {selector: '[data-testid="taoffice-pdf-text"]', contains: Revenue by region}
+- press: {selector: '[data-testid="taoffice-pdf-outline-item"]', key: Escape}
+- press: {selector: '[data-testid="taoffice-pdf-viewport"]', key: Control+=, macos_key: Meta+=}
+- assert_attribute: {selector: '[data-testid="taoffice-pdf-fit"]', name: aria-pressed, equals: 'false'}
+- press: {selector: '[data-testid="taoffice-pdf-viewport"]', key: Control+0, macos_key: Meta+0}
+- assert_attribute: {selector: '[data-testid="taoffice-pdf-fit"]', name: aria-pressed, equals: 'true'}
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/report.pdf', sha256: '${fixture.taoffice_pdf_sha}'}
 - assert_no_runtime_errors: null

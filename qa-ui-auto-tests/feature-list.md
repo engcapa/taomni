@@ -16770,6 +16770,7 @@ files:
   - src-tauri/plugins/taoffice-video/frontend/index.js
   - src-tauri/plugins/taoffice-pdf/renderer/PdfViewer.jsx
   - src-tauri/plugins/taoffice-pdf/renderer/PdfPage.jsx
+  - src-tauri/plugins/taoffice-pdf/renderer/PdfNavigation.jsx
   - src/lib/openFile/documentProvider.ts
   - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts
@@ -16913,6 +16914,36 @@ controls:
   - id: taoffice-pdf-page
     selector: '[data-testid="taoffice-pdf-page"]'
     kind: display
+  - id: taoffice-pdf-viewport
+    selector: '[data-testid="taoffice-pdf-viewport"]'
+    kind: interactive
+  - id: taoffice-pdf-find
+    selector: '[data-testid="taoffice-pdf-find"]'
+    kind: interactive
+  - id: taoffice-pdf-search-input
+    selector: '[data-testid="taoffice-pdf-search-input"]'
+    kind: interactive
+  - id: taoffice-pdf-search-submit
+    selector: '[data-testid="taoffice-pdf-search-submit"]'
+    kind: interactive
+  - id: taoffice-pdf-search-previous
+    selector: '[data-testid="taoffice-pdf-search-previous"]'
+    kind: interactive
+  - id: taoffice-pdf-search-next
+    selector: '[data-testid="taoffice-pdf-search-next"]'
+    kind: interactive
+  - id: taoffice-pdf-search-status
+    selector: '[data-testid="taoffice-pdf-search-status"]'
+    kind: display
+  - id: taoffice-pdf-outline-toggle
+    selector: '[data-testid="taoffice-pdf-outline-toggle"]'
+    kind: interactive
+  - id: taoffice-pdf-outline
+    selector: '[data-testid="taoffice-pdf-outline"]'
+    kind: display
+  - id: taoffice-pdf-outline-item
+    selector: '[data-testid="taoffice-pdf-outline-item"]'
+    kind: interactive
   - id: taoffice-pdf-text
     selector: '[data-testid="taoffice-pdf-text"]'
     kind: display

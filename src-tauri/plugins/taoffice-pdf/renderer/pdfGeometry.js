@@ -13,3 +13,11 @@ export function fitPageScale(width, availableWidth) {
 export function canvasScale(width, height, deviceScale) {
   return Math.min(deviceScale, 8192 / Math.max(width, height), Math.sqrt(MAX_CANVAS_PIXELS / (width * height)));
 }
+
+export const MIN_PAGE_SCALE = 0.2;
+export const MAX_PAGE_SCALE = 4;
+
+export function stepPageScale(current, direction) {
+  const scale = direction > 0 ? current * 1.25 : current / 1.25;
+  return Number(Math.max(MIN_PAGE_SCALE, Math.min(MAX_PAGE_SCALE, scale)).toFixed(3));
+}

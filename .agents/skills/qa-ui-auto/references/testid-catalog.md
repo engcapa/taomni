@@ -1488,6 +1488,16 @@
 - `[data-testid="taoffice-media-error"]` — display — F-FILEOPEN-1.taoffice-media-error
 - `[data-testid="taoffice-media-retry"]` — interactive — F-FILEOPEN-1.taoffice-media-retry
 - `[data-testid="taoffice-pdf-page"]` — display — F-FILEOPEN-1.taoffice-pdf-page
+- `[data-testid="taoffice-pdf-viewport"]` — interactive — F-FILEOPEN-1.taoffice-pdf-viewport
+- `[data-testid="taoffice-pdf-find"]` — interactive — F-FILEOPEN-1.taoffice-pdf-find
+- `[data-testid="taoffice-pdf-search-input"]` — interactive — F-FILEOPEN-1.taoffice-pdf-search-input
+- `[data-testid="taoffice-pdf-search-submit"]` — interactive — F-FILEOPEN-1.taoffice-pdf-search-submit
+- `[data-testid="taoffice-pdf-search-previous"]` — interactive — F-FILEOPEN-1.taoffice-pdf-search-previous
+- `[data-testid="taoffice-pdf-search-next"]` — interactive — F-FILEOPEN-1.taoffice-pdf-search-next
+- `[data-testid="taoffice-pdf-search-status"]` — display — F-FILEOPEN-1.taoffice-pdf-search-status
+- `[data-testid="taoffice-pdf-outline-toggle"]` — interactive — F-FILEOPEN-1.taoffice-pdf-outline-toggle
+- `[data-testid="taoffice-pdf-outline"]` — display — F-FILEOPEN-1.taoffice-pdf-outline
+- `[data-testid="taoffice-pdf-outline-item"]` — interactive — F-FILEOPEN-1.taoffice-pdf-outline-item
 - `[data-testid="taoffice-pdf-text"]` — display — F-FILEOPEN-1.taoffice-pdf-text
 - `[data-testid="taoffice-pdf-page-count"]` — display — F-FILEOPEN-1.taoffice-pdf-page-count
 - `[data-testid="taoffice-pdf-page-number"]` — interactive — F-FILEOPEN-1.taoffice-pdf-page-number
