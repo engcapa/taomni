@@ -3,7 +3,7 @@ title: Install the signed TaOffice Media module and decode a local WAV
 description: Enable the signed package in the store and check the WAV duration in the native WebView, including devices that need the bounded local media fallback. Disable the renderer with the file open and verify the source bytes.
 modes: [native]
 covers: [F-FILEOPEN-1, F-Modules-1]
-tags: [p0, file-open, taoffice, media, native-boundary]
+tags: [p0, file-open, taoffice, media, native-boundary, taoffice-video]
 fixtures: [reset_db, file_open_files, taoffice_signed_media]
 timeout_sec: 210
 steps:

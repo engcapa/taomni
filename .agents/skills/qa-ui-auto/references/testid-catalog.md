@@ -1493,6 +1493,8 @@
 - `[data-testid="taoffice-media-player"]` — interactive — F-FILEOPEN-1.taoffice-media-player
   ↳ `video[data-testid="taoffice-media-player"]` — alias
 - `[data-testid="taoffice-media-error"]` — display — F-FILEOPEN-1.taoffice-media-error
+- `[data-testid="taoffice-media-playback-mode"]` — interactive — F-FILEOPEN-1.taoffice-media-playback-mode
+- `[data-testid="taoffice-media-preparing"]` — display [optional] — F-FILEOPEN-1.taoffice-media-preparing
 - `[data-testid="taoffice-media-retry"]` — interactive — F-FILEOPEN-1.taoffice-media-retry
 - `[data-testid="taoffice-excel"]` — display — F-FILEOPEN-1.taoffice-excel
 - `[data-testid="taoffice-excel-sheet"]` — interactive — F-FILEOPEN-1.taoffice-excel-sheet

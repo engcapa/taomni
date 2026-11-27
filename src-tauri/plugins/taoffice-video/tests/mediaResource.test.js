@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mediaSeekTarget, openMediaResource, shouldRetryAsBlob } from "../frontend/mediaResource.js";
+import { initialMediaAttempt, mediaSeekTarget, openMediaResource, shouldRetryAsBlob } from "../frontend/mediaResource.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("the TaOffice media resource", () => {
+  it("tries the WebView directly when available and prepares unsupported Matroska containers", () => {
+    expect(initialMediaAttempt("mkv", () => "maybe")).toBe("stream");
+    expect(initialMediaAttempt("mkv", () => "")).toBe("compatible");
+    expect(initialMediaAttempt("mp4", () => "")).toBe("stream");
+  });
   it("bounds keyboard seeks to the available duration", () => {
     expect(mediaSeekTarget(0, 12, "ArrowRight")).toBe(5);
     expect(mediaSeekTarget(11, 12, "ArrowRight")).toBe(12);

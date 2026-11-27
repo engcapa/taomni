@@ -145,7 +145,7 @@ jobs:
               ]}, separators=(',', ':')) + '\n')
               suffix = '-'.join(target['platform'] for target in targets)
               if os.environ['QA_MODULE'] in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
-                                             'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project'}:
+                                             'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project', 'taoffice-video'}:
                   output.write(f"frontend_artifact=qa-{os.environ['QA_MODULE']}-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
               if roster:
                   output.write(f"roster_mfa_frontend_artifact=qa-roster-mfa-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
@@ -260,7 +260,7 @@ jobs:
                   helper = 'taomni-vnc-key-helper.exe'
                   shutil.copyfile(binaries / helper, output / helper)
               if slug not in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
-                              'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project'} and manifest['entry'].get('frontend'):
+                              'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project', 'taoffice-video'} and manifest['entry'].get('frontend'):
                   shutil.copytree(source / 'frontend', output / 'frontend')
 
           stage(os.environ['QA_MODULE'], 'unsigned-module')
@@ -410,7 +410,7 @@ jobs:
               allowed = {'module.json', *binaries, *resources}
               frontend = expected['entry'].get('frontend')
               if frontend and slug not in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
-                                           'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project'}:
+                                           'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project', 'taoffice-video'}:
                   assert (trusted_source / frontend).is_file()
                   for source in (trusted_source / 'frontend').rglob('*'):
                       assert not source.is_symlink()

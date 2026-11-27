@@ -1,0 +1,33 @@
+id: TC-TAOFFICE-031
+title: Compatible Matroska playback decodes and seeks in a local video
+description: Select the portable playback mode through the player, then verify decoded frames, timing, keyboard controls and source bytes.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, media, taoffice-video]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 170
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage: {key: taomni.preview.modules.taoffice-video.v1, value: '{"lifecycle":"enabled","values":[]}'}
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="rollout-compatible.mkv"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="rollout-compatible.mkv"]'
+- select_option: {selector: '[data-testid="taoffice-media-playback-mode"]', value: compatible}
+- wait_for: 'video[data-testid="taoffice-media-player"][data-playback="compatible"][data-ready="true"]'
+- eval_readonly:
+    expression: document.querySelector('video').videoWidth === 160 && document.querySelector('video').videoHeight === 90 && Math.abs(document.querySelector('video').duration - 12) < 0.2
+- press: {selector: 'video[data-testid="taoffice-media-player"]', key: ArrowRight}
+- eval_readonly:
+    expression: document.querySelector('video').currentTime > 4.8 && document.querySelector('video').currentTime < 5.2
+- press: {selector: 'video[data-testid="taoffice-media-player"]', key: Space}
+- eval_readonly:
+    timeout_sec: 10
+    expression: document.querySelector('video').paused === false && document.querySelector('video').currentTime > 5.2
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/rollout-compatible.mkv', sha256: '${fixture.taoffice_mkv_sha}'}
+- assert_no_runtime_errors: null

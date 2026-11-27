@@ -920,6 +920,9 @@ jobs:
       - name: Build the TaOffice Project module for browser preview
         if: inputs.operation == 'run' && matrix.mode == 'browser' && contains(matrix.capabilities, 'taoffice-project')
         run: pnpm exec vite build --config src-tauri/plugins/taoffice-project/vite.config.ts
+      - name: Build the TaOffice Media module for browser preview
+        if: inputs.operation == 'run' && matrix.mode == 'browser' && contains(matrix.capabilities, 'taoffice-video')
+        run: pnpm exec vite build --config src-tauri/plugins/taoffice-video/vite.config.ts
       - name: Run selected cases (Linux Xvfb desktop)
         if: (runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'xvfb') && inputs.operation == 'run'
         env:

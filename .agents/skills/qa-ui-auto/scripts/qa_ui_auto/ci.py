@@ -100,6 +100,8 @@ def capabilities(cases, mode: str) -> list[str]:
             result.add("taoffice-word")
         if mode == "browser" and "taoffice-project" in case.tags:
             result.add("taoffice-project")
+        if mode == "browser" and "taoffice-video" in case.tags:
+            result.add("taoffice-video")
         if mode == "native" and "mobile_service" in fixtures:
             result.add("mobile")
         if fixtures & {"ssh_required", "sftp_required"}:

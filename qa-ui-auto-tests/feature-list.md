@@ -17039,6 +17039,13 @@ controls:
   - id: taoffice-media-error
     selector: '[data-testid="taoffice-media-error"]'
     kind: display
+  - id: taoffice-media-playback-mode
+    selector: '[data-testid="taoffice-media-playback-mode"]'
+    kind: interactive
+  - id: taoffice-media-preparing
+    selector: '[data-testid="taoffice-media-preparing"]'
+    kind: display
+    optional: true
   - id: taoffice-media-retry
     selector: '[data-testid="taoffice-media-retry"]'
     kind: interactive

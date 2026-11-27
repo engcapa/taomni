@@ -63,6 +63,7 @@
     "konva": "^10.5.0",
     "lucide-react": "^1.45.0",
     "marked": "18.0.13",
+    "mediabunny": "1.66.5",
     "mermaid": "^11.17.2",
     "perfect-freehand": "^1.2.3",
     "qr": "0.7.2",

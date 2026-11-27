@@ -3,7 +3,7 @@ title: Signed media plays and seeks a WebM in the native WebView
 description: Install the signed renderer and verify keyboard seek, real frame dimensions, background pause, and the unchanged media bytes.
 modes: [native]
 covers: [F-FILEOPEN-1, F-Modules-1]
-tags: [p0, file-open, taoffice, media, native-boundary]
+tags: [p0, file-open, taoffice, media, native-boundary, taoffice-video]
 fixtures: [reset_db, file_open_files, taoffice_signed_media]
 timeout_sec: 210
 steps:

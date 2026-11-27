@@ -3,7 +3,7 @@ title: Video playback accepts keyboard seek and pauses when its tab is hidden
 description: Decode a sample produced from an older codec, seek before playing, and pause when switching tabs.
 modes: [browser]
 covers: [F-FILEOPEN-1]
-tags: [p0, file-open, taoffice, media]
+tags: [p0, file-open, taoffice, media, taoffice-video]
 fixtures: [reset_db, file_open_files]
 timeout_sec: 140
 steps:
