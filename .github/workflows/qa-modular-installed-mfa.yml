@@ -83,9 +83,25 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
+  signed-rdp:
+    needs: package
+    if: inputs.verify_rdp_perf && !inputs.first_release
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ inputs.package_source }}
+      module: rdp-server
+      artifact_key: ${{ github.run_id }}-rdp-server
+      native_builds: '{"include":[{"platform_key":"linux","arch":"X64","capabilities":["signed-local-rdp"]}]}'
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
   upgrade:
-    needs: [package, signed-mfa]
-    if: ${{ !cancelled() && needs.package.result == 'success' && (needs.signed-mfa.result == 'success' || needs.signed-mfa.result == 'skipped') }}
+    needs: [package, signed-mfa, signed-rdp]
+    if: >-
+      ${{ !cancelled() && needs.package.result == 'success' &&
+      (needs.signed-mfa.result == 'success' || needs.signed-mfa.result == 'skipped') &&
+      (needs.signed-rdp.result == 'success' || needs.signed-rdp.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
@@ -128,6 +144,11 @@ jobs:
           path: signed-input
           run-id: ${{ inputs.signed_run || github.run_id }}
           github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        if: inputs.verify_rdp_perf && !inputs.first_release
+        with:
+          name: qa-modular-package-linux-x86_64-${{ github.run_id }}-rdp-server
+          path: signed-rdp-input
       - uses: actions/checkout@v4
         if: inputs.first_release
         with:
@@ -189,6 +210,9 @@ jobs:
           if [[ "$VERIFY_RDP_PERF" == true ]]; then
             python -m unittest test_installed_rdp_baseline
             extra+=(--rdp-probe rdp-probe-source/src-tauri/target/release/rdp-probe)
+            if [[ "$FIRST_RELEASE" != true ]]; then
+              extra+=(--signed-rdp signed-rdp-input)
+            fi
           fi
           if [[ "$VERIFY_RELOCATION" == true ]]; then
             python -m unittest test_installed_mfa_profile test_installed_linux_formats

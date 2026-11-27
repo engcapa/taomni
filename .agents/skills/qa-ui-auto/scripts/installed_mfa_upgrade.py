@@ -330,8 +330,16 @@ def execute(args):
             verify_crash_recovery(ctx, candidate, work, profile, report, receipt, observation)
             if args.rdp_probe:
                 from installed_rdp_baseline import measure
+                if origin:
+                    rdp_receipt = origin.roster["taomni-plugin-rdp-server"]
+                    rdp_archive = origin.files["/" + rdp_receipt["archive"]]
+                else:
+                    rdp_receipt, rdp_archive, _, _ = load_artifact(
+                        args.signed_rdp, target["producerSource"], "linux-x86_64", "rdp-server", version=None,
+                    )
                 stages["rdpPerformance"] = measure(candidate, args.rdp_probe.resolve(strict=True),
-                                                   target["producerSource"], work, report, origin=origin)
+                                                   target["producerSource"], work, report,
+                                                   signed_server=(rdp_receipt, rdp_archive))
             result["passed"] = True
     except Exception as error:
         result["error"] = str(error)
@@ -349,4 +357,8 @@ if __name__ == "__main__":
     signed.add_argument("--first-release", type=Path)
     parser.add_argument("--verify-relocation", action="store_true")
     parser.add_argument("--rdp-probe", type=Path)
-    execute(parser.parse_args())
+    parser.add_argument("--signed-rdp", type=Path)
+    args = parser.parse_args()
+    if args.rdp_probe and not (args.first_release or args.signed_rdp):
+        parser.error("--rdp-probe requires --signed-rdp or --first-release")
+    execute(args)

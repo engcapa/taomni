@@ -20,9 +20,7 @@ from qa_ui_auto.testcase import load_case, step_verb_and_args
 CASE = Path("qa-ui-auto-tests/cases/TC-RDPS-PERF-01-performance-budget.testcase.yaml")
 
 
-def install_signed_server(steps, origin, profile, source):
-    receipt = origin.roster["taomni-plugin-rdp-server"]
-    archive = origin.files["/" + receipt["archive"]]
+def install_signed_server(steps, receipt, archive, profile, source):
     signature = archive.with_name(receipt["signature"])
     if receipt["sourceSha"] != source or digest(archive) != receipt["sha256"]:
         raise RuntimeError("The RDP Server package does not match the installed core source")
@@ -70,7 +68,7 @@ def install_signed_server(steps, origin, profile, source):
     return result
 
 
-def measure(candidate, probe, source, work, report, *, origin=None):
+def measure(candidate, probe, source, work, report, *, signed_server):
     case = load_case(CASE)
     evidence = report / "rdp-performance"
     evidence.mkdir()
@@ -86,8 +84,10 @@ def measure(candidate, probe, source, work, report, *, origin=None):
         desktop = work / "rdp-profile"
         environment, profile = desktop_environment(desktop)
         with installed_desktop(observer, candidate, desktop, evidence, "desktop", environment=environment) as (driver, session):
-            if origin:
-                result["signedServer"] = install_signed_server(NativeStepContext(session, evidence, config), origin, profile, source)
+            receipt, archive = signed_server
+            result["signedServer"] = install_signed_server(
+                NativeStepContext(session, evidence, config), receipt, archive, profile, source,
+            )
             session.deadline = Deadline(case.timeout_sec)
             steps = NativeStepContext(session, evidence, observer.cfg, fixture_context=observer)
             try:
