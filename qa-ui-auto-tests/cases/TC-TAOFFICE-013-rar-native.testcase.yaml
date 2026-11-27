@@ -23,11 +23,13 @@ steps:
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/records/notes/first.txt', sha256: '${fixture.taoffice_rar_text_sha}'}
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/records/notes/second.txt', sha256: '${fixture.taoffice_rar_text_sha}'}
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/records.RAR', sha256: '${fixture.taoffice_rar_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="legacy.rar"]'
 - wait_for: '[data-testid="file-viewer"][data-kind="archive"][data-active="true"] [data-testid="archive-entry"][data-name="notes/second.txt"] [data-testid="archive-preview"]'
 - press: {selector: '[data-testid="file-viewer"][data-kind="archive"][data-active="true"] [data-testid="archive-entry"][data-name="notes/second.txt"] [data-testid="archive-preview"]', key: Enter}
 - wait_for: '[data-testid="file-viewer"][data-kind="text"][data-active="true"] [data-testid="viewer-readonly"]'
 - assert_file_open_bytes: {selector: '[data-testid="file-viewer"][data-kind="text"][data-active="true"]', sha256: '${fixture.taoffice_rar_text_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="locked.rar"]'
 - wait_for: '[data-testid="file-viewer"][data-kind="archive"][data-active="true"] [data-testid="archive-error"]'
 - assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="archive-error"]', contains: Password-protected archives are unsupported}
