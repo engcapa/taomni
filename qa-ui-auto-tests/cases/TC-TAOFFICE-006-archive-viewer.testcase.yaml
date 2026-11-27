@@ -1,6 +1,6 @@
 id: TC-TAOFFICE-006
 title: Filter, extract and preview entries in a core ZIP viewer
-description: Check file contents after extraction, preserve the first result after a collision and use a read-only text preview.
+description: Check extracted bytes, preserve an earlier result after a collision, preview a read-only member, and reject an unsafe archive before extraction.
 modes: [browser, native]
 covers: [F-FILEOPEN-1]
 tags: [p0, file-open, taoffice, archive, core-only]
@@ -28,4 +28,10 @@ steps:
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/bundle/notes/readme.txt', sha256: '${fixture.file_open_original_sha}'}
 - press: {selector: '[data-testid="archive-preview"]', key: Enter}
 - wait_for: '[data-testid="file-viewer"][data-kind="text"][data-active="true"] [data-testid="viewer-readonly"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="unsafe.zip"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="archive-error"]'
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="archive-error"]', contains: unsafe path}
+- assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="archive-extract-here"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/notes.txt', sha256: '${fixture.file_open_original_sha}'}
 - assert_no_runtime_errors: null

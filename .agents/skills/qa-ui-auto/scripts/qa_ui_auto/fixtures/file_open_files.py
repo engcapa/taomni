@@ -74,6 +74,11 @@ def setup(ctx: Any) -> None:
             bundle.writestr("notes/readme.txt", TEXT)
             bundle.writestr("images/pixel.png", PNG)
         files["bundle.zip"] = archive.getvalue()
+        rejected = io.BytesIO()
+        with zipfile.ZipFile(rejected, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            bundle.writestr("file.txt", "First entry is safe.")
+            bundle.writestr("../notes.txt", "This entry must be rejected.")
+        files["unsafe.zip"] = rejected.getvalue()
     if ctx.case_id in {"TC-TAOFFICE-003", "TC-TAOFFICE-005"}:
         wav = io.BytesIO()
         with wave.open(wav, "wb") as audio:

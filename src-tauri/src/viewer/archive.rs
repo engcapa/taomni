@@ -168,6 +168,43 @@ pub(crate) fn extract(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unsafe_paths_and_links_fail_before_publishing_output() {
+        let files = tempfile::tempdir().unwrap();
+        let options = zip::write::SimpleFileOptions::default();
+        let destination = files.path().to_str().unwrap();
+        let cases = [
+            ("traversal.zip", Some("../outside.txt")),
+            ("absolute.zip", Some("/outside.txt")),
+            ("device.zip", Some("folder/COM1.txt")),
+            ("symlink.zip", None),
+        ];
+        std::fs::write(files.path().join("outside.txt"), "existing data").unwrap();
+        for (name, unsafe_name) in cases {
+            let path = files.path().join(name);
+            let mut zip = zip::ZipWriter::new(File::create(&path).unwrap());
+            zip.start_file("earlier.txt", options).unwrap();
+            zip.write_all(b"valid earlier member").unwrap();
+            if let Some(unsafe_name) = unsafe_name {
+                zip.start_file(unsafe_name, options).unwrap();
+                zip.write_all(b"replacement").unwrap();
+            } else {
+                zip.add_symlink("linked.txt", "../outside.txt", options)
+                    .unwrap();
+            }
+            zip.finish().unwrap();
+            let source = path.to_str().unwrap();
+            assert!(list(source).unwrap_err().contains("unsafe path"));
+            assert!(extract(source, destination, None).is_err());
+            assert!(!files.path().join(path.file_stem().unwrap()).exists());
+        }
+        assert_eq!(
+            std::fs::read(files.path().join("outside.txt")).unwrap(),
+            b"existing data"
+        );
+    }
+
     #[test]
     fn preview_and_extract_keep_payloads_and_collisions_intact() {
         let files = tempfile::tempdir().unwrap();
