@@ -24,7 +24,7 @@ steps:
 - fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
 - press: {selector: '[data-testid="explorer-address"]', key: Enter}
 - dblclick: '[data-testid="explorer-file-row"][data-name="sample.wav"]'
-- wait_for: 'audio[data-testid="taoffice-media-player"][data-ready="true"][controls]'
+- wait_for: '[data-testid="taoffice-media-player"][data-ready="true"][controls]'
 - eval_readonly:
     expression: document.querySelector("audio").duration > 0
     expect_truthy: true

@@ -24,7 +24,7 @@ steps:
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/bundle/notes/readme.txt', sha256: '${fixture.file_open_original_sha}'}
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/bundle/images/pixel.png', sha256: '${fixture.file_open_png_sha}'}
 - click: '[data-testid="archive-extract-here"]'
-- wait_for: '[data-kind="archive"] [role="alert"]'
+- wait_for: '[data-testid="archive-error"]'
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/bundle/notes/readme.txt', sha256: '${fixture.file_open_original_sha}'}
 - press: {selector: '[data-testid="archive-preview"]', key: Enter}
 - wait_for: '[data-testid="file-viewer"][data-kind="text"][data-active="true"] [data-testid="viewer-readonly"]'

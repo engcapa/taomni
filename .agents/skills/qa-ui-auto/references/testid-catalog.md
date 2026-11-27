@@ -1483,7 +1483,8 @@
 - `[data-testid="archive-extract-here"]` — interactive — F-FILEOPEN-1.archive-extract-here
 - `[data-testid="archive-preview"]` — interactive — F-FILEOPEN-1.archive-preview
 - `[data-testid="archive-output"]` — display — F-FILEOPEN-1.archive-output
-- `[data-testid="taoffice-media-player"]` — interactive — F-FILEOPEN-1.taoffice-media-player
+- `[data-testid="archive-error"]` — display — F-FILEOPEN-1.archive-error
+- `[data-testid="taoffice-media-player"]` — display — F-FILEOPEN-1.taoffice-media-player
 - `[data-testid="taoffice-media-error"]` — display — F-FILEOPEN-1.taoffice-media-error
 - `[data-testid="taoffice-media-retry"]` — interactive — F-FILEOPEN-1.taoffice-media-retry
 - `[data-testid="viewer-editor"]` — interactive — F-FILEOPEN-1.viewer-editor
@@ -3024,6 +3025,7 @@
   ↳ `[data-testid="module-action-enable-screenshot"]` — alias
   ↳ `[data-testid="module-action-enable-ai-voice-local"]` — alias
   ↳ `[data-testid="module-action-enable-sockscap"]` — alias
+  ↳ `[data-testid="module-action-enable-taoffice-video"]` — alias
 - `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
 - `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
   ↳ `[data-testid="module-action-disable-mfa"]` — alias
@@ -3036,6 +3038,7 @@
   ↳ `[data-testid="module-action-disable-screenshot"]` — alias
   ↳ `[data-testid="module-action-disable-ai-voice-local"]` — alias
   ↳ `[data-testid="module-action-disable-sockscap"]` — alias
+  ↳ `[data-testid="module-action-disable-taoffice-video"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
   ↳ `[data-testid="module-action-uninstall-rdp-client"]:enabled` — alias
   ↳ `[data-testid="module-action-uninstall-rdp-server"]:enabled` — alias

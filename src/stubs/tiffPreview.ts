@@ -1,4 +1,4 @@
-import { decode, decodeImage, toRGBA8 } from "utif2";
+import { decode, decodeImage, toRGBA8 } from "./utif2Decoder.js";
 import { VIEWER_IMAGE_LIMIT } from "../lib/viewer";
 
 export async function renderTiffPreview(buffer: ArrayBuffer) {

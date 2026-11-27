@@ -84,7 +84,7 @@ export function ArchiveViewer({ viewer, active = true, workspaceId, host }: {
       <button className="taomni-btn" disabled={working || !entries?.length} onClick={() => extract(false)}>{label("解压到…", "Extract to…")}</button>
     </header>
     {viewer.readOnlyReason && <p role="status">{viewer.readOnlyReason}</p>}
-    {error && <p role="alert" className="fv-banner warn">{error}</p>}
+    {error && <p role="alert" className="fv-banner warn" data-testid="archive-error">{error}</p>}
     {working && <p role="status">{label("正在处理…", "Working…")}</p>}
     {output && <p role="status" data-testid="archive-output">{label("已解压到", "Extracted to")} <span className="taomni-mono">{output}</span></p>}
     {!entries && !error && <p role="status">{label("正在读取压缩包…", "Reading archive…")}</p>}

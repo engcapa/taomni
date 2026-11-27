@@ -420,6 +420,7 @@ controls:
     - '[data-testid="module-action-enable-screenshot"]'
     - '[data-testid="module-action-enable-ai-voice-local"]'
     - '[data-testid="module-action-enable-sockscap"]'
+    - '[data-testid="module-action-enable-taoffice-video"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
@@ -437,6 +438,7 @@ controls:
     - '[data-testid="module-action-disable-screenshot"]'
     - '[data-testid="module-action-disable-ai-voice-local"]'
     - '[data-testid="module-action-disable-sockscap"]'
+    - '[data-testid="module-action-disable-taoffice-video"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
@@ -16892,9 +16894,12 @@ controls:
   - id: archive-output
     selector: '[data-testid="archive-output"]'
     kind: display
+  - id: archive-error
+    selector: '[data-testid="archive-error"]'
+    kind: display
   - id: taoffice-media-player
     selector: '[data-testid="taoffice-media-player"]'
-    kind: interactive
+    kind: display
   - id: taoffice-media-error
     selector: '[data-testid="taoffice-media-error"]'
     kind: display
