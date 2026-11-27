@@ -111,6 +111,28 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
         self.assertEqual(compare_permissions(legacy, {**candidate, "screenRecording": "denied"})["lostGrants"],
                          ["screenRecording"])
 
+    def test_standalone_macos_stages_the_selected_mfa_package_before_opening_the_profile(self):
+        profile = Path("legacy-profile")
+        args = SimpleNamespace(signed=Mock(), macos_hardened_mfa=False)
+        receipt = {"passed": True}
+        initial = {"screenRecording": "granted", "accessibility": "granted", "requirement": "fixed"}
+        stages = {"originalPermissions": initial}
+        with patch("installed_desktop_upgrade.platform.system", return_value="Darwin"), patch(
+            "installed_desktop_upgrade.verify_crash_recovery", return_value=receipt,
+        ) as migrate, patch("installed_desktop_upgrade.check_mode_lease") as mode, patch(
+            "installed_desktop_upgrade.observe_permissions", return_value=initial,
+        ) as permissions, patch("installed_desktop_upgrade.observe_hosted_screen_scan"):
+            order = Mock()
+            order.attach_mock(migrate, "migrate")
+            order.attach_mock(mode, "open")
+            errors = exercise_desktop_contracts(
+                "app", profile, stages, args, {"producerSource": "source"}, "work", "evidence", None,
+            )
+        self.assertEqual(errors, (None, None))
+        self.assertEqual([event[0] for event in order.mock_calls], ["migrate", "open"])
+        self.assertEqual(migrate.call_args.args[1], profile)
+        permissions.assert_called_once_with("app", "evidence", "candidate", work="work", screenshot_only=True)
+
     def test_windows_retries_inspection_after_timeout_with_one_msi_install(self):
         with TemporaryDirectory() as directory:
             destination = Path(directory)
@@ -263,7 +285,7 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             root = Path(directory)
             archive = root / "mfa.taomni-plugin"
-            receipt = {"archive": archive.name, "signature": archive.name + ".minisig",
+            receipt = {"archive": archive.name, "signature": archive.name + ".minisig", "version": "0.1.2",
                        "sha256": "module-package", "sourceSha": "source"}
             roster = SimpleNamespace(roster={"taomni-plugin-mfa": receipt},
                                      files={"/" + archive.name: archive}, requests=["/" + archive.name])

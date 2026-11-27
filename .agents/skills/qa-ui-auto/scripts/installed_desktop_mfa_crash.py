@@ -142,6 +142,12 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
         if first_release is not None:
             downloaded_pointer, _ = installed_mfa(profile, receipt)
         result["legacyDatabaseSha256"] = digest(profile / "mfa.db")
+        version_dir = profile / "plugins/mfa/versions" / receipt["version"]
+        stored_proof = version_dir / ".taomni-trust/package.taomni-plugin"
+        result["stagedBeforeMigration"] = {
+            "versionDirectoryExists": version_dir.is_dir(),
+            "signedArchiveSha256": digest(stored_proof) if stored_proof.is_file() else None,
+        }
         commit_mfa_upgrade(executable, profile, archive, signature, evidence)
         installed, module = installed_mfa(profile, receipt)
         if downloaded_pointer is not None and installed != downloaded_pointer:
