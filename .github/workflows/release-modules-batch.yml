@@ -1,0 +1,295 @@
+name: Release Modules Batch
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: auto-changed detects every stable module newer than the published catalog; manual uses modules
+        required: true
+        default: auto-changed
+        type: choice
+        options:
+          - auto-changed
+          - manual
+      tag:
+        description: Optional GitHub Release tag (auto-generated when empty)
+        required: false
+        default: ''
+        type: string
+      modules:
+        description: Comma-separated stable module slugs when mode=manual (for example servers,vnc-server)
+        required: false
+        default: ''
+        type: string
+      head:
+        description: Commit or ref containing the module changes (defaults to workflow branch)
+        required: false
+        default: ''
+        type: string
+      macos_runner:
+        description: Hosted macOS builder for both Darwin targets
+        required: false
+        default: macos-15
+        type: choice
+        options: [macos-15, macos-15-intel, macos-26, macos-latest]
+      dry_run:
+        description: Preview selected modules and target tag without building or publishing
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: module-batch-${{ inputs.tag || inputs.mode }}-${{ inputs.modules || 'auto' }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan module batch release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+      committed_at: ${{ steps.source.outputs.committed_at }}
+      macos_runner: ${{ steps.source.outputs.macos_runner }}
+      core_tag: ${{ steps.baseline.outputs.core_tag }}
+      modules: ${{ steps.select.outputs.modules }}
+      expected_packages: ${{ steps.select.outputs.expected_packages }}
+      tag: ${{ steps.select.outputs.tag }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build catalog verifier
+        run: cargo build --manifest-path scripts/plugin-package/Cargo.toml --release --locked
+      - name: Record source metadata
+        id: source
+        env:
+          MACOS_RUNNER: ${{ inputs.macos_runner || 'macos-15' }}
+        run: |
+          set -euo pipefail
+          if [[ "$MACOS_RUNNER" != "macos-15" && "$MACOS_RUNNER" != "macos-15-intel" && "$MACOS_RUNNER" != "macos-26" && "$MACOS_RUNNER" != "macos-latest" ]]; then
+            echo "Unsupported macOS runner: $MACOS_RUNNER" >&2
+            exit 1
+          fi
+          {
+            echo "sha=$(git rev-parse HEAD)"
+            echo "committed_at=$(git show -s --format=%cI HEAD)"
+            echo "macos_runner=$MACOS_RUNNER"
+          } >> "$GITHUB_OUTPUT"
+      - name: Stage and verify current public module catalog
+        id: baseline
+        run: |
+          set -euo pipefail
+          core_tag="$(gh release view --json tagName,assets --jq 'select(any(.assets[]; .name == "latest.json")).tagName')"
+          if [[ -z "$core_tag" ]]; then
+            echo 'No published core release with latest.json was found.' >&2
+            exit 1
+          fi
+          catalog_source="$(node scripts/stage-published-module-catalog.mjs current-catalog)"
+          test "$catalog_source" = "source_tag=$core_tag"
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog-signature current-catalog
+          echo "core_tag=$core_tag" >> "$GITHUB_OUTPUT"
+      - name: Select updated modules to build
+        id: select
+        env:
+          BATCH_MODE: ${{ inputs.mode }}
+          BATCH_MODULES: ${{ inputs.modules }}
+          BATCH_TAG: ${{ inputs.tag }}
+          CORE_TAG: ${{ steps.baseline.outputs.core_tag }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          node scripts/detect-changed-modules.mjs \
+            --catalog current-catalog/modules.json \
+            --mode "$BATCH_MODE" \
+            --modules "$BATCH_MODULES" \
+            --tag "$BATCH_TAG" \
+            --core-tag "$CORE_TAG" \
+            --run-number "$RUN_NUMBER" \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary-file "$GITHUB_STEP_SUMMARY"
+
+  package-modules:
+    needs: plan
+    if: ${{ !inputs.dry_run && needs.plan.result == 'success' && needs.plan.outputs.modules != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.plan.outputs.modules) }}
+    uses: ./.github/workflows/release-modules.yml
+    with:
+      tag: ${{ needs.plan.outputs.tag }}
+      module: ${{ matrix.module }}
+      head: ${{ needs.plan.outputs.sha }}
+      macos_runner: ${{ needs.plan.outputs.macos_runner }}
+      package_only: true
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+  publish:
+    name: Publish batch module catalog and packages
+    needs: [plan, package-modules]
+    if: ${{ !inputs.dry_run && needs.plan.result == 'success' && needs.package-modules.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: taomni-release-catalog-publication
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      MODULE_SOURCE_SHA: ${{ needs.plan.outputs.sha }}
+      EXPECTED_PACKAGES: ${{ needs.plan.outputs.expected_packages }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run release and catalog contracts
+        run: |
+          node --test \
+            scripts/fetch-published-module-assets.test.mjs \
+            scripts/compose-modules-manifest.test.mjs \
+            scripts/stage-published-module-catalog.test.mjs \
+            scripts/verify-module-catalog-delta.test.mjs \
+            scripts/detect-changed-modules.test.mjs \
+            scripts/release-modules-workflow.test.mjs \
+            scripts/release-modules-batch-workflow.test.mjs
+          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
+          cargo build --manifest-path scripts/plugin-package/Cargo.toml --release --locked
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: module-signed-*-${{ github.run_id }}
+          path: signed-artifacts
+          merge-multiple: false
+      - name: Stage the signed public catalog baseline
+        id: catalog-baseline
+        run: |
+          set -euo pipefail
+          core_tag="$(gh release view --json tagName,assets --jq 'select(any(.assets[]; .name == "latest.json")).tagName')"
+          if [[ -z "$core_tag" || "$core_tag" == "$TAG" ]]; then
+            echo 'Use a separate module tag and start from a published core release.' >&2
+            exit 1
+          fi
+          catalog_source="$(node scripts/stage-published-module-catalog.mjs current-catalog)"
+          test "$catalog_source" = "source_tag=$core_tag"
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog-signature current-catalog
+          node scripts/fetch-published-module-assets.mjs current-catalog current-catalog
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog current-catalog
+          echo "core_tag=$core_tag" >> "$GITHUB_OUTPUT"
+      - name: Compose and merge the batch module catalog
+        env:
+          MODULES_PUBLISHED_CATALOG: current-catalog/modules.json
+          MODULE_SEQUENCE: ${{ github.run_number }}
+          MODULES_REQUIRE_SIGNATURE: '0'
+          MODULE_UPDATED_AT: ${{ needs.plan.outputs.committed_at }}
+        run: |
+          set -euo pipefail
+          mkdir -p changed-modules
+          find signed-artifacts -type f -name '*.taomni-plugin' -exec cp {} changed-modules/ \;
+          find signed-artifacts -type f -name '*.taomni-plugin.minisig' -exec cp {} changed-modules/ \;
+          actual="$(find changed-modules -type f -name '*.taomni-plugin' | wc -l | tr -d ' ')"
+          test "$actual" = "$EXPECTED_PACKAGES"
+          node scripts/compose-modules-manifest.mjs changed-modules changed-catalog --delta
+          scripts/plugin-package/target/release/taomni-plugin-package \
+            --prepare-catalog-update current-catalog changed-catalog next-catalog > new-assets.json
+          cp changed-catalog/SHA256SUMS next-catalog/SHA256SUMS
+          (cd next-catalog && sha256sum --check --strict SHA256SUMS)
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-release-roster next-catalog current-catalog
+      - name: Sign the complete module catalog
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: scripts/plugin-package/target/release/taomni-plugin-package --sign-catalog next-catalog
+      - name: Verify and record the signed catalog
+        run: |
+          set -euo pipefail
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog next-catalog
+          printf '%s\n' "$MODULE_SOURCE_SHA" > module-batch-evidence-source-sha.txt
+          cp next-catalog/modules.json module-batch-evidence-modules.json
+          cp new-assets.json module-batch-evidence-assets.json
+      - name: Create or reuse the draft batch module release
+        run: |
+          set -euo pipefail
+          if core_manifest="$(gh release view "$TAG" --json assets --jq 'any(.assets[]; .name == "latest.json")' 2>/dev/null)"; then
+            test "$core_manifest" = false
+          else
+            gh release create "$TAG" --draft --title "Taomni modules $TAG" --generate-notes --target "$MODULE_SOURCE_SHA"
+          fi
+      - name: Upload changed packages before the signed catalog
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import filecmp, json, os, pathlib, subprocess, tempfile
+
+          tag = os.environ['TAG']
+          release = json.loads(subprocess.check_output(['gh', 'release', 'view', tag, '--json', 'assets'], text=True))
+          existing = {asset['name'] for asset in release['assets']}
+          for name in [*json.loads(pathlib.Path('new-assets.json').read_text(encoding='utf-8')), 'SHA256SUMS']:
+              candidate = f'next-catalog/{name}'
+              if name not in existing:
+                  subprocess.run(['gh', 'release', 'upload', tag, candidate], check=True)
+                  continue
+              with tempfile.TemporaryDirectory() as work:
+                  downloaded = str(pathlib.Path(work) / name)
+                  subprocess.run(['gh', 'release', 'download', tag, '--pattern', name, '--output', downloaded], check=True)
+                  if not filecmp.cmp(downloaded, candidate, shallow=False):
+                      raise SystemExit(f'Existing release asset has different bytes: {name}')
+          PY
+          gh release upload "$TAG" next-catalog/modules.json.minisig --clobber
+          gh release upload "$TAG" next-catalog/modules.json --clobber
+      - name: Publish the batch module assets and update the core release catalog
+        env:
+          CORE_TAG: ${{ steps.catalog-baseline.outputs.core_tag }}
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --draft=false --latest=false
+          test "$(gh release view --json tagName --jq .tagName)" = "$CORE_TAG"
+          if ! gh release upload "$CORE_TAG" next-catalog/modules.json.minisig --clobber \
+            || ! gh release upload "$CORE_TAG" next-catalog/modules.json --clobber; then
+            gh release upload "$CORE_TAG" current-catalog/modules.json.minisig --clobber
+            gh release upload "$CORE_TAG" current-catalog/modules.json --clobber
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: module-batch-release-evidence-${{ github.run_id }}
+          path: |
+            module-batch-evidence-source-sha.txt
+            module-batch-evidence-modules.json
+            module-batch-evidence-assets.json
+            new-assets.json
+            next-catalog/modules.json
+            next-catalog/modules.json.minisig
+          if-no-files-found: error
+          retention-days: 30
