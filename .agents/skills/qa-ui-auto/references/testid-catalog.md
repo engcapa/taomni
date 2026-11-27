@@ -1525,6 +1525,9 @@
 - `[data-testid="taoffice-project-critical"]` — display — F-FILEOPEN-1.taoffice-project-critical
 - `[data-testid="taoffice-project-save"]` — interactive — F-FILEOPEN-1.taoffice-project-save
 - `[data-testid="taoffice-project-output"]` — display — F-FILEOPEN-1.taoffice-project-output
+- `[data-testid="taoffice-project-error"]` — display — F-FILEOPEN-1.taoffice-project-error
+- `[data-testid="taoffice-project-retry"]` — interactive — F-FILEOPEN-1.taoffice-project-retry
+- `[data-testid="taoffice-project-open-system"]` — interactive — F-FILEOPEN-1.taoffice-project-open-system
 - `[data-testid="taoffice-pdf-form-toggle"]` — interactive — F-FILEOPEN-1.taoffice-pdf-form-toggle
 - `[data-testid="taoffice-pdf-form"]` — display — F-FILEOPEN-1.taoffice-pdf-form
 - `[data-testid="taoffice-pdf-form-field"]` — interactive — F-FILEOPEN-1.taoffice-pdf-form-field

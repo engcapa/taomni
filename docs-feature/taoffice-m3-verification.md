@@ -47,6 +47,12 @@ Windows 同源码复跑的 84 项 Native 用例有 80 项通过。`TC-FILE-OPEN-
 | Windows Browser | [1](https://github.com/engcapa/taomni/actions/runs/46045339273/artifacts/15222558215) · [2](https://github.com/engcapa/taomni/actions/runs/46045339273/artifacts/15223161012) |
 | Windows Native | [1](https://github.com/engcapa/taomni/actions/runs/46045339273/artifacts/15224762627) · [2](https://github.com/engcapa/taomni/actions/runs/46045339273/artifacts/15225391628) · [3](https://github.com/engcapa/taomni/actions/runs/46045339273/artifacts/15224728002) · [4](https://github.com/engcapa/taomni/actions/runs/46045339273/artifacts/15224822865) |
 
+## Project 二进制导入
+
+Project 0.3.0 用隔离的原生宿主读取 MPP。前端通过当前文档的只读授权分块上传，导入后的调度数据进入现有甘特视图，系统另存对话框只接受 MSPDI XML 副本。MPP9、MPP12 和 MPP14 的 21 个样本均已转换。独立 XML 解析确认 650 条任务的名称和日期、64 条前置关系、67 份日历及 629 条资源分配记录与读取模型一致，导出包括 350 条任务基线。Microsoft Project 重开验收待完成。 [二进制样本来源](https://github.com/joniles/mpxj/tree/63cdc4e8dd9eaa4c7b87158dcbd5fda77a04b671/junit/data/generated)
+
+宿主固定使用 LGPL-2.1-or-later 的 `mpxj-rs` 0.1.1。核心无默认特性构建的依赖树排除导入宿主和引擎。模块正式分发需要随包提供许可证、对应源码和重新链接路径，链接方式按设计 §8.6 的发布前复核执行。 [依赖许可证](https://github.com/lyj-514328/rust-mpxj)
+
 ## 待验证范围
 
-Word 当前保留原文件的静态分页，复杂段落只读。Project 当前支持 MSPDI，二进制 MPP、调度重算及 Microsoft Project 重开验证待办。旧格式媒体通过独立 FFmpeg 命令验证过 AVI、FLV 和 WMV 的可转换性，应用内第三档解码或转码仍待集成。PowerPoint、Visio、视频编辑、PDF 批注和页面操作、Excel 公式重算属于后续阶段。 [设计与阶段](taoffice-design.md#112-阶段m0-落地后才开始-m1)
+Word 当前保留原文件的静态分页，支持编辑混合格式 run 和表格单元格，正文之外的复杂对象继续只读。Project 已接入工作日历和前置关系的调度重算，任务日期和完成度、依赖及资源分配编辑仍待补齐。旧格式媒体通过独立 FFmpeg 命令验证过 AVI、FLV 和 WMV 的可转换性，应用内第三档解码或转码仍待集成。PowerPoint、Visio、视频编辑、PDF 批注和页面操作、Excel 公式重算属于后续阶段。 [设计与阶段](taoffice-design.md#112-阶段m0-落地后才开始-m1)

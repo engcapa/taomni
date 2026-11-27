@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project xmlns="http://schemas.microsoft.com/project">
+  <Name>Linked tasks</Name>
+  <ScheduleFromStart>1</ScheduleFromStart>
+  <StartDate>2014-10-29T08:00:00</StartDate>
+  <FinishDate>2014-10-30T17:00:00</FinishDate>
+  <Tasks>
+    <Task>
+      <UID>1</UID><ID>1</ID><Name>Task 1</Name><OutlineLevel>1</OutlineLevel>
+      <Start>2014-10-29T08:00:00</Start><Finish>2014-10-29T17:00:00</Finish><Duration>PT8H0M0S</Duration>
+    </Task>
+    <Task>
+      <UID>2</UID><ID>2</ID><Name>Task 2</Name><OutlineLevel>1</OutlineLevel>
+      <Start>2014-10-30T08:00:00</Start><Finish>2014-10-30T17:00:00</Finish><Duration>PT8H0M0S</Duration>
+      <PredecessorLink><PredecessorUID>1</PredecessorUID><Type>1</Type></PredecessorLink>
+    </Task>
+  </Tasks>
+</Project>

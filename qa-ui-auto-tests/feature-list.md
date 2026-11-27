@@ -17135,6 +17135,15 @@ controls:
   - id: taoffice-project-output
     selector: '[data-testid="taoffice-project-output"]'
     kind: display
+  - id: taoffice-project-error
+    selector: '[data-testid="taoffice-project-error"]'
+    kind: display
+  - id: taoffice-project-retry
+    selector: '[data-testid="taoffice-project-retry"]'
+    kind: interactive
+  - id: taoffice-project-open-system
+    selector: '[data-testid="taoffice-project-open-system"]'
+    kind: interactive
   - id: taoffice-pdf-form-toggle
     selector: '[data-testid="taoffice-pdf-form-toggle"]'
     kind: interactive

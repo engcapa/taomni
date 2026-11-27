@@ -109,10 +109,8 @@ def setup(ctx: Any) -> None:
         files["damaged.wav"] = b"Invalid WAV fixture"
         ctx.values["taoffice_wav_sha"] = hashlib.sha256(files["sample.wav"]).hexdigest()
     if ctx.case_id == "TC-TAOFFICE-001":
-        for name in ("Build", "Review"):
-            files[f"{name}.mppx"] = (
-                f'<Project xmlns="http://schemas.microsoft.com/project"><Name>{name}</Name></Project>'
-            ).encode()
+        files["Build.mppx"] = b'<Project xmlns="http://schemas.microsoft.com/project"><Name>Build</Name></Project>'
+        files["Review.mpp"] = (TAOFFICE_ASSETS / "linked-tasks.mpp").read_bytes()
     if ctx.case_id in {"TC-TAOFFICE-007", "TC-TAOFFICE-008"}:
         files["report.pdf"] = pdf_fixture()
         files["locked.pdf"] = locked_pdf_fixture()
@@ -139,6 +137,15 @@ def setup(ctx: Any) -> None:
         plan = (TAOFFICE_ASSETS / "shift-plan.mppx").read_bytes()
         files["shift-plan.xml" if native else "shift-plan.mppx"] = plan
         ctx.values["taoffice_schedule_sha"] = hashlib.sha256(plan).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-029", "TC-TAOFFICE-030"}:
+        files["linked-tasks.mpp"] = (TAOFFICE_ASSETS / "linked-tasks.mpp").read_bytes()
+        files["damaged.mpp"] = b"This is not a Project file."
+        digest = hashlib.sha256(files["linked-tasks.mpp"]).hexdigest()
+        ctx.values["taoffice_mpp_sha"] = digest
+        if not native:
+            ctx.values["taoffice_mpp_preview"] = json.dumps({
+                "hash": digest, "xml": (TAOFFICE_ASSETS / "linked-tasks-preview.xml").read_text(encoding="utf-8"),
+            })
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative

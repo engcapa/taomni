@@ -6,6 +6,7 @@ import excelManifest from "../../src-tauri/plugins/taoffice-excel/module.json";
 import wordManifest from "../../src-tauri/plugins/taoffice-word/module.json";
 import projectManifest from "../../src-tauri/plugins/taoffice-project/module.json";
 import { invokeExcelPreview } from "./excelWorkbookPreview";
+import { invokeProjectPreview } from "./projectImportPreview";
 import mailManifest from "../../src-tauri/plugins/mail/module.json";
 import mfaManifest from "../../src-tauri/plugins/mfa/module.json";
 import rdpManifest from "../../src-tauri/plugins/rdp-client/module.json";
@@ -108,6 +109,8 @@ export function invokeModulePreview(command: string, args?: Record<string, unkno
     [state.version, state.previousVersion] = [state.previousVersion, state.version];
   } else if (command === "plugin_invoke" && manifest.slug === excelManifest.slug && state.lifecycle === "enabled") {
     return invokeExcelPreview(String(args.command), args.payload);
+  } else if (command === "plugin_invoke" && manifest.slug === projectManifest.slug && state.lifecycle === "enabled") {
+    return invokeProjectPreview(String(args.command), args.payload);
   } else if (command === "plugin_invoke" && manifest === previewHelloManifest && state.lifecycle === "enabled") {
     if (args.command === "hello/ping") return { pluginId: previewHelloManifest.id, version: state.version ?? previewHelloManifest.version, enabled: true };
     if (args.command === "hello/read") return { values: [...state.values] };

@@ -1,5 +1,6 @@
 use super::document_access::reject_profile_paths;
 use super::paths::{ScopedRoot, absolute, display, file_name, io_error};
+use std::ffi::OsStr;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use tauri::Window;
@@ -17,20 +18,34 @@ pub(crate) fn validate(source: &Path, bytes: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-fn suggested_name(source: &Path) -> Result<String, String> {
+fn extension<'a>(source: &'a Path, slug: &str) -> Result<&'a OsStr, String> {
+    let extension = source.extension().ok_or("Missing document extension")?;
+    Ok(
+        if slug == "taoffice-project" && extension.eq_ignore_ascii_case("mpp") {
+            OsStr::new("xml")
+        } else {
+            extension
+        },
+    )
+}
+
+fn suggested_name(source: &Path, slug: &str) -> Result<String, String> {
     let base = source
         .file_stem()
         .and_then(|name| name.to_str())
         .ok_or("Missing document name")?;
-    let extension = source
-        .extension()
-        .and_then(|ext| ext.to_str())
+    let extension = extension(source, slug)?
+        .to_str()
         .ok_or("Missing document extension")?;
     Ok(format!("{base} - copy.{extension}"))
 }
 
-pub(crate) fn select_destination(window: &Window, source: &Path) -> Result<Option<String>, String> {
-    let name = suggested_name(source)?;
+pub(crate) fn select_destination(
+    window: &Window,
+    source: &Path,
+    slug: &str,
+) -> Result<Option<String>, String> {
+    let name = suggested_name(source, slug)?;
     let parent = source.parent().ok_or("Missing document directory")?;
     let selected = window
         .dialog()
@@ -50,6 +65,7 @@ pub(crate) fn select_destination(window: &Window, source: &Path) -> Result<Optio
 
 pub(crate) fn write(
     source: &Path,
+    slug: &str,
     selected: &str,
     protected: &[&Path],
     bytes: &[u8],
@@ -61,7 +77,7 @@ pub(crate) fn write(
         .and_then(|name| name.to_str())
         .ok_or("Missing copy name")?;
     let name = file_name(name)?;
-    let expected = source.extension().ok_or("Missing document extension")?;
+    let expected = extension(source, slug)?;
     if !selected
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case(expected))
@@ -111,11 +127,25 @@ mod tests {
         fs::create_dir(&config).unwrap();
         fs::write(&original, b"original").unwrap();
         let protected = [config.as_path()];
-        assert_eq!(suggested_name(&original).unwrap(), "report - copy.pdf");
-        assert!(write(&original, original.to_str().unwrap(), &protected, b"other").is_err());
+        let slug = "taoffice-pdf";
+        assert_eq!(
+            suggested_name(&original, slug).unwrap(),
+            "report - copy.pdf"
+        );
         assert!(
             write(
                 &original,
+                slug,
+                original.to_str().unwrap(),
+                &protected,
+                b"other"
+            )
+            .is_err()
+        );
+        assert!(
+            write(
+                &original,
+                slug,
                 config.join("copy.pdf").to_str().unwrap(),
                 &protected,
                 b"bytes"
@@ -123,10 +153,20 @@ mod tests {
             .is_err()
         );
         assert!(!config.join("copy.pdf").exists());
-        assert!(write(&original, copy.to_str().unwrap(), &protected, b"bytes").is_ok());
         assert!(
             write(
                 &original,
+                slug,
+                copy.to_str().unwrap(),
+                &protected,
+                b"bytes"
+            )
+            .is_ok()
+        );
+        assert!(
+            write(
+                &original,
+                slug,
                 copy.to_str().unwrap(),
                 &protected,
                 b"replacement"
@@ -136,5 +176,21 @@ mod tests {
         assert_eq!(fs::read(&original).unwrap(), b"original");
         assert_eq!(fs::read(&copy).unwrap(), b"bytes");
         assert_eq!(fs::read_dir(root.path()).unwrap().count(), 3);
+    }
+
+    #[test]
+    fn a_project_import_saves_only_as_xml() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("plan.MPP");
+        let valid = root.path().join("plan - copy.xml");
+        let invalid = root.path().join("other.mpp");
+        fs::write(&source, b"original").unwrap();
+        let slug = "taoffice-project";
+        assert_eq!(suggested_name(&source, slug).unwrap(), "plan - copy.xml");
+        assert!(write(&source, slug, invalid.to_str().unwrap(), &[], b"xml").is_err());
+        assert!(!invalid.exists());
+        write(&source, slug, valid.to_str().unwrap(), &[], b"xml").unwrap();
+        assert_eq!(fs::read(&source).unwrap(), b"original");
+        assert_eq!(fs::read(&valid).unwrap(), b"xml");
     }
 }

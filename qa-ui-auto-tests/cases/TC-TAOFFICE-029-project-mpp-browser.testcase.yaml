@@ -1,0 +1,60 @@
+id: TC-TAOFFICE-029
+title: Project handles a rejected MPP import and exports an edited plan as XML
+description: Transfer real MPP fixture bytes through the browser provider, verify error recovery and the Gantt view, rename a task and export XML.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-project]
+fixtures: [reset_db, file_open_files]
+ui_standard: [UI-FOC-02]
+timeout_sec: 170
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-project.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- seed_storage: {key: taomni.preview.taoffice-project.import.v1, value: '${fixture.taoffice_mpp_preview}'}
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="damaged.mpp"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="damaged.mpp"]'
+- wait_for: '[data-testid="taoffice-project-error"]'
+- click: '[data-testid="taoffice-project-open-system"]'
+- press: {selector: '[data-testid="taoffice-project-retry"]', key: Enter}
+- wait_for: '[data-testid="taoffice-project-error"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="linked-tasks.mpp"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="linked-tasks.mpp"]'
+- wait_for: '[data-testid="taoffice-project-schedule"]'
+- assert_visible: '[data-testid="taoffice-project-task"][data-uid="2"] [data-testid="taoffice-project-bar"]'
+- assert_attribute: {selector: '[data-testid="taoffice-project-task"][data-uid="2"]', name: data-start, equals: '2014-10-30T08:00:00'}
+- press: {selector: '[data-testid="taoffice-project-task"][data-uid="2"] [data-testid="taoffice-project-rename"]', key: Enter}
+- assert_focus_on: '[data-testid="taoffice-project-task-name"]'
+- fill: {selector: '[data-testid="taoffice-project-task-name"]', value: 'Review linked task'}
+- press: Enter
+- assert_focus_on: '[data-testid="taoffice-project-task"][data-uid="2"] [data-testid="taoffice-project-rename"]'
+- assert_download:
+    trigger: '[data-testid="taoffice-project-save"]'
+    filename: linked-tasks - copy.xml
+    contains: ['<Name>Review linked task</Name>', '<PredecessorUID>1</PredecessorUID><Type>1</Type>']
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/linked-tasks.mpp', sha256: '${fixture.taoffice_mpp_sha}'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-FOC-02]
+    requirement: Keyboard rename places focus in the task input, and applying the edit returns focus to the task's rename button.
+    actions: [23, 26]
+    checkpoints:
+    - {step: 24, expectation: The task name input receives focus.}
+    - {step: 27, expectation: The renamed task's button receives focus.}
+    results: [24, 27]
+  visual:
+  - {check: Gantt task, method: automated, reason: The linked task has a visible timeline bar at its imported date.}
+  native:
+  - {check: MPP conversion and OS save, method: external, reason: TC-TAOFFICE-030 uses the real signed host and the native Save As chooser.}

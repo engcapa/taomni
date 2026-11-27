@@ -1,4 +1,5 @@
-import { MAX_PROJECT_BYTES, MAX_TASK_NAME, parseProject, projectCopy } from "./projectXml.js";
+import { MAX_TASK_NAME, parseProject, projectCopy } from "./projectXml.js";
+import { readProject } from "./projectImport.js";
 import { recalculateSchedule, scheduleModel } from "./projectSchedule.js";
 import { MINUTE, scheduleDateText } from "./scheduleTime.js";
 import { ProjectDuration } from "./ProjectDuration.jsx";
@@ -13,31 +14,50 @@ const SCHEDULE = "schedule";
 const dateLabel = (value) => value?.slice(0, 10) ?? "—";
 const extentLabel = (value) => new Date(value).toISOString().slice(0, 10);
 
-export default function ProjectViewer({ document: source, active }) {
+export default function ProjectViewer({ document: source, active, api }) {
   const { locale } = i18n.useLocale();
   const label = (zh, en) => locale === "zh-CN" ? zh : en;
   const [state, setState] = useState(null);
+  const [retry, setRetry] = useState(0);
+  const [systemError, setSystemError] = useState("");
   useEffect(() => {
-    let current = true;
+    const controller = new AbortController();
+    const { signal } = controller;
     async function load() {
-      const file = await source.read();
-      if (file.size > MAX_PROJECT_BYTES) throw new Error(label("Project XML 预览上限为 8 MiB。", "Project XML preview is limited to 8 MiB."));
-      const project = parseProject(new Uint8Array(await file.arrayBuffer()));
-      if (!current) return;
+      const bytes = await readProject(api, source, signal);
+      if (signal.aborted) return;
+      const project = parseProject(bytes);
       try {
-        setState({ source, project, model: scheduleModel(project.xml) });
+        setState({ source, retry, project, model: scheduleModel(project.xml) });
       } catch (calculationError) {
-        setState({ source, project, calculationError: calculationError.message });
+        setState({ source, retry, project, calculationError: calculationError.message });
       }
     }
-    void load().catch((error) => { if (current) setState({ source, error: String(error) }); });
-    return () => { current = false; };
-  }, [source]);
+    void load().catch((error) => {
+      if (!signal.aborted) setState({ source, retry, error: error.message ?? String(error) });
+    });
+    return () => controller.abort();
+  }, [source, api, retry]);
 
-  return <section className="taoffice-project" aria-label={source.name} data-testid="taoffice-project">
+  const loading = state?.source !== source || state.retry !== retry;
+  return <section className="taoffice-project" aria-label={source.name} aria-busy={loading} data-testid="taoffice-project">
     <style>{styles}</style>
-    {state?.source !== source ? <p role="status">{label("正在打开项目…", "Opening project…")}</p>
-      : state.error ? <p role="alert" data-testid="taoffice-project-error">{state.error}</p>
+    {loading ? <p role="status">{label("正在打开项目…", "Opening project…")}</p>
+      : state.error ? <div role="alert" data-testid="taoffice-project-error">
+          <p>{label("无法打开项目。", "Could not open the project.")} {state.error}</p>
+          <div className="taoffice-project-toolbar">
+            <button type="button" className="taomni-btn" data-testid="taoffice-project-retry" onClick={() => {
+              setSystemError("");
+              setRetry((value) => value + 1);
+            }}>{label("重试", "Retry")}</button>
+            <button type="button" className="taomni-btn" data-testid="taoffice-project-open-system"
+              onClick={() => {
+                setSystemError("");
+                void source.openSystem().catch((error) => setSystemError(error.message ?? String(error)));
+              }}>{label("用系统应用打开", "Open in system app")}</button>
+          </div>
+          {systemError && <p>{systemError}</p>}
+        </div>
         : <ProjectSchedule source={source} project={state.project} model={state.model}
           modelError={state.calculationError} active={active} label={label} />}
   </section>;
@@ -92,7 +112,8 @@ function ProjectSchedule({ source, project, model, modelError, active, label }) 
         disabled={draft.saving} onClick={() => calculate()}>{label("重算排程", "Recalculate schedule")}</button>}
       {source.saveCopy && <button type="button" className="taomni-btn" data-variant="primary"
         data-testid="taoffice-project-save" disabled={!draft.dirty || draft.saving}
-        aria-busy={draft.saving} onClick={save}>{draft.saving ? label("正在保存…", "Saving…") : label("保存副本", "Save a copy")}</button>}
+        aria-busy={draft.saving} onClick={save}>{draft.saving ? label("正在保存…", "Saving…")
+          : source.extension === "mpp" ? label("保存 XML 副本", "Save XML copy") : label("保存副本", "Save a copy")}</button>}
     </div>
     {draft.output && <p role="status" data-testid="taoffice-project-output">{draft.output}</p>}
     {draft.error && <p role="alert">{draft.error}</p>}

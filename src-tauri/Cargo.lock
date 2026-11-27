@@ -1349,6 +1349,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cfb"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f13298d9178622b7916ec5d01d470425c04273c8ed07e87b1c38b34c4f4612b"
+dependencies = [
+ "fnv",
+ "uuid",
+ "web-time",
+]
+
+[[package]]
 name = "cff-parser"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6204,6 +6215,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "mpxj-rs"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb3edccf1d43bda1c50d87280c5ac88fd891f1869bd2a53ba08a5b76e9256df2"
+dependencies = [
+ "byteorder",
+ "cfb 0.15.0",
+ "chrono",
+ "encoding_rs",
+ "roxmltree",
+ "thiserror 2.0.20",
+ "uuid",
+]
+
+[[package]]
 name = "muda"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9055,6 +9081,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxmltree"
+version = "0.21.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9da7f59328b09405b181fee1018925fad50f157afb43c0c0f5c522c256dd5907"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "rsa"
 version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11576,6 +11611,21 @@ dependencies = [
  "taomni-plugin-sdk",
  "uuid",
  "zip 9.8.2",
+]
+
+[[package]]
+name = "taomni-plugin-taoffice-project"
+version = "0.3.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "mpxj-rs",
+ "quick-xml 0.42.0",
+ "serde",
+ "serde_json",
+ "taomni-plugin-api",
+ "taomni-plugin-sdk",
+ "uuid",
 ]
 
 [[package]]
