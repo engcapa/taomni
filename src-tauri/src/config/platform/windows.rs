@@ -2,7 +2,17 @@ use super::paths::{existing_file_from, initial_dir_from};
 use std::ffi::OsStr;
 use std::mem::{size_of, zeroed};
 use std::os::windows::ffi::OsStrExt;
+use std::os::windows::process::CommandExt;
 use std::ptr;
+
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+fn run_hidden_powershell(script: &str) -> std::io::Result<std::process::Output> {
+    std::process::Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+}
 use winapi::um::commdlg::{
     CommDlgExtendedError, GetOpenFileNameW, OFN_ALLOWMULTISELECT, OFN_EXPLORER, OFN_FILEMUSTEXIST,
     OFN_HIDEREADONLY, OFN_NOCHANGEDIR, OFN_PATHMUSTEXIST, OPENFILENAMEW,
@@ -136,7 +146,6 @@ fn wide_filter(filters: &[(&str, &str)]) -> Vec<u16> {
 }
 
 pub fn select_save_directory(current_path: Option<&str>) -> Result<Option<String>, String> {
-    use std::process::Command;
     let initial = super::paths::initial_dir_from(current_path)
         .or_else(dirs::download_dir)
         .or_else(dirs::home_dir)
@@ -146,10 +155,7 @@ pub fn select_save_directory(current_path: Option<&str>) -> Result<Option<String
         r#"Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = 'Select save directory'; $d.SelectedPath = '{}'; if ($d.ShowDialog() -eq 'OK') {{ $d.SelectedPath }} else {{ '' }}"#,
         initial.replace('\'', "''")
     );
-    let output = Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-        .output()
-        .map_err(|e| format!("powershell: {e}"))?;
+    let output = run_hidden_powershell(&script).map_err(|e| format!("powershell: {e}"))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!("powershell: {}", stderr.trim()));
@@ -163,7 +169,6 @@ pub fn select_save_directory(current_path: Option<&str>) -> Result<Option<String
 pub fn select_folder_path(current_path: Option<&str>) -> Result<Option<String>, String> {
     // Folder pickers reuse the same PowerShell FolderBrowserDialog as
     // select_save_directory; only the dialog title differs.
-    use std::process::Command;
     let initial = super::paths::initial_dir_from(current_path)
         .or_else(dirs::home_dir)
         .map(|p| p.to_string_lossy().into_owned())
@@ -172,10 +177,7 @@ pub fn select_folder_path(current_path: Option<&str>) -> Result<Option<String>, 
         r#"Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = 'Select folder to open'; $d.SelectedPath = '{}'; if ($d.ShowDialog() -eq 'OK') {{ $d.SelectedPath }} else {{ '' }}"#,
         initial.replace('\'', "''")
     );
-    let output = Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-        .output()
-        .map_err(|e| format!("powershell: {e}"))?;
+    let output = run_hidden_powershell(&script).map_err(|e| format!("powershell: {e}"))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!("powershell: {}", stderr.trim()));

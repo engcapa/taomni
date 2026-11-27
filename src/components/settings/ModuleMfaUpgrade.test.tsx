@@ -22,6 +22,9 @@ it("clears a refused password and submits the retry once while restart is pendin
   ipc.migrateMfaAndRestart.mockRejectedValueOnce("VAULT_BAD_PASSWORD");
   ipc.migrateMfaAndRestart.mockResolvedValueOnce(undefined);
   render(<ModuleMfaUpgrade eligible />);
+  expect(screen.getByTestId("module-upgrade-mfa-card")).toBeInTheDocument();
+  expect(screen.getByTestId("module-upgrade-mfa-title")).toHaveTextContent("Migrate legacy MFA accounts");
+  expect(screen.getByTestId("module-upgrade-mfa-subtitle")).toHaveTextContent("original Vault master password");
   fireEvent.click(screen.getByTestId("module-upgrade-mfa-open"));
   const submit = screen.getByTestId("module-upgrade-mfa-submit");
   expect(submit).toBeDisabled();
@@ -47,6 +50,8 @@ it("reports success after the last pending MFA candidate disappears", async () =
   ipc.getMfaMigrationResult.mockResolvedValue("complete");
   render(<ModuleMfaUpgrade eligible={false} />);
   expect(await screen.findByRole("status")).toHaveTextContent("MFA migration completed.");
+  expect(screen.getByTestId("module-upgrade-mfa-card")).toBeInTheDocument();
+  expect(screen.queryByTestId("module-upgrade-mfa-title")).toBeNull();
   expect(screen.queryByTestId("module-upgrade-mfa-open")).toBeNull();
 });
 

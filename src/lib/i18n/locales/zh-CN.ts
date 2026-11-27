@@ -2738,6 +2738,8 @@ export const zhCN: DeepPartial<typeof en> = {
     moduleUpgradeRetained: "为备份保留的旧文件：{count}",
     moduleUpgradeNone: "未检测到需要迁移的旧模块数据。",
     moduleUpgradeMigrate: "迁移检测到的数据",
+    moduleUpgradeMfaTitle: "迁移旧版 MFA 账户",
+    moduleUpgradeMfaSubtitle: "旧版 MFA 账户需单独迁移：点击下方按钮输入原 Vault 主密码并重启应用即可完成。",
     moduleUpgradeMfaOpen: "使用签名包迁移 MFA",
     moduleUpgradeMfaInstalled: "将旧数据迁入已安装的 MFA 模块",
     moduleUpgradeMfaArchive: "MFA 模块包",

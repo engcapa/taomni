@@ -25,9 +25,17 @@ fn private_file(path: &Path) -> Result<std::fs::File, String> {
         .map_err(|e| format!("Create private key: {e}"))?;
     #[cfg(windows)]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let hidden_cmd = |program: &str| {
+            let mut cmd = std::process::Command::new(program);
+            cmd.creation_flags(CREATE_NO_WINDOW);
+            cmd
+        };
+
         // Remove inherited ACL entries before writing any private key bytes.
         let secure = (|| -> Result<(), String> {
-            let identity = std::process::Command::new("whoami.exe")
+            let identity = hidden_cmd("whoami.exe")
                 .args(["/user", "/fo", "csv", "/nh"])
                 .output()
                 .map_err(|e| e.to_string())?;
@@ -40,7 +48,7 @@ fn private_file(path: &Path) -> Result<std::fs::File, String> {
                             .all(|c| c.is_ascii_digit() || c == 'S' || c == '-')
                 })
                 .ok_or("Could not resolve the current Windows account SID")?;
-            let result = std::process::Command::new("icacls.exe")
+            let result = hidden_cmd("icacls.exe")
                 .arg(path)
                 .args(["/inheritance:r", "/grant:r", &format!("*{sid}:F")])
                 .output()
