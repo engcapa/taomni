@@ -27,6 +27,10 @@ steps:
     key: Enter
 - dblclick: '[data-testid="explorer-file-row"][data-name="sample.wav"]'
 - wait_for: '[data-testid="taoffice-media-player"][data-ready="true"][controls]'
+- eval_readonly:
+    expression: Math.abs(document.querySelector("audio").duration - 2) < 0.05
+    expect_truthy: true
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/sample.wav', sha256: '${fixture.taoffice_wav_sha}'}
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="damaged.wav"]'
 - wait_for: '[data-testid="taoffice-media-error"]'

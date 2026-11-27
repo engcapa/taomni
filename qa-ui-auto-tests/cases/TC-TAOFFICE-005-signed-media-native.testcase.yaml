@@ -1,6 +1,6 @@
 id: TC-TAOFFICE-005
 title: Install the signed TaOffice Media module and decode a local WAV
-description: Enable the package through the store, read metadata in the native WebView and disable the renderer with the file still open.
+description: Enable the signed package in the store and check the WAV duration in the native WebView, including devices that need the bounded local media fallback. Disable the renderer with the file open and verify the source bytes.
 modes: [native]
 covers: [F-FILEOPEN-1, F-Modules-1]
 tags: [p0, file-open, taoffice, media, native-boundary]
@@ -24,10 +24,11 @@ steps:
 - fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
 - press: {selector: '[data-testid="explorer-address"]', key: Enter}
 - dblclick: '[data-testid="explorer-file-row"][data-name="sample.wav"]'
-- wait_for: '[data-testid="taoffice-media-player"][data-ready="true"][controls]'
+- wait_for: {selector: '[data-testid="taoffice-media-player"][data-ready="true"][controls]', timeout_sec: 25}
 - eval_readonly:
-    expression: document.querySelector("audio").duration > 0
+    expression: Math.abs(document.querySelector("audio").duration - 2) < 0.05
     expect_truthy: true
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/sample.wav', sha256: '${fixture.taoffice_wav_sha}'}
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
 - click: '[data-testid="module-action-disable-taoffice-video"]'

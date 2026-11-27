@@ -81,6 +81,7 @@ def setup(ctx: Any) -> None:
             audio.writeframes(bytes(32000))
         files["sample.wav"] = wav.getvalue()
         files["damaged.wav"] = b"Invalid WAV fixture"
+        ctx.values["taoffice_wav_sha"] = hashlib.sha256(files["sample.wav"]).hexdigest()
     if ctx.case_id == "TC-TAOFFICE-001":
         for name in ("Build", "Review"):
             files[f"{name}.mppx"] = (
