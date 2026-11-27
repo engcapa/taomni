@@ -114,12 +114,15 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
     def test_standalone_macos_stages_the_selected_mfa_package_before_opening_the_profile(self):
         profile = Path("legacy-profile")
         args = SimpleNamespace(signed=Mock(), macos_hardened_mfa=False)
-        receipt = {"passed": True}
+        desktop = {"profile": str(profile), "desktopOwnerPid": 21, "generation": "candidate"}
+        receipt = {"passed": True, "desktopModeLease": desktop}
         initial = {"screenRecording": "granted", "accessibility": "granted", "requirement": "fixed"}
         stages = {"originalPermissions": initial}
         with patch("installed_desktop_upgrade.platform.system", return_value="Darwin"), patch(
             "installed_desktop_upgrade.verify_crash_recovery", return_value=receipt,
-        ) as migrate, patch("installed_desktop_upgrade.check_mode_lease") as mode, patch(
+        ) as migrate, patch("installed_desktop_upgrade.check_mode_lease") as fresh_mode, patch(
+            "installed_desktop_upgrade.finish_first_release_mode_lease",
+        ) as mode, patch(
             "installed_desktop_upgrade.observe_permissions", return_value=initial,
         ) as permissions, patch("installed_desktop_upgrade.observe_hosted_screen_scan"):
             order = Mock()
@@ -131,6 +134,8 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
         self.assertEqual(errors, (None, None))
         self.assertEqual([event[0] for event in order.mock_calls], ["migrate", "open"])
         self.assertEqual(migrate.call_args.args[1], profile)
+        fresh_mode.assert_not_called()
+        mode.assert_called_once_with("app", "work", "evidence", desktop)
         permissions.assert_called_once_with("app", "evidence", "candidate", work="work", screenshot_only=True)
 
     def test_windows_retries_inspection_after_timeout_with_one_msi_install(self):

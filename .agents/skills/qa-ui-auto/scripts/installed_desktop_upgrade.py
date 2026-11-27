@@ -92,7 +92,11 @@ def exercise_desktop_contracts(candidate, desktop_profile, stages, args, identit
     # can enroll this legacy profile in the public release catalog.
     migrate_before_launch = system == "Darwin" and first_release is None
     recovery_failure = recover_mfa(desktop_profile) if migrate_before_launch else None
-    if first_release is None:
+    if migrate_before_launch:
+        if recovery_failure is not None:
+            return recovery_failure, permission_failure
+        mode_lease = finish_first_release_mode_lease(candidate, work, report, stages["crashRecovery"]["desktopModeLease"])
+    elif first_release is None:
         mode_lease = check_mode_lease(candidate, work, report, profile=desktop_profile)
     else:
         desktop = stages["firstBusinessInstall"]["stages"]["reopen-without-mail"]

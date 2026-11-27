@@ -9,6 +9,7 @@ import platform
 import re
 from types import SimpleNamespace
 
+from installed_desktop_mode_lease import observe_desktop_owner
 from installed_macos_host_signature import observe_installed_host
 from installed_macos_store import compile_driver, controls, installed_macos_desktop
 from installed_windows_host_security import mark_download, observe_downloaded_host
@@ -173,6 +174,8 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
                 session.session_id = None
         with open_desktop(ctx, executable, work, evidence, "mfa-after-kill", appkit=appkit) as (launcher, session):
             verify_open_mfa(launcher, session, executable, work, evidence, ctx, phase="after", appkit=appkit)
+            if appkit and first_release is None:
+                result["desktopModeLease"] = observe_desktop_owner(executable, profile, evidence, launcher)
         if installed_mfa(profile, receipt) != (installed, module) or digest(module) != result["moduleBinarySha256"]:
             raise RuntimeError("Recovery changed the active MFA version or module binary")
         if zone is not None:
