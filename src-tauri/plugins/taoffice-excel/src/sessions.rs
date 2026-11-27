@@ -1,5 +1,6 @@
-use crate::workbook::{MAX_INPUT_BYTES, Workbook, invalid};
+use crate::workbook::{MAX_INPUT_BYTES, Workbook};
 use crate::workbook_copy::{self, Edit};
+use crate::workbook_package::invalid;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};

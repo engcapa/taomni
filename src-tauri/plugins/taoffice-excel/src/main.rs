@@ -4,6 +4,7 @@ use taomni_plugin_sdk::{HostConfig, serve_stdio_with};
 mod sessions;
 mod workbook;
 mod workbook_copy;
+mod workbook_package;
 
 const ID: &str = "taomni-plugin-taoffice-excel";
 const COMMANDS: [&str; 8] = [

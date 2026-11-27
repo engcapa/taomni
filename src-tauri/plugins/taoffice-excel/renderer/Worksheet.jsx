@@ -94,6 +94,9 @@ export function Worksheet({ range, cursor, move, active, pending, label, platfor
     {selected?.truncated && <p className="taoffice-excel-feedback" role="status">
       {label("单元格内容过长，查看器显示前 960 个字符。", "This cell preview shows the first 960 characters.")}
     </p>}
+    {editor.permitted && selected?.tableMetadata && <p className="taoffice-excel-feedback" role="status" data-testid="taoffice-excel-table-readonly">
+      {label("表格标题和汇总行是只读的。", "Table headers and totals rows are read-only.")}
+    </p>}
     {clipboardError && <p role="alert">{label("无法复制，请再次按复制快捷键。", "Clipboard access failed. Try the copy shortcut again.")}</p>}
     <div className="taoffice-excel-grid">
       <table role="grid" aria-label={label("工作表单元格", "Worksheet cells")} aria-busy={pending}

@@ -1,6 +1,6 @@
 id: TC-TAOFFICE-019
 title: Edit XLSX cells with keyboard commit, cancellation and dirty close
-description: Protect formulas, reject invalid numeric input, commit and advance to the next cell with Tab, and retain edits when cancelling the shared close dialog.
+description: Protect table headings and formulas, reject invalid numeric input, commit and advance to the next cell with Tab, and retain edits when cancelling the shared close dialog.
 modes: [browser]
 covers: [F-FILEOPEN-1]
 tags: [p0, file-open, taoffice, taoffice-excel]
@@ -27,6 +27,12 @@ steps:
 - eval_readonly:
     expression: getComputedStyle(document.querySelector(".taoffice-excel-grid td")).borderBottomWidth === "1px"
     expect_truthy: true
+- click: '[data-testid="taoffice-excel-cell"][data-address="A1"]'
+- assert_attribute: {selector: '[data-testid="taoffice-excel-cell"][data-address="A1"]', name: aria-readonly, equals: 'true'}
+- assert_disabled: '[data-testid="taoffice-excel-edit-cell"]'
+- press: {selector: '[data-testid="taoffice-excel-cell"][data-address="A1"]', key: F2}
+- assert_not_visible: '[data-testid="taoffice-excel-input"]'
+- assert_text: {selector: '[data-testid="taoffice-excel-table-readonly"]', contains: Table headers and totals rows are read-only}
 - click: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
 - assert_disabled: '[data-testid="taoffice-excel-edit-cell"]'
 - click: '[data-testid="taoffice-excel-cell"][data-address="B2"]'

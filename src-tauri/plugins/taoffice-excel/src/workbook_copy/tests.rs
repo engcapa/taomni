@@ -1,4 +1,6 @@
 use super::*;
+use crate::workbook_package::Source;
+use std::io::Read;
 
 const FILE: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -75,17 +77,29 @@ fn rejects_formula_blank_duplicate_and_invalid_numeric_updates() {
 }
 
 #[test]
+fn rejects_table_headers_and_keeps_ordinary_table_rows_editable() {
+    let mut workbook = Workbook::open(FILE.to_vec()).unwrap();
+    let window = serde_json::to_value(workbook.sheet("Totals", 0, 0, || Ok(())).unwrap()).unwrap();
+    let cells = window["cells"].as_array().unwrap();
+    assert_eq!(cells[0]["value"], "Product");
+    assert_eq!(cells[0]["tableMetadata"], true);
+    assert!(cells[0].get("editType").is_none());
+    let body = cells
+        .iter()
+        .find(|cell| cell["value"] == "Keyboard")
+        .unwrap();
+    assert_eq!(body["editType"], "text");
+    let err = create(&workbook, vec![edit("A1", "Renamed")], || Ok(())).unwrap_err();
+    assert!(err.message.contains("Table headers and totals"));
+    assert!(create(&workbook, vec![edit("A2", "North")], || Ok(())).is_ok());
+}
+
+#[test]
 fn adds_calculation_settings_in_schema_order_when_the_workbook_omits_them() {
     let xml = format!(
-        r#"<m:workbook xmlns:m="{MAIN}" xmlns:r="{RID}"><m:sheets><m:sheet r:id="rId1" name="Sheet1"/></m:sheets><m:extLst/></m:workbook><!-- trailing comment </other> -->"#
+        r#"<m:workbook xmlns:m="{MAIN}"><m:sheets/><m:extLst/></m:workbook><!-- trailing comment </other> -->"#
     );
-    let targets = HashMap::from([("rId1".into(), "xl/worksheets/sheet1.xml".into())]);
-    let (sheets, rewritten) = workbook_parts(&xml, &targets).unwrap();
-    assert_eq!(
-        sheets,
-        HashMap::from([("Sheet1".into(), "xl/worksheets/sheet1.xml".into())])
-    );
-    let rewritten = String::from_utf8(rewritten).unwrap();
+    let rewritten = String::from_utf8(recalculate_on_open(&xml).unwrap()).unwrap();
     assert_eq!(
         rewritten,
         xml.replace(
@@ -94,7 +108,7 @@ fn adds_calculation_settings_in_schema_order_when_the_workbook_omits_them() {
         )
     );
     let xml = xml.replace("<m:extLst/>", "");
-    let (_, rewritten) = workbook_parts(&xml, &targets).unwrap();
+    let rewritten = recalculate_on_open(&xml).unwrap();
     assert_eq!(
         String::from_utf8(rewritten).unwrap(),
         xml.replace(

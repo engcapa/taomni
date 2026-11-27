@@ -1,6 +1,6 @@
 id: TC-TAOFFICE-020
 title: Save edited XLSX cells through the signed Excel host and reopen the copy
-description: Install the signed module, edit text and a number, cancel the save shortcut's desktop dialog, then save and reopen with the formula intact.
+description: Install the signed module, protect a table heading, edit table data, cancel the save shortcut's desktop dialog, then save and reopen with the table and formula intact.
 modes: [native]
 covers: [F-FILEOPEN-1, F-Modules-1]
 tags: [p0, file-open, taoffice, taoffice-excel, native-boundary]
@@ -27,6 +27,12 @@ steps:
 - wait_for: '[data-testid="explorer-file-row"][data-name="quarterly.xlsx"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="quarterly.xlsx"]'
 - wait_for: '[data-testid="taoffice-excel-cell"][data-address="A2"]'
+- click: '[data-testid="taoffice-excel-cell"][data-address="A1"]'
+- assert_attribute: {selector: '[data-testid="taoffice-excel-cell"][data-address="A1"]', name: aria-readonly, equals: 'true'}
+- assert_disabled: '[data-testid="taoffice-excel-edit-cell"]'
+- press: {selector: '[data-testid="taoffice-excel-cell"][data-address="A1"]', key: F2}
+- assert_not_visible: '[data-testid="taoffice-excel-input"]'
+- assert_text: {selector: '[data-testid="taoffice-excel-table-readonly"]', contains: Table headers and totals rows are read-only}
 - click: '[data-testid="taoffice-excel-cell"][data-address="A2"]'
 - press: {selector: '[data-testid="taoffice-excel-cell"][data-address="A2"]', key: F2}
 - fill: {selector: '[data-testid="taoffice-excel-input"]', value: Mechanical Keyboard}
@@ -56,6 +62,8 @@ steps:
 - wait_for: '[data-testid="explorer-file-row"][data-name="edited.xlsx"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="edited.xlsx"]'
 - wait_for: '[data-testid="taoffice-excel-cell"][data-address="A2"]'
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="A1"]', contains: Product}
+- assert_attribute: {selector: '[data-testid="taoffice-excel-cell"][data-address="A1"]', name: aria-readonly, equals: 'true'}
 - assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="A2"]', contains: Mechanical Keyboard}
 - assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', contains: '15.5'}
 - click: '[data-testid="taoffice-excel-cell"][data-address="C2"]'

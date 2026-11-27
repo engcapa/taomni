@@ -1,15 +1,16 @@
+use crate::workbook_package::{
+    MAX_COLUMNS, MAX_ROWS, Source, WorksheetLayout, editable_worksheets, invalid,
+};
 use calamine::{Data, DataRef, Reader, SheetType, SheetVisible, Xlsx, open_workbook_from_rs};
 use serde::Serialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::{io::Cursor, sync::Arc};
-use taomni_plugin_api::{ErrorCode, RpcError};
+use taomni_plugin_api::RpcError;
 use zip::ZipArchive;
 
 pub const MAX_INPUT_BYTES: usize = 16 * 1024 * 1024;
 pub const WINDOW_ROWS: u32 = 32;
 pub const WINDOW_COLUMNS: u32 = 12;
-const MAX_ROWS: u32 = 1_048_576;
-const MAX_COLUMNS: u32 = 16_384;
 const MAX_ENTRY_BYTES: u64 = 24 * 1024 * 1024;
 const MAX_EXPANDED_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_PARTS: usize = 4096;
@@ -20,6 +21,7 @@ pub struct Workbook {
     file: Xlsx<Cursor<Arc<[u8]>>>,
     sheets: Vec<String>,
     bytes: Arc<[u8]>,
+    editable_sheets: HashMap<String, WorksheetLayout>,
 }
 
 #[derive(Debug, Serialize)]
@@ -42,17 +44,15 @@ struct Cell {
     truncated: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     edit_type: Option<&'static str>,
-}
-
-pub fn invalid(message: impl std::fmt::Display) -> RpcError {
-    RpcError::new(ErrorCode::InvalidParams, message.to_string())
+    #[serde(skip_serializing_if = "is_false")]
+    table_metadata: bool,
 }
 
 fn is_false(value: &bool) -> bool {
     !value
 }
 
-fn check_package(bytes: &[u8]) -> Result<(), RpcError> {
+fn check_package(bytes: &[u8]) -> Result<Source<'_>, RpcError> {
     let mut zip = ZipArchive::new(Cursor::new(bytes)).map_err(|_| {
         invalid("This workbook could not be opened as XLSX or XLSM. Check for encryption or file damage.")
     })?;
@@ -81,7 +81,7 @@ fn check_package(bytes: &[u8]) -> Result<(), RpcError> {
             return Err(invalid("The workbook exceeds the expanded preview limit"));
         }
     }
-    Ok(())
+    Ok(zip)
 }
 
 fn excerpt(text: &str) -> (String, bool) {
@@ -108,7 +108,7 @@ fn value_text(value: DataRef<'_>) -> (String, bool) {
 
 impl Workbook {
     pub fn open(bytes: Vec<u8>) -> Result<Self, RpcError> {
-        check_package(&bytes)?;
+        let editable_sheets = editable_worksheets(&mut check_package(&bytes)?).unwrap_or_default();
         let bytes: Arc<[u8]> = bytes.into();
         let file: Xlsx<_> = open_workbook_from_rs(Cursor::new(bytes.clone())).map_err(invalid)?;
         let sheets: Vec<String> = file
@@ -129,6 +129,7 @@ impl Workbook {
             file,
             sheets,
             bytes,
+            editable_sheets,
         })
     }
 
@@ -138,6 +139,10 @@ impl Workbook {
 
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
+    }
+
+    pub(crate) fn edit_layout(&self, name: &str) -> Option<&WorksheetLayout> {
+        self.editable_sheets.get(name)
     }
 
     pub fn sheet(
@@ -155,6 +160,7 @@ impl Workbook {
                 "The selected worksheet or cell range is unavailable",
             ));
         }
+        let layout = self.editable_sheets.get(name);
         let mut reader = self.file.worksheet_cells_reader(name).map_err(invalid)?;
         let declared = reader.dimensions().end;
         let mut rows = declared.0.saturating_add(1).clamp(1, MAX_ROWS);
@@ -181,7 +187,13 @@ impl Workbook {
                     _ => None,
                 };
                 let (value, value_truncated) = value_text(cell.value);
-                let edit_type = edit_type.filter(|_| !value_truncated && cell.formula.is_none());
+                let table_metadata = layout.is_some_and(|sheet| !sheet.allows_cell(row, column));
+                let edit_type = edit_type.filter(|_| {
+                    layout.is_some()
+                        && !table_metadata
+                        && !value_truncated
+                        && cell.formula.is_none()
+                });
                 let (formula, formula_truncated) = match cell.formula {
                     Some(formula) => {
                         let (formula, truncated) = excerpt(&formula);
@@ -197,6 +209,7 @@ impl Workbook {
                         formula,
                         truncated: value_truncated || formula_truncated,
                         edit_type,
+                        table_metadata,
                     });
                 }
             }

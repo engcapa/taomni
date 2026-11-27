@@ -17,11 +17,17 @@ def fixtures(assets, values):
     ]
 
     def sheet(rows, columns, items):
-        return {"rows": rows, "columns": columns, "cells": [
-            {"row": row, "column": column, "value": value,
-             **({"formula": formula[0]} if formula else {"editType": "number" if value.isdigit() else "text"})}
-            for row, column, value, *formula in items
-        ]}
+        cells = []
+        for row, column, value, *formula in items:
+            cell = {"row": row, "column": column, "value": value}
+            if items is totals and row == 0:
+                cell["tableMetadata"] = True
+            elif formula:
+                cell["formula"] = formula[0]
+            else:
+                cell["editType"] = "number" if value.isdigit() else "text"
+            cells.append(cell)
+        return {"rows": rows, "columns": columns, "cells": cells}
 
     values["taoffice_workbook_sha"] = digest
     values["taoffice_workbook_model"] = json.dumps({

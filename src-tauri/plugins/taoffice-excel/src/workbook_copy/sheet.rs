@@ -1,4 +1,4 @@
-use super::{MAIN, attribute, invalid};
+use crate::workbook_package::{MAIN, attribute, invalid};
 use quick_xml::{
     NsReader, Writer,
     events::{BytesEnd, BytesStart, BytesText, Event},
