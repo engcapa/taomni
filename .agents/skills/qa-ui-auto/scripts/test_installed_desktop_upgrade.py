@@ -280,6 +280,30 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
             self.assertTrue(result["passed"])
             self.assertEqual(result["windowsHostExecution"]["after"]["security"], "active-after")
 
+    def test_windows_standalone_crash_uses_the_already_seeded_legacy_profile(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            application, archive, host = (root / name for name in ("core.exe", "mfa.taomni-plugin", "host.exe"))
+            for path in (application, root / "mfa.db", host):
+                path.touch()
+            receipt = {"version": "0.1.2", "archive": archive.name, "signature": archive.name + ".minisig",
+                       "sha256": "signed-mfa"}
+            (root / "provenance.json").write_text(json.dumps(receipt), encoding="utf-8")
+            with patch("installed_desktop_mfa_crash.platform.system", return_value="Windows"), patch(
+                "installed_desktop_mfa_crash.load_artifact", return_value=(receipt, archive, None, None),
+            ), patch("installed_desktop_mfa_crash.commit_mfa_upgrade") as migrate, patch(
+                "installed_desktop_mfa_crash.installed_mfa", return_value=({"activeVersion": "0.1.2"}, host),
+            ), patch("installed_desktop_mfa_crash.open_desktop", side_effect=[nullcontext((object(), None)) for _ in range(2)]), patch(
+                "installed_desktop_mfa_crash.verify_mfa_controls",
+            ) as controls, patch("installed_desktop_mfa_crash.observe_abrupt_exit"), patch(
+                "installed_desktop_mfa_crash.mark_download", return_value="download-zone",
+            ), patch("installed_desktop_mfa_crash.observe_downloaded_host", return_value={"security": "active"}):
+                result = verify_crash_recovery(application, root, root, "source", root, root)
+            migrate.assert_called_once_with(application, root, archive, root / receipt["signature"], root)
+            self.assertEqual([call.args[1] for call in controls.call_args_list], ["before", "after"])
+            self.assertEqual(result["windowsHostExecution"]["after"]["security"], "active")
+            self.assertTrue(result["passed"])
+
     def test_kills_only_the_owned_application_and_waits_for_the_signed_host(self):
         for host_survives in (False, True):
             with self.subTest(host_survives=host_survives), TemporaryDirectory() as temporary:

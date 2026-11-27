@@ -172,17 +172,18 @@ def execute(args):
     try:
         if args.first_release:
             origin = installed_first_release.open_release(args.first_release.resolve(strict=True), identity, report)
-            if system == "Windows":
-                enable_defender(report)
+        if system == "Windows":
+            enable_defender(report)
+            desktop_profile = profile if origin else reserve_default_profile(report)
         old_binary, stages["original"] = install(old_package, slot, report / "original", old_version)
         if origin:
             measure_core("original", old_binary)
         initialize_profile(old_binary, profile, work, report, "original-start")
         insert_business_rows(profile, input_sessions(True))
         expected_rows = session_rows(profile)
-        if origin and system == "Windows":
+        if system == "Windows":
             from installed_windows_store import seed
-            seed(old_binary, work, report, profile)
+            seed(old_binary, work, report, desktop_profile)
         elif origin:
             seed_legacy_desktop(ctx, old_binary, work / "desktop", report, profile,
                                 catalog_source=f"{installed_first_release.ORIGIN}/{origin.start_catalog}",

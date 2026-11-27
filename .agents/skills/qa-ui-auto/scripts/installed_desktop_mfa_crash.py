@@ -135,30 +135,27 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
         "passed": False,
     }
     ctx = SimpleNamespace(cfg={"webdriver": {"startup_timeout": 60}})
-    appkit = first_release is not None and platform.system() == "Darwin"
+    system = platform.system()
+    appkit = first_release is not None and system == "Darwin"
     try:
         downloaded_pointer = None
-        if first_release is None:
-            with open_desktop(ctx, executable, work, evidence, "mfa-legacy-seed") as (launcher, session):
-                if session is None:
-                    verify_mfa_controls(launcher, "seed", evidence)
-                else:
-                    create_account(session, ctx, evidence)
-        else:
+        if first_release is None and system == "Darwin":
+            with open_desktop(ctx, executable, work, evidence, "mfa-legacy-seed") as (_, session):
+                create_account(session, ctx, evidence)
+        elif first_release is not None:
             downloaded_pointer, _ = installed_mfa(profile, receipt)
         result["legacyDatabaseSha256"] = digest(profile / "mfa.db")
         commit_mfa_upgrade(executable, profile, archive, signature, evidence)
         installed, module = installed_mfa(profile, receipt)
         if downloaded_pointer is not None and installed != downloaded_pointer:
             raise RuntimeError("Migrating MFA changed the downloaded module's active pointer")
-        system = platform.system()
         zone = None
         if system == "Darwin" and (macos_hardened_mfa or first_release is not None):
             result["macosHostExecution"] = observe_installed_host(
                 executable, module, evidence, os.environ.get("MACOS_SIGNING_CERT_SHA1", "").upper(),
                 require_hardened_core=macos_hardened_mfa,
             )
-        elif system == "Windows" and first_release is not None:
+        elif system == "Windows":
             zone = mark_download(module, ORIGIN, receipt["archive"])
             result["windowsHostExecution"] = {
                 "before": observe_downloaded_host(evidence, "before", module, zone), "launched": False,
