@@ -5,6 +5,7 @@ import { activeExplorerTab } from "../../stores/explorerStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { documentPathKey } from "./pathIdentity";
 import { getAppPlatform } from "../runtime";
+import { saveViewerChanges } from "./closeGuard";
 
 function activeViewer() {
   const app = useAppStore.getState();
@@ -22,8 +23,10 @@ function activeViewer() {
 export function activeViewerCommands(): WorkspaceCommandRegistration | null {
   const viewer = activeViewer();
   if (!viewer) return null;
-  const document = useDocumentStore.getState().documents[documentPathKey(viewer.path)];
-  const enabled = !!document && !document.readOnly && document.dirty && !document.saving && !document.loading;
+  const state = useDocumentStore.getState();
+  const keyPath = documentPathKey(viewer.path);
+  const document = state.documents[keyPath];
+  const enabled = !!state.moduleDrafts?.[keyPath] || (!!document && !document.readOnly && document.dirty && !document.saving && !document.loading);
   const key = `${viewer.path}:${enabled}`;
   if (cached?.key === key) return cached.registration;
   const registration: WorkspaceCommandRegistration = {
@@ -32,7 +35,7 @@ export function activeViewerCommands(): WorkspaceCommandRegistration | null {
     executeAction: async (id) => {
       const current = activeViewer();
       if (id !== "viewer.save" || !current) return { kind: "no-op", reason: "unknown-action" };
-      try { await useDocumentStore.getState().save(current.path); return { kind: "applied" }; }
+      try { return await saveViewerChanges(current.path) ? { kind: "applied" } : { kind: "cancelled" }; }
       catch (error) { return { kind: "failed", reason: "exception", message: String(error), retryable: true }; }
     },
     execute: (id) => { if (id !== "viewer.save") return false; void registration.executeAction(id); return true; },

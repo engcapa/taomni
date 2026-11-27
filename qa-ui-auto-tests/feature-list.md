@@ -420,6 +420,9 @@ controls:
     - '[data-testid="module-action-enable-screenshot"]'
     - '[data-testid="module-action-enable-ai-voice-local"]'
     - '[data-testid="module-action-enable-sockscap"]'
+    - '[data-testid="module-action-enable-taoffice-video"]'
+    - '[data-testid="module-action-enable-taoffice-pdf"]'
+    - '[data-testid="module-action-enable-taoffice-excel"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
@@ -437,6 +440,9 @@ controls:
     - '[data-testid="module-action-disable-screenshot"]'
     - '[data-testid="module-action-disable-ai-voice-local"]'
     - '[data-testid="module-action-disable-sockscap"]'
+    - '[data-testid="module-action-disable-taoffice-video"]'
+    - '[data-testid="module-action-disable-taoffice-pdf"]'
+    - '[data-testid="module-action-disable-taoffice-excel"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
@@ -16853,6 +16859,13 @@ File Explorer 是 Sessions 下方的独立工作区，Tools 面板不再提供�
 
 TC-FILE-OPEN-006 检查工作区入口去重和全局文件设置。TC-FILE-OPEN-049
 检查 Mail 附件的只读副本、去重和最终关闭清理，并在完整模块回归中使用已启用的 Mail。
+TC-TAOFFICE-009 验证核心查看器打开 gzip TAR、清除筛选与恢复焦点、只读预览、原始文件摘要和解压后的实际内容。
+TC-TAOFFICE-010 验证单文件 gzip 预览、直接解压成文件，以及重复解压时保留原有内容。
+TC-TAOFFICE-011 验证原生 7z 固实压缩包的预览和解压，TC-TAOFFICE-012 验证浏览器预览显示桌面打开提示。
+TC-TAOFFICE-013 覆盖原生固实 RAR4/RAR5 解码、只读预览、准确解压和加密包提示。TC-TAOFFICE-014 覆盖浏览器桌面打开提示。
+TC-TAOFFICE-015/016 覆盖独立 Excel 模块的工作表导航、选中单元格恢复、缓存值与原公式、隐藏工作表、输入文件散列以及原生签名安装和停用。
+TC-TAOFFICE-017/018 覆盖 PDF 表单填写、关闭守卫、保存副本和原生文件重新打开。
+TC-TAOFFICE-019/020 覆盖 XLSX 表格列标题只读、数据行文字与数字编辑、输入校验、取消、保存副本、公式保留和原始文件摘要。
 
 <!-- feature
 id: F-FILEOPEN-1
@@ -16861,6 +16874,20 @@ status: implemented
 area: files/viewer
 components: [ViewerShell, TextEditor, ImageViewer, MarkdownEditor, HtmlPreview, FileOpenSettings]
 files:
+  - src/components/viewer/ModuleDocumentPane.tsx
+  - src/components/viewer/DelimitedDocumentPane.tsx
+  - src-tauri/src/viewer/tiff_preview.rs
+  - src/components/viewer/ArchiveViewer.tsx
+  - src-tauri/src/viewer/archive.rs
+  - src-tauri/src/viewer/archive/tar_archive.rs
+  - src-tauri/src/viewer/archive/compressed_file.rs
+  - src-tauri/src/viewer/archive/seven_zip.rs
+  - src-tauri/plugins/taoffice-video/frontend/index.js
+  - src-tauri/plugins/taoffice-pdf/renderer/PdfViewer.jsx
+  - src-tauri/plugins/taoffice-pdf/renderer/PdfPage.jsx
+  - src-tauri/plugins/taoffice-pdf/renderer/PdfNavigation.jsx
+  - src-tauri/plugins/taoffice-pdf/renderer/PdfPassword.jsx
+  - src/lib/openFile/documentProvider.ts
   - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts
   - src/lib/openFile/preferences.ts
@@ -16952,6 +16979,195 @@ controls:
   - id: file-viewer
     selector: '[data-testid="file-viewer"]'
     kind: display
+  - id: document-module-state
+    selector: '[data-testid="document-module-state"]'
+    kind: display
+  - id: document-open-store
+    selector: '[data-testid="document-open-store"]'
+    kind: interactive
+  - id: document-open-system
+    selector: '[data-testid="document-open-system"]'
+    kind: interactive
+  - id: document-readonly
+    selector: '[data-testid="document-readonly"]'
+    kind: display
+  - id: delimited-table
+    selector: '[data-testid="delimited-table"]'
+    kind: display
+  - id: delimited-source
+    selector: '[data-testid="delimited-source"]'
+    kind: interactive
+  - id: taoffice-media
+    selector: '[data-testid="taoffice-media"]'
+    kind: display
+  - id: archive-filter
+    selector: '[data-testid="archive-filter"]'
+    kind: interactive
+  - id: archive-filter-clear
+    selector: '[data-testid="archive-filter-clear"]'
+    kind: interactive
+  - id: archive-entry
+    selector: '[data-testid="archive-entry"]'
+    kind: display
+  - id: archive-extract-here
+    selector: '[data-testid="archive-extract-here"]'
+    kind: interactive
+  - id: archive-preview
+    selector: '[data-testid="archive-preview"]'
+    kind: interactive
+  - id: archive-output
+    selector: '[data-testid="archive-output"]'
+    kind: display
+  - id: archive-error
+    selector: '[data-testid="archive-error"]'
+    kind: display
+  - id: taoffice-media-player
+    selector: '[data-testid="taoffice-media-player"]'
+    kind: display
+  - id: taoffice-media-error
+    selector: '[data-testid="taoffice-media-error"]'
+    kind: display
+  - id: taoffice-media-retry
+    selector: '[data-testid="taoffice-media-retry"]'
+    kind: interactive
+  - id: taoffice-excel
+    selector: '[data-testid="taoffice-excel"]'
+    kind: display
+  - id: taoffice-excel-sheet
+    selector: '[data-testid="taoffice-excel-sheet"]'
+    kind: interactive
+  - id: taoffice-excel-grid
+    selector: '[data-testid="taoffice-excel-grid"]'
+    kind: display
+  - id: taoffice-excel-cell
+    selector: '[data-testid="taoffice-excel-cell"]'
+    kind: interactive
+  - id: taoffice-excel-cell-address
+    selector: '[data-testid="taoffice-excel-cell-address"]'
+    kind: display
+  - id: taoffice-excel-formula
+    selector: '[data-testid="taoffice-excel-formula"]'
+    kind: display
+  - id: taoffice-excel-error
+    selector: '[data-testid="taoffice-excel-error"]'
+    kind: display
+  - id: taoffice-excel-edit-cell
+    selector: '[data-testid="taoffice-excel-edit-cell"]'
+    kind: interactive
+  - id: taoffice-excel-input
+    selector: '[data-testid="taoffice-excel-input"]'
+    kind: interactive
+  - id: taoffice-excel-input-error
+    selector: '[data-testid="taoffice-excel-input-error"]'
+    kind: display
+  - id: taoffice-excel-table-readonly
+    selector: '[data-testid="taoffice-excel-table-readonly"]'
+    kind: display
+  - id: taoffice-excel-save-copy
+    selector: '[data-testid="taoffice-excel-save-copy"]'
+    kind: interactive
+  - id: taoffice-excel-copy-output
+    selector: '[data-testid="taoffice-excel-copy-output"]'
+    kind: display
+  - id: taoffice-pdf-page
+    selector: '[data-testid="taoffice-pdf-page"]'
+    kind: display
+  - id: taoffice-pdf-form-toggle
+    selector: '[data-testid="taoffice-pdf-form-toggle"]'
+    kind: interactive
+  - id: taoffice-pdf-form
+    selector: '[data-testid="taoffice-pdf-form"]'
+    kind: display
+  - id: taoffice-pdf-form-field
+    selector: '[data-testid="taoffice-pdf-form-field"]'
+    kind: interactive
+  - id: taoffice-pdf-save-copy
+    selector: '[data-testid="taoffice-pdf-save-copy"]'
+    kind: interactive
+  - id: taoffice-pdf-copy-output
+    selector: '[data-testid="taoffice-pdf-copy-output"]'
+    kind: display
+  - id: taoffice-pdf-viewport
+    selector: '[data-testid="taoffice-pdf-viewport"]'
+    kind: interactive
+  - id: taoffice-pdf-find
+    selector: '[data-testid="taoffice-pdf-find"]'
+    kind: interactive
+  - id: taoffice-pdf-search-input
+    selector: '[data-testid="taoffice-pdf-search-input"]'
+    kind: interactive
+  - id: taoffice-pdf-search-submit
+    selector: '[data-testid="taoffice-pdf-search-submit"]'
+    kind: interactive
+  - id: taoffice-pdf-search-previous
+    selector: '[data-testid="taoffice-pdf-search-previous"]'
+    kind: interactive
+  - id: taoffice-pdf-search-next
+    selector: '[data-testid="taoffice-pdf-search-next"]'
+    kind: interactive
+  - id: taoffice-pdf-search-status
+    selector: '[data-testid="taoffice-pdf-search-status"]'
+    kind: display
+  - id: taoffice-pdf-outline-toggle
+    selector: '[data-testid="taoffice-pdf-outline-toggle"]'
+    kind: interactive
+  - id: taoffice-pdf-outline
+    selector: '[data-testid="taoffice-pdf-outline"]'
+    kind: display
+  - id: taoffice-pdf-outline-item
+    selector: '[data-testid="taoffice-pdf-outline-item"]'
+    kind: interactive
+  - id: taoffice-pdf-text
+    selector: '[data-testid="taoffice-pdf-text"]'
+    kind: display
+  - id: taoffice-pdf-page-count
+    selector: '[data-testid="taoffice-pdf-page-count"]'
+    kind: display
+  - id: taoffice-pdf-page-number
+    selector: '[data-testid="taoffice-pdf-page-number"]'
+    kind: interactive
+  - id: taoffice-pdf-next
+    selector: '[data-testid="taoffice-pdf-next"]'
+    kind: interactive
+  - id: taoffice-pdf-previous
+    selector: '[data-testid="taoffice-pdf-previous"]'
+    kind: interactive
+  - id: taoffice-pdf-zoom-in
+    selector: '[data-testid="taoffice-pdf-zoom-in"]'
+    kind: interactive
+  - id: taoffice-pdf-zoom-out
+    selector: '[data-testid="taoffice-pdf-zoom-out"]'
+    kind: interactive
+  - id: taoffice-pdf-fit
+    selector: '[data-testid="taoffice-pdf-fit"]'
+    kind: interactive
+  - id: taoffice-pdf-rotate
+    selector: '[data-testid="taoffice-pdf-rotate"]'
+    kind: interactive
+  - id: taoffice-pdf-page-error
+    selector: '[data-testid="taoffice-pdf-page-error"]'
+    kind: display
+  - id: taoffice-pdf-error
+    selector: '[data-testid="taoffice-pdf-error"]'
+    kind: display
+  - id: taoffice-pdf-retry
+    selector: '[data-testid="taoffice-pdf-retry"]'
+    kind: interactive
+  - id: taoffice-pdf-password
+    selector: '[data-testid="taoffice-pdf-password"]'
+    kind: interactive
+  - id: taoffice-pdf-password-status
+    selector: '[data-testid="taoffice-pdf-password-status"]'
+    kind: display
+  - id: taoffice-pdf-unlock
+    selector: '[data-testid="taoffice-pdf-unlock"]'
+    kind: interactive
+  - id: taoffice-pdf-password-cancel
+    selector: '[data-testid="taoffice-pdf-password-cancel"]'
+    kind: interactive
+  - id: taoffice-pdf-password-open
+    selector: '[data-testid="taoffice-pdf-password-open"]'
+    kind: interactive
   - id: viewer-editor
     selector: '[data-testid="viewer-editor"]'
     kind: interactive

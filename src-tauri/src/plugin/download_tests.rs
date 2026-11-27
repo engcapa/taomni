@@ -72,6 +72,7 @@ fn valid_catalog() -> ModuleCatalog {
         version: "1.0.0".into(),
         core_api_version: "1".into(),
         kind: None,
+        document: None,
         permissions: None,
         description: String::new(),
         platforms,

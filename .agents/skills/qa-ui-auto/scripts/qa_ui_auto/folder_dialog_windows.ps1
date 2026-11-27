@@ -16,15 +16,10 @@ public static class QaFolderDialog {
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr window, StringBuilder text, int count);
     [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr window);
     [DllImport("user32.dll")] static extern IntPtr GetParent(IntPtr window);
+    [DllImport("user32.dll")] static extern bool IsChild(IntPtr parent, IntPtr child);
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr window);
     [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr window);
-    [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
-    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] static extern IntPtr SetFocus(IntPtr window);
-    [DllImport("user32.dll")] static extern IntPtr GetFocus();
-    [DllImport("user32.dll")] static extern bool AttachThreadInput(uint from, uint to, bool attach);
-    [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
     [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, SetLastError = true)]
     static extern IntPtr ReadTextMessage(IntPtr window, uint message, UIntPtr capacity, StringBuilder text,
                                         uint flags, uint timeout, out UIntPtr result);
@@ -161,13 +156,21 @@ public static class QaFolderDialog {
             ? null : value.ToString();
     }
 
-    private static void WaitForText(IntPtr dialog, IntPtr edit, string expected) {
+    private static void CheckReceiver(IntPtr dialog, IntPtr edit, uint expectedPid) {
+        uint dialogPid, editPid;
+        GetWindowThreadProcessId(dialog, out dialogPid);
+        GetWindowThreadProcessId(edit, out editPid);
+        if (!Open(dialog) || dialogPid != expectedPid || editPid != expectedPid || !IsChild(dialog, edit)
+            || Class(edit) != "Edit" || !IsWindowVisible(edit) || !IsWindowEnabled(edit)) {
+            throw new InvalidOperationException("Native chooser lost its owned filename control");
+        }
+    }
+
+    private static void WaitForText(IntPtr dialog, IntPtr edit, uint pid, string expected) {
         var deadline = DateTime.UtcNow.AddSeconds(5);
         string actual;
         do {
-            if (!Open(dialog) || GetForegroundWindow() != dialog || GetFocus() != edit) {
-                throw new InvalidOperationException("Owned chooser lost foreground during path input");
-            }
+            CheckReceiver(dialog, edit, pid);
             // The shell can briefly stop processing messages while populating
             // autocomplete. Poll only the field value; never resend input.
             actual = ReadEditText(edit);
@@ -181,23 +184,13 @@ public static class QaFolderDialog {
     }
 
     private static void EnterPath(IntPtr dialog, IntPtr edit, string path) {
-        SetForegroundWindow(dialog);
-        uint ignored;
-        uint ownerThread = GetWindowThreadProcessId(edit, out ignored);
-        uint currentThread = GetCurrentThreadId();
-        if (!AttachThreadInput(currentThread, ownerThread, true)) {
-            throw new InvalidOperationException("Could not attach to the owned chooser input thread");
-        }
-        try {
-            SetFocus(edit);
-            if (GetForegroundWindow() != dialog || GetFocus() != edit) {
-                throw new InvalidOperationException("Owned chooser folder field did not receive native focus");
-            }
-            TypePath(dialog, edit, path);
-        } finally { AttachThreadInput(currentThread, ownerThread, false); }
+        uint pid;
+        GetWindowThreadProcessId(dialog, out pid);
+        CheckReceiver(dialog, edit, pid);
+        TypePath(dialog, edit, pid, path);
     }
 
-    private static void TypePath(IntPtr dialog, IntPtr edit, string path) {
+    private static void TypePath(IntPtr dialog, IntPtr edit, uint pid, string path) {
         // Send native character events to the verified owned Edit. WM_SETTEXT
         // only changes its appearance; WM_CHAR also updates IFileDialog's
         // internal selection. Do not route text through a global keyboard
@@ -209,21 +202,19 @@ public static class QaFolderDialog {
         if (!PostMessage(edit, 0x0102, new IntPtr(0x08), new IntPtr(1))) {
             throw new InvalidOperationException("Native chooser could not clear the filename");
         }
-        WaitForText(dialog, edit, "");
+        WaitForText(dialog, edit, pid, "");
         var expected = new StringBuilder();
         foreach (char character in path) {
-            if (GetForegroundWindow() != dialog) {
-                throw new InvalidOperationException("Owned chooser lost foreground during path input");
-            }
+            CheckReceiver(dialog, edit, pid);
             if (!PostMessage(edit, 0x0102, new IntPtr(character), new IntPtr(1))) {
                 throw new InvalidOperationException("Native chooser could not receive a character event");
             }
             // Read back each character before sending another. Never click
             // Save when the actual field does not match the complete path.
             expected.Append(character);
-            WaitForText(dialog, edit, expected.ToString());
+            WaitForText(dialog, edit, pid, expected.ToString());
         }
-        WaitForText(dialog, edit, path);
+        WaitForText(dialog, edit, pid, path);
         Console.Error.WriteLine("Native folder field input: {0}", path);
     }
 

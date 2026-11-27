@@ -97,7 +97,7 @@ jobs:
       artifact_key: installed-desktop-${{ github.run_id }}
       macos_runner: ${{ inputs.macos_arm_runner }}
       native_builds: ${{ needs.plan.outputs.mfa_builds }}
-      native_macos_signing: ${{ inputs.macos_hardened_mfa }}
+      native_macos_signing: true
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

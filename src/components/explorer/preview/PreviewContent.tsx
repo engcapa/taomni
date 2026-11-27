@@ -45,8 +45,8 @@ export function MarkdownFilePreview({ text }: { text: string }) {
   return <div data-testid="explorer-preview-markdown" className="ex-pv-md" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-export function CsvFilePreview({ text, rowsLabel }: { text: string; rowsLabel: string }) {
-  const preview = useMemo(() => parseCsvPreview(text), [text]);
+export function CsvFilePreview({ text, rowsLabel, delimiter = "," }: { text: string; rowsLabel: string; delimiter?: string }) {
+  const preview = useMemo(() => parseCsvPreview(text, undefined, delimiter), [text, delimiter]);
   return (
     <div>
       <div data-testid="explorer-preview-csv" className="ex-pv-csv">

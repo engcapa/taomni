@@ -67,6 +67,17 @@ test("composes platform entries with exact bytes, SHA-256 and detached signature
   assert.deepEqual(JSON.parse(readFileSync(join(f.output, "modules.json"), "utf8")), result.manifest);
 });
 
+test("projects document associations into the signed catalog and rejects differing platform claims", (t) => {
+  const f = fixture(t);
+  const document = { fileKinds: ["excel"], extensions: ["xlsx"] };
+  const manifest = { ...moduleManifest(), kind: "media", document, entry: { frontend: "frontend/index.js", protocol: 1 } };
+  const compose = (name) => composeModulesManifest({ artifactsDir: f.artifacts, outputDir: join(f.root, name), tag: "v0.6.0", repository: "engcapa/taomni" });
+  f.add("linux-x86_64", "linux", manifest);
+  assert.deepEqual(compose("initial").manifest.plugins[manifest.id].document, document);
+  f.add("windows-x86_64", "windows", { ...manifest, document: { ...document, extensions: ["xls"] } });
+  assert.throws(() => compose("updated"), /inconsistent metadata/);
+});
+
 test("copies and reports the detached modules.json signature", (t) => {
   const f = fixture(t);
   f.add("linux-x86_64");

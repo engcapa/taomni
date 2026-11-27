@@ -1,0 +1,96 @@
+id: TC-TAOFFICE-009
+title: Open a compressed TAR in Explorer and extract exact member bytes
+description: Use the core archive viewer for a gzip TAR. Clear an empty filter with keyboard focus restoration, preview a read-only member, extract to the compound archive's base name, and reject a link without writing output.
+modes: [browser, native]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, archive, core-only, crash-regression]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="quarterly.TAR.GZ"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="quarterly.TAR.GZ"]'
+- wait_for: '[data-testid="archive-entry"][data-name="images/pixel.png"]'
+- assert_count: {selector: '[data-testid="archive-entry"]', equal: 2}
+- fill: {selector: '[data-testid="archive-filter"]', value: missing}
+- assert_count: {selector: '[data-testid="archive-entry"]', equal: 0}
+- assert_text: {selector: '[data-testid="file-viewer"][data-kind="archive"]', contains: No matching entries}
+- press: {selector: '[data-testid="archive-filter-clear"]', key: Enter}
+- assert_count: {selector: '[data-testid="archive-entry"]', equal: 2}
+- eval_readonly:
+    expression: document.activeElement.dataset.testid === "archive-filter"
+    expect_truthy: true
+- fill: {selector: '[data-testid="archive-filter"]', value: readme}
+- assert_count: {selector: '[data-testid="archive-entry"]', equal: 1}
+- press: {selector: '[data-testid="archive-filter"]', key: Escape}
+- assert_count: {selector: '[data-testid="archive-entry"]', equal: 2}
+- press: {selector: '[data-testid="archive-extract-here"]', key: Enter}
+- wait_for: '[data-testid="archive-output"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/quarterly/notes/readme.txt', sha256: '${fixture.file_open_original_sha}'}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/quarterly/images/pixel.png', sha256: '${fixture.file_open_png_sha}'}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/quarterly.TAR.GZ', sha256: '${fixture.taoffice_tar_sha}'}
+- screenshot: tar-extraction.png
+- press: {selector: '[data-testid="archive-entry"][data-name="notes/readme.txt"] [data-testid="archive-preview"]', key: Enter}
+- wait_for: '[data-testid="file-viewer"][data-kind="text"][data-active="true"] [data-testid="viewer-readonly"]'
+- assert_text: {selector: '[data-testid="file-viewer"][data-kind="text"][data-active="true"] [data-testid="viewer-readonly"]', contains: Read-only archive entry}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="unsafe.tgz"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="archive-error"]'
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="archive-error"]', contains: unsafe path}
+- assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="archive-extract-here"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/unsafe/notes/readme.txt', absent: true}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/notes.txt', sha256: '${fixture.file_open_original_sha}'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: TAR-FILTER
+    requirement: UI-PAT-05 and UI-PAT-15. Clear a TAR filter with Enter on the clear action or Escape inside the search field.
+    actions: [13, 16, 19, 21]
+    checkpoints:
+    - step: 15
+      expectation: An unmatched search explains the empty list.
+    - step: 18
+      expectation: The clear action returns keyboard focus to the search field.
+    - step: 22
+      expectation: Escape restores both entries from a filtered result.
+    results: [15, 18, 22]
+  - id: TAR-EXTRACT
+    requirement: Extract to a directory named for the archive without changing the source and open a read-only member.
+    actions: [10, 23, 29]
+    checkpoints:
+    - step: 25
+      expectation: A text member appears at the expected destination with its source digest.
+    - step: 26
+      expectation: The extracted image has the expected digest.
+    - step: 27
+      expectation: The original archive retains its exact digest.
+    - step: 31
+      expectation: The ordinary text viewer explains the read-only member.
+    results: [25, 26, 27, 31]
+  - id: TAR-LINK
+    requirement: Reject the archive containing a symbolic link and preserve the original files.
+    actions: [33]
+    checkpoints:
+    - step: 35
+      expectation: The viewer explains why the TAR member is unsafe.
+    - step: 37
+      expectation: The destination has no extracted member.
+    - step: 38
+      expectation: The file beside the archive keeps its exact digest.
+    results: [35, 37, 38]
+  native:
+  - check: The native command reads the physical archive and commits the extracted text and image on disk.
+    method: automated
+    reason: The file assertions in steps 25 through 27, 37 and 38 read isolated native filesystem paths.
+  visual:
+  - check: The core archive viewer shows the members and the successful destination below the shared toolbar.
+    method: manual
+    reason: The tar-extraction.png screenshot captures the resulting layout.

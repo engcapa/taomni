@@ -29,6 +29,8 @@ src-tauri/frameworks/
 /src-tauri/plugins/rdp-server/dist/
 /src-tauri/plugins/vnc-server/dist/
 /src-tauri/plugins/sockscap/dist/
+/src-tauri/plugins/taoffice-pdf/dist/
+/src-tauri/plugins/taoffice-excel/dist/
 
 
 # =============================================================================

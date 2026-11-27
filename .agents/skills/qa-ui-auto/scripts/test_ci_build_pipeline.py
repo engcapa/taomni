@@ -138,7 +138,7 @@ class BuildPipelineTests(unittest.TestCase):
                 jobs[f'execute-{platform}-native']['needs'],
                 dependencies + [
                     'signed-mail', 'signed-screenshot', 'signed-vnc-server', 'signed-servers',
-                    'signed-voice', 'signed-sockscap', rdp_server_signer,
+                    'signed-voice', 'signed-sockscap', 'signed-taoffice-video', 'signed-taoffice-pdf', 'signed-taoffice-excel', rdp_server_signer,
                 ],
             )
             self.assertIn(f'execute-{platform}-native', jobs['summarize']['needs'])
@@ -261,6 +261,9 @@ class BuildPipelineTests(unittest.TestCase):
                 self.assertIsNone(env.get('CARGO_PROFILE_RELEASE_CODEGEN_UNITS'))
                 binary.parent.mkdir(parents=True, exist_ok=True)
                 binary.write_bytes(b'release-qa-binary')
+                if '--bin' in cmd:
+                    name = cmd[cmd.index('--bin') + 1]
+                    binary.with_name(name + binary.suffix).write_bytes(b'qa-platform-helper')
             clean_env = {k: v for k, v in os.environ.items() if k != 'CARGO_PROFILE_RELEASE_CODEGEN_UNITS'}
             with patch.dict(os.environ, clean_env, clear=True), \
                  patch.object(native_build, 'ROOT', root), \

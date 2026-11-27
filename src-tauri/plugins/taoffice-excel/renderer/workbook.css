@@ -1,0 +1,133 @@
+.taoffice-excel,
+.taoffice-excel-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.taoffice-excel-sheets,
+.taoffice-excel-pages,
+.taoffice-excel-formula {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+}
+
+.taoffice-excel-sheets {
+  overflow: auto;
+  border-bottom: 1px solid var(--taomni-card-border);
+}
+
+.taoffice-excel-sheets [role="tab"] {
+  flex-shrink: 0;
+}
+
+.taoffice-excel-formula input {
+  min-width: 0;
+  flex: 1;
+}
+
+.taoffice-excel-edit {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.taoffice-excel-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--taomni-card-border);
+  overflow-wrap: anywhere;
+}
+
+.taoffice-excel-formula span {
+  min-width: 7ch;
+  text-align: center;
+}
+
+.taoffice-excel-grid {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  isolation: isolate;
+}
+
+.taoffice-excel-grid table {
+  table-layout: fixed;
+  border-spacing: 0;
+  min-width: 100%;
+}
+
+.taoffice-excel-grid th,
+.taoffice-excel-grid td {
+  border-right: 1px solid var(--taomni-card-border);
+  border-bottom: 1px solid var(--taomni-card-border);
+  padding: 4px 8px;
+  height: 27px;
+}
+
+.taoffice-excel-grid th {
+  background: var(--taomni-card-bg);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.taoffice-excel-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: var(--taomni-z-sticky);
+}
+
+.taoffice-excel-grid tr > :first-child {
+  position: sticky;
+  left: 0;
+  width: 6ch;
+}
+
+.taoffice-excel-grid thead th:first-child {
+  z-index: var(--taomni-z-docked-overlay);
+}
+
+.taoffice-excel-grid td {
+  width: 132px;
+  min-width: 132px;
+  max-width: 132px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.taoffice-excel-grid td[aria-selected="true"] {
+  background: var(--taomni-selected);
+  box-shadow: inset 0 0 0 1px var(--taomni-selected-border);
+}
+
+.taoffice-excel-grid td[aria-selected="false"]:hover {
+  background: var(--taomni-hover);
+}
+
+.taoffice-excel-grid td:focus-visible {
+  outline: 2px solid var(--taomni-focus-ring, var(--taomni-accent));
+  outline-offset: -2px;
+}
+
+.taoffice-excel-pages {
+  flex-wrap: wrap;
+}
+
+.taoffice-excel-feedback {
+  margin: 8px;
+}
+
+.taoffice-excel-feedback button {
+  margin-inline-end: 8px;
+}

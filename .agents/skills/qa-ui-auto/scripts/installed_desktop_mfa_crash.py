@@ -9,13 +9,14 @@ import platform
 import re
 from types import SimpleNamespace
 
+from installed_desktop_mode_lease import observe_desktop_owner
 from installed_macos_host_signature import observe_installed_host
 from installed_macos_store import compile_driver, controls, installed_macos_desktop
 from installed_windows_host_security import mark_download, observe_downloaded_host
 from installed_windows_mfa import installed_windows_desktop, verify_mfa_controls
 from modular_bundle_inventory import digest, write_json
 from qa_ui_auto.fixtures.module_legacy_mfa import (
-    ISSUER, PASSWORD, commit_mfa_upgrade, create_account, desktop_action, element, installed_desktop, open_unlocked_mfa,
+    ISSUER, PASSWORD, commit_mfa_upgrade, desktop_action, element, installed_desktop, open_unlocked_mfa,
 )
 from qa_ui_auto.fixtures.module_marketplace import ORIGIN
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key
@@ -135,30 +136,30 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
         "passed": False,
     }
     ctx = SimpleNamespace(cfg={"webdriver": {"startup_timeout": 60}})
-    appkit = first_release is not None and platform.system() == "Darwin"
+    system = platform.system()
+    appkit = system == "Darwin"
     try:
         downloaded_pointer = None
-        if first_release is None:
-            with open_desktop(ctx, executable, work, evidence, "mfa-legacy-seed") as (launcher, session):
-                if session is None:
-                    verify_mfa_controls(launcher, "seed", evidence)
-                else:
-                    create_account(session, ctx, evidence)
-        else:
+        if first_release is not None:
             downloaded_pointer, _ = installed_mfa(profile, receipt)
         result["legacyDatabaseSha256"] = digest(profile / "mfa.db")
+        version_dir = profile / "plugins/mfa/versions" / receipt["version"]
+        stored_proof = version_dir / ".taomni-trust/package.taomni-plugin"
+        result["stagedBeforeMigration"] = {
+            "versionDirectoryExists": version_dir.is_dir(),
+            "signedArchiveSha256": digest(stored_proof) if stored_proof.is_file() else None,
+        }
         commit_mfa_upgrade(executable, profile, archive, signature, evidence)
         installed, module = installed_mfa(profile, receipt)
         if downloaded_pointer is not None and installed != downloaded_pointer:
             raise RuntimeError("Migrating MFA changed the downloaded module's active pointer")
-        system = platform.system()
         zone = None
-        if system == "Darwin" and (macos_hardened_mfa or first_release is not None):
+        if system == "Darwin":
             result["macosHostExecution"] = observe_installed_host(
                 executable, module, evidence, os.environ.get("MACOS_SIGNING_CERT_SHA1", "").upper(),
                 require_hardened_core=macos_hardened_mfa,
             )
-        elif system == "Windows" and first_release is not None:
+        elif system == "Windows":
             zone = mark_download(module, ORIGIN, receipt["archive"])
             result["windowsHostExecution"] = {
                 "before": observe_downloaded_host(evidence, "before", module, zone), "launched": False,
@@ -173,6 +174,8 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
                 session.session_id = None
         with open_desktop(ctx, executable, work, evidence, "mfa-after-kill", appkit=appkit) as (launcher, session):
             verify_open_mfa(launcher, session, executable, work, evidence, ctx, phase="after", appkit=appkit)
+            if appkit and first_release is None:
+                result["desktopModeLease"] = observe_desktop_owner(executable, profile, evidence, launcher)
         if installed_mfa(profile, receipt) != (installed, module) or digest(module) != result["moduleBinarySha256"]:
             raise RuntimeError("Recovery changed the active MFA version or module binary")
         if zone is not None:

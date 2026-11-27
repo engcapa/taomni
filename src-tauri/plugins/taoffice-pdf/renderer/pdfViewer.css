@@ -1,0 +1,111 @@
+.taoffice-pdf {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  color: var(--taomni-text);
+  background: var(--taomni-panel-bg);
+}
+.taoffice-pdf-toolbar,
+.taoffice-pdf-toolbar form,
+.taoffice-pdf-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.taoffice-pdf-toolbar, .taoffice-pdf-navigation {
+  flex-wrap: wrap;
+  padding: 8px;
+  border-bottom: 1px solid var(--taomni-card-border);
+}
+.taoffice-pdf :is(.taomni-btn, .taomni-input) {
+  min-height: max(26px, calc(1em + 8px));
+  padding-inline: 8px;
+}
+.taoffice-pdf .taomni-input { width: 6ch; text-align: end; font-variant-numeric: tabular-nums; }
+.taoffice-pdf :focus-visible { outline: 2px solid var(--taomni-focus-ring, var(--taomni-accent)); outline-offset: 2px; }
+.taoffice-pdf [aria-pressed="true"] { background: var(--taomni-selected); color: var(--taomni-text); }
+.taoffice-pdf [aria-expanded="true"] { background: var(--taomni-selected); color: var(--taomni-text); }
+.taoffice-pdf-navigation .taomni-input { width: min(28ch, 100%); text-align: start; }
+.taoffice-pdf-outline { max-height: 35%; overflow: auto; padding: 8px; }
+.taoffice-pdf-outline ul { margin: 0; padding: 0; list-style: none; }
+.taoffice-pdf-outline .taomni-btn { text-align: start; overflow-wrap: anywhere; margin-bottom: 4px; }
+.taoffice-pdf-viewport { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px; }
+.taoffice-pdf-page { position: relative; margin-inline: auto; }
+.taoffice-pdf-page canvas { display: block; width: 100%; height: 100%; }
+.taoffice-pdf-error { padding: 8px; overflow-wrap: anywhere; user-select: text; }
+.taoffice-pdf-password, .taoffice-pdf-locked { max-width: 24rem; margin: 1em auto; }
+.taoffice-pdf-password > label { display: grid; gap: .4em; }
+.taoffice-pdf-password .taomni-input { width: 100%; text-align: start; }
+.taoffice-pdf-password > p, .taoffice-pdf-locked > p { margin-block: .5em; }
+.taoffice-pdf-password > div { display: flex; flex-wrap: wrap; gap: .5em; }
+.taoffice-pdf-page .textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  text-align: initial;
+  line-height: 1;
+  text-size-adjust: none;
+  user-select: text;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+}
+.taoffice-pdf-page .textLayer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  transform-origin: 0 0;
+}
+.taoffice-pdf-page .textLayer > :not(.markedContent),
+.taoffice-pdf-page .textLayer .markedContent span:not(.markedContent) {
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate, 0deg)) scaleX(var(--scale-x, 1)) scale(calc(1 / var(--min-font-size)));
+}
+.taoffice-pdf-page .textLayer .markedContent { display: contents; }
+.taoffice-pdf-page .textLayer ::selection { background: var(--taomni-editor-selection-bg); }
+.taoffice-pdf-page .textLayer [data-search-hit] { background: var(--taomni-editor-selection-match-bg); }
+.taoffice-pdf-form {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--taomni-card-border);
+  max-height: 45%;
+  overflow: auto;
+}
+
+.taoffice-pdf-form-actions,
+.taoffice-pdf-form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.taoffice-pdf-form-actions h3,
+.taoffice-pdf-form-row label {
+  flex: 1;
+  min-width: 0;
+}
+
+.taoffice-pdf-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.taoffice-pdf-form-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.taoffice-pdf-form-row label span {
+  flex: 0 1 32%;
+  overflow-wrap: anywhere;
+}
+
+.taoffice-pdf-form-row :is(input:not([type="checkbox"]), select, textarea) {
+  flex: 1;
+  min-width: 0;
+  text-align: start;
+}

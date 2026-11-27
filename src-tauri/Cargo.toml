@@ -59,6 +59,7 @@ members = [
     "plugins/sockscap",
     "plugins/sockscap/tools",
     "plugins/sockscap/xray",
+    "plugins/taoffice-excel",
     "plugins/vnc-client",
     "plugins/vnc-server",
     "plugins/servers",
@@ -195,6 +196,14 @@ libc = "0.2"
 font-kit = "0.14"
 dirs = "6"
 flate2 = "1"
+# Core viewer codecs for compressed TAR archives.
+bzip2 = "0.5"
+crc32fast = "1"
+tar = { version = "0.4", default-features = false }
+xz2 = { version = "0.1", features = ["static"] }
+zstd = { version = "0.13", default-features = false }
+sevenz-rust2 = { version = "=0.25.0", default-features = false, features = ["aes256", "deflate"] }
+rars = { version = "=0.13.1", default-features = false }
 # Read source files returned as jar:/kls: definition URIs without extracting
 # archives to the workspace. Keep formats narrow: SDK/source JARs use deflate.
 zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2"] }
@@ -282,7 +291,7 @@ if-addrs = "0.15.0"
 socket2 = { version = "0.6", features = ["all"] }
 tauri-plugin-notification = "2.4.0"
 xcap = { version = "0.9.6", optional = true }
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png", "tiff"] }
 # Clipboard export can copy the first frame of a GIF.
 gif = "0.13"
 tauri-plugin-dialog = "2.7.3"
@@ -442,6 +451,7 @@ webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 gtk = "0.18.2"
 
 [dev-dependencies]
+sevenz-rust2 = { version = "=0.25.0", default-features = false, features = ["compress"] }
 imap = "2.4.1"
 taomni-mail-engine = { path = "crates/taomni-mail-engine", features = ["imap-runtime", "pop3-runtime", "mime-compose"], default-features = false }
 taomni-mfa-engine = { path = "crates/taomni-mfa-engine" }

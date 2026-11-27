@@ -1,0 +1,14 @@
+.archive-viewer { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: auto;
+  color: var(--taomni-text); background: var(--taomni-panel-bg); font: inherit; }
+.archive-viewer header, .archive-viewer footer { display: flex; align-items: center; flex-wrap: wrap; gap: .5em; padding: .5em; }
+.archive-viewer h2 { min-width: 0; overflow-wrap: anywhere; font-size: var(--taomni-fs-title, 1.167em); font-weight: 600; }
+.archive-viewer button { min-height: var(--taomni-control-h-sm, 24px); padding-inline: .5em; }
+.archive-viewer :is(button, input):focus-visible { outline: 2px solid var(--taomni-focus-ring, var(--taomni-accent)); outline-offset: 1px; }
+.archive-viewer p { padding: .5em; overflow-wrap: anywhere; user-select: text; }
+.archive-list { flex: 1; min-height: 0; overflow: auto; }
+.archive-list table { border-collapse: collapse; width: 100%; }
+.archive-list :is(td, th) { text-align: start; padding: .4em .55em; border-bottom: 1px solid var(--taomni-card-border); }
+.archive-list th { position: sticky; top: 0; background: var(--taomni-panel-bg); }
+.archive-list td { overflow-wrap: anywhere; user-select: text; }
+.archive-list td:nth-child(2) { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.archive-list td button { margin: .15em; }

@@ -93,10 +93,12 @@
     "@xterm/headless": "6.0.0",
     "autoprefixer": "^10.6.0",
     "jsdom": "^29.1.1",
+    "pdfjs-dist": "6.5.438",
     "postcss": "^8.5.28",
     "ssh2": "^1.17.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
+    "utif2": "4.1.0",
     "vite": "^8.3.0",
     "vitest": "^4.1.11",
     "ws": "^8.21.3"

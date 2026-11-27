@@ -32,7 +32,7 @@ def controls(driver, owner, executable, phase, evidence, **inputs):
     )
     if observed.returncode:
         (evidence / f"{phase}-error.log").write_text(observed.stderr, encoding="utf-8")
-        if phase in {"permissions", "mfa-before", "mfa-after", "screen-scan"} and owner.poll() is None:
+        if phase in {"permissions", "screenshot-permissions", "mfa-before", "mfa-after", "screen-scan"} and owner.poll() is None:
             try:
                 subprocess.run(["screencapture", "-x", str(evidence / f"{phase}-failure.png")],
                                capture_output=True, timeout=10)

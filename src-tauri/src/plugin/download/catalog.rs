@@ -26,7 +26,9 @@ pub struct ModuleCatalogPlugin {
     pub core_api_version: String,
     #[serde(default)]
     pub kind: Option<taomni_plugin_api::PluginKind>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub document: Option<taomni_plugin_api::DocumentTypes>,
+    #[serde(default, alias = "documentPermissions")]
     pub permissions: Option<std::collections::BTreeSet<String>>,
     #[serde(default)]
     pub description: String,
@@ -69,6 +71,11 @@ impl ModuleCatalog {
             ));
         }
         for (key, plugin) in &self.plugins {
+            if let Some(types) = &plugin.document {
+                types
+                    .validate()
+                    .map_err(|reason| DownloadError::InvalidCatalog(reason.into()))?;
+            }
             if key != &plugin.id || plugin.id != format!("taomni-plugin-{}", plugin.slug) {
                 return Err(DownloadError::InvalidCatalog(format!(
                     "plugin id/slug mismatch for {key}"

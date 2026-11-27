@@ -1,0 +1,25 @@
+{
+  "id": "taomni-plugin-taoffice-excel",
+  "slug": "taoffice-excel",
+  "name": "TaOffice Excel",
+  "description": "Browse worksheets, inspect formulas, and save selected XLSX edits to a new copy.",
+  "version": "0.1.3",
+  "coreApiVersion": "1",
+  "kind": "media",
+  "status": "provisional",
+  "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
+  "entry": { "host": "taomni-plugin-taoffice-excel", "frontend": "frontend/index.js", "protocol": 1 },
+  "document": { "fileKinds": ["excel"], "extensions": ["xlsx", "xlsm"] },
+  "tabs": [],
+  "commands": [
+    "workbook/begin", "workbook/append", "workbook/open", "workbook/sheet", "workbook/close",
+    "workbook/copy", "workbook/copyChunk", "workbook/releaseCopy"
+  ],
+  "permissions": ["fs.readUserFile"],
+  "dataDir": "plugins/taoffice-excel",
+  "dataSchemaVersion": 1,
+  "backupPaths": [],
+  "legacyTables": [],
+  "vaultFixedKeys": [],
+  "snapshot": "file"
+}

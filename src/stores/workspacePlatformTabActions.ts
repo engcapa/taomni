@@ -2,9 +2,7 @@ import { workspaceFileTabId } from "../lib/workspaceFileTarget";
 import type { StoreApi } from "zustand";
 import type { WorkspacePlatformState, WorkspaceIsolatedTab } from "./workspacePlatformStore";
 import { computeDuplicateTitle } from "./app/tabTitles";
-import { consumeDirtyCloseBypass, guardViewerClose } from "../lib/openFile/closeGuard";
-import { documentPathKey } from "../lib/openFile/pathIdentity";
-import { useDocumentStore } from "./documentStore";
+import { consumeDirtyCloseBypass, guardViewerClose, viewerHasChanges } from "../lib/openFile/closeGuard";
 
 type TabActions = Pick<WorkspacePlatformState,
   "closeWorkspaceTab" | "renameWorkspaceTab" | "moveWorkspaceTab" | "duplicateWorkspaceTab" | "setActiveWorkspaceTab" | "syncWorkspaceFiles">;
@@ -46,7 +44,7 @@ export function createWorkspaceTabActions(
   },
   closeWorkspaceTab: (workspaceId, tabId) => {
     const path = get().getWorkspace(workspaceId)?.openTabs.find((tab) => tab.id === tabId)?.fileViewer?.path;
-    if (path && useDocumentStore.getState().documents[documentPathKey(path)]?.dirty && !consumeDirtyCloseBypass(path)) {
+    if (path && viewerHasChanges(path) && !consumeDirtyCloseBypass(path)) {
       guardViewerClose([path], () => get().closeWorkspaceTab(workspaceId, tabId));
       return;
     }

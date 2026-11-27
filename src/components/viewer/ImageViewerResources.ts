@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { effectiveFileType, sftpListLocal, parentPath, basename, type FileEntry } from "../../lib/sftp";
-import { viewerReadBytes, type ViewerDocument } from "../../lib/viewer";
-import { IMAGE_EXTENSIONS, IMAGE_VIEWER_LIMIT, imageExtension, safeImageBlob } from "./ImageViewerImage";
+import { viewerReadBytes, viewerTiffPreview, type ViewerDocument } from "../../lib/viewer";
+import { IMAGE_EXTENSIONS, IMAGE_VIEWER_LIMIT, imageExtension, isTiff, safeImageBlob } from "./ImageViewerImage";
 
 export interface ImageResource { path: string; url: string; blob: Blob; mime: string }
 
@@ -20,7 +20,7 @@ export function useImageResource(document: ViewerDocument, svg: boolean, retry: 
     setLoading(true);
     void (async () => {
       const bytes = svg ? { bytes: new TextEncoder().encode(document.content), mime: "image/svg+xml" }
-        : await viewerReadBytes(document.path, IMAGE_VIEWER_LIMIT);
+        : isTiff(document.path) ? await viewerTiffPreview(document.path) : await viewerReadBytes(document.path, IMAGE_VIEWER_LIMIT);
       if (stale) return;
       const blob = safeImageBlob(bytes.bytes, bytes.mime, IMAGE_VIEWER_LIMIT);
       objectUrl = URL.createObjectURL(blob);

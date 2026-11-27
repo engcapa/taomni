@@ -316,7 +316,15 @@ fn verify_asset(
         status_ok && !description.is_empty(),
         "release module must be stable and described: {id}"
     );
-    for key in ["id", "slug", "version", "name", "coreApiVersion", "kind"] {
+    for key in [
+        "id",
+        "slug",
+        "version",
+        "name",
+        "coreApiVersion",
+        "kind",
+        "document",
+    ] {
         ensure!(
             manifest[key] == plugin[key],
             "signed package metadata differs for {id}/{key}"
@@ -340,11 +348,15 @@ fn verify_asset(
         "release does not contain all declared platforms for {id}"
     );
     let permissions = |value: &Value| {
-        value["permissions"].as_array().map(|items| {
-            let mut items = items.clone();
-            items.sort_by(|left, right| left.as_str().cmp(&right.as_str()));
-            items
-        })
+        value
+            .get("permissions")
+            .or_else(|| value.get("documentPermissions"))
+            .and_then(Value::as_array)
+            .map(|items| {
+                let mut items = items.clone();
+                items.sort_by(|left, right| left.as_str().cmp(&right.as_str()));
+                items
+            })
     };
     ensure!(
         description == crate::string(plugin, "description")?

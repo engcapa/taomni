@@ -109,7 +109,11 @@ export function useViewerRecovery(): void {
     const unsubscribeWorkspace = useWorkspacePlatformStore.subscribe(schedule);
     const beforeUnload = (event: BeforeUnloadEvent) => {
       flush();
-      if (Object.values(useDocumentStore.getState().documents).some((document) => document.dirty)) { event.preventDefault(); event.returnValue = ""; }
+      const store = useDocumentStore.getState();
+      if (Object.keys(store.moduleDrafts ?? {}).length || Object.values(store.documents).some((document) => document.dirty)) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
     };
     flush();
     window.addEventListener("pagehide", flush);

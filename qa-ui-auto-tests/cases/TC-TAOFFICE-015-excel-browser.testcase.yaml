@@ -1,0 +1,44 @@
+id: TC-TAOFFICE-015
+title: Navigate Excel worksheet tabs and inspect a cached formula
+description: Open the workbook through Explorer, move by keyboard between cells and worksheets, and restore the selected cell when returning.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-excel]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 115
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-excel.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- seed_storage:
+    key: taomni.preview.taoffice-excel.workbook.v1
+    value: '${fixture.taoffice_workbook_model}'
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="quarterly.xlsx"]'
+- wait_for: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="C2"]', contains: '24'}
+- assert_count: {selector: '[data-testid="taoffice-excel-sheet"]', equal: 2}
+- click: '[data-testid="taoffice-excel-cell"][data-address="B2"]'
+- press: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', key: ArrowRight}
+- wait_for: '[data-testid="taoffice-excel-cell"][data-address="C2"]:focus'
+- assert_attribute: {selector: '[data-testid="taoffice-excel-formula"]', name: value, equals: '=B2*2'}
+- press: {selector: '[data-testid="taoffice-excel-sheet"][aria-selected="true"]', key: ArrowRight}
+- wait_for: '[data-testid="taoffice-excel-sheet"][aria-selected="true"]:focus'
+- assert_text: {selector: '[data-testid="taoffice-excel-sheet"][aria-selected="true"]', contains: Inventory}
+- wait_for: '[data-testid="taoffice-excel-cell"][data-address="A2"]'
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="A2"]', contains: 上海}
+- press: {selector: '[data-testid="taoffice-excel-sheet"][aria-selected="true"]', key: ArrowLeft}
+- wait_for: '[data-testid="taoffice-excel-cell"][data-address="C2"][aria-selected="true"]'
+- assert_attribute: {selector: '[data-testid="taoffice-excel-formula"]', name: value, equals: '=B2*2'}
+- press: {selector: '[data-testid="taoffice-excel-cell"][data-address="C2"]', key: Control+End, macos_key: Meta+End}
+- wait_for: '[data-testid="taoffice-excel-cell"][data-address="M35"]:focus'
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="M35"]', contains: Beyond L}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/quarterly.xlsx', sha256: '${fixture.taoffice_workbook_sha}'}
+- assert_no_runtime_errors: null

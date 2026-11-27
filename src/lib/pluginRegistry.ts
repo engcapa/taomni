@@ -19,6 +19,7 @@ export const PLUGIN_PERMISSION_NAMES = [
   "session.read",
   "network.egress",
   "fs.dataDir",
+  "fs.readUserFile",
   "window.open",
   "capture.screen",
   "terminal.observe",
@@ -46,6 +47,18 @@ export interface PluginTab {
   title: string;
 }
 
+export interface DocumentTypes {
+  fileKinds: string[];
+  extensions: string[];
+}
+
+export function validDocumentTypes(input: unknown): input is DocumentTypes {
+  if (!isRecord(input) || Object.keys(input).some((key) => key !== "fileKinds" && key !== "extensions")) return false;
+  return [input.fileKinds, input.extensions].every((list) => Array.isArray(list)
+    && list.length > 0 && list.length <= 64 && new Set(list).size === list.length
+    && list.every((name) => typeof name === "string" && /^[a-z0-9]{1,24}$/.test(name)));
+}
+
 export interface PluginManifest {
   id: string;
   slug: string;
@@ -54,6 +67,7 @@ export interface PluginManifest {
   version: string;
   coreApiVersion: string;
   kind: PluginKind;
+  document?: DocumentTypes;
   status: PluginStatus;
   removalCandidate?: boolean;
   platforms: PluginPlatform[];
@@ -108,7 +122,7 @@ function isSafeRelativePath(value: unknown): value is string {
 
 const MANIFEST_FIELDS = new Set([
   "id", "slug", "name", "description", "version", "coreApiVersion", "kind", "status", "removalCandidate", "platforms",
-  "entry", "tabs", "commands", "permissions", "dataDir", "dataSchemaVersion", "backupPaths", "legacyTables", "vaultFixedKeys", "snapshot",
+  "entry", "tabs", "commands", "permissions", "dataDir", "dataSchemaVersion", "backupPaths", "legacyTables", "vaultFixedKeys", "snapshot", "document",
 ]);
 
 function asStringArray(value: unknown): value is string[] {
@@ -148,6 +162,9 @@ export function validatePluginManifest(
   }
 
   const entry = input.entry;
+  if (input.document !== undefined && (!validDocumentTypes(input.document) || !isRecord(entry) || !entry.frontend)) {
+    errors.push("document associations require a frontend and valid file kinds and extensions");
+  }
   if (!isRecord(entry) || Object.keys(entry).some((key) => !["host", "frontend", "protocol"].includes(key))
     || (entry.host === undefined && entry.frontend === undefined)
     || (entry.host !== undefined && !isSafeRelativePath(entry.host))
@@ -185,6 +202,7 @@ export function validatePluginManifest(
       version: input.version as string,
       coreApiVersion,
       kind: input.kind as PluginKind,
+      ...(input.document === undefined ? {} : { document: input.document as DocumentTypes }),
       status: input.status as PluginStatus,
       ...(input.removalCandidate === undefined ? {} : { removalCandidate: input.removalCandidate as boolean }),
       platforms: platforms as PluginPlatform[],

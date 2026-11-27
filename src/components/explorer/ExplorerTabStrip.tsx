@@ -4,13 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { writeText } from "../../lib/clipboard";
 import { openExplorer } from "../../lib/explorer/openExplorer";
 import { openUntitledNotepadDocument } from "../../lib/openFile";
-import { documentPathKey } from "../../lib/openFile/pathIdentity";
+import { viewerHasChanges } from "../../lib/openFile/closeGuard";
 import { filterExplorerTabs, hasExplorerTabFilter } from "../../lib/explorerTabFilter";
 import { maxScrollLeft } from "../tabbar/tabs/scroll";
 import { IconBtn, TabIcon } from "../tabbar/tabs/TabItem";
 import { buildTabContextMenu } from "../tabbar/tabs/tabContextMenu";
 import { useTabStripScroll } from "../tabbar/tabs/useTabStripScroll";
-import { useDocumentStore } from "../../stores/documentStore";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { useExplorerUiStore } from "../../stores/explorerUiStore";
 import { useSftpStore } from "../../stores/sftpStore";
@@ -92,7 +91,6 @@ export function ExplorerTabStrip() {
   };
   const menuItems = (tab: Tab) => {
     const index = tabs.findIndex((item) => item.id === tab.id);
-    const docs = useDocumentStore.getState().documents;
     const first = index <= 0;
     const last = index >= tabs.length - 1;
     return buildTabContextMenu({
@@ -141,7 +139,7 @@ export function ExplorerTabStrip() {
         togglePin: () => togglePinTab(tab.id),
         closeLeft: () => closeTabsLeft(tab.id),
         closeRight: () => closeTabsRight(tab.id),
-        closeUnmodified: () => closeUnmodifiedTabs((item) => Boolean(item.fileViewer && docs[documentPathKey(item.fileViewer.path)]?.dirty)),
+        closeUnmodified: () => closeUnmodifiedTabs((item) => Boolean(item.fileViewer && viewerHasChanges(item.fileViewer.path))),
         closeUnpinned: () => closeUnpinnedTabs(),
       },
     });

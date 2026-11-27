@@ -15,6 +15,7 @@ import { documentPathKey, UNTITLED_KEY_PREFIX } from "./pathIdentity";
 import type { FileViewerTabInfo } from "../../types";
 import { activateCodeDocument, removeCleanViewerTabs } from "./codeDocumentOwner";
 import { readViewerDrafts } from "../../stores/viewerDrafts";
+import { documentProvider } from "./documentProvider";
 
 export { classifyFile, fileExtension, supportsFileViewer } from "./classifyFile";
 export type { FileKind } from "./classifyFile";
@@ -164,7 +165,9 @@ export function openFile(target: OpenFileTarget | string, options: OpenFileOptio
   const result = previous.catch(() => undefined).then(async () => {
     let path = input.path;
     try { path = await explorerCanonicalPath(path); } catch { /* Missing paths still have a recoverable viewer error state. */ }
-    const kind = classifyFile(input.path);
+    const classified = classifyFile(input.path);
+    const provider = documentProvider(input.path);
+    const kind = classified === "binary" && provider ? "document" : classified;
     const preferences = useFileOpenPreferences.getState();
     let mode: OpenFileMode = options.mode ?? preferences.associations[fileExtension(input.path)] ?? preferences.defaultHandler;
     if (options.alternate) mode = mode === "system" ? "taomni" : "system";
@@ -178,6 +181,8 @@ export function openFile(target: OpenFileTarget | string, options: OpenFileOptio
     if (mode === "system" || (!explicitNotepad && !supportsFileViewer(kind) && kind !== "source")) {
       return sftpOpenPath(path);
     }
+    // A workspace owns document tabs as well as code tabs.
+    if (mode === "workspace" && provider) mode = "taomni";
 
     const key = documentPathKey(path);
     const readOnlyReason = input.readOnlyReason ?? (input.source && input.source !== "local" ? "只读副本 / Read-only copy" : undefined);
@@ -187,8 +192,8 @@ export function openFile(target: OpenFileTarget | string, options: OpenFileOptio
       const explorer = useExplorerStore.getState();
       const existing = explorer.tabs.find((tab) => tab.type === "file-viewer" && tab.fileViewer && documentPathKey(tab.fileViewer.path) === key);
       if (existing) {
-        if (options.mode === "source" || options.mode === "taomni" || options.mode === "notepad") {
-          explorer.updateViewerMode(existing.id, options.mode === "source" ? "source" : options.mode === "notepad" ? "notepad" : "taomni");
+        if (!useDocumentStore.getState().documents[key]?.dirty && (options.mode === "source" || options.mode === "taomni" || options.mode === "notepad" || options.mode === "taoffice")) {
+          explorer.updateViewerMode(existing.id, resolvedViewerMode);
         }
         explorer.setActiveTab(existing.id);
         useAppStore.getState().setActiveSideTab("explorer");
@@ -198,7 +203,7 @@ export function openFile(target: OpenFileTarget | string, options: OpenFileOptio
       const id = `explorer-viewer-${crypto.randomUUID()}`;
       const viewer: FileViewerTabInfo = {
         path,
-        kind: (readOnlyReason && kind === "source") || mode === "notepad" ? "text" : kind,
+        kind: (readOnlyReason && kind === "source") || (mode === "notepad" && !provider) ? "text" : kind,
         mode: resolvedViewerMode,
         readOnlyReason,
         source: input.source ?? "local",
@@ -232,7 +237,7 @@ export function openFile(target: OpenFileTarget | string, options: OpenFileOptio
     }
     const existing = existingViewer(key, options.workspaceId);
     if (existing) {
-      if (options.mode === "source" || options.mode === "taomni" || options.mode === "notepad") {
+      if (!useDocumentStore.getState().documents[key]?.dirty && (options.mode === "source" || options.mode === "taomni" || options.mode === "notepad" || options.mode === "taoffice")) {
         const nextMode: FileViewerTabInfo["mode"] = options.mode === "source" ? "source" : options.mode === "notepad" ? "notepad" : "taomni";
         if (options.workspaceId) useWorkspacePlatformStore.setState((state) => ({ workspaces: state.workspaces.map((workspace) => workspace.id === options.workspaceId
           ? { ...workspace, openTabs: workspace.openTabs.map((tab) => tab.id === existing && tab.fileViewer ? { ...tab, fileViewer: { ...tab.fileViewer, mode: nextMode } } : tab) } : workspace) }));
@@ -243,7 +248,7 @@ export function openFile(target: OpenFileTarget | string, options: OpenFileOptio
     }
     const viewer: FileViewerTabInfo = {
       path,
-      kind: (readOnlyReason && kind === "source") || mode === "notepad" ? "text" : kind,
+      kind: (readOnlyReason && kind === "source") || (mode === "notepad" && !provider) ? "text" : kind,
       mode: mode === "source" ? "source" : mode === "notepad" ? "notepad" : "taomni",
       readOnlyReason,
       source: input.source ?? "local",

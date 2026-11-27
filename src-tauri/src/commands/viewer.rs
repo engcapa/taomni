@@ -1,8 +1,9 @@
 //! Local viewer IPC stays on blocking workers; handlers never own UI state.
+use crate::state::AppState;
 use crate::viewer::{
     self, BytesData, FileStat, HtmlSession, SavedImage, TempFile, TextChunk, TextData, WriteAck,
 };
-use tauri::Manager;
+use tauri::{Manager, State, Window};
 
 async fn on_worker<T: Send + 'static>(
     operation: impl FnOnce() -> Result<T, String> + Send + 'static,
@@ -10,6 +11,108 @@ async fn on_worker<T: Send + 'static>(
     tauri::async_runtime::spawn_blocking(operation)
         .await
         .map_err(|error| format!("permission: Viewer worker failed: {error}"))?
+}
+
+#[tauri::command]
+async fn viewer_tiff_preview(path: String) -> Result<BytesData, String> {
+    on_worker(move || viewer::tiff_preview::read(&path)).await
+}
+
+#[tauri::command]
+async fn viewer_archive_list(path: String) -> Result<Vec<viewer::archive::Entry>, String> {
+    on_worker(move || viewer::archive::list(&path)).await
+}
+
+#[tauri::command]
+async fn viewer_archive_preview(
+    path: String,
+    entry: viewer::archive::Entry,
+) -> Result<TempFile, String> {
+    on_worker(move || viewer::archive::preview(&path, entry)).await
+}
+
+#[tauri::command]
+async fn viewer_archive_extract(
+    path: String,
+    destination: String,
+    entry: Option<viewer::archive::Entry>,
+) -> Result<String, String> {
+    on_worker(move || viewer::archive::extract(&path, &destination, entry)).await
+}
+
+#[tauri::command]
+async fn viewer_media_open(
+    path: String,
+    slug: String,
+    version: String,
+    state: State<'_, AppState>,
+) -> Result<viewer::media_stream::MediaStream, String> {
+    let registry = state.plugins.clone();
+    let profile = state.core.paths.clone();
+    on_worker(move || {
+        let path = viewer::document_access::approved_path(
+            &registry,
+            &[&profile.data, &profile.config, &profile.cache],
+            &path,
+            &slug,
+            &version,
+        )?;
+        viewer::media_stream::open(&viewer::display_path(&path))
+    })
+    .await
+}
+
+#[tauri::command]
+async fn viewer_document_read(
+    path: String,
+    slug: String,
+    version: String,
+    state: State<'_, AppState>,
+) -> Result<BytesData, String> {
+    let registry = state.plugins.clone();
+    let profile = state.core.paths.clone();
+    on_worker(move || {
+        let path = viewer::document_access::approved_path(
+            &registry,
+            &[&profile.data, &profile.config, &profile.cache],
+            &path,
+            &slug,
+            &version,
+        )?;
+        viewer::read_bytes(&viewer::display_path(&path), Some(32 * 1024 * 1024))
+    })
+    .await
+}
+
+#[tauri::command]
+async fn viewer_document_save_copy(
+    path: String,
+    slug: String,
+    version: String,
+    bytes: Vec<u8>,
+    window: Window,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let registry = state.plugins.clone();
+    let profile = state.core.paths.clone();
+    on_worker(move || {
+        let protected = [&*profile.data, &*profile.config, &*profile.cache];
+        let source =
+            viewer::document_access::approved_path(&registry, &protected, &path, &slug, &version)?;
+        viewer::document_copy::validate(&source, &bytes)?;
+        let Some(selected) = viewer::document_copy::select_destination(&window, &source)? else {
+            return Ok(None);
+        };
+        let source =
+            viewer::document_access::approved_path(&registry, &protected, &path, &slug, &version)?;
+        viewer::document_copy::write(&source, &selected, &protected, &bytes).map(Some)
+    })
+    .await
+}
+
+#[tauri::command]
+fn viewer_media_close(token: String) {
+    viewer::media_stream::close(&token);
 }
 
 #[tauri::command]
@@ -162,6 +265,14 @@ pub(super) fn handles(command: &str) -> bool {
     matches!(
         command,
         "viewer_stat"
+            | "viewer_tiff_preview"
+            | "viewer_archive_list"
+            | "viewer_archive_preview"
+            | "viewer_archive_extract"
+            | "viewer_media_open"
+            | "viewer_document_read"
+            | "viewer_document_save_copy"
+            | "viewer_media_close"
             | "viewer_read_text"
             | "viewer_read_bytes"
             | "viewer_write_text"
@@ -182,6 +293,14 @@ pub(super) fn handles(command: &str) -> bool {
 pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
     let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
         crate::commands::viewer::viewer_stat,
+        crate::commands::viewer::viewer_tiff_preview,
+        crate::commands::viewer::viewer_archive_list,
+        crate::commands::viewer::viewer_archive_preview,
+        crate::commands::viewer::viewer_archive_extract,
+        crate::commands::viewer::viewer_media_open,
+        crate::commands::viewer::viewer_document_read,
+        crate::commands::viewer::viewer_document_save_copy,
+        crate::commands::viewer::viewer_media_close,
         crate::commands::viewer::viewer_read_text,
         crate::commands::viewer::viewer_read_bytes,
         crate::commands::viewer::viewer_write_text,

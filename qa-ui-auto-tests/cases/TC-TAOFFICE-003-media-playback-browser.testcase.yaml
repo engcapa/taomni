@@ -1,0 +1,47 @@
+id: TC-TAOFFICE-003
+title: An enabled TaOffice Media module decodes a WAV and recovers from a damaged file
+description: The browser module fixture provides the manifest and lifecycle. The player uses the production module ESM and the browser media decoder.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, media]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-video.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="sample.wav"]'
+- wait_for: '[data-testid="taoffice-media-player"][data-ready="true"][controls]'
+- eval_readonly:
+    expression: Math.abs(document.querySelector("audio").duration - 2) < 0.05
+    expect_truthy: true
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/sample.wav', sha256: '${fixture.taoffice_wav_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="damaged.wav"]'
+- wait_for: '[data-testid="taoffice-media-error"]'
+- press:
+    selector: '[data-testid="taoffice-media-retry"]'
+    key: Enter
+- wait_for: '[data-testid="taoffice-media-error"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="sample.wav"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] audio[data-ready="true"]'
+- assert_count:
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
+    equal: 2
+- assert_no_runtime_errors: null

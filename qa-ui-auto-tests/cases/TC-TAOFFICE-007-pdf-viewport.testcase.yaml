@@ -1,0 +1,133 @@
+id: TC-TAOFFICE-007
+title: Navigate, zoom and rotate a PDF in its independent renderer
+description: Check real page text and pixels, registered module navigation, search highlights and focus restoration, content zoom and the original file digest.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-pdf]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-pdf.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="report.pdf"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"]'
+- assert_text: {selector: '[data-testid="taoffice-pdf-text"]', contains: Quarterly report}
+- assert_text: {selector: '[data-testid="taoffice-pdf-page-count"]', contains: '2'}
+- assert_disabled: '[data-testid="taoffice-pdf-previous"]'
+- press: {selector: '[data-testid="taoffice-pdf-next"]', key: Enter}
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-ready="true"]'
+- assert_text: {selector: '[data-testid="taoffice-pdf-text"]', contains: Revenue by region}
+- eval_readonly:
+    expression: document.querySelector(".taoffice-pdf-page canvas").getContext("2d").getImageData(1, 1, document.querySelector(".taoffice-pdf-page canvas").width - 2, document.querySelector(".taoffice-pdf-page canvas").height - 2).data.includes(0)
+    expect_truthy: true
+- assert_disabled: '[data-testid="taoffice-pdf-next"]'
+- screenshot: pdf-second-page.png
+- fill: {selector: '[data-testid="taoffice-pdf-page-number"]', value: '9'}
+- press: {selector: '[data-testid="taoffice-pdf-page-number"]', key: Enter}
+- wait_for: '[data-testid="taoffice-pdf-page-error"]'
+- press: {selector: '[data-testid="taoffice-pdf-page-number"]', key: Escape}
+- assert_attribute: {selector: '[data-testid="taoffice-pdf-page-number"]', name: aria-invalid, equals: 'false'}
+- click: '[data-testid="taoffice-pdf-previous"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"]'
+- click: '[data-testid="taoffice-pdf-rotate"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-rotation="90"][data-ready="true"]'
+- press: {selector: '[data-testid="taoffice-pdf-viewport"]', key: Control+=, macos_key: Meta+=}
+- wait_for: '[data-testid="taoffice-pdf-page"][data-scale="1.875"][data-ready="true"]'
+- click: '[data-testid="taoffice-pdf-zoom-out"]'
+- assert_attribute: {selector: '[data-testid="taoffice-pdf-fit"]', name: aria-pressed, equals: 'false'}
+- click: '[data-testid="taoffice-pdf-zoom-in"]'
+- click: '[data-testid="taoffice-pdf-fit"]'
+- assert_attribute: {selector: '[data-testid="taoffice-pdf-fit"]', name: aria-pressed, equals: 'true'}
+- press: {selector: '[data-testid="taoffice-pdf-find"]', key: Enter}
+- fill: {selector: '[data-testid="taoffice-pdf-search-input"]', value: Revenue}
+- press: {selector: '[data-testid="taoffice-pdf-search-submit"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-pdf-search-status"]', contains: '1 of 1'}
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-ready="true"] [data-search-hit]'
+- fill: {selector: '[data-testid="taoffice-pdf-search-input"]', value: report}
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Enter}
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"] [data-search-hit]'
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: ArrowDown}
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-ready="true"] [data-search-hit]'
+- eval_readonly:
+    expression: document.activeElement.dataset.testid === "taoffice-pdf-search-input"
+    expect_truthy: true
+- click: '[data-testid="taoffice-pdf-search-previous"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"] [data-search-hit]'
+- click: '[data-testid="taoffice-pdf-search-next"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-ready="true"] [data-search-hit]'
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Escape}
+- assert_attribute: {selector: '[data-testid="taoffice-pdf-find"]', name: aria-expanded, equals: 'true'}
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Escape}
+- assert_attribute: {selector: '[data-testid="taoffice-pdf-find"]', name: aria-expanded, equals: 'false'}
+- eval_readonly:
+    expression: document.activeElement.dataset.testid === "taoffice-pdf-find"
+    expect_truthy: true
+- press: {selector: '[data-testid="taoffice-pdf-viewport"]', key: Control+f, macos_key: Meta+f}
+- eval_readonly:
+    expression: document.activeElement.dataset.testid === "taoffice-pdf-search-input"
+    expect_truthy: true
+- fill: {selector: '[data-testid="taoffice-pdf-search-input"]', value: absent phrase}
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-pdf-search-status"]', contains: No text found}
+- assert_disabled: '[data-testid="taoffice-pdf-search-next"]'
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Escape}
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Escape}
+- eval_readonly:
+    expression: document.activeElement.dataset.testid === "taoffice-pdf-viewport"
+    expect_truthy: true
+- click: '[data-testid="taoffice-pdf-outline-toggle"]'
+- assert_text: {selector: '[data-testid="taoffice-pdf-outline"]', contains: Revenue appendix}
+- press: {selector: '[data-testid="taoffice-pdf-outline-item"]', key: Enter}
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-ready="true"]'
+- press: {selector: '[data-testid="taoffice-pdf-outline-item"]', key: Escape}
+- click: '[data-testid="taoffice-pdf-previous"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: theme}
+- click: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-dark"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-rotation="90"][data-ready="true"]'
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector(".taoffice-pdf")).backgroundColor === getComputedStyle(document.documentElement).getPropertyValue("--taomni-panel-bg").trim() || getComputedStyle(document.querySelector(".taoffice-pdf")).backgroundColor === getComputedStyle(document.querySelector(".module-document")).backgroundColor
+    expect_truthy: true
+- screenshot: pdf-dark-app.png
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/report.pdf', sha256: '${fixture.taoffice_pdf_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="damaged.pdf"]'
+- wait_for: '[data-testid="taoffice-pdf-error"]'
+- click: '[data-testid="taoffice-pdf-retry"]'
+- wait_for: '[data-testid="taoffice-pdf-error"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="locked.pdf"]'
+- wait_for: '[data-testid="taoffice-pdf-password"]'
+- assert_attribute: {selector: '[data-testid="taoffice-pdf-password"]', name: type, equals: password}
+- assert_disabled: '[data-testid="taoffice-pdf-unlock"]'
+- eval_readonly:
+    expression: document.activeElement.dataset.testid === "taoffice-pdf-password"
+    expect_truthy: true
+- fill: {selector: '[data-testid="taoffice-pdf-password"]', value: wrong-password}
+- press: {selector: '[data-testid="taoffice-pdf-password"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-pdf-password-status"]', contains: Incorrect password}
+- assert_attribute: {selector: '[data-testid="taoffice-pdf-password"]', name: aria-invalid, equals: 'true'}
+- eval_readonly:
+    expression: document.activeElement.value === ""
+    expect_truthy: true
+- press: {selector: '[data-testid="taoffice-pdf-password"]', key: Escape}
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-pdf-password"]', state: detached}
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-pdf-password-open"]'
+- click: '[data-testid="taoffice-pdf-password-open"]'
+- fill: {selector: '[data-testid="taoffice-pdf-password"]', value: open-report}
+- click: '[data-testid="taoffice-pdf-unlock"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"]'
+- assert_text: {selector: '[data-testid="taoffice-pdf-text"]', contains: Quarterly report}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/locked.pdf', sha256: '${fixture.taoffice_locked_pdf_sha}'}
+- assert_no_runtime_errors: null

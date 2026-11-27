@@ -1,0 +1,64 @@
+id: TC-TAOFFICE-018
+title: Save and reopen filled PDF fields in a signed desktop module
+description: Install the signed renderer, edit a text field and a checkbox, use the native save dialog, and reopen both files to verify their different values.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, file-open, taoffice, taoffice-pdf, native-boundary]
+fixtures: [reset_db, file_open_files, taoffice_signed_pdf]
+timeout_sec: 250
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.pdf_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.pdf_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- wait_for: '[data-testid="module-action-enable-taoffice-pdf"]:enabled'
+- press: {selector: '[data-testid="module-action-enable-taoffice-pdf"]', key: Enter}
+- wait_for: '[data-testid="module-action-disable-taoffice-pdf"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="order-form.pdf"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="order-form.pdf"]'
+- wait_for: '[data-testid="taoffice-pdf-form-toggle"]'
+- click: '[data-testid="taoffice-pdf-form-toggle"]'
+- wait_for: '[data-testid="taoffice-pdf-form-field"][data-field="Contact"]'
+- fill: {selector: '[data-testid="taoffice-pdf-form-field"][data-field="Contact"]', value: Avery}
+- click: '[data-testid="taoffice-pdf-form-field"][data-field="Approved"]'
+- eval_readonly:
+    timeout_sec: 10
+    expression: >-
+      Math.min(...document.querySelector('.taoffice-pdf-page canvas').getContext("2d").getImageData(
+      document.querySelector('.taoffice-pdf-page canvas').width * 39 / 420, document.querySelector('.taoffice-pdf-page canvas').height * 166 / 300,
+      document.querySelector('.taoffice-pdf-page canvas').width * 10 / 420, document.querySelector('.taoffice-pdf-page canvas').height * 10 / 300
+      ).data) < 80
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.file_open_root}/filled-form.pdf
+    trigger: '[data-testid="taoffice-pdf-save-copy"]'
+- wait_for: '[data-testid="taoffice-pdf-copy-output"]'
+- assert_text: {selector: '[data-testid="taoffice-pdf-copy-output"]', contains: filled-form.pdf}
+- wait_for: {selector: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]', state: detached}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/order-form.pdf', sha256: '${fixture.taoffice_pdf_form_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="filled-form.pdf"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="filled-form.pdf"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-pdf-form-toggle"]'
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-pdf-form-toggle"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-pdf-form-field"][data-field="Contact"]'
+- assert_attribute: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-pdf-form-field"][data-field="Contact"]', name: value, equals: Avery}
+- eval_readonly:
+    expression: document.querySelector('input[data-field]:checked')?.dataset.field === "Approved"
+    expect_truthy: true
+- assert_no_runtime_errors: null

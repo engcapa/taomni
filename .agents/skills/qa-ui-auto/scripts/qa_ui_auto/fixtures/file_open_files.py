@@ -4,11 +4,19 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import io
+import wave
+import zipfile
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from . import platform_workspace_root, mail_server
+from .taoffice_7z import archive as seven_zip_fixture
+from .taoffice_locked_pdf import document as locked_pdf_fixture
+from .taoffice_pdf import document as pdf_fixture
+from .taoffice_tar import archives as tar_fixtures, compressed_text
+from .taoffice_workbook import fixtures as workbook_fixtures
 from .explorer_files import PNG
 
 TEXT = "File open original\nSecond line\n中文\n"
@@ -32,6 +40,7 @@ window.addEventListener("load", function () {
 });
 </script></body></html>'''
 MAIL_TEXT = "Mail attachment read-only fixture.\nSave locally before editing.\n"
+TAOFFICE_ASSETS = Path(__file__).resolve().parents[6] / "qa-ui-auto-tests/fixtures/taoffice"
 
 
 def workspace(root: str) -> str:
@@ -56,6 +65,65 @@ def setup(ctx: Any) -> None:
         "assets/local.css": b"#resource { color: rgb(12, 34, 56); }", "assets/pixel.png": PNG,
         "src/sample.ts": b"export const fileOpenSource = true;\n", "unsupported.bin": b"\x00\xff\x10",
     }
+    if ctx.case_id == "TC-TAOFFICE-002":
+        files["records.tsv"] = 'City\tNote\r\nTokyo\t"Metro, East"\r\nParis\t"Line 1\nLine 2"\r\n'.encode()
+    if ctx.case_id == "TC-TAOFFICE-004":
+        # 4x3 LZW TIFF, every pixel RGB(29, 81, 144).
+        files["swatch.tif"] = base64.b64decode(
+            "SUkqABoAAACAB0opCBQSBwWEQeFQaGQlIQEKAAABAwABAAAABAAAAAEBAwABAAAAAwAAAAIBAwADAAAAmAAAAAMBAwAB"
+            "AAAABQAAAAYBAwABAAAAAgAAABEBBAABAAAACAAAABUBAwABAAAAAwAAABYBAwABAAAAAwAAABcBBAABAAAAEgAAABwBAwABAAAAAQAAAAAAAAAIAAgACAA="
+        )
+    if ctx.case_id == "TC-TAOFFICE-006":
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            bundle.writestr("notes/readme.txt", TEXT)
+            bundle.writestr("images/pixel.png", PNG)
+        files["bundle.zip"] = archive.getvalue()
+        rejected = io.BytesIO()
+        with zipfile.ZipFile(rejected, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            bundle.writestr("file.txt", "First entry is safe.")
+            bundle.writestr("../notes.txt", "This entry must be rejected.")
+        files["unsafe.zip"] = rejected.getvalue()
+    if ctx.case_id == "TC-TAOFFICE-009":
+        files.update(tar_fixtures(TEXT.encode(), PNG))
+        ctx.values["taoffice_tar_sha"] = hashlib.sha256(files["quarterly.TAR.GZ"]).hexdigest()
+    if ctx.case_id == "TC-TAOFFICE-010":
+        files["notes-backup.txt.GZ"] = compressed_text(TEXT.encode())
+        ctx.values["taoffice_gzip_sha"] = hashlib.sha256(files["notes-backup.txt.GZ"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-011", "TC-TAOFFICE-012"}:
+        files["records.7Z"] = seven_zip_fixture()
+        ctx.values["taoffice_7z_sha"] = hashlib.sha256(files["records.7Z"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-013", "TC-TAOFFICE-014"}:
+        files["records.RAR"] = (TAOFFICE_ASSETS / "records.RAR").read_bytes()
+        ctx.values["taoffice_rar_sha"] = hashlib.sha256(files["records.RAR"]).hexdigest()
+        ctx.values["taoffice_rar_text_sha"] = hashlib.sha256((TEXT * 32).encode()).hexdigest()
+        if native:
+            for name in ("legacy.rar", "locked.rar"):
+                files[name] = (TAOFFICE_ASSETS / name).read_bytes()
+    if ctx.case_id in {"TC-TAOFFICE-003", "TC-TAOFFICE-005"}:
+        wav = io.BytesIO()
+        with wave.open(wav, "wb") as audio:
+            audio.setparams((1, 2, 8000, 0, "NONE", "not compressed"))
+            audio.writeframes(bytes(32000))
+        files["sample.wav"] = wav.getvalue()
+        files["damaged.wav"] = b"Invalid WAV fixture"
+        ctx.values["taoffice_wav_sha"] = hashlib.sha256(files["sample.wav"]).hexdigest()
+    if ctx.case_id == "TC-TAOFFICE-001":
+        for name in ("Build", "Review"):
+            files[f"{name}.mppx"] = (
+                f'<Project xmlns="http://schemas.microsoft.com/project"><Name>{name}</Name></Project>'
+            ).encode()
+    if ctx.case_id in {"TC-TAOFFICE-007", "TC-TAOFFICE-008"}:
+        files["report.pdf"] = pdf_fixture()
+        files["locked.pdf"] = locked_pdf_fixture()
+        files["damaged.pdf"] = b"This is not a PDF."
+        ctx.values["taoffice_pdf_sha"] = hashlib.sha256(files["report.pdf"]).hexdigest()
+        ctx.values["taoffice_locked_pdf_sha"] = hashlib.sha256(files["locked.pdf"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-015", "TC-TAOFFICE-016", "TC-TAOFFICE-019", "TC-TAOFFICE-020"}:
+        files.update(workbook_fixtures(TAOFFICE_ASSETS, ctx.values))
+    if ctx.case_id in {"TC-TAOFFICE-017", "TC-TAOFFICE-018"}:
+        files["order-form.pdf"] = (TAOFFICE_ASSETS / "order-form.pdf").read_bytes()
+        ctx.values["taoffice_pdf_form_sha"] = hashlib.sha256(files["order-form.pdf"]).hexdigest()
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative

@@ -9,6 +9,7 @@ import { PLUGIN_CORE_API_VERSION } from "./pluginRegistry";
 
 export interface PluginFrontendApi {
   invoke: <T = unknown>(command: string, payload?: unknown, options?: { signal?: AbortSignal }) => Promise<T>;
+  deferCleanup?: (command: string, payload?: unknown) => () => void;
   dispose: () => void;
 }
 
@@ -43,6 +44,7 @@ export class PluginRequestError extends Error {
 /** Each mounted tab owns cancellation; callbacks from an old activation fail closed. */
 export function createPluginFrontendApi(slug: string, isCurrent: () => boolean): PluginFrontendApi {
   const requests = new Map<string, () => void>();
+  const cleanups = new Set<() => void>();
   let disposed = false;
   const cancel = (id: string) => { void cancelPluginRequest(slug, id).catch(() => undefined); };
   return {
@@ -70,11 +72,20 @@ export function createPluginFrontendApi(slug: string, isCurrent: () => boolean):
         signal?.removeEventListener("abort", abort);
       }
     },
+    deferCleanup: (command, payload) => {
+      const release = () => {
+        if (!cleanups.delete(release) || !isCurrent()) return;
+        void invokePlugin(slug, command, payload, { requestId: crypto.randomUUID() }).catch(() => {});
+      };
+      if (!disposed && isCurrent()) cleanups.add(release);
+      return release;
+    },
     dispose: () => {
       if (disposed) return;
       disposed = true;
       for (const abort of requests.values()) abort();
       requests.clear();
+      for (const release of cleanups) release();
     },
   };
 }

@@ -1,0 +1,37 @@
+id: TC-TAOFFICE-013
+title: Open solid RAR4 and RAR5 archives in the core desktop viewer
+description: Extract verified RAR5 members, read a RAR4 member using the shared preview, and explain encrypted headers.
+modes: [native]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, archive, core-only]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 160
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="records.RAR"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="archive"][data-active="true"] [data-testid="archive-entry"][data-name="notes/second.txt"]'
+- assert_count: {selector: '[data-testid="file-viewer"][data-kind="archive"][data-active="true"] [data-testid="archive-entry"]', equal: 2}
+- press: {selector: '[data-testid="file-viewer"][data-kind="archive"][data-active="true"] [data-testid="archive-extract-here"]', key: Enter}
+- wait_for: '[data-testid="file-viewer"][data-kind="archive"][data-active="true"] [data-testid="archive-output"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/records/notes/first.txt', sha256: '${fixture.taoffice_rar_text_sha}'}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/records/notes/second.txt', sha256: '${fixture.taoffice_rar_text_sha}'}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/records.RAR', sha256: '${fixture.taoffice_rar_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy.rar"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="archive"][data-active="true"] [data-testid="archive-entry"][data-name="notes/second.txt"] [data-testid="archive-preview"]'
+- press: {selector: '[data-testid="file-viewer"][data-kind="archive"][data-active="true"] [data-testid="archive-entry"][data-name="notes/second.txt"] [data-testid="archive-preview"]', key: Enter}
+- wait_for: '[data-testid="file-viewer"][data-kind="text"][data-active="true"] [data-testid="viewer-readonly"]'
+- assert_file_open_bytes: {selector: '[data-testid="file-viewer"][data-kind="text"][data-active="true"]', sha256: '${fixture.taoffice_rar_text_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="locked.rar"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="archive"][data-active="true"] [data-testid="archive-error"]'
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="archive-error"]', contains: Password-protected archives are unsupported}
+- assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="archive-extract-here"]'
+- assert_no_runtime_errors: null

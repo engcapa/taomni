@@ -1,0 +1,22 @@
+{
+  "id": "taomni-plugin-taoffice-pdf",
+  "slug": "taoffice-pdf",
+  "name": "TaOffice PDF",
+  "description": "View PDFs offline, unlock protected documents, and fill supported form fields in a saved copy.",
+  "version": "0.1.5",
+  "coreApiVersion": "1",
+  "kind": "media",
+  "status": "provisional",
+  "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
+  "entry": { "frontend": "frontend/index.js", "protocol": 1 },
+  "document": { "fileKinds": ["pdf"], "extensions": ["pdf"] },
+  "tabs": [],
+  "commands": [],
+  "permissions": ["fs.readUserFile"],
+  "dataDir": "plugins/taoffice-pdf",
+  "dataSchemaVersion": 1,
+  "backupPaths": [],
+  "legacyTables": [],
+  "vaultFixedKeys": [],
+  "snapshot": "file"
+}

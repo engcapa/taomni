@@ -5,11 +5,11 @@ import { Button } from "../ui/Button";
 import { MergeView } from "@codemirror/merge";
 import { EditorState } from "@codemirror/state";
 import { EditorView, lineNumbers } from "@codemirror/view";
-import { useDocumentStore } from "../../stores/documentStore";
+import { useDocumentStore, type ViewerCloseRequest } from "../../stores/documentStore";
+import { discardViewerChanges, saveViewerChanges } from "../../lib/openFile/closeGuard";
 import { documentPathKey } from "../../lib/openFile/pathIdentity";
 import { useViewerLabels } from "./viewerLabels";
 import "./viewer.css";
-import type { ViewerCloseRequest } from "../../stores/documentStore";
 
 export function ViewerCloseDialog() {
   const request = useDocumentStore((state) => state.closeRequest);
@@ -18,6 +18,7 @@ export function ViewerCloseDialog() {
 
 function CloseDecision({ request }: { request: ViewerCloseRequest }) {
   const label = useViewerLabels();
+  const savesCopy = useDocumentStore((state) => request.paths.some((path) => state.moduleDrafts[documentPathKey(path)]));
   const [pending, setPending] = useState<"draft" | "save" | null>(null);
   const running = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,8 +39,13 @@ function CloseDecision({ request }: { request: ViewerCloseRequest }) {
     setError(null);
     try {
       const store = useDocumentStore.getState();
-      if (action === "draft") await store.persistRecoveryDrafts(request.paths);
-      else for (const path of request.paths) await store.save(path);
+      if (action === "draft") {
+        await store.persistRecoveryDrafts(request.paths);
+      } else {
+        for (const path of request.paths) {
+          if (!(await saveViewerChanges(path))) return;
+        }
+      }
       finish();
     } catch (failure) {
       const detail = String(failure);
@@ -58,14 +64,15 @@ function CloseDecision({ request }: { request: ViewerCloseRequest }) {
     initialFocus='[data-testid="viewer-close-cancel"]' onCancel={cancel}
     footer={<>
       <Button variant="danger" data-testid="viewer-close-discard" disabled={!!pending} onClick={() => {
-        request.paths.forEach((path) => useDocumentStore.getState().discard(path));
+        if (running.current) return;
+        request.paths.forEach(discardViewerChanges);
         finish();
       }}>{label("放弃更改", "Discard changes")}</Button>
-      <Button data-testid="viewer-close-keep-draft" disabled={!!pending} busy={pending === "draft"}
-        onClick={() => void persist("draft")}>{label("保留草稿", "Keep draft")}</Button>
+      {!savesCopy && <Button data-testid="viewer-close-keep-draft" disabled={!!pending} busy={pending === "draft"}
+        onClick={() => void persist("draft")}>{label("保留草稿", "Keep draft")}</Button>}
       <Button data-testid="viewer-close-cancel" disabled={!!pending} onClick={cancel}>{label("取消", "Cancel")}</Button>
       <Button variant="primary" data-testid="viewer-close-save" disabled={!!pending} busy={pending === "save"}
-        onClick={() => void persist("save")}>{label("保存", "Save")}</Button>
+        onClick={() => void persist("save")}>{savesCopy ? label("保存更改…", "Save changes…") : label("保存", "Save")}</Button>
     </>}>
     <p>{request.paths.map((path) => <span className="block" key={path}>{path}</span>)}</p>
     {external && <p>{label("磁盘版本已更改。取消关闭后可在文件横幅比较差异、重新加载或保留我的版本。",

@@ -1,7 +1,8 @@
 export { safeImageBlob } from "../../lib/imageSafety";
 
 export const IMAGE_VIEWER_LIMIT = 32 * 1024 * 1024;
-export const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"]);
+export const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico", "tif", "tiff"]);
+export const isTiff = (path: string) => /\.tiff?$/i.test(path);
 
 export function imageExtension(path: string): string {
   return path.slice(path.lastIndexOf(".") + 1).toLowerCase();

@@ -12,6 +12,8 @@ use serde_json::Value;
 mod binary_ref;
 pub use binary_ref::BinaryRef;
 mod correlation;
+mod document;
+pub use document::DocumentTypes;
 mod metadata;
 pub use correlation::{ReplayError, RequestIdMode, RequestReplay};
 pub mod services;

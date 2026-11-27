@@ -1,20 +1,8 @@
 import { fileExtension } from "./classifyFile";
+import { officialDocumentFormats } from "./documentFormats";
 import type { FileHandler } from "./preferences";
 
-export const OFFICE_EXTENSIONS = new Set([
-  "docx",
-  "doc",
-  "xlsx",
-  "xls",
-  "pptx",
-  "ppt",
-  "odt",
-  "ods",
-  "odp",
-  "rtf",
-  "csv",
-  "tsv",
-]);
+export const OFFICE_EXTENSIONS = new Set(officialDocumentFormats.keys());
 
 export interface FileHandlerDescriptor {
   id: FileHandler;
@@ -90,8 +78,7 @@ const registry = new Map<FileHandler, FileHandlerDescriptor>([
       id: "taoffice",
       labelZh: "TaOffice",
       labelEn: "TaOffice",
-      inDevelopment: true,
-      available: () => false,
+      available: () => true,
       supportsExtension: (ext) => OFFICE_EXTENSIONS.has(ext.toLowerCase().replace(/^\./, "")),
     },
   ],

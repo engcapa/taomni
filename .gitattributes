@@ -5,6 +5,7 @@ src-tauri/Cargo.toml text eol=lf
 # Official module frontend bytes are compared with the trusted signer checkout.
 # Windows autocrlf must not alter the payload before hashing and signing.
 src-tauri/plugins/hello-plugin/frontend/*.js text eol=lf
+src-tauri/plugins/taoffice-*/frontend/**/*.js text eol=lf
 # Keep the reported Markdown byte-identical on all QA hosts.
 .agents/skills/qa-ui-auto/scripts/qa_ui_auto/fixtures/data/markdown-testing.md text eol=lf
 src/components/viewer/markdown/vendor/viewer-static.min.js -text -diff

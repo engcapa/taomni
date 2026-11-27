@@ -1,0 +1,50 @@
+id: TC-TAOFFICE-001
+title: Explorer preserves separate document tabs when the Project module is absent
+description: Open two MSPDI files from the real file list, reopen the first, and enter the module store from its placeholder.
+modes: [browser, native]
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+tags: [p0, file-open, taoffice]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="Build.mppx"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"][data-module="taoffice-project"] [data-testid="document-module-state"]'
+- assert_text:
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="document-module-state"] h2'
+    contains: Build.mppx
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="Review.mppx"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"][data-module="taoffice-project"] [data-testid="document-module-state"]'
+- assert_text:
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="document-module-state"] h2'
+    contains: Review.mppx
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="Build.mppx"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"][data-module="taoffice-project"] [data-testid="document-module-state"]'
+- assert_text:
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="document-module-state"] h2'
+    contains: Build.mppx
+- assert_count:
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
+    equal: 2
+- assert_enabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="document-open-system"]'
+- press:
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="document-open-store"]'
+    key: Enter
+- wait_for: '[data-testid="module-marketplace"]'
+- assert_no_runtime_errors: null

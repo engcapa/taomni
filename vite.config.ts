@@ -58,6 +58,7 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     include: [
       "zmodem.js",
       "tesseract.js",
+      ...(isTauriBuild ? [] : ["utif2"]),
       "react",
       "react-dom",
       "react-dom/client",

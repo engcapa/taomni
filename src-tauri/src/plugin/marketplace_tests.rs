@@ -176,6 +176,10 @@ fn catalog_permissions_and_category_must_match_the_actual_signed_package() {
     for (field, value) in [
         ("permissions", serde_json::json!(["capture.screen"])),
         ("kind", serde_json::json!("media")),
+        (
+            "document",
+            serde_json::json!({"fileKinds":["audio"], "extensions":["wav"]}),
+        ),
     ] {
         let root = tempdir().unwrap();
         let (selection, bytes) = fixture(root.path());

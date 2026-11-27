@@ -1,6 +1,9 @@
-export type FileKind = "image" | "svg" | "text" | "markdown" | "html" | "pdf" | "source" | "binary";
+import { officialDocumentFormats } from "./documentFormats";
+import { isArchiveName } from "./archiveFormats";
 
-const images = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "avif"]);
+export type FileKind = "image" | "svg" | "text" | "markdown" | "html" | "pdf" | "document" | "archive" | "source" | "binary";
+
+const images = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "avif", "tif", "tiff"]);
 const text = new Set(["txt", "text", "log", "ini", "conf", "config", "env", "json", "jsonc", "yaml", "yml", "toml", "xml", "csv", "tsv", "properties", "gitignore", "gitattributes", "editorconfig", "dockerignore"]);
 const source = new Set(["ts", "tsx", "js", "jsx", "mjs", "cjs", "rs", "py", "pyi", "go", "java", "kt", "kts", "c", "h", "cc", "cpp", "hpp", "cs", "swift", "m", "mm", "php", "rb", "sh", "bash", "zsh", "fish", "ps1", "bat", "cmd", "sql", "css", "scss", "less", "sass", "vue", "svelte", "gradle", "cmake", "make"]);
 const textNames = new Set(["readme", "license", "licence", "copying", "changelog", "authors"]);
@@ -24,10 +27,12 @@ export function classifyFile(path: string): FileKind {
   if (extension === "md" || extension === "markdown" || extension === "mdown") return "markdown";
   if (extension === "html" || extension === "htm") return "html";
   if (extension === "pdf") return "pdf";
+  if (isArchiveName(name)) return "archive";
+  if (officialDocumentFormats.has(extension)) return "document";
   if (sourceNames.has(name) || source.has(extension)) return "source";
   if (textNames.has(name) || text.has(extension) || name.startsWith(".env.")) return "text";
   return "binary";
 }
 export function supportsFileViewer(kind: FileKind): boolean {
-  return ["image", "svg", "text", "markdown", "html"].includes(kind);
+  return ["image", "svg", "text", "markdown", "html", "pdf", "document", "archive"].includes(kind);
 }

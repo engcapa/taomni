@@ -52,18 +52,7 @@ on:
       module:
         description: Stable module slug to release
         required: true
-        type: choice
-        options:
-          - ai-voice-local
-          - mail
-          - mfa
-          - rdp-client
-          - rdp-server
-          - screenshot
-          - servers
-          - sockscap
-          - vnc-client
-          - vnc-server
+        type: string
       head:
         description: Commit or ref containing the module change
         required: false
@@ -143,7 +132,7 @@ jobs:
           BASELINE_TAG: ${{ inputs.baseline_tag || 'v0.6.0' }}
         run: |
           python - <<'PY'
-          import json, os, pathlib, re, subprocess
+          import json, os, pathlib, re, subprocess, tomllib
 
           slug = os.environ['MODULE_SLUG'].strip()
           tag = os.environ['RELEASE_TAG'].strip()
@@ -175,16 +164,16 @@ jobs:
               raise SystemExit('only stable modules can enter a production catalog')
           if not manifest.get('description', '').strip():
               raise SystemExit('stable modules require a store description')
-          cargo = manifest_path.parent / 'Cargo.toml'
-          if not cargo.is_file():
-              raise SystemExit('module-only release requires a native Cargo package')
-          package = None
-          for line in cargo.read_text(encoding='utf-8').splitlines():
-              if line.startswith('name = '):
-                  package = json.loads(line.split('=', 1)[1].strip())
-                  break
-          if not package:
-              raise SystemExit('module Cargo.toml has no package name')
+          entry = manifest['entry']
+          package = ''
+          if entry.get('host'):
+              cargo = manifest_path.parent / 'Cargo.toml'
+              with cargo.open('rb') as stream:
+                  package = tomllib.load(stream)['package']['name']
+              if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', package):
+                  raise SystemExit('invalid module Cargo package name')
+          elif not entry.get('frontend'):
+              raise SystemExit('module must declare a host or frontend entry')
           targets = [
               {'os': 'ubuntu-22.04', 'target': 'x86_64-unknown-linux-gnu', 'platform': 'linux-x86_64'},
               {'os': 'windows-latest', 'target': 'x86_64-pc-windows-msvc', 'platform': 'windows-x86_64'},
@@ -196,7 +185,7 @@ jobs:
               raise SystemExit('manifest must declare supported production release targets')
           targets = [target for target in targets if target['platform'] in declared]
           built_frontend = slug in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
-                                   'rdp-server', 'vnc-server', 'servers'}
+                                   'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel'}
           output = os.environ['GITHUB_OUTPUT']
           with open(output, 'a', encoding='utf-8') as stream:
               stream.write(f"sha={subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()}\n")
@@ -232,9 +221,11 @@ jobs:
           ref: ${{ needs.source.outputs.sha }}
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
+        if: needs.source.outputs.package != ''
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
+        if: needs.source.outputs.package != ''
         with:
           workspaces: src-tauri -> target
           shared-key: module-release-${{ needs.source.outputs.slug }}-${{ matrix.target }}-${{ matrix.os }}
@@ -259,6 +250,7 @@ jobs:
         if: needs.source.outputs.slug == 'ai-voice-local'
         run: node scripts/refresh-sherpa-onnx-cache.mjs src-tauri/Cargo.toml '${{ matrix.target }}'
       - name: Build the module host without signing credentials
+        if: needs.source.outputs.package != ''
         run: cargo build --manifest-path src-tauri/Cargo.toml -p '${{ needs.source.outputs.package }}' --release --target '${{ matrix.target }}' --locked
       - name: Build the Windows VNC key helper
         if: needs.source.outputs.slug == 'vnc-client' && runner.os == 'Windows'

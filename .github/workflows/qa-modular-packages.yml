@@ -10,7 +10,7 @@ on:
       module:
         description: Official QA module
         type: choice
-        options: [hello-plugin, mfa, mail, vnc-client, vnc-server, rdp-client, rdp-server, screenshot, servers, ai-voice-local, sockscap]
+        options: [hello-plugin, mfa, mail, vnc-client, vnc-server, rdp-client, rdp-server, screenshot, servers, ai-voice-local, sockscap, taoffice-video, taoffice-pdf, taoffice-excel]
         default: hello-plugin
       macos_runner:
         description: Hosted macOS package builder (both Darwin targets remain explicit)
@@ -74,9 +74,10 @@ jobs:
           fi
           case "$QA_MODULE" in
             hello-plugin) echo 'host_package=taomni-hello-plugin' >> "$GITHUB_OUTPUT" ;;
+            taoffice-video|taoffice-pdf) echo 'host_package=' >> "$GITHUB_OUTPUT" ;;
             mfa) echo 'host_package=taomni-plugin-mfa' >> "$GITHUB_OUTPUT" ;;
             mail) echo 'host_package=taomni-plugin-mail' >> "$GITHUB_OUTPUT" ;;
-            vnc-client|vnc-server|rdp-client|rdp-server|screenshot|servers|ai-voice-local|sockscap) echo "host_package=taomni-plugin-$QA_MODULE" >> "$GITHUB_OUTPUT" ;;
+            vnc-client|vnc-server|rdp-client|rdp-server|screenshot|servers|ai-voice-local|sockscap|taoffice-excel) echo "host_package=taomni-plugin-$QA_MODULE" >> "$GITHUB_OUTPUT" ;;
             *) echo 'Unknown official QA module.' >&2; exit 1 ;;
           esac
           test -n "$(git for-each-ref --format='%(refname)' --contains HEAD refs/remotes/origin/)" || {
@@ -109,6 +110,8 @@ jobs:
                         'rdp-client': 'signed-rdp', 'rdp-server': 'signed-local-rdp',
                         'servers': 'signed-local-servers',
                         'ai-voice-local': 'signed-local-voice', 'sockscap': 'signed-sockscap',
+                        'taoffice-video': 'signed-taoffice-video', 'taoffice-pdf': 'signed-taoffice-pdf',
+                        'taoffice-excel': 'signed-taoffice-excel',
                         'screenshot': 'signed-screenshot'}[os.environ['QA_MODULE']]
           roster = set()
           lifecycle = set()
@@ -141,7 +144,7 @@ jobs:
               ]}, separators=(',', ':')) + '\n')
               suffix = '-'.join(target['platform'] for target in targets)
               if os.environ['QA_MODULE'] in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
-                                             'rdp-server', 'vnc-server', 'servers'}:
+                                             'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel'}:
                   output.write(f"frontend_artifact=qa-{os.environ['QA_MODULE']}-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
               if roster:
                   output.write(f"roster_mfa_frontend_artifact=qa-roster-mfa-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
@@ -209,6 +212,7 @@ jobs:
       # runner/job with signing secrets. Nothing from this job is executed by
       # the signing job; it receives only an inert payload directory.
       - name: Build candidate without signing credentials
+        if: needs.source.outputs.host_package != ''
         env:
           MODULE_PACKAGE: ${{ needs.source.outputs.host_package }}
         run: cargo build --manifest-path src-tauri/Cargo.toml -p "$MODULE_PACKAGE" --bin "$MODULE_PACKAGE" --release --target '${{ matrix.target }}' --locked
@@ -241,18 +245,21 @@ jobs:
               output = pathlib.Path(folder)
               output.mkdir()
               manifest = json.loads((source / 'module.json').read_text(encoding='utf-8'))
-              host = manifest['entry']['host'] + ('.exe' if os.environ['MODULE_PLATFORM'].startswith('windows') else '')
-              manifest['entry']['host'] = host
+              host = manifest['entry'].get('host')
+              if host and os.environ['MODULE_PLATFORM'].startswith('windows'):
+                  host += '.exe'
+                  manifest['entry']['host'] = host
               (output / 'module.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
               binaries = pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release'
-              shutil.copyfile(binaries / host, output / host)
+              if host:
+                  shutil.copyfile(binaries / host, output / host)
               stage_runtime(slug, os.environ['MODULE_PLATFORM'], binaries, output)
               redirector.stage(slug, os.environ['MODULE_PLATFORM'], source, output)
               if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
                   helper = 'taomni-vnc-key-helper.exe'
                   shutil.copyfile(binaries / helper, output / helper)
               if slug not in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
-                              'rdp-server', 'vnc-server', 'servers'} and manifest['entry'].get('frontend'):
+                              'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel'} and manifest['entry'].get('frontend'):
                   shutil.copytree(source / 'frontend', output / 'frontend')
 
           stage(os.environ['QA_MODULE'], 'unsigned-module')
@@ -373,7 +380,7 @@ jobs:
           import sockscap_xray_resource as xray
           root = pathlib.Path('candidate')
           module = os.environ['QA_MODULE']
-          assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client', 'vnc-server', 'rdp-client', 'rdp-server', 'screenshot', 'servers', 'ai-voice-local', 'sockscap'}, 'Unknown official QA module'
+          assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client', 'vnc-server', 'rdp-client', 'rdp-server', 'screenshot', 'servers', 'ai-voice-local', 'sockscap', 'taoffice-video', 'taoffice-pdf', 'taoffice-excel'}, 'Unknown official QA module'
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
           assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': module}
           assert not any(p.is_symlink() for p in root.rglob('*'))
@@ -382,10 +389,12 @@ jobs:
               trusted_source = pathlib.Path('src-tauri/plugins') / slug
               expected = json.loads((trusted_source / 'module.json').read_text(encoding='utf-8'))
               platform = os.environ['MODULE_PLATFORM']
-              if platform.startswith('windows'):
+              if expected['entry'].get('host') and platform.startswith('windows'):
                   expected['entry']['host'] += '.exe'
               assert expected['id'] == 'taomni-plugin-' + slug
-              binaries = {expected['entry']['host'], *runtime_files(slug, platform)}
+              binaries = set(runtime_files(slug, platform))
+              if host := expected['entry'].get('host'):
+                  binaries.add(host)
               if slug == 'vnc-client' and platform == 'windows-x86_64':
                   binaries.add('taomni-vnc-key-helper.exe')
               payload = root / folder
@@ -400,7 +409,7 @@ jobs:
               allowed = {'module.json', *binaries, *resources}
               frontend = expected['entry'].get('frontend')
               if frontend and slug not in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
-                                           'rdp-server', 'vnc-server', 'servers'}:
+                                           'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel'}:
                   assert (trusted_source / frontend).is_file()
                   for source in (trusted_source / 'frontend').rglob('*'):
                       assert not source.is_symlink()

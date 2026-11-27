@@ -1,0 +1,33 @@
+id: TC-TAOFFICE-004
+title: Open an LZW TIFF in the built-in image viewer
+description: Check the decoded dimensions, and the unchanged source file without installing a document module.
+modes: [browser, native]
+covers: [F-FILEOPEN-1]
+tags: [p0, taoffice, file-open, image, core-only]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="swatch.tif"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="image"] [data-testid="image-render"][data-image-ready="true"]'
+- eval_readonly:
+    expression: document.querySelector(".image-stage .image-render").naturalWidth === 4 && document.querySelector(".image-stage .image-render").naturalHeight === 3
+    expect_truthy: true
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/swatch.tif
+    sha256: c3642b8435a9f055810a24f1afc09627dac02a91ce00f010b3c453644ee3c9bb
+- assert_no_runtime_errors: null

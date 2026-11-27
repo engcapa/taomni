@@ -75,7 +75,28 @@ def select_candidate(directory, identity):
 def exercise_desktop_contracts(candidate, desktop_profile, stages, args, identity, work, report, permission_failure,
                                *, first_release=None):
     system = platform.system()
-    if first_release is None:
+
+    def recover_mfa(profile):
+        try:
+            stages["crashRecovery"] = verify_crash_recovery(
+                candidate, profile, args.signed.resolve(strict=True) if args.signed else None,
+                identity["producerSource"], report, work, macos_hardened_mfa=args.macos_hardened_mfa,
+                first_release=first_release,
+            )
+        except Exception as error:
+            stages["crashRecovery"] = {"passed": False, "error": str(error)}
+            return error
+        return None
+
+    # Stage the chosen signed version before the first candidate GUI launch
+    # can enroll this legacy profile in the public release catalog.
+    migrate_before_launch = system == "Darwin" and first_release is None
+    recovery_failure = recover_mfa(desktop_profile) if migrate_before_launch else None
+    if migrate_before_launch:
+        if recovery_failure is not None:
+            return recovery_failure, permission_failure
+        mode_lease = finish_first_release_mode_lease(candidate, work, report, stages["crashRecovery"]["desktopModeLease"])
+    elif first_release is None:
         mode_lease = check_mode_lease(candidate, work, report, profile=desktop_profile)
     else:
         desktop = stages["firstBusinessInstall"]["stages"]["reopen-without-mail"]
@@ -84,41 +105,36 @@ def exercise_desktop_contracts(candidate, desktop_profile, stages, args, identit
     if system == "Darwin":
         try:
             stages["candidatePermissions"] = observe_permissions(
-                candidate, report, "candidate", work=work if first_release is not None else None,
+                candidate, report, "candidate", work=work, screenshot_only=first_release is None,
             )
-            if permission_failure is None:
-                stages["permissionContinuity"] = compare_permissions(
-                    stages["originalPermissions"], stages["candidatePermissions"],
-                )
         except Exception as error:
             permission_failure = permission_failure or error
             stages["candidatePermissions"] = {"error": str(error)}
-    recovery_failure = None
-    try:
-        stages["crashRecovery"] = verify_crash_recovery(
-            candidate, Path(mode_lease["profile"]), args.signed.resolve(strict=True) if args.signed else None,
-            identity["producerSource"], report, work, macos_hardened_mfa=args.macos_hardened_mfa,
-            first_release=first_release,
-        )
-    except Exception as error:
-        # Preserve rollback evidence after the hosted crash scenario fails.
-        recovery_failure = error
-        stages["crashRecovery"] = {"passed": False, "error": str(error)}
+    if not migrate_before_launch:
+        recovery_failure = recover_mfa(Path(mode_lease["profile"]))
 
-    if system == "Darwin" and (args.macos_hardened_mfa or first_release is not None) and recovery_failure is None:
+    if system == "Darwin" and recovery_failure is None:
         try:
             stages["mfaScreenScan"] = observe_hosted_screen_scan(
-                candidate, report, stages["crashRecovery"], work=work if first_release is not None else None,
+                candidate, report, stages["crashRecovery"], work=work,
             )
         except Exception as error:
             permission_failure = permission_failure or error
             stages["mfaScreenScan"] = {"passed": False, "error": str(error)}
-    if system == "Darwin" and first_release is not None:
+    if system == "Darwin":
         try:
             stages["mobileDesktop"] = observe_mobile(candidate, work, report, identity["producerSource"])
         except Exception as error:
             permission_failure = permission_failure or error
             stages["mobileDesktop"] = {"passed": False, "error": str(error)}
+        if permission_failure is None:
+            candidate_permissions = stages["candidatePermissions"]
+            if first_release is None:
+                mobile = stages["mobileDesktop"]
+                if mobile["installedBinarySha256"] != candidate_permissions["binarySha256"]:
+                    return recovery_failure, RuntimeError("The Mobile input and Screen Recording checks used different installed binaries")
+                candidate_permissions = {**candidate_permissions, "accessibility": mobile["accessibility"]}
+            stages["permissionContinuity"] = compare_permissions(stages["originalPermissions"], candidate_permissions)
     return recovery_failure, permission_failure
 
 
@@ -172,17 +188,18 @@ def execute(args):
     try:
         if args.first_release:
             origin = installed_first_release.open_release(args.first_release.resolve(strict=True), identity, report)
-            if system == "Windows":
-                enable_defender(report)
+        if system == "Windows":
+            enable_defender(report)
+            desktop_profile = profile if origin else reserve_default_profile(report)
         old_binary, stages["original"] = install(old_package, slot, report / "original", old_version)
         if origin:
             measure_core("original", old_binary)
         initialize_profile(old_binary, profile, work, report, "original-start")
         insert_business_rows(profile, input_sessions(True))
         expected_rows = session_rows(profile)
-        if origin and system == "Windows":
+        if system == "Windows":
             from installed_windows_store import seed
-            seed(old_binary, work, report, profile)
+            seed(old_binary, work, report, desktop_profile)
         elif origin:
             seed_legacy_desktop(ctx, old_binary, work / "desktop", report, profile,
                                 catalog_source=f"{installed_first_release.ORIGIN}/{origin.start_catalog}",
@@ -197,6 +214,8 @@ def execute(args):
             except Exception as error:
                 permission_failure = error
                 stages["originalPermissions"] = {"error": str(error)}
+            if not origin:
+                seed_legacy_desktop(ctx, old_binary, work / "desktop", report, desktop_profile, environment=environment)
 
         # The old macOS desktop opens LanChat SQLite in WAL mode during its permissions check.
         # Snapshot the historical files after the last legacy desktop run.
@@ -266,7 +285,7 @@ def execute(args):
         continuity = stages.get("permissionContinuity")
         if continuity and continuity["lostGrants"]:
             raise RuntimeError("The installed upgrade lost a previously granted macOS permission")
-        if origin and system == "Darwin" and not (continuity and continuity["retainedBothGrants"]):
+        if system == "Darwin" and not (continuity and continuity["retainedBothGrants"]):
             raise RuntimeError("The installed upgrade did not establish both macOS grants under the same identity")
         if resource_failures:
             raise RuntimeError(f"Installed core resource samples are incomplete: {resource_failures}")

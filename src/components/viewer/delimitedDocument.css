@@ -1,0 +1,52 @@
+.delimited-document {
+  min-width: 0;
+  min-height: 0;
+  color: var(--taomni-text);
+  background: var(--taomni-panel-bg);
+  font-size: var(--taomni-fs-body);
+}
+.delimited-document .fv-toolbar {
+  display: flex;
+  align-items: center;
+  gap: .5em;
+  flex-wrap: wrap;
+  padding: .4em .7em;
+}
+.delimited-document .fv-toolbar strong {
+  overflow-wrap: anywhere;
+}
+.delimited-document button {
+  padding: .25em .6em;
+  min-height: max(24px, 2em);
+}
+.delimited-status {
+  padding: .25em .7em;
+  color: var(--taomni-text-muted);
+}
+.delimited-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.delimited-scroll:focus-visible, .delimited-document button:focus-visible {
+  outline: 2px solid var(--taomni-accent);
+  outline-offset: -2px;
+}
+.delimited-scroll table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+.delimited-scroll td, .delimited-scroll th {
+  padding: .25em .65em;
+  max-width: 50ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+  border: 1px solid var(--taomni-divider);
+}
+.delimited-scroll th {
+  color: var(--taomni-text-muted);
+  font-weight: normal;
+  text-align: right;
+}

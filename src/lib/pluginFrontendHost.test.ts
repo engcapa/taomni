@@ -58,6 +58,27 @@ describe("shared module host and activation-scoped requests", () => {
     expect(mocks.cancel).toHaveBeenCalledTimes(1);
   });
 
+  it("releases an active tab's resources once without cancelling the cleanup RPC", () => {
+    mocks.invoke.mockResolvedValue(null);
+    const api = createPluginFrontendApi("taoffice-excel", () => true);
+    const close = api.deferCleanup!("workbook/close", { id: "session" });
+    api.dispose();
+    close();
+    expect(mocks.invoke).toHaveBeenCalledExactlyOnceWith(
+      "taoffice-excel", "workbook/close", { id: "session" }, { requestId: expect.any(String) },
+    );
+    expect(mocks.cancel).not.toHaveBeenCalled();
+  });
+
+  it("leaves resource cleanup to the host when the module activation has ended", () => {
+    let current = true;
+    const api = createPluginFrontendApi("taoffice-excel", () => current);
+    api.deferCleanup!("workbook/close", { id: "previous" });
+    current = false;
+    api.dispose();
+    expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+
   it("retains structured native RPC codes and readable recovery advice, then permits a fresh request", async () => {
     const rejection = { code: -32004, message: "MODULE_HOST_NOEXEC: choose an executable XDG_DATA_HOME", data: { retryable: true } };
     mocks.invoke.mockRejectedValueOnce(rejection).mockResolvedValueOnce({ values: ["preserved"] });

@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -9,6 +9,40 @@ import { listStableModules } from "./release-version-utils.mjs";
 
 const repoRoot = join(import.meta.dirname, "..");
 const workflow = readFileSync(new URL("../.github/workflows/release-modules.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+
+test("release planning accepts a renderer without Cargo and builds a declared host", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "taomni-module-source-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const source = workflow.split("Inspect the stable module manifest and build targets")[1]
+    .split("python - <<'PY'\n")[1].split("\n          PY\n")[0].replace(/^ {10}/gm, "");
+  const directory = join(root, "src-tauri/plugins/reader");
+  mkdirSync(directory, { recursive: true });
+  const manifest = { id: "taomni-plugin-reader", slug: "reader", status: "stable", version: "1.0.0",
+    description: "Document reader", platforms: ["windows-x86_64"], entry: { frontend: "frontend/index.js" } };
+  const output = join(root, "outputs");
+  const gitDir = spawnSync("git", ["rev-parse", "--absolute-git-dir"], { encoding: "utf8" }).stdout.trim();
+  const plan = () => {
+    writeFileSync(join(directory, "module.json"), JSON.stringify(manifest));
+    writeFileSync(output, "");
+    return spawnSync(process.platform === "win32" ? "python" : "python3", ["-"], {
+      input: source, encoding: "utf8", cwd: root, env: { ...process.env, GIT_DIR: gitDir,
+        GITHUB_OUTPUT: output, MODULE_SLUG: "reader", RELEASE_TAG: "v1.0.0", PACKAGE_ONLY: "false",
+        MACOS_RUNNER: "macos-15", REHEARSAL_BASELINE_RUN: "", BASELINE_TAG: "v0.6.0" },
+    });
+  };
+  const renderer = plan();
+  assert.equal(renderer.status, 0, renderer.stderr);
+  assert.match(readFileSync(output, "utf8"), /^package=$/m);
+  assert.match(workflow, /Build the module host without signing credentials\n\s+if: needs.source.outputs.package != ''/);
+  manifest.entry = {};
+  assert.match(plan().stderr, /host or frontend entry/);
+  manifest.entry = { host: "reader" };
+  assert.notEqual(plan().status, 0);
+  writeFileSync(join(directory, "Cargo.toml"), '[package]\nname = "reader"\n');
+  const native = plan();
+  assert.equal(native.status, 0, native.stderr);
+  assert.match(readFileSync(output, "utf8"), /^package=reader$/m);
+});
 
 test("workflow_dispatch module input offers a dropdown matching every stable module", () => {
   const dispatchSection = workflow.split("  workflow_call:\n")[0];
@@ -31,6 +65,10 @@ test("module-only release builds every declared target and never invokes the cor
 });
 
 test("reusable packaging keeps independent artifact names and skips standalone publication", () => {
+  const reusable = workflow.split("  workflow_call:\n")[1];
+  const moduleBlock = reusable.split("      module:\n")[1].split("      head:\n")[0];
+  assert.match(moduleBlock, /^        type: string$/m);
+  assert.doesNotMatch(moduleBlock, /^        options:/m);
   assert.match(workflow, /module-unsigned-\$\{\{ needs\.source\.outputs\.slug \}\}-/);
   assert.match(workflow, /module-signed-\$\{\{ needs\.source\.outputs\.slug \}\}-/);
   assert.match(workflow, /release-desktop-frontend-\$\{\{ needs\.source\.outputs\.slug \}\}-/);
