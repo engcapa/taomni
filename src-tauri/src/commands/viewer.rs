@@ -3,7 +3,7 @@ use crate::state::AppState;
 use crate::viewer::{
     self, BytesData, FileStat, HtmlSession, SavedImage, TempFile, TextChunk, TextData, WriteAck,
 };
-use tauri::{Manager, State};
+use tauri::{Manager, State, Window};
 
 async fn on_worker<T: Send + 'static>(
     operation: impl FnOnce() -> Result<T, String> + Send + 'static,
@@ -90,6 +90,7 @@ async fn viewer_document_save_copy(
     slug: String,
     version: String,
     bytes: Vec<u8>,
+    window: Window,
     state: State<'_, AppState>,
 ) -> Result<Option<String>, String> {
     let registry = state.plugins.clone();
@@ -99,9 +100,7 @@ async fn viewer_document_save_copy(
         let source =
             viewer::document_access::approved_path(&registry, &protected, &path, &slug, &version)?;
         viewer::document_copy::validate(&source, &bytes)?;
-        let name = viewer::document_copy::suggested_name(&source)?;
-        let parent = source.parent().map(viewer::display_path);
-        let Some(selected) = crate::config::select_save_file_path(Some(name), parent)? else {
+        let Some(selected) = viewer::document_copy::select_destination(&window, &source)? else {
             return Ok(None);
         };
         let source =

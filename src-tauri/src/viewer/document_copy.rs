@@ -2,6 +2,8 @@ use super::document_access::reject_profile_paths;
 use super::paths::{ScopedRoot, absolute, display, file_name, io_error};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use tauri::Window;
+use tauri_plugin_dialog::DialogExt;
 
 const MAX_COPY_BYTES: usize = 32 * 1024 * 1024;
 
@@ -15,7 +17,7 @@ pub(crate) fn validate(source: &Path, bytes: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn suggested_name(source: &Path) -> Result<String, String> {
+fn suggested_name(source: &Path) -> Result<String, String> {
     let base = source
         .file_stem()
         .and_then(|name| name.to_str())
@@ -25,6 +27,25 @@ pub(crate) fn suggested_name(source: &Path) -> Result<String, String> {
         .and_then(|ext| ext.to_str())
         .ok_or("Missing document extension")?;
     Ok(format!("{base} - copy.{extension}"))
+}
+
+pub(crate) fn select_destination(window: &Window, source: &Path) -> Result<Option<String>, String> {
+    let name = suggested_name(source)?;
+    let parent = source.parent().ok_or("Missing document directory")?;
+    let selected = window
+        .dialog()
+        .file()
+        .set_parent(window)
+        .set_title("Save as")
+        .set_directory(parent)
+        .set_file_name(name)
+        .blocking_save_file();
+    selected
+        .map(|file| {
+            let path = file.into_path().map_err(|error| error.to_string())?;
+            Ok(display(&path))
+        })
+        .transpose()
 }
 
 pub(crate) fn write(
