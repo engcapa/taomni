@@ -122,8 +122,8 @@ steps:
     expression: document.activeElement.value === ""
     expect_truthy: true
 - press: {selector: '[data-testid="taoffice-pdf-password"]', key: Escape}
-- wait_for: '[data-testid="taoffice-pdf-password-open"]'
-- assert_count: {selector: '[data-testid="taoffice-pdf-password"]', equal: 0}
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-pdf-password"]', state: detached}
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-pdf-password-open"]'
 - click: '[data-testid="taoffice-pdf-password-open"]'
 - fill: {selector: '[data-testid="taoffice-pdf-password"]', value: open-report}
 - click: '[data-testid="taoffice-pdf-unlock"]'
