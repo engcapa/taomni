@@ -15,6 +15,7 @@ fn mailbox(root: &Path, account: &str) -> LegacyMailbox {
         account_id: account.to_owned(),
         database: root.join(format!("{}.db", mail_db_file_stem(account))),
         pop3: false,
+        preserve_in_place: false,
     }
 }
 
@@ -70,6 +71,7 @@ fn captures_wal_and_originals_from_custom_storage_without_changing_the_source() 
         account_id: "unused".into(),
         database: default_root.join(format!("{}.db", mail_db_file_stem("unused"))),
         pop3: false,
+        preserve_in_place: false,
     };
     let staged = StagedMailData::prepare(
         staging.path(),
@@ -406,4 +408,70 @@ fn imap_owner_receipt_selects_complete_module_data_and_survives_missing_legacy_c
     assert!(crate::imap_ownership::database(&directory, ACCOUNT).is_err());
     assert!(handle.lock().is_err());
     assert!(!elsewhere.exists());
+}
+
+#[test]
+fn preserves_custom_storage_mailbox_in_place_without_copying_archives() {
+    let custom = tempfile::tempdir().unwrap();
+    let staging = tempfile::tempdir().unwrap();
+    let custom_root = custom.path().canonicalize().unwrap();
+    let mut custom_mailbox = mailbox(&custom_root, ACCOUNT);
+    custom_mailbox.preserve_in_place = true;
+    let db = Connection::open(&custom_mailbox.database).unwrap();
+    init_mail_tables(&db).unwrap();
+    upsert_message(
+        &db,
+        &parse_body_message(ACCOUNT, "INBOX", 3, None, ORIGINAL, 2048),
+    )
+    .unwrap();
+    let stored = storage::store(&db, ACCOUNT, "INBOX", 3, 1, ORIGINAL).unwrap();
+    drop(db);
+    let stem = mail_db_file_stem(ACCOUNT);
+    let attachments = PathBuf::from("attachments").join(&stem).join("INBOX");
+    fs::create_dir_all(custom_root.join(&attachments)).unwrap();
+    fs::write(custom_root.join(attachments.join("3-1.bin")), b"attachment").unwrap();
+    let db_before = fs::read(&custom_mailbox.database).unwrap();
+    let object = object_path(
+        &custom_root.join(format!("{stem}.mail")),
+        &stored.hash,
+    )
+    .unwrap();
+    let object_before = fs::read(&object).unwrap();
+
+    let staged = StagedMailData::prepare(
+        staging.path(),
+        &[custom_mailbox],
+        HostedMailboxData::ALL,
+        &control(),
+    )
+    .unwrap();
+    assert_eq!(staged.mailbox_count(), 0);
+    assert_eq!(staged.data().read_dir().unwrap().count(), 0);
+    assert!(
+        crate::imap_ownership::database(&staged.data(), ACCOUNT)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(fs::read(custom_root.join(format!("{stem}.db"))).unwrap(), db_before);
+    assert_eq!(fs::read(&object).unwrap(), object_before);
+
+    let broken_name = format!("{}.db", mail_db_file_stem("broken-link"));
+    let missing_target = custom_root.join(&broken_name);
+    let elsewhere = custom_root.join("missing-dir").join(&broken_name);
+    crate::database::write_redirect(&missing_target, &elsewhere).unwrap();
+    let broken_redirect = LegacyMailbox {
+        account_id: "broken-link".into(),
+        database: missing_target,
+        pop3: false,
+        preserve_in_place: true,
+    };
+    let error = StagedMailData::prepare(
+        staging.path(),
+        &[broken_redirect],
+        HostedMailboxData::ALL,
+        &control(),
+    )
+    .err()
+    .unwrap();
+    assert!(error.contains("relocation target is missing"), "{error}");
 }

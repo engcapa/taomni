@@ -21,6 +21,7 @@ pub struct LegacyMailbox {
     pub account_id: String,
     pub database: PathBuf,
     pub pop3: bool,
+    pub preserve_in_place: bool,
 }
 
 /// A core-only upgrade can retain an older signed Mail host. Only hand it
@@ -84,6 +85,7 @@ impl StagedMailData {
             }
         }
         sync_directories(&target, control)?;
+        sync_filesystem(&target)?;
         Ok(Self {
             directory,
             mailbox_count,
@@ -109,6 +111,10 @@ fn stage_account(
     let filename = format!("{stem}.db");
     if mailbox.database.file_name() != Some(OsStr::new(&filename)) {
         return Err("Legacy Mail source does not belong to the account".into());
+    }
+    if mailbox.preserve_in_place {
+        let _ = resolve_database(&mailbox.database, &filename, control)?;
+        return Ok(false);
     }
     let owns_imap = hosted.imap_cache && !mailbox.pop3;
     let Some(source) = resolve_database(&mailbox.database, &filename, control)? else {
@@ -302,10 +308,7 @@ fn copy_originals(
             }
         }
         let staged = object_path(&target, &hash)?;
-        copy_file(&previous, &staged, control)?;
-        verify_message_with(open_file(&staged)?, &hash, raw_size, io::sink(), || {
-            check(control)
-        })?;
+        copy_and_verify_original(&previous, &staged, &hash, raw_size, control)?;
     }
     Ok(())
 }
@@ -382,6 +385,52 @@ pub fn legacy_attachment(
     }
 }
 
+struct TeeReader<R, W> {
+    reader: R,
+    writer: W,
+}
+
+impl<R: Read, W: Write> Read for TeeReader<R, W> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let count = self.reader.read(buf)?;
+        if count > 0 {
+            self.writer.write_all(&buf[..count])?;
+        }
+        Ok(count)
+    }
+}
+
+fn copy_and_verify_original(
+    source: &Path,
+    target: &Path,
+    hash: &str,
+    expected: u64,
+    control: &SnapshotControl,
+) -> Result<(), String> {
+    let input = open_file(source)?;
+    let parent = target.parent().ok_or("Invalid Mail staging path")?;
+    fs::create_dir_all(parent).map_err(string_error)?;
+    let output = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(target)
+        .map_err(string_error)?;
+    let mut tee = TeeReader {
+        reader: input,
+        writer: io::BufWriter::with_capacity(64 * 1024, output),
+    };
+    verify_message_with(&mut tee, hash, expected, io::sink(), || check(control))?;
+    let mut tail = [0_u8; 64 * 1024];
+    loop {
+        check(control)?;
+        let read = tee.read(&mut tail).map_err(string_error)?;
+        if read == 0 {
+            break;
+        }
+    }
+    tee.writer.flush().map_err(string_error)
+}
+
 fn copy_file(source: &Path, target: &Path, control: &SnapshotControl) -> Result<(), String> {
     let mut input = open_file(source)?;
     let parent = target.parent().ok_or("Invalid Mail staging path")?;
@@ -400,7 +449,7 @@ fn copy_file(source: &Path, target: &Path, control: &SnapshotControl) -> Result<
         }
         output.write_all(&buffer[..read]).map_err(string_error)?;
     }
-    output.sync_all().map_err(string_error)
+    output.flush().map_err(string_error)
 }
 
 fn check(control: &SnapshotControl) -> Result<(), String> {
@@ -486,6 +535,23 @@ fn sync_directories(path: &Path, control: &SnapshotControl) -> Result<(), String
     #[cfg(not(unix))]
     let _ = path;
     check(control)
+}
+
+fn sync_filesystem(path: &Path) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::fd::AsRawFd;
+        let dir = File::open(path).map_err(string_error)?;
+        // Flush staged Mail objects and directory entries once instead of
+        // calling fsync on thousands of individual immutable files.
+        let status = unsafe { libc::syncfs(dir.as_raw_fd()) };
+        if status != 0 {
+            return Err(io::Error::last_os_error().to_string());
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = path;
+    Ok(())
 }
 
 #[cfg(all(test, feature = "mime-parse"))]

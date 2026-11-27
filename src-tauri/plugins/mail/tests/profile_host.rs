@@ -366,6 +366,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
             account_id: ACCOUNT.into(),
             database: source.clone(),
             pop3: true,
+            preserve_in_place: false,
         }],
         taomni_mail_engine::migration::HostedMailboxData::ALL,
         &SnapshotControl::with_timeout(WAIT),

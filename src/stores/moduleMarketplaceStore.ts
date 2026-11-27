@@ -84,6 +84,11 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
         if (field === "legacyPending") {
           release.legacyRestartRequired = release.legacyRestartRequired?.filter((current) => current !== id);
           release.legacyImportFailed = release.legacyImportFailed?.filter((current) => current !== id);
+          if (release.legacyImportErrors) {
+            const nextErrors = { ...release.legacyImportErrors };
+            delete nextErrors[id];
+            release.legacyImportErrors = nextErrors;
+          }
         }
         return { catalog: { ...catalog, release } };
       });
@@ -171,6 +176,8 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
               const catalog = state.catalog;
               const release = catalog?.release;
               if (!catalog || !release || !matchesSelection(catalog, selection)) return state;
+              const nextErrors = release.legacyImportErrors ? { ...release.legacyImportErrors } : undefined;
+              if (nextErrors) delete nextErrors[id];
               return {
                 catalog: {
                   ...catalog,
@@ -178,6 +185,7 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
                     ...release,
                     legacyRestartRequired: [...new Set([...(release.legacyRestartRequired ?? []), id])],
                     legacyImportFailed: release.legacyImportFailed?.filter((current) => current !== id),
+                    ...(nextErrors ? { legacyImportErrors: nextErrors } : {}),
                   },
                 },
               };

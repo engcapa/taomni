@@ -103,6 +103,7 @@ export interface ModuleReleasePlan {
   legacyPending: string[];
   legacyRestartRequired?: string[];
   legacyImportFailed?: string[];
+  legacyImportErrors?: Record<string, string>;
   updates: string[];
   newModules: string[];
 }

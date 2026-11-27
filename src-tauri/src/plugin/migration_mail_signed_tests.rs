@@ -76,10 +76,10 @@ fn signed_mail_upgrade_starts_the_installed_host_with_retained_migrated_data() {
         cached_mail(&profile.join("mail-cache"), "default", "old default inbox"),
         cached_mail(&custom_root, "custom", "old custom inbox"),
     ];
-    let raw = b"Subject: Migrated archive\r\n\r\nOriginal from custom storage\r\n";
-    let db = Connection::open(&caches[1]).unwrap();
-    let saved = storage::store(&db, "custom", "INBOX", 9, 1, raw.as_slice()).unwrap();
-    let object = storage::account_root(&db, "custom")
+    let raw = b"Subject: Migrated archive\r\n\r\nOriginal from default storage\r\n";
+    let db = Connection::open(&caches[0]).unwrap();
+    let saved = storage::store(&db, "default", "INBOX", 9, 1, raw.as_slice()).unwrap();
+    let object = storage::account_root(&db, "default")
         .unwrap()
         .join("objects")
         .join(&saved.hash[..2])
@@ -114,6 +114,13 @@ fn signed_mail_upgrade_starts_the_installed_host_with_retained_migrated_data() {
     assert_eq!(fs::read(&object).unwrap(), replacement);
     fs::write(&object, &original).unwrap();
 
+    // Opening while failed does not stall or retry automatically until resumed.
+    let paused = VaultHarness::open(root);
+    assert_eq!(provision::queued_failure(&profile).unwrap(), Some(true));
+    assert!(active_version(&profile).is_none());
+    assert!(provision::queue(&profile, &package).unwrap());
+    let root = close_profile(paused);
+
     let state = VaultHarness::open(root);
     assert!(!provision::queued(&profile).unwrap());
     let journal = MigrationJournal::load(&profile.join("migration/journal.json")).unwrap();
@@ -122,66 +129,91 @@ fn signed_mail_upgrade_starts_the_installed_host_with_retained_migrated_data() {
     state.registry.scan().unwrap();
     state.registry.set_enabled(OWNER, true).unwrap();
     let runtime = crate::state::MailRuntime::new(&profile);
-    for (account, expected) in [
-        ("default", "old default inbox"),
-        ("custom", "Original from custom storage"),
-    ] {
-        let target = profile.join(MAIL_MIGRATION_TARGET);
-        assert_eq!(
-            state
-                .registry
-                .invoke(
-                    OWNER,
-                    taomni_mail_api::IMAP_MAILBOX_OWNER,
-                    json!({"accountId": account})
-                )
-                .unwrap(),
-            json!(true)
-        );
-        let handle = runtime
-            .database(&state.registry, account, || {
-                panic!("do not load the old path")
-            })
-            .unwrap();
-        assert_eq!(
-            Path::new(handle.lock().unwrap().path().unwrap())
-                .canonicalize()
-                .unwrap()
-                .parent()
-                .unwrap(),
-            target
-        );
-        let value = state
+    let target = profile.join(MAIL_MIGRATION_TARGET);
+    assert_eq!(
+        state
             .registry
             .invoke(
                 OWNER,
-                "mail_get_cached_body",
-                json!({"accountId":account,"folder":"INBOX","uid":9}),
+                taomni_mail_api::IMAP_MAILBOX_OWNER,
+                json!({"accountId": "default"})
             )
-            .unwrap();
-        assert!(value["text"].as_str().unwrap().contains(expected));
-        let drafts = state
-            .registry
-            .invoke(OWNER, "mail_list_drafts", json!({"accountId": account}))
-            .unwrap();
-        assert_eq!(drafts[0]["subject"], format!("Legacy {account} draft"));
-        assert_eq!(drafts[0]["remoteDraftUid"], 9);
-        assert_eq!(
-            drafts[0]["replyContext"]["outbox"]["sendAt"],
-            4102444800_i64
-        );
-        let contacts = state
+            .unwrap(),
+        json!(true)
+    );
+    let handle = runtime
+        .database(&state.registry, "default", || {
+            panic!("do not load the old path")
+        })
+        .unwrap();
+    assert_eq!(
+        Path::new(handle.lock().unwrap().path().unwrap())
+            .canonicalize()
+            .unwrap()
+            .parent()
+            .unwrap(),
+        target
+    );
+    let value = state
+        .registry
+        .invoke(
+            OWNER,
+            "mail_get_cached_body",
+            json!({"accountId":"default","folder":"INBOX","uid":9}),
+        )
+        .unwrap();
+    assert!(
+        value["text"]
+            .as_str()
+            .unwrap()
+            .contains("Original from default storage")
+    );
+    let drafts = state
+        .registry
+        .invoke(OWNER, "mail_list_drafts", json!({"accountId": "default"}))
+        .unwrap();
+    assert_eq!(drafts[0]["subject"], "Legacy default draft");
+    assert_eq!(drafts[0]["remoteDraftUid"], 9);
+    assert_eq!(
+        drafts[0]["replyContext"]["outbox"]["sendAt"],
+        4102444800_i64
+    );
+    let contacts = state
+        .registry
+        .invoke(
+            OWNER,
+            "mail_search_contacts",
+            json!({"accountId":"default","query":"legacy"}),
+        )
+        .unwrap();
+    assert_eq!(contacts.as_array().unwrap().len(), 1);
+    assert_eq!(contacts[0]["source"], "addressBook");
+    assert_eq!(contacts[0]["email"], "default@example.com");
+
+    assert_eq!(
+        state
             .registry
             .invoke(
                 OWNER,
-                "mail_search_contacts",
-                json!({"accountId":account,"query":"legacy"}),
+                taomni_mail_api::IMAP_MAILBOX_OWNER,
+                json!({"accountId": "custom"})
             )
-            .unwrap();
-        assert_eq!(contacts.as_array().unwrap().len(), 1);
-        assert_eq!(contacts[0]["source"], "addressBook");
-        assert_eq!(contacts[0]["email"], format!("{account}@example.com"));
-    }
+            .unwrap(),
+        json!(false)
+    );
+    let custom_handle = runtime
+        .database(&state.registry, "custom", || {
+            Ok(Some(
+                json!({"mailStorageDirectory": custom_root}).to_string(),
+            ))
+        })
+        .unwrap();
+    assert_eq!(
+        Path::new(custom_handle.lock().unwrap().path().unwrap())
+            .canonicalize()
+            .unwrap(),
+        caches[1]
+    );
     state.registry.shutdown().unwrap();
     let root = close_profile(state);
 
@@ -202,10 +234,23 @@ fn signed_mail_upgrade_reuses_data_restored_before_first_activation() {
     let profile = temp.path().canonicalize().unwrap();
     let legacy_directory = profile.join("legacy-custom");
     legacy_profile(&profile, &legacy_directory);
+    let main_db = Connection::open(profile.join("taomni.db")).unwrap();
+    main_db
+        .execute(
+            "INSERT INTO sessions VALUES ('secondary', 'Mail', '{}', 'legacy-secret')",
+            [],
+        )
+        .unwrap();
+    drop(main_db);
     let legacy = cached_mail(
         &profile.join("mail-cache"),
         "default",
         "current legacy inbox",
+    );
+    let legacy_secondary = cached_mail(
+        &profile.join("mail-cache"),
+        "secondary",
+        "legacy secondary inbox",
     );
     let legacy_custom = cached_mail(&legacy_directory, "custom", "legacy custom inbox");
     let data = profile.join(MAIL_MIGRATION_TARGET);
@@ -217,6 +262,7 @@ fn signed_mail_upgrade_reuses_data_restored_before_first_activation() {
     )
     .unwrap();
     let old_bytes = fs::read(&legacy).unwrap();
+    let secondary_bytes = fs::read(&legacy_secondary).unwrap();
     let custom_bytes = fs::read(&legacy_custom).unwrap();
     let restored_bytes = fs::read(&restored).unwrap();
     let [archive, signature] = signed_mail_files();
@@ -263,13 +309,13 @@ fn signed_mail_upgrade_reuses_data_restored_before_first_activation() {
             .invoke(
                 OWNER,
                 taomni_mail_api::IMAP_MAILBOX_OWNER,
-                json!({"accountId": "custom"})
+                json!({"accountId": "secondary"})
             )
             .unwrap(),
         json!(true)
     );
     let handle = runtime
-        .database(&state.registry, "custom", || {
+        .database(&state.registry, "secondary", || {
             panic!("do not load the old path")
         })
         .unwrap();
@@ -281,9 +327,33 @@ fn signed_mail_upgrade_reuses_data_restored_before_first_activation() {
             .unwrap(),
         data
     );
+    assert_eq!(
+        state
+            .registry
+            .invoke(
+                OWNER,
+                taomni_mail_api::IMAP_MAILBOX_OWNER,
+                json!({"accountId": "custom"})
+            )
+            .unwrap(),
+        json!(false)
+    );
+    let custom_handle = runtime
+        .database(&state.registry, "custom", || {
+            Ok(Some(
+                json!({"mailStorageDirectory": legacy_directory}).to_string(),
+            ))
+        })
+        .unwrap();
+    assert_eq!(
+        Path::new(custom_handle.lock().unwrap().path().unwrap())
+            .canonicalize()
+            .unwrap(),
+        legacy_custom
+    );
     for (account, expected) in [
         ("default", "restored default inbox"),
-        ("custom", "legacy custom inbox"),
+        ("secondary", "legacy secondary inbox"),
     ] {
         let body = state
             .registry
@@ -297,6 +367,7 @@ fn signed_mail_upgrade_reuses_data_restored_before_first_activation() {
     }
     state.registry.shutdown().unwrap();
     assert_eq!(fs::read(legacy).unwrap(), old_bytes);
+    assert_eq!(fs::read(&legacy_secondary).unwrap(), secondary_bytes);
     assert_eq!(fs::read(legacy_custom).unwrap(), custom_bytes);
     assert_eq!(fs::read(restored).unwrap(), restored_bytes);
 }

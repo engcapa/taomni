@@ -245,4 +245,23 @@ describe("ModuleStorePanel", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("native enable failed");
     expect(useModuleStore.getState().records[entry.slug]).toMatchObject({ lifecycle: "installed", error: "native enable failed" });
   });
+
+  it("explains the separate MFA and Mail migration paths when both remain pending", () => {
+    const snapshot: LegacyInstallSnapshot = {
+      from_version: "0.5.13",
+      database_path: "/profile/taomni.db",
+      database_tables: ["sessions"],
+      candidates: [
+        { item: "mail-accounts", evidence: ["taomni.db"], plugin_slug: "mail" },
+        { item: "mfa", evidence: ["mfa.db"], plugin_slug: "mfa" },
+      ],
+      source_fingerprints: { "taomni.db": "sha256:test:bytes:1", "mfa.db": "sha256:mfa:bytes:1" },
+      retained_paths: [],
+      vault: null,
+    };
+    render(<ModuleStorePanel migrationSnapshot={snapshot} onMigrationExecute={vi.fn()} />);
+    expect(screen.getByTestId("module-upgrade-mfa-hint")).toHaveTextContent("Vault password");
+    expect(screen.getByTestId("module-upgrade-mail-hint")).toHaveTextContent("Official modules");
+    expect(screen.getByTestId("module-upgrade-migrate")).toBeInTheDocument();
+  });
 });
