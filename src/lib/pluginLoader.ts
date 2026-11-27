@@ -70,6 +70,7 @@ export async function loadPluginFrontend<Props = PluginFrontendProps>(
     if (importer === defaultImporter && import.meta.env.DEV && !isTauriRuntime()) {
       if (manifest.slug === "hello-plugin") url = "/src-tauri/plugins/hello-plugin/frontend/index.js";
       if (manifest.document) url = `/src-tauri/plugins/${manifest.slug}/${manifest.entry.frontend}`;
+      if (manifest.slug === "taoffice-pdf") url = `/src-tauri/plugins/${manifest.slug}/dist/${manifest.entry.frontend}`;
       if (manifest.slug === "vnc-client") url = "/src-tauri/plugins/vnc-client/renderer/VncPanel.tsx";
       if (manifest.slug === "rdp-client") url = "/src-tauri/plugins/rdp-client/renderer/RdpPanel.tsx";
       if (manifest.slug === "mail") url = "/src-tauri/plugins/mail/renderer/MailView.tsx";

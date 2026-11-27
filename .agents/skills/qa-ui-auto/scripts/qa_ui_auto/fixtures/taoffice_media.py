@@ -1,4 +1,4 @@
-"""Locate the signed media renderer that matches the checkout and native platform."""
+"""Locate a signed TaOffice renderer that matches the checkout and native platform."""
 import json
 import os
 from pathlib import Path
@@ -8,14 +8,22 @@ from .module_signed_archive import load_artifact, platform_key
 
 
 def setup(ctx):
+    _setup(ctx, "taoffice-video", "media")
+
+
+def setup_pdf(ctx):
+    _setup(ctx, "taoffice-pdf", "pdf")
+
+
+def _setup(ctx, slug, name):
     if ctx.cfg["app"]["mode"] != "native":
-        raise ValueError("The signed media package requires the native installer")
+        raise ValueError("A signed TaOffice package requires the native installer")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    variable = "QA_SIGNED_" + slug.upper().replace("-", "_") + "_ROOT"
     receipt, archive, signature, _ = load_artifact(
-        Path(os.environ["QA_SIGNED_TAOFFICE_VIDEO_ROOT"]), source, platform_key(),
-        "taoffice-video", version=None,
+        Path(os.environ[variable]), source, platform_key(), slug, version=None,
     )
-    (Path(ctx.case_dir) / "media-package.json").write_text(
+    (Path(ctx.case_dir) / f"{name}-package.json").write_text(
         json.dumps(receipt, indent=2), encoding="utf-8",
     )
-    ctx.values.update(media_archive=archive.as_posix(), media_signature=signature)
+    ctx.values.update({f"{name}_archive": archive.as_posix(), f"{name}_signature": signature})

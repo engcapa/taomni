@@ -421,6 +421,7 @@ controls:
     - '[data-testid="module-action-enable-ai-voice-local"]'
     - '[data-testid="module-action-enable-sockscap"]'
     - '[data-testid="module-action-enable-taoffice-video"]'
+    - '[data-testid="module-action-enable-taoffice-pdf"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
@@ -439,6 +440,7 @@ controls:
     - '[data-testid="module-action-disable-ai-voice-local"]'
     - '[data-testid="module-action-disable-sockscap"]'
     - '[data-testid="module-action-disable-taoffice-video"]'
+    - '[data-testid="module-action-disable-taoffice-pdf"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
@@ -16766,6 +16768,8 @@ files:
   - src-tauri/src/viewer/tiff_preview.rs
   - src/components/viewer/ArchiveViewer.tsx
   - src-tauri/plugins/taoffice-video/frontend/index.js
+  - src-tauri/plugins/taoffice-pdf/renderer/PdfViewer.jsx
+  - src-tauri/plugins/taoffice-pdf/renderer/PdfPage.jsx
   - src/lib/openFile/documentProvider.ts
   - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts
@@ -16905,6 +16909,45 @@ controls:
     kind: display
   - id: taoffice-media-retry
     selector: '[data-testid="taoffice-media-retry"]'
+    kind: interactive
+  - id: taoffice-pdf-page
+    selector: '[data-testid="taoffice-pdf-page"]'
+    kind: display
+  - id: taoffice-pdf-text
+    selector: '[data-testid="taoffice-pdf-text"]'
+    kind: display
+  - id: taoffice-pdf-page-count
+    selector: '[data-testid="taoffice-pdf-page-count"]'
+    kind: display
+  - id: taoffice-pdf-page-number
+    selector: '[data-testid="taoffice-pdf-page-number"]'
+    kind: interactive
+  - id: taoffice-pdf-next
+    selector: '[data-testid="taoffice-pdf-next"]'
+    kind: interactive
+  - id: taoffice-pdf-previous
+    selector: '[data-testid="taoffice-pdf-previous"]'
+    kind: interactive
+  - id: taoffice-pdf-zoom-in
+    selector: '[data-testid="taoffice-pdf-zoom-in"]'
+    kind: interactive
+  - id: taoffice-pdf-zoom-out
+    selector: '[data-testid="taoffice-pdf-zoom-out"]'
+    kind: interactive
+  - id: taoffice-pdf-fit
+    selector: '[data-testid="taoffice-pdf-fit"]'
+    kind: interactive
+  - id: taoffice-pdf-rotate
+    selector: '[data-testid="taoffice-pdf-rotate"]'
+    kind: interactive
+  - id: taoffice-pdf-page-error
+    selector: '[data-testid="taoffice-pdf-page-error"]'
+    kind: display
+  - id: taoffice-pdf-error
+    selector: '[data-testid="taoffice-pdf-error"]'
+    kind: display
+  - id: taoffice-pdf-retry
+    selector: '[data-testid="taoffice-pdf-retry"]'
     kind: interactive
   - id: viewer-editor
     selector: '[data-testid="viewer-editor"]'

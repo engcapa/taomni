@@ -1,6 +1,7 @@
 """Add a verified module renderer to a validated signing payload."""
 import hashlib
 import json
+import re
 from pathlib import Path
 import sys
 
@@ -15,13 +16,17 @@ SCREENSHOT_ASSETS = {
 
 def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, Path]:
     if slug not in {"rdp-client", "vnc-client", "mail", "mfa", "screenshot", "sockscap",
-                    "rdp-server", "vnc-server", "servers"}:
+                    "rdp-server", "vnc-server", "servers", "taoffice-pdf"}:
         raise ValueError("Unexpected module")
     expected = {"index.js"}
-    directories = {"screenshot-ocr"} if slug == "screenshot" else set()
-    if directories:
+    directories = set()
+    if slug == "screenshot":
+        directories.add("screenshot-ocr")
         expected.add("recorder.js")
         expected.update(f"screenshot-ocr/{name}" for name in SCREENSHOT_ASSETS)
+    if slug == "taoffice-pdf":
+        directories.update({"pdfjs", "pdfjs/cmaps", "pdfjs/iccs", "pdfjs/standard_fonts", "pdfjs/wasm"})
+        expected.update({"pdfjs/LICENSE", "pdfjs/pdf.worker.mjs"})
     if with_receipt:
         expected.add("receipt.json")
     files = {}
@@ -34,7 +39,14 @@ def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, P
         if not path.is_file():
             raise ValueError("Unexpected file in module frontend artifact")
         files[name] = path
-    if set(files) != expected:
+    pdf_asset = re.compile(
+        r"pdfjs/(cmaps|iccs|standard_fonts|wasm)/(?:LICENSE[\w.-]*|[\w.-]+\.(?:bcmap|icc|pfb|ttf|wasm|js))",
+        re.ASCII,
+    )
+    extra = set(files) - expected
+    if not expected <= set(files) or (
+        extra and (slug != "taoffice-pdf" or any(not pdf_asset.fullmatch(name) for name in extra))
+    ):
         raise ValueError("Unexpected files in module frontend artifact")
     return files
 
@@ -47,7 +59,7 @@ def frontend_receipt(files: dict[str, Path], source: str, tooling: str, slug: st
         if artifact.stat().st_size == 0:
             raise ValueError("Empty module frontend file")
     receipt = {"sourceSha": source, "toolingSha": tooling, "slug": slug, "sha256": digests["index.js"]}
-    if slug == "screenshot":
+    if slug in {"screenshot", "taoffice-pdf"}:
         receipt["files"] = digests
     return receipt
 

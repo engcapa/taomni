@@ -1487,6 +1487,19 @@
 - `[data-testid="taoffice-media-player"]` — display — F-FILEOPEN-1.taoffice-media-player
 - `[data-testid="taoffice-media-error"]` — display — F-FILEOPEN-1.taoffice-media-error
 - `[data-testid="taoffice-media-retry"]` — interactive — F-FILEOPEN-1.taoffice-media-retry
+- `[data-testid="taoffice-pdf-page"]` — display — F-FILEOPEN-1.taoffice-pdf-page
+- `[data-testid="taoffice-pdf-text"]` — display — F-FILEOPEN-1.taoffice-pdf-text
+- `[data-testid="taoffice-pdf-page-count"]` — display — F-FILEOPEN-1.taoffice-pdf-page-count
+- `[data-testid="taoffice-pdf-page-number"]` — interactive — F-FILEOPEN-1.taoffice-pdf-page-number
+- `[data-testid="taoffice-pdf-next"]` — interactive — F-FILEOPEN-1.taoffice-pdf-next
+- `[data-testid="taoffice-pdf-previous"]` — interactive — F-FILEOPEN-1.taoffice-pdf-previous
+- `[data-testid="taoffice-pdf-zoom-in"]` — interactive — F-FILEOPEN-1.taoffice-pdf-zoom-in
+- `[data-testid="taoffice-pdf-zoom-out"]` — interactive — F-FILEOPEN-1.taoffice-pdf-zoom-out
+- `[data-testid="taoffice-pdf-fit"]` — interactive — F-FILEOPEN-1.taoffice-pdf-fit
+- `[data-testid="taoffice-pdf-rotate"]` — interactive — F-FILEOPEN-1.taoffice-pdf-rotate
+- `[data-testid="taoffice-pdf-page-error"]` — display — F-FILEOPEN-1.taoffice-pdf-page-error
+- `[data-testid="taoffice-pdf-error"]` — display — F-FILEOPEN-1.taoffice-pdf-error
+- `[data-testid="taoffice-pdf-retry"]` — interactive — F-FILEOPEN-1.taoffice-pdf-retry
 - `[data-testid="viewer-editor"]` — interactive — F-FILEOPEN-1.viewer-editor
 - `[data-testid="viewer-save"]` — interactive — F-FILEOPEN-1.viewer-save
 - `[data-testid="viewer-readonly"]` — display — F-FILEOPEN-1.viewer-readonly
@@ -3026,6 +3039,7 @@
   ↳ `[data-testid="module-action-enable-ai-voice-local"]` — alias
   ↳ `[data-testid="module-action-enable-sockscap"]` — alias
   ↳ `[data-testid="module-action-enable-taoffice-video"]` — alias
+  ↳ `[data-testid="module-action-enable-taoffice-pdf"]` — alias
 - `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
 - `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
   ↳ `[data-testid="module-action-disable-mfa"]` — alias
@@ -3039,6 +3053,7 @@
   ↳ `[data-testid="module-action-disable-ai-voice-local"]` — alias
   ↳ `[data-testid="module-action-disable-sockscap"]` — alias
   ↳ `[data-testid="module-action-disable-taoffice-video"]` — alias
+  ↳ `[data-testid="module-action-disable-taoffice-pdf"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
   ↳ `[data-testid="module-action-uninstall-rdp-client"]:enabled` — alias
   ↳ `[data-testid="module-action-uninstall-rdp-server"]:enabled` — alias

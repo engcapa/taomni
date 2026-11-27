@@ -12,6 +12,7 @@ from typing import Any
 from uuid import uuid4
 
 from . import platform_workspace_root, mail_server
+from .taoffice_pdf import document as pdf_fixture
 from .explorer_files import PNG
 
 TEXT = "File open original\nSecond line\n中文\n"
@@ -85,6 +86,10 @@ def setup(ctx: Any) -> None:
             files[f"{name}.mppx"] = (
                 f'<Project xmlns="http://schemas.microsoft.com/project"><Name>{name}</Name></Project>'
             ).encode()
+    if ctx.case_id in {"TC-TAOFFICE-007", "TC-TAOFFICE-008"}:
+        files["report.pdf"] = pdf_fixture()
+        files["damaged.pdf"] = b"This is not a PDF."
+        ctx.values["taoffice_pdf_sha"] = hashlib.sha256(files["report.pdf"]).hexdigest()
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative

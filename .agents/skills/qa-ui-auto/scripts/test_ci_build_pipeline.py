@@ -138,7 +138,7 @@ class BuildPipelineTests(unittest.TestCase):
                 jobs[f'execute-{platform}-native']['needs'],
                 dependencies + [
                     'signed-mail', 'signed-screenshot', 'signed-vnc-server', 'signed-servers',
-                    'signed-voice', 'signed-sockscap', 'signed-taoffice-video', rdp_server_signer,
+                    'signed-voice', 'signed-sockscap', 'signed-taoffice-video', 'signed-taoffice-pdf', rdp_server_signer,
                 ],
             )
             self.assertIn(f'execute-{platform}-native', jobs['summarize']['needs'])

@@ -174,7 +174,7 @@ jobs:
               raise SystemExit('manifest must declare supported production release targets')
           targets = [target for target in targets if target['platform'] in declared]
           built_frontend = slug in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
-                                   'rdp-server', 'vnc-server', 'servers'}
+                                   'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf'}
           output = os.environ['GITHUB_OUTPUT']
           with open(output, 'a', encoding='utf-8') as stream:
               stream.write(f"sha={subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()}\n")

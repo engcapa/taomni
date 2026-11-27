@@ -92,6 +92,8 @@ def capabilities(cases, mode: str) -> list[str]:
     result = set()
     for case in cases:
         fixtures = set(case.fixtures)
+        if mode == "browser" and "taoffice-pdf" in case.tags:
+            result.add("taoffice-pdf")
         if mode == "native" and "mobile_service" in fixtures:
             result.add("mobile")
         if fixtures & {"ssh_required", "sftp_required"}:
@@ -132,6 +134,8 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.add("signed-local-servers")
             if "taoffice_signed_media" in fixtures:
                 result.add("signed-taoffice-video")
+            if "taoffice_signed_pdf" in fixtures:
+                result.add("signed-taoffice-pdf")
             if "module_signed_voice_archive" in fixtures:
                 result.add("signed-local-voice")
             if "module_signed_sockscap_archive" in fixtures:

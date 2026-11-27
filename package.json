@@ -93,6 +93,7 @@
     "@xterm/headless": "6.0.0",
     "autoprefixer": "^10.6.0",
     "jsdom": "^29.1.1",
+    "pdfjs-dist": "6.5.438",
     "postcss": "^8.5.28",
     "ssh2": "^1.17.0",
     "tailwindcss": "^4.3.3",

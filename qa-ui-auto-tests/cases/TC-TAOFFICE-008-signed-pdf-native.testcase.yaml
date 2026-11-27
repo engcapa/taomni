@@ -1,0 +1,33 @@
+id: TC-TAOFFICE-008
+title: Render two pages using the installed signed PDF module
+description: Install the signed PDF renderer and assets through the Module Store. Verify actual local document text, native page navigation and unchanged source bytes.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, file-open, taoffice, taoffice-pdf, native-boundary]
+fixtures: [reset_db, file_open_files, taoffice_signed_pdf]
+timeout_sec: 230
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.pdf_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.pdf_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- click: '[data-testid="module-action-enable-taoffice-pdf"]'
+- wait_for: '[data-testid="module-action-disable-taoffice-pdf"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="report.pdf"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"]'
+- assert_text: {selector: '[data-testid="taoffice-pdf-text"]', contains: Quarterly report}
+- press: {selector: '[data-testid="taoffice-pdf-next"]', key: Enter}
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-ready="true"]'
+- assert_text: {selector: '[data-testid="taoffice-pdf-text"]', contains: Revenue by region}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/report.pdf', sha256: '${fixture.taoffice_pdf_sha}'}
+- assert_no_runtime_errors: null
