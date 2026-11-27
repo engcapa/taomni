@@ -5,8 +5,18 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { listStableModules } from "./release-version-utils.mjs";
 
+const repoRoot = join(import.meta.dirname, "..");
 const workflow = readFileSync(new URL("../.github/workflows/release-modules.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+
+test("workflow_dispatch module input offers a dropdown matching every stable module", () => {
+  const dispatchSection = workflow.split("  workflow_call:\n")[0];
+  const moduleBlock = dispatchSection.split("      module:\n")[1].split("      head:\n")[0];
+  assert.match(moduleBlock, /^        type: choice$/m);
+  const options = [...moduleBlock.matchAll(/^          - (.+)$/gm)].map((match) => match[1]);
+  assert.deepEqual(options, listStableModules(repoRoot).map((mod) => mod.slug));
+});
 
 test("module-only release builds every declared target and never invokes the core release workflow", () => {
   for (const platform of ["linux-x86_64", "windows-x86_64", "darwin-aarch64", "darwin-x86_64"]) {
