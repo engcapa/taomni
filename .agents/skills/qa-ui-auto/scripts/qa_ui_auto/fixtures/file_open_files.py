@@ -135,6 +135,10 @@ def setup(ctx: Any) -> None:
     if ctx.case_id in {"TC-TAOFFICE-025", "TC-TAOFFICE-026"}:
         files["rollout-replay.webm"] = (TAOFFICE_ASSETS / "rollout-replay.webm").read_bytes()
         ctx.values["taoffice_video_sha"] = hashlib.sha256(files["rollout-replay.webm"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-027", "TC-TAOFFICE-028"}:
+        plan = (TAOFFICE_ASSETS / "shift-plan.mppx").read_bytes()
+        files["shift-plan.xml" if native else "shift-plan.mppx"] = plan
+        ctx.values["taoffice_schedule_sha"] = hashlib.sha256(plan).hexdigest()
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative

@@ -16873,6 +16873,7 @@ TC-TAOFFICE-019/020 覆盖 XLSX 表格列标题只读、数据行文字与数字
 TC-TAOFFICE-021/022 覆盖 DOCX 页面、页眉、正文混合格式和表格单元格编辑，以及共享关闭守卫、签名安装、原生另存和副本重开。
 TC-TAOFFICE-023/024 覆盖 MSPDI 任务列表及甘特条、筛选、键盘重命名、原生保存和副本重开。
 TC-TAOFFICE-025/026 覆盖 WebM 解码、键盘定位、真实播放、离开标签暂停及原始媒体摘要。
+TC-TAOFFICE-027/028 覆盖改工期、避开日历例外、更新后续任务及关键路径，并检查另存和原文件。
 
 <!-- feature
 id: F-FILEOPEN-1
@@ -17116,6 +17117,18 @@ controls:
   - id: taoffice-project-task-name
     selector: '[data-testid="taoffice-project-task-name"]'
     kind: interactive
+  - id: taoffice-project-duration
+    selector: '[data-testid="taoffice-project-duration"]'
+    kind: interactive
+  - id: taoffice-project-duration-input
+    selector: '[data-testid="taoffice-project-duration-input"]'
+    kind: interactive
+  - id: taoffice-project-recalculate
+    selector: '[data-testid="taoffice-project-recalculate"]'
+    kind: interactive
+  - id: taoffice-project-critical
+    selector: '[data-testid="taoffice-project-critical"]'
+    kind: display
   - id: taoffice-project-save
     selector: '[data-testid="taoffice-project-save"]'
     kind: interactive

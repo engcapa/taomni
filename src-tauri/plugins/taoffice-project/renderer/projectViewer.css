@@ -83,3 +83,26 @@
   height: 9px;
   transform: translateY(-50%) rotate(45deg);
 }
+
+.taoffice-project-bar[data-critical="true"] {
+  background: var(--taomni-danger);
+}
+
+.taoffice-project-critical {
+  position: relative;
+  display: inline-block;
+  padding: 2px 4px;
+  border-radius: var(--taomni-radius-sm);
+  background: var(--taomni-card-bg);
+  font-size: var(--taomni-fs-caption);
+}
+
+.taoffice-project-duration-form {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.taoffice-project-duration-form input {
+  width: 7ch;
+}

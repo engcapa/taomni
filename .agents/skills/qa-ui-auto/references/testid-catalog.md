@@ -1519,6 +1519,10 @@
 - `[data-testid="taoffice-project-filter"]` — interactive — F-FILEOPEN-1.taoffice-project-filter
 - `[data-testid="taoffice-project-rename"]` — interactive — F-FILEOPEN-1.taoffice-project-rename
 - `[data-testid="taoffice-project-task-name"]` — interactive — F-FILEOPEN-1.taoffice-project-task-name
+- `[data-testid="taoffice-project-duration"]` — interactive — F-FILEOPEN-1.taoffice-project-duration
+- `[data-testid="taoffice-project-duration-input"]` — interactive — F-FILEOPEN-1.taoffice-project-duration-input
+- `[data-testid="taoffice-project-recalculate"]` — interactive — F-FILEOPEN-1.taoffice-project-recalculate
+- `[data-testid="taoffice-project-critical"]` — display — F-FILEOPEN-1.taoffice-project-critical
 - `[data-testid="taoffice-project-save"]` — interactive — F-FILEOPEN-1.taoffice-project-save
 - `[data-testid="taoffice-project-output"]` — display — F-FILEOPEN-1.taoffice-project-output
 - `[data-testid="taoffice-pdf-form-toggle"]` — interactive — F-FILEOPEN-1.taoffice-pdf-form-toggle
