@@ -12,6 +12,16 @@ export default defineConfig({
   publicDir: false,
   plugins: [{
     name: "taoffice-pdf-assets",
+    generateBundle(_options, output) {
+      const entry = output["index.js"];
+      if (!entry || entry.type !== "chunk" || entry.imports.length || Object.keys(output).length !== 1) {
+        this.error("The PDF renderer must build as one standalone ESM entry.");
+      }
+      if (Object.keys(entry.modules).some((id) => id.replaceAll("\\", "/").includes("/node_modules/react/"))
+        || /\bprocess\.env\b/.test(entry.code)) {
+        this.error("The PDF renderer must use the host React runtime without Node globals.");
+      }
+    },
     writeBundle() {
       const destination = join(outDir, "pdfjs");
       mkdirSync(destination, { recursive: true });
@@ -39,5 +49,7 @@ export default defineConfig({
       output: { codeSplitting: false },
     },
   },
-  esbuild: { jsxFactory: "React.createElement", jsxFragment: "React.Fragment" },
+  oxc: {
+    jsx: { runtime: "classic", pragma: "React.createElement", pragmaFrag: "React.Fragment" },
+  },
 });
