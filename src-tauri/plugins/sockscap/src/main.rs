@@ -1,5 +1,7 @@
 //! Native entry for the signed SocksCap module.
 
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod settings;
 mod xray;
 

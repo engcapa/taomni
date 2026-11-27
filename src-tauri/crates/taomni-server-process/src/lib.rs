@@ -41,11 +41,19 @@ pub async fn spawn_supervised(
     let resolved = which::which(program)
         .map_err(|_| format!("{program} not found in PATH — install it to use this server"))?;
 
-    let mut child = Command::new(&resolved)
-        .args(&args)
+    let mut cmd = Command::new(&resolved);
+    cmd.args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .kill_on_drop(true)
+        .kill_on_drop(true);
+    #[cfg(windows)]
+    {
+        // Plugin hosts launch without an attached console; keep supervised tools
+        // (VNC, iperf, etc.) from popping a Windows console window.
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to spawn {}: {}", resolved.display(), e))?;
 
