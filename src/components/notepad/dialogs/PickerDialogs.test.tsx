@@ -19,7 +19,7 @@ describe("notepad custom date insertion", () => {
 });
 
 describe("Open With picker TaOffice scoping and deferred Remember", () => {
-  it("shows TaOffice (in development) only for office extensions and defers Remember until launch", () => {
+  it("offers TaOffice for Office files and remembers it when selected", () => {
     const onOpenWith = vi.fn();
     const onRemember = vi.fn();
     const onClose = vi.fn();
@@ -42,14 +42,13 @@ describe("Open With picker TaOffice scoping and deferred Remember", () => {
     fireEvent.click(screen.getByTestId("notepad-open-with-close"));
     expect(onRemember).not.toHaveBeenCalled();
 
-    // Office extension shows disabled TaOffice option; clicking an enabled handler persists Remember
     view.rerender(<PickerDialogs {...shared} modal={{ kind: "openWith", path: "/tmp/report.docx" }} />);
     const taoffice = screen.getByTestId("notepad-open-with-taoffice");
-    expect(taoffice).toBeDisabled();
-    fireEvent.click(screen.getByTestId("notepad-open-with-remember-notepad"));
+    expect(taoffice).toBeEnabled();
+    fireEvent.click(screen.getByTestId("notepad-open-with-remember-taoffice"));
     expect(onRemember).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId("notepad-open-with-notepad"));
-    expect(onRemember).toHaveBeenCalledWith("notepad");
-    expect(onOpenWith).toHaveBeenCalledWith("notepad");
+    fireEvent.click(taoffice);
+    expect(onRemember).toHaveBeenCalledWith("taoffice");
+    expect(onOpenWith).toHaveBeenCalledWith("taoffice");
   });
 });

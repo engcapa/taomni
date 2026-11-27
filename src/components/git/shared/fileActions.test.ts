@@ -74,11 +74,11 @@ describe("Git file actions", () => {
     expect(useAppStore.getState().activeSideTab).toBe("workspaces");
   });
 
-  it("previews through the shared service in the owning workspace", async () => {
+  it.each(["assets/design.svg", "archive.zip", "report.pdf", "report.docx"])("routes %s through the shared service in the owning workspace", async (path) => {
     useAppStore.setState({ activeSideTab: "workspaces" });
     useWorkspacePlatformStore.setState({ activeWorkspaceId: "preview-workspace" });
-    await select("git-file-preview", [{ repoRoot: "/repo", path: "assets/design.svg" }]);
-    expect(openFile).toHaveBeenCalledWith({ path: "/repo/assets/design.svg" }, { context: "git", mode: "taomni", workspaceId: "preview-workspace" });
+    await select("git-file-preview", [{ repoRoot: "/repo", path }]);
+    expect(openFile).toHaveBeenCalledWith({ path: `/repo/${path}` }, { context: "git", mode: "taomni", workspaceId: "preview-workspace" });
     expect(invoke).not.toHaveBeenCalled();
   });
 
@@ -97,9 +97,9 @@ it.each(["README.md", "diagram.svg", "photo.png", "page.html", "config.json", "s
   expect(action.disabled).toBe(false);
 });
 
-it.each(["archive.zip", "report.pdf", "report.docx", "file.unknown"])("disables unsupported Tao opening for %s while keeping system reveal", async (path) => {
+it("disables unsupported Tao opening while keeping system reveal", async () => {
   vi.mocked(openFile).mockClear();
-  const actions = gitFileMenuItems([{ repoRoot: "/repo", path }]);
+  const actions = gitFileMenuItems([{ repoRoot: "/repo", path: "file.unknown" }]);
   expect(actions[0].disabled).toBe(true);
   actions[0].onClick!();
   await Promise.resolve();
