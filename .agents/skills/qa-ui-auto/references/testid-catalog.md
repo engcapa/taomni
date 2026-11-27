@@ -1488,12 +1488,19 @@
 - `[data-testid="taoffice-media-player"]` — display — F-FILEOPEN-1.taoffice-media-player
 - `[data-testid="taoffice-media-error"]` — display — F-FILEOPEN-1.taoffice-media-error
 - `[data-testid="taoffice-media-retry"]` — interactive — F-FILEOPEN-1.taoffice-media-retry
+- `[data-testid="taoffice-excel"]` — display — F-FILEOPEN-1.taoffice-excel
+- `[data-testid="taoffice-excel-sheet"]` — interactive — F-FILEOPEN-1.taoffice-excel-sheet
+- `[data-testid="taoffice-excel-grid"]` — display — F-FILEOPEN-1.taoffice-excel-grid
+- `[data-testid="taoffice-excel-cell"]` — interactive — F-FILEOPEN-1.taoffice-excel-cell
+- `[data-testid="taoffice-excel-cell-address"]` — display — F-FILEOPEN-1.taoffice-excel-cell-address
+- `[data-testid="taoffice-excel-formula"]` — display — F-FILEOPEN-1.taoffice-excel-formula
+- `[data-testid="taoffice-excel-error"]` — display — F-FILEOPEN-1.taoffice-excel-error
+- `[data-testid="taoffice-pdf-page"]` — display — F-FILEOPEN-1.taoffice-pdf-page
 - `[data-testid="taoffice-pdf-form-toggle"]` — interactive — F-FILEOPEN-1.taoffice-pdf-form-toggle
 - `[data-testid="taoffice-pdf-form"]` — display — F-FILEOPEN-1.taoffice-pdf-form
 - `[data-testid="taoffice-pdf-form-field"]` — interactive — F-FILEOPEN-1.taoffice-pdf-form-field
 - `[data-testid="taoffice-pdf-save-copy"]` — interactive — F-FILEOPEN-1.taoffice-pdf-save-copy
 - `[data-testid="taoffice-pdf-copy-output"]` — display — F-FILEOPEN-1.taoffice-pdf-copy-output
-- `[data-testid="taoffice-pdf-page"]` — display — F-FILEOPEN-1.taoffice-pdf-page
 - `[data-testid="taoffice-pdf-viewport"]` — interactive — F-FILEOPEN-1.taoffice-pdf-viewport
 - `[data-testid="taoffice-pdf-find"]` — interactive — F-FILEOPEN-1.taoffice-pdf-find
 - `[data-testid="taoffice-pdf-search-input"]` — interactive — F-FILEOPEN-1.taoffice-pdf-search-input
@@ -3061,6 +3068,7 @@
   ↳ `[data-testid="module-action-enable-sockscap"]` — alias
   ↳ `[data-testid="module-action-enable-taoffice-video"]` — alias
   ↳ `[data-testid="module-action-enable-taoffice-pdf"]` — alias
+  ↳ `[data-testid="module-action-enable-taoffice-excel"]` — alias
 - `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
 - `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
   ↳ `[data-testid="module-action-disable-mfa"]` — alias
@@ -3075,6 +3083,7 @@
   ↳ `[data-testid="module-action-disable-sockscap"]` — alias
   ↳ `[data-testid="module-action-disable-taoffice-video"]` — alias
   ↳ `[data-testid="module-action-disable-taoffice-pdf"]` — alias
+  ↳ `[data-testid="module-action-disable-taoffice-excel"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
   ↳ `[data-testid="module-action-uninstall-rdp-client"]:enabled` — alias
   ↳ `[data-testid="module-action-uninstall-rdp-server"]:enabled` — alias

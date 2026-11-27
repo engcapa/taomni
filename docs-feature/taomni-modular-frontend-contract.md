@@ -32,6 +32,10 @@ PDF 0.1.4 在表单面板显示普通 AcroForm 文本、复选框和单选列表
 
 核心在求值 ESM 前安装只读的 `globalThis.__taomniHost`。模块不能打包第二份 React；共享 hooks 必须使用该对象里的 React 实例。
 
+TaOffice Excel 0.1.0 将 Calamine 放在独立宿主，通过分块 RPC 接收当前打开的 XLSX/XLSM。渲染器按工作表读取 32 行、12 列的窗口，显示缓存结果和原公式，支持键盘切换工作表和复制选区。每个工作表保留最近选中的单元格。工作簿数据随会话释放。清单的迁移和备份列表为空。TC-TAOFFICE-015 使用浏览器 RPC fixture，TC-TAOFFICE-016 使用签名包和真实工作簿验证原生解析、启用与停用。
+
+渲染器可以通过可选的 `api.deferCleanup(command, payload)` 注册当前标签的资源释放操作。回调只派发一次，仍经过模块 IPC 的命令授权。关闭标签或发生渲染错误时，核心取消在途请求并执行释放回调。模块停用或版本变化后，原生宿主随注册表生命周期释放资源。
+
 | SDK 字段 | 当前公开内容 |
 |---|---|
 | `coreApiVersion` | 与 manifest 协商的核心 API 版本 |

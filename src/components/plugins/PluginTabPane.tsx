@@ -66,7 +66,7 @@ export function PluginTabPane<Props extends object = Record<never, never>>({ tab
     }).catch((error) => {
       if (isCurrent()) setFailure({ identity, error: error instanceof Error ? error.message : String(error) });
     });
-    return () => { disposed = true; api.dispose(); };
+    return () => { api.dispose(); disposed = true; };
   }, [available, record, slug, epoch, retry, identity, importer, tab.id]);
 
   const retryLoad = () => { setRetry((value) => value + 1); void state.refresh(slug); };

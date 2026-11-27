@@ -16,6 +16,7 @@ from .taoffice_7z import archive as seven_zip_fixture
 from .taoffice_locked_pdf import document as locked_pdf_fixture
 from .taoffice_pdf import document as pdf_fixture
 from .taoffice_tar import archives as tar_fixtures, compressed_text
+from .taoffice_workbook import fixtures as workbook_fixtures
 from .explorer_files import PNG
 
 TEXT = "File open original\nSecond line\n中文\n"
@@ -118,6 +119,8 @@ def setup(ctx: Any) -> None:
         files["damaged.pdf"] = b"This is not a PDF."
         ctx.values["taoffice_pdf_sha"] = hashlib.sha256(files["report.pdf"]).hexdigest()
         ctx.values["taoffice_locked_pdf_sha"] = hashlib.sha256(files["locked.pdf"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-015", "TC-TAOFFICE-016"}:
+        files.update(workbook_fixtures(TAOFFICE_ASSETS, ctx.values))
     if ctx.case_id in {"TC-TAOFFICE-017", "TC-TAOFFICE-018"}:
         files["order-form.pdf"] = (TAOFFICE_ASSETS / "order-form.pdf").read_bytes()
         ctx.values["taoffice_pdf_form_sha"] = hashlib.sha256(files["order-form.pdf"]).hexdigest()

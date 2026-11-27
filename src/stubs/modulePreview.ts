@@ -2,6 +2,8 @@ import type { PluginManifest, PluginRecord } from "../lib/pluginRegistry";
 import voiceManifest from "../../src-tauri/plugins/ai-voice-local/module.json";
 import videoManifest from "../../src-tauri/plugins/taoffice-video/module.json";
 import pdfManifest from "../../src-tauri/plugins/taoffice-pdf/module.json";
+import excelManifest from "../../src-tauri/plugins/taoffice-excel/module.json";
+import { invokeExcelPreview } from "./excelWorkbookPreview";
 import mailManifest from "../../src-tauri/plugins/mail/module.json";
 import mfaManifest from "../../src-tauri/plugins/mfa/module.json";
 import rdpManifest from "../../src-tauri/plugins/rdp-client/module.json";
@@ -27,6 +29,7 @@ export const previewHelloManifest: PluginManifest = {
 const previewModules = [
   [videoManifest, "taoffice-video"],
   [pdfManifest, "taoffice-pdf"],
+  [excelManifest, "taoffice-excel"],
   [vncManifest, "vnc"],
   [rdpManifest, "rdp"],
   [mailManifest, "mail"],
@@ -99,6 +102,8 @@ export function invokeModulePreview(command: string, args?: Record<string, unkno
     if (args.deleteData === true) state.values = [];
   } else if (command === "plugin_rollback" && state.lifecycle !== "uninstalled" && state.previousVersion && args.version === state.previousVersion) {
     [state.version, state.previousVersion] = [state.previousVersion, state.version];
+  } else if (command === "plugin_invoke" && manifest.slug === excelManifest.slug && state.lifecycle === "enabled") {
+    return invokeExcelPreview(String(args.command), args.payload);
   } else if (command === "plugin_invoke" && manifest === previewHelloManifest && state.lifecycle === "enabled") {
     if (args.command === "hello/ping") return { pluginId: previewHelloManifest.id, version: state.version ?? previewHelloManifest.version, enabled: true };
     if (args.command === "hello/read") return { values: [...state.values] };

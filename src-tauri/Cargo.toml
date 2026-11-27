@@ -59,6 +59,7 @@ members = [
     "plugins/sockscap",
     "plugins/sockscap/tools",
     "plugins/sockscap/xray",
+    "plugins/taoffice-excel",
     "plugins/vnc-client",
     "plugins/vnc-server",
     "plugins/servers",
