@@ -1,4 +1,4 @@
-import { openMediaResource, shouldRetryAsBlob } from "./mediaResource.js";
+import { mediaSeekTarget, openMediaResource, shouldRetryAsBlob } from "./mediaResource.js";
 
 const { React, i18n } = globalThis.__taomniHost;
 const { createElement: h, useEffect, useRef, useState } = React;
@@ -15,6 +15,7 @@ export default function MediaPlayer({ document: source, active }) {
   const [resource, setResource] = useState(null);
   const [ready, setReady] = useState(false);
   const [failure, setFailure] = useState("");
+  const [playError, setPlayError] = useState("");
   const [systemError, setSystemError] = useState("");
   const media = useRef(null);
   const mime = formats[source.extension];
@@ -24,6 +25,7 @@ export default function MediaPlayer({ document: source, active }) {
     setResource(null);
     setReady(false);
     setFailure("");
+    setPlayError("");
     setSystemError("");
     openMediaResource(source, mime, attempt).then((result) => {
       if (!current) { result.close(); return; }
@@ -53,6 +55,20 @@ export default function MediaPlayer({ document: source, active }) {
         || (zh ? "当前设备无法解码此媒体。" : "The device could not decode this media."));
     }
   }
+  function handlePlayerKey(event) {
+    if (!active || !ready || event.nativeEvent.isComposing || event.metaKey || event.ctrlKey
+      || event.shiftKey || event.altKey) return;
+    const player = event.currentTarget;
+    const seek = mediaSeekTarget(player.currentTime, player.duration, event.key);
+    if (seek === null && event.key !== " ") return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (seek !== null) player.currentTime = seek;
+    else if (player.paused) {
+      setPlayError("");
+      void player.play().catch((error) => setPlayError(String(error)));
+    } else player.pause();
+  }
   const controls = { className: "taomni-btn", type: "button", style: { minHeight: "max(26px, calc(1em + 8px))", padding: "4px 8px" } };
   return h("section", { "data-testid": "taoffice-media", "aria-label": source.name,
     style: { display: "flex", flexDirection: "column", gap: ".65em", padding: ".8em", minWidth: 0, height: "100%" } },
@@ -69,10 +85,13 @@ export default function MediaPlayer({ document: source, active }) {
       systemError && h("p", { role: "alert" }, systemError))
     : h(React.Fragment, null,
       !ready && h("p", { role: "status" }, zh ? "正在读取媒体…" : "Loading media…"),
+      playError && h("p", { role: "alert" }, playError),
       resource?.attempt === attempt && h(mime.startsWith("audio/") ? "audio" : "video", { key: resource.url, ref: media, src: resource.url, controls: true,
-        playsInline: true, preload: "metadata", "aria-label": source.name, "data-testid": "taoffice-media-player",
+        playsInline: true, preload: "metadata", tabIndex: 0, "aria-label": source.name, "data-testid": "taoffice-media-player",
+        title: zh ? "空格播放或暂停，方向键快退或快进 5 秒" : "Space to play or pause. Left and Right to seek by 5 seconds.",
         "data-ready": ready, style: { width: "100%", minHeight: 0, maxHeight: "100%", objectFit: "contain" },
         onLoadedMetadata: () => setReady(true),
+        onKeyDown: handlePlayerKey,
         onError: handleMediaError,
       })));
 }

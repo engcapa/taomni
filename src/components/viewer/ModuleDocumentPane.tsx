@@ -36,7 +36,7 @@ export function ModuleDocumentPane({ viewer, active }: { viewer: FileViewerTabIn
   const id = useId();
   const state = usePluginFrontendRegistry();
   useModuleMarketplaceStore((store) => store.catalog);
-  const provider = documentProvider(viewer.path);
+  const provider = documentProvider(viewer.path, viewer.kind === "document");
   const slug = provider?.slug ?? "";
   const extension = fileExtension(viewer.path);
   const name = basename(viewer.path);

@@ -1,9 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { openMediaResource, shouldRetryAsBlob } from "../frontend/mediaResource.js";
+import { mediaSeekTarget, openMediaResource, shouldRetryAsBlob } from "../frontend/mediaResource.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("the TaOffice media resource", () => {
+  it("bounds keyboard seeks to the available duration", () => {
+    expect(mediaSeekTarget(0, 12, "ArrowRight")).toBe(5);
+    expect(mediaSeekTarget(11, 12, "ArrowRight")).toBe(12);
+    expect(mediaSeekTarget(1, 12, "ArrowLeft")).toBe(0);
+    expect(mediaSeekTarget(1, Infinity, "ArrowRight")).toBeNull();
+    expect(mediaSeekTarget(1, 12, "ArrowDown")).toBeNull();
+  });
+
   it("uses the host stream lease and retries a rejected stream only once", async () => {
     const lease = { url: "http://127.0.0.1:3333/media/example", close: vi.fn() };
     const source = { openMedia: vi.fn().mockResolvedValue(lease), read: vi.fn() };

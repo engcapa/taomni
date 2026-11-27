@@ -1,0 +1,22 @@
+{
+  "id": "taomni-plugin-taoffice-project",
+  "slug": "taoffice-project",
+  "name": "TaOffice Project",
+  "description": "Browse task schedules in Microsoft Project XML (.xml, .mppx). Edit individual task names and save a copy.",
+  "version": "0.1.0",
+  "coreApiVersion": "1",
+  "kind": "media",
+  "status": "provisional",
+  "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
+  "entry": { "frontend": "frontend/index.js", "protocol": 1 },
+  "document": { "fileKinds": ["project"], "extensions": ["mppx", "xml"] },
+  "tabs": [],
+  "commands": [],
+  "permissions": ["fs.readUserFile"],
+  "dataDir": "plugins/taoffice-project",
+  "dataSchemaVersion": 1,
+  "backupPaths": [],
+  "legacyTables": [],
+  "vaultFixedKeys": [],
+  "snapshot": "file"
+}

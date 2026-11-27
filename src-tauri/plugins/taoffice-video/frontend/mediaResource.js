@@ -10,3 +10,10 @@ export async function openMediaResource(source, mime, attempt) {
 export function shouldRetryAsBlob(attempt, url) {
   return attempt === "stream" && !url.startsWith("blob:");
 }
+
+export function mediaSeekTarget(currentTime, duration, key) {
+  if (!Number.isFinite(currentTime) || !Number.isFinite(duration) || duration < 0) return null;
+  if (key === "ArrowLeft") return Math.max(0, currentTime - 5);
+  if (key === "ArrowRight") return Math.min(duration, currentTime + 5);
+  return null;
+}

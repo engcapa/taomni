@@ -32,6 +32,7 @@ src-tauri/frameworks/
 /src-tauri/plugins/taoffice-pdf/dist/
 /src-tauri/plugins/taoffice-excel/dist/
 /src-tauri/plugins/taoffice-word/dist/
+/src-tauri/plugins/taoffice-project/dist/
 
 
 # =============================================================================

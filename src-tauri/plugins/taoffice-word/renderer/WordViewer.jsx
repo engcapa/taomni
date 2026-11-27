@@ -1,7 +1,7 @@
-import { docxPreviewBytes, MAX_DOCX_BYTES, openDocx } from "./docxPackage.js";
+import { docxPreviewBytes, MAX_DOCX_BYTES, openDocx, saveDocxCopy } from "./docxPackage.js";
 import { MAX_PARAGRAPH_LENGTH } from "./wordXml.js";
 import { renderWordPreview } from "./wordPreview.js";
-import { useWordDraft } from "./useWordDraft.js";
+import { useDocumentDraft } from "../../../crates/taomni-plugin-api/frontend/documentDraft.js";
 import styles from "./wordViewer.css?inline";
 
 const { React, i18n } = globalThis.__taomniHost;
@@ -49,7 +49,7 @@ function LoadedWord({ source, document, preview: initialPreview, active, label }
   const [previewing, setPreviewing] = useState(false);
   const toggle = useRef(null);
   const editor = useRef(null);
-  const draft = useWordDraft(source, document);
+  const draft = useDocumentDraft(source, (edits) => saveDocxCopy(document, edits));
   const canEdit = !!source.saveCopy && document.paragraphs.length > 0;
 
   useEffect(() => {
@@ -118,7 +118,7 @@ function LoadedWord({ source, document, preview: initialPreview, active, label }
         <input type="text" ref={index === 0 ? editor : undefined} data-testid="taoffice-word-paragraph"
           className="taomni-input" maxLength={MAX_PARAGRAPH_LENGTH} disabled={draft.saving}
           value={draft.edits.get(paragraph.id) ?? paragraph.text}
-          onChange={(event) => draft.edit(paragraph, event.target.value)} />
+          onChange={(event) => draft.edit(paragraph.id, event.target.value, paragraph.text)} />
       </label>)}
     </div> : <>
       {previewing && <p className="taoffice-word-feedback" role="status">{label("正在更新预览…", "Updating preview…")}</p>}

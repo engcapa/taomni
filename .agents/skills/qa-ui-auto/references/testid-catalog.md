@@ -1490,7 +1490,8 @@
 - `[data-testid="archive-preview"]` — interactive — F-FILEOPEN-1.archive-preview
 - `[data-testid="archive-output"]` — display — F-FILEOPEN-1.archive-output
 - `[data-testid="archive-error"]` — display — F-FILEOPEN-1.archive-error
-- `[data-testid="taoffice-media-player"]` — display — F-FILEOPEN-1.taoffice-media-player
+- `[data-testid="taoffice-media-player"]` — interactive — F-FILEOPEN-1.taoffice-media-player
+  ↳ `video[data-testid="taoffice-media-player"]` — alias
 - `[data-testid="taoffice-media-error"]` — display — F-FILEOPEN-1.taoffice-media-error
 - `[data-testid="taoffice-media-retry"]` — interactive — F-FILEOPEN-1.taoffice-media-retry
 - `[data-testid="taoffice-excel"]` — display — F-FILEOPEN-1.taoffice-excel
@@ -1512,6 +1513,14 @@
 - `[data-testid="taoffice-word-paragraph"]` — interactive — F-FILEOPEN-1.taoffice-word-paragraph
 - `[data-testid="taoffice-word-save"]` — interactive — F-FILEOPEN-1.taoffice-word-save
 - `[data-testid="taoffice-word-output"]` — display — F-FILEOPEN-1.taoffice-word-output
+- `[data-testid="taoffice-project-schedule"]` — display — F-FILEOPEN-1.taoffice-project-schedule
+- `[data-testid="taoffice-project-task"]` — display — F-FILEOPEN-1.taoffice-project-task
+- `[data-testid="taoffice-project-bar"]` — display — F-FILEOPEN-1.taoffice-project-bar
+- `[data-testid="taoffice-project-filter"]` — interactive — F-FILEOPEN-1.taoffice-project-filter
+- `[data-testid="taoffice-project-rename"]` — interactive — F-FILEOPEN-1.taoffice-project-rename
+- `[data-testid="taoffice-project-task-name"]` — interactive — F-FILEOPEN-1.taoffice-project-task-name
+- `[data-testid="taoffice-project-save"]` — interactive — F-FILEOPEN-1.taoffice-project-save
+- `[data-testid="taoffice-project-output"]` — display — F-FILEOPEN-1.taoffice-project-output
 - `[data-testid="taoffice-pdf-form-toggle"]` — interactive — F-FILEOPEN-1.taoffice-pdf-form-toggle
 - `[data-testid="taoffice-pdf-form"]` — display — F-FILEOPEN-1.taoffice-pdf-form
 - `[data-testid="taoffice-pdf-form-field"]` — interactive — F-FILEOPEN-1.taoffice-pdf-form-field
@@ -3096,6 +3105,7 @@
   ↳ `[data-testid="module-action-enable-taoffice-pdf"]` — alias
   ↳ `[data-testid="module-action-enable-taoffice-excel"]` — alias
   ↳ `[data-testid="module-action-enable-taoffice-word"]` — alias
+  ↳ `[data-testid="module-action-enable-taoffice-project"]` — alias
 - `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
 - `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
   ↳ `[data-testid="module-action-disable-mfa"]` — alias
@@ -3112,6 +3122,7 @@
   ↳ `[data-testid="module-action-disable-taoffice-pdf"]` — alias
   ↳ `[data-testid="module-action-disable-taoffice-excel"]` — alias
   ↳ `[data-testid="module-action-disable-taoffice-word"]` — alias
+  ↳ `[data-testid="module-action-disable-taoffice-project"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
   ↳ `[data-testid="module-action-uninstall-rdp-client"]:enabled` — alias
   ↳ `[data-testid="module-action-uninstall-rdp-server"]:enabled` — alias

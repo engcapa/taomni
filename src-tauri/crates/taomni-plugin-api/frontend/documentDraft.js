@@ -1,12 +1,10 @@
-import { saveDocxCopy } from "./docxPackage.js";
-
 const { useLayoutEffect, useRef, useState } = globalThis.__taomniHost.React;
 
 function sameEdits(first, second) {
   return first.size === second.size && [...first].every(([id, text]) => second.get(id) === text);
 }
 
-export function useWordDraft(source, document) {
+export function useDocumentDraft(source, createCopy) {
   const [edits, setEdits] = useState(() => new Map());
   const [saved, setSaved] = useState(() => new Map());
   const [saving, setSaving] = useState(false);
@@ -17,11 +15,11 @@ export function useWordDraft(source, document) {
   const latest = useRef(null);
   const dirty = !sameEdits(edits, saved);
 
-  function edit(paragraph, value) {
+  function edit(id, value, original) {
     if (task.current) return;
     const next = new Map(current.current);
-    if (paragraph.text === value) next.delete(paragraph.id);
-    else next.set(paragraph.id, value);
+    if (original === value) next.delete(id);
+    else next.set(id, value);
     current.current = next;
     setEdits(next);
     setError("");
@@ -35,7 +33,8 @@ export function useWordDraft(source, document) {
     setSaving(true);
     setError("");
     const work = Promise.resolve().then(async () => {
-      const path = await source.saveCopy(saveDocxCopy(document, snapshot));
+      const bytes = await createCopy(snapshot);
+      const path = await source.saveCopy(bytes);
       if (!path) return false;
       setSaved(snapshot);
       setOutput(path);

@@ -117,6 +117,7 @@
           "taoffice_signed_pdf",
           "taoffice_signed_excel",
           "taoffice_signed_word",
+          "taoffice_signed_project",
           "module_signed_voice_archive",
           "local_servers_http",
           "local_servers_ssh",

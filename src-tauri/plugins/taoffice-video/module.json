@@ -3,7 +3,7 @@
   "slug": "taoffice-video",
   "name": "TaOffice Media",
   "description": "Play local audio and video using the codecs available on this device.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "coreApiVersion": "1",
   "kind": "media",
   "status": "provisional",

@@ -3,10 +3,11 @@ import { useModuleMarketplaceStore } from "../../stores/moduleMarketplaceStore";
 import { classifyFile, fileExtension } from "./classifyFile";
 import { officialDocumentFormats, type DocumentProvider } from "./documentFormats";
 
-export function documentProvider(path: string): DocumentProvider | undefined {
+export function documentProvider(path: string, projectXml = false): DocumentProvider | undefined {
   const kind = classifyFile(path);
-  if (kind !== "document" && kind !== "binary" && kind !== "pdf") return;
   const extension = fileExtension(path);
+  if (extension === "xml" && projectXml) return { slug: "taoffice-project", name: "MS Project" };
+  if (kind !== "document" && kind !== "binary" && kind !== "pdf") return;
   const official = officialDocumentFormats.get(extension);
   const matches = (provider: { slug: string; document?: { extensions: string[] } }) =>
     (!official || official.slug === provider.slug) && provider.document?.extensions.includes(extension);

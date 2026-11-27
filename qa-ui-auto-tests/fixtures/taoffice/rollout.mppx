@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project xmlns="http://schemas.microsoft.com/project">
+  <Name>Product rollout</Name>
+  <StartDate>2026-12-01T08:00:00</StartDate>
+  <FinishDate>2026-12-10T17:00:00</FinishDate>
+  <Tasks>
+    <Task>
+      <UID>1</UID><ID>1</ID><Name>Rollout</Name><OutlineLevel>1</OutlineLevel><Summary>1</Summary>
+      <Start>2026-12-01T08:00:00</Start><Finish>2026-12-10T17:00:00</Finish><PercentComplete>30</PercentComplete>
+    </Task>
+    <Task>
+      <UID>2</UID><ID>2</ID><Name>Pilot review</Name><OutlineLevel>2</OutlineLevel>
+      <Start>2026-12-02T08:00:00</Start><Finish>2026-12-04T17:00:00</Finish><PercentComplete>25</PercentComplete>
+      <Notes>Keep the calendar and assignments.</Notes>
+    </Task>
+    <Task>
+      <UID>3</UID><ID>3</ID><Name>Launch gate</Name><OutlineLevel>2</OutlineLevel><Milestone>1</Milestone>
+      <Start>2026-12-10T17:00:00</Start><Finish>2026-12-10T17:00:00</Finish><PercentComplete>0</PercentComplete>
+      <PredecessorLink><PredecessorUID>2</PredecessorUID><Type>1</Type></PredecessorLink>
+    </Task>
+  </Tasks>
+  <Resources><Resource><UID>1</UID><Name>Release engineer</Name></Resource></Resources>
+  <Assignments><Assignment><UID>7</UID><TaskUID>2</TaskUID><ResourceUID>1</ResourceUID></Assignment></Assignments>
+</Project>

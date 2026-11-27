@@ -723,7 +723,7 @@ jobs:
             qa-ui-auto-report/${{ matrix.id }}/
           retention-days: 14
       - name: Identify the native platform for the official module input
-        if: inputs.operation == 'run' && matrix.mode == 'native' && (contains(matrix.capabilities, 'full-module-profile') || contains(matrix.capabilities, 'signed-module') || contains(matrix.capabilities, 'signed-mfa') || contains(matrix.capabilities, 'signed-vnc') || contains(matrix.capabilities, 'signed-rdp') || contains(matrix.capabilities, 'signed-mail') || contains(matrix.capabilities, 'signed-screenshot') || contains(matrix.capabilities, 'signed-local-vnc') || contains(matrix.capabilities, 'signed-local-rdp') || contains(matrix.capabilities, 'signed-local-servers') || contains(matrix.capabilities, 'signed-local-voice') || contains(matrix.capabilities, 'signed-sockscap') || contains(matrix.capabilities, 'signed-taoffice-video') || contains(matrix.capabilities, 'signed-taoffice-pdf') || contains(matrix.capabilities, 'signed-taoffice-excel') || contains(matrix.capabilities, 'signed-taoffice-word'))
+        if: inputs.operation == 'run' && matrix.mode == 'native' && (contains(matrix.capabilities, 'full-module-profile') || contains(matrix.capabilities, 'signed-module') || contains(matrix.capabilities, 'signed-mfa') || contains(matrix.capabilities, 'signed-vnc') || contains(matrix.capabilities, 'signed-rdp') || contains(matrix.capabilities, 'signed-mail') || contains(matrix.capabilities, 'signed-screenshot') || contains(matrix.capabilities, 'signed-local-vnc') || contains(matrix.capabilities, 'signed-local-rdp') || contains(matrix.capabilities, 'signed-local-servers') || contains(matrix.capabilities, 'signed-local-voice') || contains(matrix.capabilities, 'signed-sockscap') || contains(matrix.capabilities, 'signed-taoffice-video') || contains(matrix.capabilities, 'signed-taoffice-pdf') || contains(matrix.capabilities, 'signed-taoffice-excel') || contains(matrix.capabilities, 'signed-taoffice-word') || contains(matrix.capabilities, 'signed-taoffice-project'))
         id: module_platform
         run: |
           python - <<'PY'
@@ -747,6 +747,7 @@ jobs:
               stream.write('QA_SIGNED_TAOFFICE_PDF_ROOT=' + os.path.abspath('qa-ui-auto-report/official-taoffice-pdf-input') + '\n')
               stream.write('QA_SIGNED_TAOFFICE_EXCEL_ROOT=' + os.path.abspath('qa-ui-auto-report/official-taoffice-excel-input') + '\n')
               stream.write('QA_SIGNED_TAOFFICE_WORD_ROOT=' + os.path.abspath('qa-ui-auto-report/official-taoffice-word-input') + '\n')
+              stream.write('QA_SIGNED_TAOFFICE_PROJECT_ROOT=' + os.path.abspath('qa-ui-auto-report/official-taoffice-project-input') + '\n')
               stream.write('QA_LOCAL_VOICE_AUDIO_ROOT=' + os.path.abspath('qa-ui-auto-report/official-voice-fixture') + '\n')
           PY
       - name: Bind the first-upgrade roster to the selected release build
@@ -871,6 +872,12 @@ jobs:
         with:
           name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-taoffice-word
           path: qa-ui-auto-report/official-taoffice-word-input
+      - name: Download this invocation's signed TaOffice Project module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-taoffice-project')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-taoffice-project
+          path: qa-ui-auto-report/official-taoffice-project-input
       - name: Download this invocation's signed SocksCap module
         if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-sockscap')
         uses: ./.github/actions/qa-download-artifact
@@ -910,6 +917,9 @@ jobs:
       - name: Build the TaOffice Word module for browser preview
         if: inputs.operation == 'run' && matrix.mode == 'browser' && contains(matrix.capabilities, 'taoffice-word')
         run: pnpm exec vite build --config src-tauri/plugins/taoffice-word/vite.config.ts
+      - name: Build the TaOffice Project module for browser preview
+        if: inputs.operation == 'run' && matrix.mode == 'browser' && contains(matrix.capabilities, 'taoffice-project')
+        run: pnpm exec vite build --config src-tauri/plugins/taoffice-project/vite.config.ts
       - name: Run selected cases (Linux Xvfb desktop)
         if: (runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'xvfb') && inputs.operation == 'run'
         env:

@@ -1,0 +1,85 @@
+.taoffice-project,
+.taoffice-project-schedule {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.taoffice-project-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--taomni-divider);
+}
+
+.taoffice-project-toolbar h2 {
+  flex: 1;
+  font-weight: 600;
+  font-size: var(--taomni-fs-title);
+}
+
+.taoffice-project > p,
+.taoffice-project-schedule > p {
+  margin: 8px;
+  overflow-wrap: anywhere;
+}
+
+.taoffice-project-scroll {
+  overflow: auto;
+}
+
+.taoffice-project-table {
+  width: 100%;
+  border-spacing: 0;
+  font-size: var(--taomni-fs-body);
+}
+
+.taoffice-project-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--taomni-card-bg);
+  z-index: var(--taomni-z-sticky);
+}
+
+.taoffice-project-table th,
+.taoffice-project-table td {
+  padding: 4px 8px;
+  text-align: start;
+  border-bottom: 1px solid var(--taomni-divider);
+}
+
+.taoffice-project-table tbody th {
+  min-width: 180px;
+  overflow-wrap: anywhere;
+}
+
+.taoffice-project-table tbody tr[data-summary="true"] {
+  background: var(--taomni-card-bg);
+  font-weight: 600;
+}
+
+.taoffice-project-track {
+  position: relative;
+  min-width: 220px;
+  background: var(--taomni-card-bg);
+}
+
+.taoffice-project-bar {
+  position: absolute;
+  top: 50%;
+  min-width: 3px;
+  height: 10px;
+  transform: translateY(-50%);
+  border-radius: var(--taomni-radius-sm);
+  background: var(--taomni-primary-bg);
+}
+
+.taoffice-project-bar[data-milestone="true"] {
+  width: 9px;
+  height: 9px;
+  transform: translateY(-50%) rotate(45deg);
+}

@@ -128,6 +128,13 @@ def setup(ctx: Any) -> None:
         files["planning-notes.docx"] = (TAOFFICE_ASSETS / "planning-notes.docx").read_bytes()
         files["damaged.docx"] = b"This is not a Word document."
         ctx.values["taoffice_word_sha"] = hashlib.sha256(files["planning-notes.docx"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-023", "TC-TAOFFICE-024"}:
+        schedule = (TAOFFICE_ASSETS / "rollout.mppx").read_bytes()
+        files["rollout.xml" if native else "rollout.mppx"] = schedule
+        ctx.values["taoffice_project_sha"] = hashlib.sha256(schedule).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-025", "TC-TAOFFICE-026"}:
+        files["rollout-replay.webm"] = (TAOFFICE_ASSETS / "rollout-replay.webm").read_bytes()
+        ctx.values["taoffice_video_sha"] = hashlib.sha256(files["rollout-replay.webm"]).hexdigest()
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative

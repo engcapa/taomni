@@ -16,7 +16,7 @@ SCREENSHOT_ASSETS = {
 
 def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, Path]:
     if slug not in {"rdp-client", "vnc-client", "mail", "mfa", "screenshot", "sockscap",
-                    "rdp-server", "vnc-server", "servers", "taoffice-pdf", "taoffice-excel", "taoffice-word"}:
+                    "rdp-server", "vnc-server", "servers", "taoffice-pdf", "taoffice-excel", "taoffice-word", "taoffice-project"}:
         raise ValueError("Unexpected module")
     expected = {"index.js"}
     directories = set()

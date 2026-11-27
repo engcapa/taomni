@@ -424,6 +424,7 @@ controls:
     - '[data-testid="module-action-enable-taoffice-pdf"]'
     - '[data-testid="module-action-enable-taoffice-excel"]'
     - '[data-testid="module-action-enable-taoffice-word"]'
+    - '[data-testid="module-action-enable-taoffice-project"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
@@ -445,6 +446,7 @@ controls:
     - '[data-testid="module-action-disable-taoffice-pdf"]'
     - '[data-testid="module-action-disable-taoffice-excel"]'
     - '[data-testid="module-action-disable-taoffice-word"]'
+    - '[data-testid="module-action-disable-taoffice-project"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
@@ -16869,6 +16871,8 @@ TC-TAOFFICE-015/016 覆盖独立 Excel 模块的工作表导航、选中单元�
 TC-TAOFFICE-017/018 覆盖 PDF 表单填写、关闭守卫、保存副本和原生文件重新打开。
 TC-TAOFFICE-019/020 覆盖 XLSX 表格列标题只读、数据行文字与数字编辑、输入校验、取消、保存副本、公式保留和原始文件摘要。
 TC-TAOFFICE-021/022 覆盖 DOCX 页面、页眉和表格、键盘编辑、共享关闭守卫、签名安装、原生另存取消与成功，以及副本重开。
+TC-TAOFFICE-023/024 覆盖 MSPDI 任务列表及甘特条、筛选、键盘重命名、原生保存和副本重开。
+TC-TAOFFICE-025/026 覆盖 WebM 解码、键盘定位、真实播放、离开标签暂停及原始媒体摘要。
 
 <!-- feature
 id: F-FILEOPEN-1
@@ -16891,6 +16895,7 @@ files:
   - src-tauri/plugins/taoffice-pdf/renderer/PdfNavigation.jsx
   - src-tauri/plugins/taoffice-pdf/renderer/PdfPassword.jsx
   - src-tauri/plugins/taoffice-word/renderer/WordViewer.jsx
+  - src-tauri/plugins/taoffice-project/renderer/ProjectViewer.jsx
   - src/lib/openFile/documentProvider.ts
   - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts
@@ -17027,7 +17032,9 @@ controls:
     kind: display
   - id: taoffice-media-player
     selector: '[data-testid="taoffice-media-player"]'
-    kind: display
+    kind: interactive
+    aliases:
+    - 'video[data-testid="taoffice-media-player"]'
   - id: taoffice-media-error
     selector: '[data-testid="taoffice-media-error"]'
     kind: display
@@ -17090,6 +17097,30 @@ controls:
     kind: interactive
   - id: taoffice-word-output
     selector: '[data-testid="taoffice-word-output"]'
+    kind: display
+  - id: taoffice-project-schedule
+    selector: '[data-testid="taoffice-project-schedule"]'
+    kind: display
+  - id: taoffice-project-task
+    selector: '[data-testid="taoffice-project-task"]'
+    kind: display
+  - id: taoffice-project-bar
+    selector: '[data-testid="taoffice-project-bar"]'
+    kind: display
+  - id: taoffice-project-filter
+    selector: '[data-testid="taoffice-project-filter"]'
+    kind: interactive
+  - id: taoffice-project-rename
+    selector: '[data-testid="taoffice-project-rename"]'
+    kind: interactive
+  - id: taoffice-project-task-name
+    selector: '[data-testid="taoffice-project-task-name"]'
+    kind: interactive
+  - id: taoffice-project-save
+    selector: '[data-testid="taoffice-project-save"]'
+    kind: interactive
+  - id: taoffice-project-output
+    selector: '[data-testid="taoffice-project-output"]'
     kind: display
   - id: taoffice-pdf-form-toggle
     selector: '[data-testid="taoffice-pdf-form-toggle"]'

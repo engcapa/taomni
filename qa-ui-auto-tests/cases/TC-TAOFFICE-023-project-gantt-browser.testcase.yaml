@@ -1,0 +1,44 @@
+id: TC-TAOFFICE-023
+title: Project displays the timeline and preserves task changes in an MSPDI copy
+description: Inspect the schedule and milestone, filter tasks, cancel a keyboard rename, and download a copy after committing the change.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-project]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 140
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-project.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="rollout.mppx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="rollout.mppx"]'
+- assert_text: {selector: '[data-testid="taoffice-project-schedule"]', contains: 2026-12-01 – 2026-12-10}
+- assert_visible: '[data-testid="taoffice-project-task"][data-uid="3"] [data-testid="taoffice-project-bar"][data-milestone="true"]'
+- assert_text: {selector: '[data-testid="taoffice-project-task"][data-uid="2"]', contains: '25%'}
+- fill: {selector: '[data-testid="taoffice-project-filter"]', value: pilot}
+- assert_count: {selector: '[data-testid="taoffice-project-task"]', equal: 1}
+- press: {selector: '[data-testid="taoffice-project-rename"]', key: Enter}
+- assert_focus_on: '[data-testid="taoffice-project-task-name"]'
+- fill: {selector: '[data-testid="taoffice-project-task-name"]', value: Cancelled rename}
+- press: Escape
+- assert_focus_on: '[data-testid="taoffice-project-rename"]'
+- assert_text: {selector: '[data-testid="taoffice-project-rename"]', contains: Pilot review}
+- press: {selector: '[data-testid="taoffice-project-rename"]', key: Enter}
+- fill: {selector: '[data-testid="taoffice-project-task-name"]', value: Pilot & approval}
+- press: Enter
+- assert_text: {selector: '[data-testid="taoffice-project-rename"]', contains: Pilot & approval}
+- assert_download:
+    trigger: '[data-testid="taoffice-project-save"]'
+    filename: rollout - copy.mppx
+    contains: ['<Name>Pilot &amp; approval</Name>', '<PredecessorUID>2</PredecessorUID>', '<ResourceUID>1</ResourceUID>']
+- assert_visible: '[data-testid="taoffice-project-output"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/rollout.mppx', sha256: '${fixture.taoffice_project_sha}'}
+- assert_no_runtime_errors: null
