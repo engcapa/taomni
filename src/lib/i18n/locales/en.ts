@@ -2761,6 +2761,8 @@ const dict = {
     moduleUpgradeRetained: "Legacy files retained for backup: {count}",
     moduleUpgradeNone: "No legacy module data needs migration.",
     moduleUpgradeMigrate: "Migrate detected data",
+    moduleUpgradeMfaTitle: "Migrate legacy MFA accounts",
+    moduleUpgradeMfaSubtitle: "Legacy MFA accounts migrate separately: enter your original Vault master password and restart Taomni to complete.",
     moduleUpgradeMfaOpen: "Migrate MFA from a signed package",
     moduleUpgradeMfaInstalled: "Migrate data to the installed MFA module",
     moduleUpgradeMfaArchive: "MFA module package",
