@@ -3,7 +3,7 @@
   "slug": "servers",
   "name": "Local servers",
   "description": "Start local SSH/SFTP, FTP, TFTP, HTTP, Telnet, NFS, Cron, and iperf services.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "coreApiVersion": "1",
   "kind": "local-server",
   "status": "stable",

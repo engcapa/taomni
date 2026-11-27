@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useT } from "../../lib/i18n";
 import type { ModuleCatalogPlugin, ModuleCatalogSelection } from "../../lib/ipc/plugin";
 import { PLUGIN_CORE_API_VERSION } from "../../lib/pluginRegistry";
+import { relaunchApp } from "../../lib/updateService";
 import { useModuleDownloadStore } from "../../stores/moduleDownloadStore";
 import { useModuleMarketplaceStore } from "../../stores/moduleMarketplaceStore";
 import { useModuleStore } from "../../stores/moduleStore";
@@ -18,6 +19,8 @@ export function ModuleMarketplace() {
   const [download, setDownload] = useState<{
     entry: ModuleCatalogPlugin; selection: ModuleCatalogSelection; size: number; installedVersion?: string;
   } | null>(null);
+  const [restarting, setRestarting] = useState(false);
+  const [restartError, setRestartError] = useState<string | null>(null);
   useEffect(() => { void state.refresh(); }, [state.refresh]);
 
   const entries = useMemo(() => Object.values(state.catalog?.catalog.plugins ?? {})
@@ -66,6 +69,9 @@ export function ModuleMarketplace() {
         const release = state.catalog?.release;
         const update = !!installedVersion && installedVersion !== entry.version && release?.updates.includes(entry.id);
         const legacyPending = release?.legacyPending.includes(entry.id);
+        const restartRequired = !!(legacyPending && release?.legacyRestartRequired?.includes(entry.id));
+        const importFailed = !!(legacyPending && release?.legacyImportFailed?.includes(entry.id));
+        const importError = release?.legacyImportErrors?.[entry.id];
         const isNew = !installedVersion && release?.newModules.includes(entry.id);
         const compatible = entry.coreApiVersion === PLUGIN_CORE_API_VERSION;
         const busy = state.busy[entry.id];
@@ -82,16 +88,30 @@ export function ModuleMarketplace() {
           {isNew && <p data-testid="module-marketplace-new">{t("plugins.marketNew")}</p>}
           {(!asset || !compatible) && <p data-testid="module-marketplace-unavailable">{t("plugins.marketUnavailable")}</p>}
           {task && <p data-testid="module-marketplace-task">{t(`plugins.downloadPhase${task.progress.phase}`)}</p>}
-          {legacyPending && release?.legacyRestartRequired?.includes(entry.id)
-            && <p>{t("plugins.marketMailRestartRequired")}</p>}
-          {legacyPending && release?.legacyImportFailed?.includes(entry.id)
-            && <p role="alert" data-testid="module-marketplace-mail-import-failed">{t("plugins.marketMailImportFailed")}</p>}
+          {restartRequired && <p>{t("plugins.marketMailRestartRequired")}</p>}
+          {importFailed && <p role="alert" data-testid="module-marketplace-mail-import-failed" className="text-ui-danger">
+            {t("plugins.marketMailImportFailed")}
+            {importError && <span className="mt-1 block break-words text-ui-small">{importError}</span>}
+          </p>}
+          {restartRequired && !importFailed && restartError && <p role="alert" data-testid="module-marketplace-restart-error" className="my-2 text-ui-danger">{restartError}</p>}
           {state.errors[entry.id] && <p data-testid="module-marketplace-action-error" role="alert" className="my-2 text-ui-danger">{state.errors[entry.id]}</p>}
           <div className="mt-2 flex gap-2">
-            {legacyPending && !installedVersion ? <button type="button" data-testid="module-marketplace-provision" className="taomni-btn"
-              disabled={!!busy || !asset || !compatible} onClick={() => { void state.provision(entry.id, true); }}>
-              {busy ? t("plugins.marketWorking") : t("plugins.marketLegacyResume")}
-            </button> : installedVersion && !update ? (
+            {legacyPending && !installedVersion ? (
+              restartRequired && !importFailed ? <button type="button" data-testid="module-marketplace-restart" className="taomni-btn"
+                disabled={restarting} onClick={() => {
+                  setRestartError(null);
+                  setRestarting(true);
+                  void relaunchApp().catch((reason: unknown) => {
+                    setRestartError(reason instanceof Error ? reason.message : String(reason));
+                    setRestarting(false);
+                  });
+                }}>
+                {restarting ? t("plugins.marketWorking") : t("plugins.marketRestartToFinish")}
+              </button> : <button type="button" data-testid="module-marketplace-provision" className="taomni-btn"
+                disabled={!!busy || !asset || !compatible} onClick={() => { void state.provision(entry.id, true); }}>
+                {busy ? t("plugins.marketWorking") : t("plugins.marketLegacyResume")}
+              </button>
+            ) : installedVersion && !update ? (
               installedVersion === entry.version ? <span data-testid="module-marketplace-current">{t("plugins.marketCurrent")}</span> : null
             ) : task?.progress.phase === "completed" ? <button type="button" data-testid="module-marketplace-review" className="taomni-btn"
               disabled={!!busy || !compatible || !asset} onClick={() => { void state.openReview(selection(entry), installedVersion); }}>

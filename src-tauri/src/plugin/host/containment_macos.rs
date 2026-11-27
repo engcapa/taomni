@@ -23,8 +23,10 @@ impl ProcessContainment {
             return Err(io::Error::last_os_error());
         }
         let descriptor_limit = unsafe { limit.assume_init() }.rlim_cur;
+        let executable = super::watchdog_unix::prepare_executable();
         // The fork child runs only low-level libc calls and never enters the
-        // allocator, ObjC runtime, logging, or any application mutex.
+        // allocator, ObjC runtime, logging, or any application mutex. When enabled,
+        // execv replaces the forked image to shed the parent's CoW address space.
         unsafe {
             command.pre_exec(move || {
                 if libc::setsid() == -1 {
@@ -34,9 +36,10 @@ impl ProcessContainment {
                     return Err(io::Error::from_raw_os_error(libc::ESRCH));
                 }
                 let group = libc::getpid();
+                let exec_ptr = executable.as_deref().map(std::ffi::CStr::as_ptr);
                 match libc::fork() {
                     -1 => return Err(io::Error::last_os_error()),
-                    0 => watchdog(group, core_pid, core_birth, descriptor_limit),
+                    0 => watchdog(group, core_pid, core_birth, descriptor_limit, exec_ptr),
                     _ => {}
                 }
                 Ok(())
@@ -95,17 +98,79 @@ unsafe fn process_birth(pid: libc::pid_t) -> Option<(u64, u64)> {
     Some((info.pbi_start_tvsec, info.pbi_start_tvusec))
 }
 
+pub(super) fn run_plugin_watchdog(mut args: impl Iterator<Item = std::ffi::OsString>) -> i32 {
+    let Some(group) = args
+        .next()
+        .and_then(|value| value.to_str().and_then(|s| s.parse::<libc::pid_t>().ok()))
+        .filter(|&pid| pid > 0)
+    else {
+        return 1;
+    };
+    let Some(core_pid) = args
+        .next()
+        .and_then(|value| value.to_str().and_then(|s| s.parse::<libc::pid_t>().ok()))
+        .filter(|&pid| pid > 0)
+    else {
+        return 1;
+    };
+    let Some(birth_sec) = args
+        .next()
+        .and_then(|value| value.to_str().and_then(|s| s.parse::<u64>().ok()))
+    else {
+        return 1;
+    };
+    let Some(birth_usec) = args
+        .next()
+        .and_then(|value| value.to_str().and_then(|s| s.parse::<u64>().ok()))
+    else {
+        return 1;
+    };
+    unsafe { monitor_and_kill_group(group, core_pid, (birth_sec, birth_usec)) }
+}
+
 unsafe fn watchdog(
     group: libc::pid_t,
     core_pid: libc::pid_t,
     core_birth: (u64, u64),
     descriptor_limit: libc::rlim_t,
+    executable: Option<*const libc::c_char>,
 ) -> ! {
     // Close the exec-error pipe as well as all inherited stdio. Keeping the
     // error pipe open here would prevent std::process::Command::spawn returning.
     for descriptor in 0..descriptor_limit.min(libc::c_int::MAX as libc::rlim_t) {
         unsafe { libc::close(descriptor as libc::c_int) };
     }
+    unsafe { super::watchdog_unix::redirect_stdio_to_devnull() };
+    if let Some(path) = executable {
+        let mut group_buf = [0u8; 32];
+        let mut core_pid_buf = [0u8; 32];
+        let mut sec_buf = [0u8; 32];
+        let mut usec_buf = [0u8; 32];
+        let group_arg = super::watchdog_unix::format_pid_nul(group, &mut group_buf);
+        let core_pid_arg = super::watchdog_unix::format_pid_nul(core_pid, &mut core_pid_buf);
+        let sec_arg = super::watchdog_unix::format_u64_nul(core_birth.0, &mut sec_buf);
+        let usec_arg = super::watchdog_unix::format_u64_nul(core_birth.1, &mut usec_buf);
+        let argv = [
+            super::watchdog_unix::WATCHDOG_ARGV0.as_ptr(),
+            super::watchdog_unix::WATCHDOG_ARG.as_ptr(),
+            group_arg,
+            core_pid_arg,
+            sec_arg,
+            usec_arg,
+            std::ptr::null(),
+        ];
+        unsafe {
+            libc::execv(path, argv.as_ptr());
+        }
+    }
+    unsafe { monitor_and_kill_group(group, core_pid, core_birth) }
+}
+
+unsafe fn monitor_and_kill_group(
+    group: libc::pid_t,
+    core_pid: libc::pid_t,
+    core_birth: (u64, u64),
+) -> ! {
     let queue = unsafe { libc::kqueue() };
     if queue >= 0 {
         let event = libc::kevent {

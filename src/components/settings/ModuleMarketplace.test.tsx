@@ -8,6 +8,11 @@ import { useModuleStore } from "../../stores/moduleStore";
 import { previewHelloManifest } from "../../stubs/modulePreview";
 import { ModuleMarketplace } from "./ModuleMarketplace";
 
+const updateMocks = vi.hoisted(() => ({
+  relaunchApp: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("../../lib/updateService", () => updateMocks);
+
 const original = useModuleMarketplaceStore.getState();
 const originalDownloads = useModuleDownloadStore.getState();
 const entry: ModuleCatalogPlugin = { id: "taomni-plugin-hello-plugin", slug: "hello-plugin", name: "Hello Plugin",
@@ -68,5 +73,50 @@ describe("official module catalog", () => {
     fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
     expect(install).toHaveBeenCalledOnce();
     expect(screen.queryByTestId("confirm-dialog")).not.toBeInTheDocument();
+  });
+
+  it("shows a restart action when staged Mail is waiting for next launch instead of looping resume", () => {
+    useModuleMarketplaceStore.setState((state) => ({
+      catalog: {
+        ...state.catalog!,
+        release: {
+          legacyWaiting: false,
+          legacyPending: [entry.id],
+          legacyRestartRequired: [entry.id],
+          updates: [],
+          newModules: [],
+        },
+      },
+    }));
+    render(<ModuleMarketplace />);
+    expect(screen.queryByTestId("module-marketplace-provision")).not.toBeInTheDocument();
+    const restart = screen.getByTestId("module-marketplace-restart");
+    expect(restart).toHaveTextContent("Restart Taomni to finish");
+    fireEvent.click(restart);
+    expect(updateMocks.relaunchApp).toHaveBeenCalledOnce();
+  });
+
+  it("surfaces persisted Mail import error details and keeps Resume installation on failure", () => {
+    const provision = vi.fn().mockResolvedValue(undefined);
+    useModuleMarketplaceStore.setState((state) => ({
+      provision,
+      catalog: {
+        ...state.catalog!,
+        release: {
+          legacyWaiting: false,
+          legacyPending: [entry.id],
+          legacyImportFailed: [entry.id],
+          legacyImportErrors: { [entry.id]: "Timed out after 900s" },
+          updates: [],
+          newModules: [],
+        },
+      },
+    }));
+    render(<ModuleMarketplace />);
+    const failed = screen.getByTestId("module-marketplace-mail-import-failed");
+    expect(failed).toHaveTextContent("Mail import failed. Resume installation in Module Store.");
+    expect(failed).toHaveTextContent("Timed out after 900s");
+    fireEvent.click(screen.getByTestId("module-marketplace-provision"));
+    expect(provision).toHaveBeenCalledWith(entry.id, true);
   });
 });

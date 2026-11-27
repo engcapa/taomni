@@ -58,6 +58,7 @@ it("retries an unsuccessful import only after the user resumes the installation"
     legacyWaiting: false,
     legacyPending: [selection.pluginId],
     legacyImportFailed: [selection.pluginId],
+    legacyImportErrors: { [selection.pluginId]: "Timed out copying objects" },
     updates: [],
     newModules: [],
   } });
@@ -68,6 +69,7 @@ it("retries an unsuccessful import only after the user resumes the installation"
   await store.getState().provision(selection.pluginId, true);
   expect(store.getState().catalog?.release?.legacyRestartRequired).toEqual([selection.pluginId]);
   expect(store.getState().catalog?.release?.legacyImportFailed).toEqual([]);
+  expect(store.getState().catalog?.release?.legacyImportErrors).toEqual({});
 });
 describe("module marketplace ownership", () => {
   it("deduplicates catalog refresh and rejects late results from an old mirror", async () => {

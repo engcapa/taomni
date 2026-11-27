@@ -1,0 +1,131 @@
+name: Bump Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Target to bump (core, a stable module slug, or batch-custom with extra_bumps)
+        required: true
+        default: core
+        type: choice
+        options:
+          - core
+          - ai-voice-local
+          - mail
+          - mfa
+          - rdp-client
+          - rdp-server
+          - screenshot
+          - servers
+          - sockscap
+          - vnc-client
+          - vnc-server
+          - batch-custom
+      bump:
+        description: Increment kind for the selected target (ignored when target is batch-custom)
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - explicit
+      explicit_version:
+        description: Exact SemVer (e.g. 0.6.2) when bump=explicit
+        required: false
+        default: ''
+        type: string
+      extra_bumps:
+        description: Optional extra bumps as comma-separated target=patch|minor|major|X.Y.Z (e.g. servers=patch,vnc-server=0.1.4)
+        required: false
+        default: ''
+        type: string
+      base_branch:
+        description: Base branch for the version bump PR
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    name: Create version bump PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base_branch || 'main' }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Update version manifests and sync Cargo.lock
+        id: plan
+        env:
+          INPUT_TARGET: ${{ inputs.target }}
+          INPUT_BUMP: ${{ inputs.bump }}
+          INPUT_EXPLICIT_VERSION: ${{ inputs.explicit_version }}
+          INPUT_EXTRA_BUMPS: ${{ inputs.extra_bumps }}
+        run: |
+          node scripts/bump-version.mjs \
+            --target "$INPUT_TARGET" \
+            --bump "$INPUT_BUMP" \
+            --explicit-version "$INPUT_EXPLICIT_VERSION" \
+            --extra-bumps "$INPUT_EXTRA_BUMPS" \
+            --github-output "$GITHUB_OUTPUT" \
+            --pr-body pr-body.md
+      - name: Verify only allowed version files changed
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only)"
+          test -n "$changed"
+          while IFS= read -r file; do
+            case "$file" in
+              package.json|src-tauri/Cargo.toml|src-tauri/Cargo.lock|src-tauri/plugins/*/module.json|src-tauri/plugins/*/Cargo.toml) ;;
+              *) echo "Unexpected modified file: $file" >&2; exit 1 ;;
+            esac
+          done <<< "$changed"
+          git diff --stat
+      - name: Commit, push branch, and open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.plan.outputs.branch }}
+          TITLE: ${{ steps.plan.outputs.title }}
+          BASE_BRANCH: ${{ inputs.base_branch || 'main' }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$BRANCH"
+          git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/plugins/
+          git commit -m "$TITLE"
+          git push origin "HEAD:refs/heads/$BRANCH"
+          compare_url="https://github.com/${GITHUB_REPOSITORY}/compare/${BASE_BRANCH}...${BRANCH}?expand=1"
+          if pr_url="$(gh pr create --base "$BASE_BRANCH" --head "$BRANCH" --title "$TITLE" --body-file pr-body.md 2>pr-error.log)"; then
+            {
+              echo "### Created Version Bump PR"
+              echo ""
+              echo "PR: $pr_url"
+              echo ""
+              cat pr-body.md
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat pr-error.log >&2
+            {
+              echo "### Branch Pushed (PR Creation Needs Repository Setting)"
+              echo ""
+              echo "Branch \`$BRANCH\` was pushed with \`Cargo.lock\` synced, but GitHub Actions is currently blocked from opening PRs."
+              echo ""
+              echo "- Direct PR creation link: $compare_url"
+              echo "- To allow automatic PR creation next time: enable **Settings -> Actions -> General -> Allow GitHub Actions to create and approve pull requests**."
+              echo ""
+              cat pr-body.md
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

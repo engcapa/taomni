@@ -208,6 +208,58 @@ fn rename_is_no_replace_and_names_are_portably_validated() {
     );
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn rename_on_unsupported_fs_preserves_file_and_rejects_collisions() {
+    use std::os::unix::fs::MetadataExt;
+
+    let root = tempfile::tempdir().unwrap();
+    let created = transfer::create_entry(root.path(), "新建文本文档.txt", false).unwrap();
+    let source = Path::new(&created);
+    fs::write(source, "source bytes").unwrap();
+    let inode = fs::metadata(source).unwrap().ino();
+    let target = root.path().join("工作笔记.txt");
+    let rename = || {
+        transfer::rename_file_on_unsupported_fs(
+            source,
+            &target,
+            std::io::Error::from_raw_os_error(libc::EINVAL),
+        )
+    };
+    fs::write(&target, "existing bytes").unwrap();
+    assert_eq!(
+        rename().unwrap_err().kind(),
+        std::io::ErrorKind::AlreadyExists
+    );
+    assert_eq!(fs::read(&target).unwrap(), b"existing bytes");
+    assert_eq!(fs::read(source).unwrap(), b"source bytes");
+    fs::remove_file(&target).unwrap();
+    rename().unwrap();
+    assert!(!source.try_exists().unwrap());
+    assert_eq!(fs::metadata(&target).unwrap().ino(), inode);
+    assert_eq!(fs::read(target).unwrap(), b"source bytes");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn rename_fallback_preserves_other_errors_and_leaves_directories_alone() {
+    let root = tempfile::tempdir().unwrap();
+    let file = root.path().join("document.txt");
+    fs::write(&file, "source bytes").unwrap();
+    let target = root.path().join("renamed.txt");
+    for (source, errno) in [(file.as_path(), libc::EACCES), (root.path(), libc::EINVAL)] {
+        let error = std::io::Error::from_raw_os_error(errno);
+        assert_eq!(
+            transfer::rename_file_on_unsupported_fs(source, &target, error)
+                .unwrap_err()
+                .raw_os_error(),
+            Some(errno)
+        );
+    }
+    assert!(!target.try_exists().unwrap());
+    assert_eq!(fs::read(file).unwrap(), b"source bytes");
+}
+
 #[test]
 fn create_entry_atomically_numbers_conflicts_preserving_extension() {
     let root = tempfile::tempdir().unwrap();

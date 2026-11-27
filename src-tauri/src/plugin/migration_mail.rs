@@ -407,8 +407,10 @@ fn reuse_restored_data(
                 taomni_mail_storage::imap_ownership::database(&mail_root.data, &mailbox.account_id)
                     .map_err(|error| error.to_string())?;
             }
-        } else if (hosted.imap_cache && !mailbox.pop3)
-            || read_legacy_mailbox(&mailbox.database, &mailbox.account_id, |_, _| Ok(()))?.is_some()
+        } else if !mailbox.preserve_in_place
+            && ((hosted.imap_cache && !mailbox.pop3)
+                || read_legacy_mailbox(&mailbox.database, &mailbox.account_id, |_, _| Ok(()))?
+                    .is_some())
         {
             missing.push(mailbox);
         }
@@ -523,13 +525,43 @@ fn read_mailboxes(
             })?;
         }
         let database = directory.join(filename);
+        let preserve_in_place =
+            directory != default || redirects_outside_default(&database, &default)?;
         mailboxes.push(LegacyMailbox {
             account_id,
             database,
             pop3,
+            preserve_in_place,
         });
     }
     Ok(mailboxes)
+}
+
+fn redirects_outside_default(database: &Path, default: &Path) -> Result<bool, String> {
+    let mut current = database.to_owned();
+    let filename = database.file_name();
+    for _ in 0..32 {
+        let redirect = taomni_mail_storage::database::redirect_path(&current);
+        if !paths::file_exists(&redirect)? {
+            if current == *database {
+                return Ok(false);
+            }
+            let target_parent = current
+                .parent()
+                .ok_or("Invalid legacy Mail relocation target")?;
+            let canonical_default =
+                fs::canonicalize(default).unwrap_or_else(|_| default.to_path_buf());
+            let canonical_parent =
+                fs::canonicalize(target_parent).unwrap_or_else(|_| target_parent.to_path_buf());
+            return Ok(canonical_parent != canonical_default);
+        }
+        let target: PathBuf = paths::read_json_bounded(&redirect)?;
+        if !target.is_absolute() || target.file_name() != filename {
+            return Err("Invalid legacy Mail relocation target".into());
+        }
+        current = target;
+    }
+    Err("Legacy Mail relocation chain is too long or contains a cycle".into())
 }
 
 #[cfg(test)]

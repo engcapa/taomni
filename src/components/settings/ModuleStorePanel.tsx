@@ -209,6 +209,16 @@ export function ModuleStorePanel({
               {t("settings.moduleUpgradeRetained", { count: migrationSnapshot.retained_paths.length })}
             </div>
           )}
+          {migrationModules.includes("mfa") && (
+            <p data-testid="module-upgrade-mfa-hint" className="mt-2 text-ui-small text-[var(--taomni-text-muted)]">
+              {t("settings.moduleUpgradeMfaHint")}
+            </p>
+          )}
+          {migrationModules.includes("mail") && (
+            <p data-testid="module-upgrade-mail-hint" className="mt-2 text-ui-small text-[var(--taomni-text-muted)]">
+              {t("settings.moduleUpgradeMailHint")}
+            </p>
+          )}
           {migrationResult?.pending.length ? (
             <div data-testid="module-upgrade-pending" className="mt-2 rounded border border-ui-warning-border bg-ui-warning-surface p-2 text-ui-body text-ui-warning">
               {migrationResult.pending_reason || t("settings.moduleUpgradePending")}

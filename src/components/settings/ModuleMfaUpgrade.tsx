@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { FileUp, RotateCcw } from "lucide-react";
+import { FileUp, KeyRound, RotateCcw } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useT } from "../../lib/i18n";
 import { getMfaMigrationResult, migrateMfaAndRestart } from "../../lib/ipc/plugin";
@@ -67,7 +67,24 @@ export function ModuleMfaUpgrade({ eligible, installed = false }: { eligible: bo
 
   if (!eligible && !result) return null;
 
-  return <div className="mb-3 space-y-2">
+  const cardTone = eligible
+    ? "border-ui-warning-border bg-ui-warning-surface"
+    : result === "complete"
+      ? "border-ui-success-border bg-ui-success-surface"
+      : "border-ui-danger-border bg-ui-danger-surface";
+
+  return <div data-testid="module-upgrade-mfa-card" className={`mb-3 space-y-2 rounded border p-3 ${cardTone}`}>
+    {eligible && <div className="flex items-start gap-2">
+      <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-ui-warning" />
+      <div className="min-w-0 flex-1">
+        <div data-testid="module-upgrade-mfa-title" className="text-ui-title font-semibold">
+          {t("settings.moduleUpgradeMfaTitle")}
+        </div>
+        <div data-testid="module-upgrade-mfa-subtitle" className="mt-1 text-ui-body text-[var(--taomni-text-muted)]">
+          {t("settings.moduleUpgradeMfaSubtitle")}
+        </div>
+      </div>
+    </div>}
     {result && <p data-testid="module-upgrade-mfa-result" data-state={result} role={result === "failed" ? "alert" : "status"} className="break-words text-xs">
       {t(result === "complete" ? "settings.moduleUpgradeMfaComplete" : "settings.moduleUpgradeMfaFailed")}
     </p>}

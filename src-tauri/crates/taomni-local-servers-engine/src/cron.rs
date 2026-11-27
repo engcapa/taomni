@@ -71,19 +71,27 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     Ok(ServerStarted { pid: None, task })
 }
 
+#[cfg(windows)]
+fn shell_command(command: &str) -> Command {
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let mut cmd = Command::new("cmd");
+    cmd.arg("/C").arg(command);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+#[cfg(not(windows))]
+fn shell_command(command: &str) -> Command {
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c").arg(command);
+    cmd
+}
+
 /// Run the configured command through the platform shell, streaming output.
 async fn run_command(command: &str, working_dir: &str, log: &super::LogEmitter) {
     log.line(format!("Running: {}", command));
 
-    let mut cmd = if cfg!(windows) {
-        let mut c = Command::new("cmd");
-        c.arg("/C").arg(command);
-        c
-    } else {
-        let mut c = Command::new("sh");
-        c.arg("-c").arg(command);
-        c
-    };
+    let mut cmd = shell_command(command);
 
     if !working_dir.is_empty() {
         cmd.current_dir(working_dir);

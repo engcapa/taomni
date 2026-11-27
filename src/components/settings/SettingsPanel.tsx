@@ -11,6 +11,7 @@ import { useSystemFonts } from "../../lib/systemFonts";
 import { DEFAULT_TERMINAL_DEFAULT_PROFILE, DEFAULT_TERMINAL_PROFILE, loadTerminalDefaultProfile, saveTerminalDefaultProfile, type TerminalProfile } from "../../lib/terminalProfile";
 import { useAiStore } from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
+import { useModuleMarketplaceStore } from "../../stores/moduleMarketplaceStore";
 import { projectModuleRecord, useModuleStore } from "../../stores/moduleStore";
 import { usePluginFrontendStore } from "../../stores/pluginFrontendStore";
 import { type FontPickerOption } from "../terminal/FontPickerPanel";
@@ -306,7 +307,13 @@ export function SettingsPanel() {
     // The signed catalog/download bridge will provide a verified staging path.
     // Until then, fail explicitly instead of advancing only the renderer state.
     const packageDir = (entry as ModuleStoreCatalogEntry & { packageDir?: string }).packageDir;
-    if (!packageDir) throw new Error(t("settings.moduleStoreInstallUnavailable"));
+    if (!packageDir) {
+      const release = useModuleMarketplaceStore.getState().catalog?.release;
+      if (entry.slug === "mail" && release?.legacyRestartRequired?.includes("taomni-plugin-mail")) {
+        throw new Error(t("plugins.marketMailRestartRequired"));
+      }
+      throw new Error(t("settings.moduleStoreInstallFromMarketplace"));
+    }
     await installStagedPlugin(entry.slug, entry.version, packageDir);
   }, [t]);
   const moduleOnEnable = useCallback(async (entry: ModuleStoreCatalogEntry) => {

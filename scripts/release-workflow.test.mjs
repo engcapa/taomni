@@ -362,3 +362,11 @@ test("read-only single-module rehearsal invokes release-modules without building
   const finalizer = workflow.split("  finalize-updater-manifest:\n")[1];
   assert.match(finalizer, /needs\.plan\.outputs\.tag != ''/);
 });
+
+test("release workflow triggers only on v* tag pushes and manual dispatches", () => {
+  const triggerBlock = workflow.split("permissions:\n")[0];
+  assert.match(triggerBlock, /push:\n\s+tags:\n\s+- "v\*"/);
+  assert.match(triggerBlock, /\bworkflow_dispatch:/);
+  assert.doesNotMatch(triggerBlock, /^\s*release:\s*$/m);
+  assert.doesNotMatch(triggerBlock, /\btypes:\s*\[published\]/);
+});
