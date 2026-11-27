@@ -109,13 +109,13 @@ function LoadedWord({ source, document, preview: initialPreview, active, label }
     {(draft.error || previewError) && <p className="taoffice-word-feedback" role="alert">{draft.error || previewError}</p>}
     {draft.output && <p className="taoffice-word-feedback" role="status" data-testid="taoffice-word-output">{draft.output}</p>}
     {!canEdit && !source.readOnly && <p className="taoffice-word-feedback" role="status">
-      {label("此文档没有可编辑的普通文本段落。", "This document has no editable plain-text paragraphs.")}
+      {label("此文档没有可编辑的段落。", "This document has no editable paragraphs.")}
     </p>}
     {editMode ? <div className="taoffice-word-paragraphs" aria-label={label("可编辑段落", "Editable paragraphs")}>
-      <p>{label("可修改单一格式的正文段落。表格和页眉可在页面预览中查看。", "Edit body paragraphs with a single text format. See tables and headers in Page preview.")}</p>
       {document.paragraphs.map((paragraph, index) => <label key={paragraph.id}>
-        <span>{label("段落", "Paragraph")} {index + 1}</span>
+        <span>{paragraph.tableDepth ? label("表格单元格段落", "Table cell paragraph") : label("正文段落", "Body paragraph")} {index + 1}</span>
         <input type="text" ref={index === 0 ? editor : undefined} data-testid="taoffice-word-paragraph"
+          data-location={paragraph.tableDepth ? "table" : "body"}
           className="taomni-input" maxLength={MAX_PARAGRAPH_LENGTH} disabled={draft.saving}
           value={draft.edits.get(paragraph.id) ?? paragraph.text}
           onChange={(event) => draft.edit(paragraph.id, event.target.value, paragraph.text)} />

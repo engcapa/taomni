@@ -24,20 +24,42 @@ describe("TaOffice Word document copies", () => {
     expect(openDocx(source).paragraphs.map(({ text }) => text)).toContain("Baseline plan & owners");
   });
 
-  it("selects one of two equal paragraphs and leaves complex runs and body tables intact", () => {
-    const wrap = (body) => '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'
-      + body + "</w:body></w:document>";
+  it("preserves formatting and the byte ranges of untouched runs and paragraphs", () => {
     const simple = "<w:p><w:r><w:t>Same</w:t></w:r></w:p>";
-    const mixed = "<w:p><w:r><w:t>Mixed</w:t></w:r><w:r><w:t>style</w:t></w:r></w:p>";
+    const bold = "<w:r><w:rPr><w:b/></w:rPr><w:t>style</w:t></w:r>";
+    const mixed = '<w:p><w:r><w:t xml:space="preserve">Mixed </w:t></w:r>' + bold + "</w:p>";
     const table = "<w:tbl><w:tr><w:tc>" + simple + "</w:tc></w:tr></w:tbl>";
     const xml = wrap(mixed + simple + table + simple);
     const paragraphs = editableParagraphs(xml);
-    expect(paragraphs.map(({ text }) => text)).toEqual(["Same", "Same"]);
-    expect(patchParagraphs(xml, paragraphs, new Map([[1, "Changed"]])))
-      .toBe(wrap(mixed + simple + table + simple.replace("Same", "Changed")));
+    expect(paragraphs.map(({ text, tableDepth }) => [text, tableDepth])).toEqual([
+      ["Mixed style", 0], ["Same", 0], ["Same", 1], ["Same", 0],
+    ]);
+    const copy = patchParagraphs(xml, paragraphs, new Map([[0, "Updated style"], [2, "Cell <ready>"]]));
+    expect(copy).toBe(wrap(mixed.replace("Mixed", "Updated") + simple + table.replace("Same", "Cell &lt;ready&gt;") + simple));
+  });
+
+  it("supports blank text runs, preserves significant spaces, and leaves complex paragraphs untouched", () => {
+    const field = "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:t>Read only</w:t></w:r></w:p>";
+    const revision = "<w:p><w:ins><w:r><w:t>Review</w:t></w:r></w:ins></w:p>";
+    const blank = "<w:p><w:r><w:t/></w:r></w:p>";
+    const mixed = "<w:p><w:r><w:t>😀 Alpha</w:t></w:r><w:r><w:t xml:space='default'>omega 📄</w:t></w:r></w:p>";
+    const xml = wrap(revision + field + blank + mixed);
+    const paragraphs = editableParagraphs(xml);
+    expect(paragraphs.map(({ text }) => text)).toEqual(["", "😀 Alphaomega 📄"]);
+    const copy = patchParagraphs(xml, paragraphs, new Map([[0, " Copy "], [1, "📄 Beta omega 😀 "]]));
+    expect(copy).toContain(field);
+    expect(copy).toContain(revision);
+    expect(copy).toContain('<w:t xml:space="preserve"> Copy </w:t>');
+    expect(copy).toContain('xml:space="preserve"> omega 😀 ');
+    expect(editableParagraphs(copy).map(({ text }) => text)).toEqual([" Copy ", "📄 Beta omega 😀 "]);
   });
 
   it("rejects a package without a Word main document", () => {
     expect(() => openDocx(new TextEncoder().encode("Unreadable DOCX"))).toThrow();
   });
 });
+
+function wrap(body) {
+  return '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'
+    + body + "</w:body></w:document>";
+}
