@@ -31,6 +31,13 @@ steps:
 - wait_for: '[data-testid="taoffice-pdf-form-field"][data-field="Contact"]'
 - fill: {selector: '[data-testid="taoffice-pdf-form-field"][data-field="Contact"]', value: Avery}
 - click: '[data-testid="taoffice-pdf-form-field"][data-field="Approved"]'
+- eval_readonly:
+    timeout_sec: 10
+    expression: >-
+      Math.min(...document.querySelector('.taoffice-pdf-page canvas').getContext("2d").getImageData(
+      document.querySelector('.taoffice-pdf-page canvas').width * 39 / 420, document.querySelector('.taoffice-pdf-page canvas').height * 166 / 300,
+      document.querySelector('.taoffice-pdf-page canvas').width * 10 / 420, document.querySelector('.taoffice-pdf-page canvas').height * 10 / 300
+      ).data) < 80
 - native_file_dialog:
     kind: save
     action: choose

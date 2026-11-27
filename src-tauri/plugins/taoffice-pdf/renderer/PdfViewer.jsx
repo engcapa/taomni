@@ -7,7 +7,7 @@ import { PdfForms } from "./PdfForms.jsx";
 import styles from "./pdfViewer.css?inline";
 
 const { React, i18n } = globalThis.__taomniHost;
-const { useEffect, useRef, useState } = React;
+const { useCallback, useEffect, useRef, useState } = React;
 
 export default function PdfViewer({ document: source, active }) {
   const { locale } = i18n.useLocale();
@@ -27,6 +27,9 @@ export default function PdfViewer({ document: source, active }) {
   const [navigation, setNavigation] = useState(null);
   const [highlight, setHighlight] = useState("");
   const [hasForms, setHasForms] = useState(false);
+  const [formRevision, setFormRevision] = useState(0);
+  const [previewRevision, setPreviewRevision] = useState(0);
+  const updateFormPreview = useCallback(() => setFormRevision((value) => value + 1), []);
   const saveForm = useRef(null);
   const viewport = useRef(null);
   const searchInput = useRef(null);
@@ -65,6 +68,11 @@ export default function PdfViewer({ document: source, active }) {
       void task?.destroy().catch(() => {});
     };
   }, [source, revision, cancelled]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setPreviewRevision(formRevision), 120);
+    return () => window.clearTimeout(timer);
+  }, [formRevision]);
 
   useEffect(() => {
     const node = viewport.current;
@@ -172,7 +180,7 @@ export default function PdfViewer({ document: source, active }) {
     {pdf && navigation === "outline" && <PdfOutline pdf={pdf} label={label} onGo={go}
       onClose={() => { changeNavigation(null); outlineButton.current?.focus(); }} />}
     {pdf && <PdfForms pdf={pdf} source={source} label={label} active={active} expanded={navigation === "form"}
-      onForms={setHasForms} saveAction={saveForm} onPage={go}
+      onForms={setHasForms} saveAction={saveForm} onPage={go} onPreviewChange={updateFormPreview}
       onClose={() => { changeNavigation(null); formButton.current?.focus(); }} />}
     <div className="taoffice-pdf-viewport" ref={viewport} tabIndex={0} aria-label={source.name}
       data-testid="taoffice-pdf-viewport" onKeyDown={onViewportKey}>
@@ -199,6 +207,7 @@ export default function PdfViewer({ document: source, active }) {
       {pdf && viewportWidth > 0 && <PdfPage
         key={currentPage + "/" + (zoom ?? viewportWidth + "fit") + "/" + rotation}
         pdf={pdf} number={currentPage} zoom={zoom} rotation={rotation} highlight={highlight} onScale={setScale}
+        formRevision={previewRevision}
         viewportWidth={zoom ? 0 : viewportWidth} label={label} />}
     </div>
   </div>;

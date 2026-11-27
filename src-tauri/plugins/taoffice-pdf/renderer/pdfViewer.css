@@ -67,7 +67,7 @@
 .taoffice-pdf-page .textLayer [data-search-hit] { background: var(--taomni-editor-selection-match-bg); }
 .taoffice-pdf-form {
   padding: 8px 12px;
-  border-bottom: 1px solid var(--taomni-border);
+  border-bottom: 1px solid var(--taomni-card-border);
   max-height: 45%;
   overflow: auto;
 }
@@ -107,4 +107,5 @@
 .taoffice-pdf-form-row :is(input:not([type="checkbox"]), select, textarea) {
   flex: 1;
   min-width: 0;
+  text-align: start;
 }

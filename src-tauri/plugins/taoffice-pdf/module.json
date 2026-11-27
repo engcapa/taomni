@@ -3,7 +3,7 @@
   "slug": "taoffice-pdf",
   "name": "TaOffice PDF",
   "description": "View PDFs offline, unlock protected documents, and fill supported form fields in a saved copy.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "coreApiVersion": "1",
   "kind": "media",
   "status": "provisional",

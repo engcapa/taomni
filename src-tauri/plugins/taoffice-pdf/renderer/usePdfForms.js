@@ -3,7 +3,7 @@ import { applyFormValue, loadForm, MAX_EXPORTED_BYTES, originalValue } from "./p
 const { React } = globalThis.__taomniHost;
 const { useEffect, useLayoutEffect, useRef, useState } = React;
 
-export function usePdfForms(pdf, source, label, onForms, saveAction) {
+export function usePdfForms(pdf, source, label, onForms, saveAction, onPreviewChange) {
   const [model, setModel] = useState(null);
   const [values, setValues] = useState(new Map());
   const saved = useRef(new Map());
@@ -38,6 +38,7 @@ export function usePdfForms(pdf, source, label, onForms, saveAction) {
     if (job.current || !canEdit || !field.editable) return;
     const next = new Map(values).set(field.name, value);
     applyFormValue(pdf.annotationStorage, field, value);
+    onPreviewChange();
     const changed = model.fields.some((item) => {
       const original = originalValue(item);
       return (next.get(item.name) ?? original) !== (saved.current.get(item.name) ?? original);
@@ -86,6 +87,7 @@ export function usePdfForms(pdf, source, label, onForms, saveAction) {
     }
     setValues(new Map(saved.current));
     setDirty(false);
+    onPreviewChange();
   }
 
   useLayoutEffect(() => {

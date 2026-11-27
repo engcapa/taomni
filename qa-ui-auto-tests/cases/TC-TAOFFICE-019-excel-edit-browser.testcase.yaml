@@ -24,6 +24,9 @@ steps:
 - wait_for: '[data-testid="explorer-file-row"][data-name="quarterly.xlsx"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="quarterly.xlsx"]'
 - wait_for: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector(".taoffice-excel-grid td")).borderBottomWidth === "1px"
+    expect_truthy: true
 - click: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
 - assert_disabled: '[data-testid="taoffice-excel-edit-cell"]'
 - click: '[data-testid="taoffice-excel-cell"][data-address="B2"]'

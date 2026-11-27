@@ -5,9 +5,9 @@ const { React } = globalThis.__taomniHost;
 const { useId, useLayoutEffect, useRef } = React;
 
 export function PdfForms({
-  pdf, source, expanded, active, onClose, onPage, label, onForms, saveAction,
+  pdf, source, expanded, active, onClose, onPage, label, onForms, saveAction, onPreviewChange,
 }) {
-  const form = usePdfForms(pdf, source, label, onForms, saveAction);
+  const form = usePdfForms(pdf, source, label, onForms, saveAction, onPreviewChange);
   const heading = useId();
   const panel = useRef(null);
   useLayoutEffect(() => {
