@@ -80,17 +80,44 @@ it("keeps custom directory changes and local history operations", async () => {
   fireEvent.click(screen.getByTestId("backup-change-directory"));
   await waitFor(() => expect(h.disk.policy.customBackupDir).toBe("/new"));
 });
-it("keeps the opaque restore dialog and requires current vault verification", async () => {
-  render(<BackupSettingsPanel />); fireEvent.click(screen.getByTestId("backup-history-restore"));
-  const dialog = screen.getByTestId("backup-restore-dialog");
-  expect(dialog).toHaveAttribute("aria-modal", "true");
-  expect(dialog).toHaveProperty("style.background", "var(--taomni-bg)");
-  expect(dialog).toHaveProperty("style.borderColor", "var(--taomni-card-border)");
-  await screen.findByText("0.3.0");
-  fireEvent.click(screen.getByText("Confirm Restore & Restart Now"));
-  expect(screen.getByText("Vault master password is required.")).toBeDefined();
+it("requires the exact archive name and the current Vault password before staging", async () => {
+  render(<BackupSettingsPanel />);
+  fireEvent.click(screen.getByTestId("backup-history-restore"));
+  const dialog = screen.getByRole("dialog", { name: "Restore Confirmation" });
+  expect(dialog).toHaveAttribute("open");
+  expect(screen.getByTestId("backup-restore-cancel")).toHaveFocus();
+  const name = await screen.findByLabelText("Type the archive name legacy.taobak to confirm the restore.");
+  const confirm = screen.getByTestId("backup-restore-confirm");
+  expect(confirm).toBeDisabled();
+  fireEvent.change(name, { target: { value: "other.taobak" } });
+  expect(confirm).toBeDisabled();
+  fireEvent.change(name, { target: { value: "legacy.taobak" } });
+  fireEvent.click(confirm);
+  expect(screen.getByRole("alert")).toHaveTextContent("Vault master password is required.");
+  expect(screen.getByTestId("backup-restore-vault-password")).toHaveFocus();
   expect(mocks.invoke.mock.calls.some(([cmd]) => cmd === "backup_stage_restore")).toBe(false);
 });
+
+it("discards a late archive inspection when the user opens another backup", async () => {
+  const pending = deferred<unknown>();
+  let first = true;
+  mocks.invoke.mockImplementation((cmd, args) => {
+    if (cmd === "backup_inspect" && first) { first = false; return pending.promise; }
+    return h.invoke(cmd, args);
+  });
+  render(<BackupSettingsPanel />);
+  const trigger = screen.getByTestId("backup-history-restore");
+  trigger.focus();
+  fireEvent.click(trigger);
+  fireEvent.keyDown(screen.getByTestId("backup-restore-cancel"), { key: "Escape" });
+  expect(trigger).toHaveFocus();
+  fireEvent.click(trigger);
+  await screen.findByText("0.3.0");
+  await act(async () => pending.reject(new Error("late archive error")));
+  expect(screen.queryByText("late archive error")).toBeNull();
+  expect(screen.getByTestId("backup-restore-files")).toBeVisible();
+});
+
 it("shows expected password rejection, then stages once and waits before relaunch", async () => {
   const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
   try {
@@ -101,6 +128,7 @@ it("shows expected password rejection, then stages once and waits before relaunc
     render(<BackupSettingsPanel />);
     fireEvent.click(screen.getByTestId("backup-history-restore"));
     await screen.findByTestId("backup-restore-vault-password");
+    fireEvent.change(screen.getByTestId("backup-restore-name"), { target: { value: "legacy.taobak" } });
     fireEvent.change(screen.getByTestId("backup-restore-vault-password"), { target: { value: "wrong" } });
     fireEvent.click(screen.getByTestId("backup-restore-confirm"));
     expect(await screen.findByTestId("backup-restore-error")).toHaveTextContent("Incorrect vault master password");
@@ -121,6 +149,23 @@ it("shows expected password rejection, then stages once and waits before relaunc
     consoleError.mockRestore();
   }
 });
+it("retries a failed restart without staging the archive a second time", async () => {
+  mocks.relaunch.mockRejectedValueOnce(new Error("desktop is busy")).mockResolvedValueOnce(undefined);
+  render(<BackupSettingsPanel />);
+  fireEvent.click(screen.getByTestId("backup-history-restore"));
+  const name = await screen.findByTestId("backup-restore-name");
+  fireEvent.change(name, { target: { value: "legacy.taobak" } });
+  fireEvent.change(screen.getByTestId("backup-restore-vault-password"), { target: { value: "current" } });
+  vi.useFakeTimers();
+  await act(async () => { fireEvent.click(screen.getByTestId("backup-restore-confirm")); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+  expect(screen.getByRole("alert")).toHaveTextContent("desktop is busy");
+  expect(screen.getByTestId("backup-restore-confirm")).toBeDisabled();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Restart now" })); });
+  expect(mocks.relaunch).toHaveBeenCalledTimes(2);
+  expect(mocks.invoke.mock.calls.filter(([cmd]) => cmd === "backup_stage_restore")).toHaveLength(1);
+});
+
 it("refreshes history and background timestamp on completion", async () => {
   render(<BackupSettingsPanel />);
   await waitFor(() => expect(useBackupStore.getState().loading).toBe(false));

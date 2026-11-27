@@ -1,0 +1,42 @@
+id: TC-UIC-028-about-keyboard
+title: About keeps keyboard navigation in its window and returns to the application menu
+covers: [F1.9]
+tags: [ui-contract, main, keyboard]
+fixtures: [reset_db]
+modes: [browser, native]
+native_platforms: [Windows, Linux]
+ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-07, UI-FOC-03]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-about
+- press: {selector: '[data-testid="app-main-menu"]', key: Enter}
+- click: '[data-testid="context-menu-item-help"]'
+- wait_for: '[data-testid="about-dialog"]:modal'
+- assert_focus_on: '[data-testid="about-close"]'
+- press: Tab
+- assert_focus_on: '[data-testid="about-version"]'
+- press: Shift+Tab
+- assert_focus_on: '[data-testid="about-close"]'
+- press: Escape
+- assert_not_visible: '[data-testid="about-dialog"]'
+- assert_focus_on: '[data-testid="app-main-menu"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: about-focus
+    requirement: The Help menu opens one native top-layer About dialog. Focus starts on Close, wraps in both directions and returns to the same menu button after Escape.
+    ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-07, UI-FOC-03]
+    actions: [3, 4, 7, 9, 11]
+    checkpoints:
+    - {step: 5, expectation: The About dialog owns the window's modal top layer.}
+    - {step: 6, expectation: Close has initial keyboard focus.}
+    - {step: 8, expectation: Forward Tab past Close reaches the version action.}
+    - {step: 10, expectation: Reverse Tab wraps back to Close.}
+    - {step: 12, expectation: Escape dismisses About.}
+    - {step: 13, expectation: The application menu button regains focus.}
+    results: [5, 6, 8, 10, 12, 13]
+  native:
+  - {check: Focus ownership in the packaged renderer, method: automated, reason: Windows and Linux expose the application menu button. TC-MAC-001 exercises About from AppKit.}
+  visual:
+  - {check: Visible window and focus, method: automated, reason: Checks the WebView top layer and its actual active element.}

@@ -151,19 +151,19 @@ export function DebugFramesPane({
   return (
     <div
       data-testid="debug-frames-pane"
-      className="h-full min-h-0 min-w-0 flex flex-col bg-[var(--taomni-code-bg)] text-[11px]"
+      className="h-full min-h-0 min-w-0 flex flex-col bg-[var(--taomni-code-bg)] text-ui-small"
     >
       {/* Multi-session selector */}
       {debug.sessions.length > 1 && (
         <div className="h-7 shrink-0 flex items-center gap-1.5 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]/30 px-2">
-          <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">Session:</span>
+          <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">Session:</span>
           <select
             data-testid="debug-active-session"
             aria-label="Debug session"
             title="Select compound debug session"
             value={debug.activeSessionId ?? debug.sessions[0].id}
             onChange={(event) => debug.selectSession(event.target.value)}
-            className="h-5 min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[10px]"
+            className="h-5 min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-ui-caption"
           >
             {debug.sessions.map((session) => (
               <option key={session.id} value={session.id}>
@@ -184,7 +184,7 @@ export function DebugFramesPane({
             aria-haspopup="listbox"
             aria-expanded={threadMenuOpen}
             disabled={threads.length === 0}
-            className="flex h-5 w-full min-w-0 items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1.5 text-left text-[10px] disabled:opacity-50"
+            className="flex h-5 w-full min-w-0 items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1.5 text-left text-ui-caption disabled:opacity-50"
             onClick={() => setThreadMenuOpen((open) => !open)}
           >
             <span className="min-w-0 flex-1 truncate">
@@ -199,7 +199,7 @@ export function DebugFramesPane({
               role="listbox"
               aria-label="Threads"
               data-testid="debug-thread-list"
-              className="absolute left-0 right-0 top-full z-30 mt-0.5 max-h-60 overflow-auto rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-0.5 shadow-lg"
+              className="absolute left-0 right-0 top-full z-[var(--taomni-z-popover)] mt-0.5 max-h-60 overflow-auto rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-0.5 shadow-lg"
             >
               {threads.map((thread) => (
                 <div
@@ -207,7 +207,7 @@ export function DebugFramesPane({
                   role="option"
                   aria-selected={thread.id === shownThreadId}
                   data-testid={`debug-thread-${thread.id}`}
-                  className={`cursor-default truncate px-2 py-0.5 text-[10px] hover:bg-[var(--taomni-hover-bg)] ${
+                  className={`cursor-default truncate px-2 py-0.5 text-ui-caption hover:bg-[var(--taomni-hover)] ${
                     thread.id === shownThreadId ? "bg-[var(--taomni-accent)]/15 font-medium" : ""
                   }`}
                   onClick={() => {
@@ -227,7 +227,7 @@ export function DebugFramesPane({
           aria-pressed={hideLibrary}
           aria-label="Hide Frames from Libraries"
           title="Hide Frames from Libraries"
-          className="h-5 w-5 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover-bg)] aria-pressed:bg-[var(--taomni-accent)]/20"
+          className="h-5 w-5 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] aria-pressed:bg-[var(--taomni-accent)]/20"
           onClick={toggleHideLibrary}
         >
           <Funnel className="h-3 w-3 text-[var(--taomni-text-muted)]" />
@@ -238,18 +238,18 @@ export function DebugFramesPane({
       {state?.exceptionInfo && (
         <div
           data-testid="debug-exception-info"
-          className="border-b border-[var(--taomni-code-border)] bg-rose-500/10 px-2.5 py-1.5 shrink-0"
+          className="border-b border-[var(--taomni-code-border)] bg-ui-danger-surface px-2.5 py-1.5 shrink-0"
         >
-          <div className="font-medium text-rose-600 dark:text-rose-400">
+          <div className="font-medium text-ui-danger">
             {state.exceptionInfo.exceptionId}
           </div>
           {state.exceptionInfo.description && (
-            <div className="text-[10px] text-rose-600/90 dark:text-rose-400/90">
+            <div className="text-ui-caption text-ui-danger">
               {state.exceptionInfo.description}
             </div>
           )}
           {state.exceptionInfo.details && (
-            <pre className="mt-1 max-h-20 overflow-auto whitespace-pre-wrap font-mono text-[9px] text-[var(--taomni-text-muted)]">
+            <pre className="mt-1 max-h-20 overflow-auto whitespace-pre-wrap font-mono text-ui-caption text-[var(--taomni-text-muted)]">
               {state.exceptionInfo.details}
             </pre>
           )}
@@ -279,7 +279,7 @@ export function DebugFramesPane({
                 <div
                   key={`folded-${entry.firstId}`}
                   data-testid={`debug-frames-folded-${entry.firstId}`}
-                  className="cursor-default select-none px-2 py-0.5 text-[10px] italic text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)]"
+                  className="cursor-default select-none px-2 py-0.5 text-ui-caption italic text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
                   title="Show frames from libraries"
                   onClick={toggleHideLibrary}
                 >
@@ -298,7 +298,7 @@ export function DebugFramesPane({
                 data-frame-id={frame.id}
                 data-library-frame={library ? "true" : undefined}
                 className={`flex cursor-default select-none items-center gap-1.5 px-2 py-0.5 ${
-                  selected ? "bg-[var(--taomni-accent)]/20" : "hover:bg-[var(--taomni-hover-bg)]"
+                  selected ? "bg-[var(--taomni-accent)]/20" : "hover:bg-[var(--taomni-hover)]"
                 }`}
                 onClick={() => selectFrame(frame, true)}
                 onContextMenu={(e) => handleFrameContextMenu(e, frame)}
@@ -315,7 +315,7 @@ export function DebugFramesPane({
           <button
             type="button"
             data-testid="debug-frames-load-more"
-            className="w-full px-2 py-0.5 text-left text-[10px] text-[var(--taomni-accent)] hover:underline"
+            className="w-full px-2 py-0.5 text-left text-ui-caption text-[var(--taomni-accent)] hover:underline"
             onClick={() => void debug.loadMoreFrames()}
           >
             Load more frames…

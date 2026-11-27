@@ -40,9 +40,9 @@ export function ExportDialog({
     sqlCommanderPosition: "caret",
   });
   const queryTabs = listQueryTabs();
-  const input = "taomni-input h-7 text-[12px]";
-  const label = "flex flex-col gap-1 text-[11px] text-[var(--taomni-text-muted)]";
-  const sectionTitle = "mb-2 text-[12px] font-semibold";
+  const input = "taomni-input h-7 text-ui-body";
+  const label = "flex flex-col gap-1 text-ui-small text-[var(--taomni-text-muted)]";
+  const sectionTitle = "mb-2 text-ui-body font-semibold";
   const update = <K extends keyof ExportOptions>(key: K, value: ExportOptions[K]) => {
     onOptionsChange({ ...options, [key]: value });
   };
@@ -100,7 +100,7 @@ export function ExportDialog({
     setSettingsOpen(false);
   };
   const bool = (key: keyof ExportOptions, text: string) => (
-    <label className="h-7 inline-flex items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
+    <label className="h-7 inline-flex items-center gap-2 text-ui-small text-[var(--taomni-text-muted)]">
       <input type="checkbox" checked={Boolean(options[key])} onChange={(event) => update(key as never, event.target.checked as never)} />
       {text}
     </label>
@@ -201,7 +201,7 @@ export function ExportDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45" onMouseDown={onClose}>
+    <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center" onMouseDown={onClose}>
       <div
         className="w-[920px] max-w-[calc(100vw-24px)] h-[min(760px,calc(100vh-24px))] flex flex-col rounded shadow-xl"
         style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)", color: "var(--taomni-text)" }}
@@ -209,13 +209,13 @@ export function ExportDialog({
       >
         <div className="h-11 flex items-center gap-2 px-3" style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
           <Download className="w-4 h-4" />
-          <div className="font-semibold text-[13px]">Export Grid</div>
-          <div className="ml-3 flex items-center gap-1 text-[11px]">
+          <div className="font-semibold text-ui-body">Export Grid</div>
+          <div className="ml-3 flex items-center gap-1 text-ui-small">
             {["Format", "Columns", "Output"].map((name, index) => (
               <button key={name} type="button" className="h-6 px-2 rounded" style={{ background: step === index ? "var(--taomni-selected)" : "transparent", color: step === index ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }} onClick={() => setStep(index)}>{index + 1}. {name}</button>
             ))}
           </div>
-          <div className="ml-auto text-[11px] text-[var(--taomni-text-muted)]">{target === "selection" ? "Selection" : "All visible rows"}: {rowCount} / Total Rows in Grid: {totalRows}</div>
+          <div className="ml-auto text-ui-small text-[var(--taomni-text-muted)]">{target === "selection" ? "Selection" : "All visible rows"}: {rowCount} / Total Rows in Grid: {totalRows}</div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-3">
@@ -260,17 +260,17 @@ export function ExportDialog({
           {step === 1 && (
             <div className="h-full min-h-[420px] grid grid-cols-[1fr_150px] gap-3">
               <div className="min-w-0 overflow-auto taomni-scroll-y" style={{ border: "1px solid var(--taomni-divider)" }}>
-                <div className="min-w-[860px] grid grid-cols-[54px_160px_180px_120px_70px_130px_1fr] text-[11px]" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>
+                <div className="min-w-[860px] grid grid-cols-[54px_160px_180px_120px_70px_130px_1fr] text-ui-small" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>
                   {["Export", "Name", "Label (Alias)", "Type", "Is Text", "Text Function", "Value"].map((head) => <div key={head} className="px-2 py-1 font-semibold" style={{ borderRight: "1px solid var(--taomni-divider)" }}>{head}</div>)}
                   {columns.map((column) => (
                     <div key={column.id} className="contents">
                       <label className="px-2 py-1"><input type="checkbox" checked={column.export} onChange={(event) => updateColumn(column.id, { export: event.target.checked })} /></label>
                       <div className="px-2 py-1 truncate">{column.name}</div>
-                      <div className="px-1 py-1"><input className="taomni-input h-6 w-full text-[11px]" value={column.label} onChange={(event) => updateColumn(column.id, { label: event.target.value })} /></div>
+                      <div className="px-1 py-1"><input className="taomni-input h-6 w-full text-ui-small" value={column.label} onChange={(event) => updateColumn(column.id, { label: event.target.value })} /></div>
                       <div className="px-2 py-1 truncate">{column.type}</div>
                       <label className="px-2 py-1"><input type="checkbox" checked={column.isText} onChange={(event) => updateColumn(column.id, { isText: event.target.checked })} /></label>
-                      <div className="px-1 py-1"><select className="taomni-input h-6 w-full text-[11px]" value={column.textFunction} onChange={(event) => updateColumn(column.id, { textFunction: event.target.value as TextFunction })}><option value="none">None</option><option value="upper">Upper case</option><option value="lower">Lower case</option><option value="trim">Trim</option></select></div>
-                      <div className="px-1 py-1"><input className="taomni-input h-6 w-full text-[11px]" value={column.valueTemplate} onChange={(event) => updateColumn(column.id, { valueTemplate: event.target.value })} /></div>
+                      <div className="px-1 py-1"><select className="taomni-input h-6 w-full text-ui-small" value={column.textFunction} onChange={(event) => updateColumn(column.id, { textFunction: event.target.value as TextFunction })}><option value="none">None</option><option value="upper">Upper case</option><option value="lower">Lower case</option><option value="trim">Trim</option></select></div>
+                      <div className="px-1 py-1"><input className="taomni-input h-6 w-full text-ui-small" value={column.valueTemplate} onChange={(event) => updateColumn(column.id, { valueTemplate: event.target.value })} /></div>
                     </div>
                   ))}
                 </div>
@@ -290,7 +290,7 @@ export function ExportDialog({
           )}
 
           {step === 2 && (
-            <div className="space-y-3 text-[12px]">
+            <div className="space-y-3 text-ui-body">
               <label className="flex items-center gap-2"><input type="radio" checked={destination.kind === "file"} onChange={() => setDestination((current) => ({ ...current, kind: "file" }))} />File</label>
               {destination.kind === "file" && (
                 <div className="grid grid-cols-[1fr_130px] gap-2">
@@ -317,7 +317,7 @@ export function ExportDialog({
         <div className="relative h-11 flex items-center gap-2 px-3" style={{ borderTop: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
           <button type="button" className="taomni-btn inline-flex items-center gap-1" onClick={() => setSettingsOpen((value) => !value)}><FileText className="w-3.5 h-3.5" />Settings</button>
           {settingsOpen && (
-            <div className="absolute left-3 bottom-10 z-10 min-w-[230px] rounded shadow-lg p-1 text-[12px]" style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}>
+            <div className="absolute left-3 bottom-10 z-[var(--taomni-z-menu-over-modal)] min-w-[230px] rounded shadow-lg p-1 text-ui-body" style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}>
               <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={saveDefaultSettings}>Save As Default Settings</button>
               <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={useDefaultSettings}>Use Default Settings</button>
               <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={removeDefaultSettings}>Remove Default Settings</button>

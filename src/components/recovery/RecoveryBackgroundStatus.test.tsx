@@ -2,11 +2,13 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecoveryBackgroundStatus } from "./RecoveryBackgroundStatus";
 
+import { setLocale } from "../../lib/i18n";
+
 const mocks = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 describe("recovery background queries", () => {
-  beforeEach(() => { mocks.invoke.mockReset(); });
-  afterEach(() => { cleanup(); vi.useRealTimers(); });
+  beforeEach(() => { setLocale("zh-CN"); mocks.invoke.mockReset(); });
+  afterEach(() => { cleanup(); setLocale("en"); vi.useRealTimers(); });
 
   it("does no automatic work or polling and only uses three existing read queries", async () => {
     mocks.invoke.mockImplementation(async (command: string) => command === "list_server_statuses"

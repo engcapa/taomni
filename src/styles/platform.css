@@ -49,7 +49,7 @@ html[data-app-theme="dark"] .taomni-main-window {
   content: "";
   position: absolute;
   inset: -1px;
-  z-index: 40;
+  z-index: calc(var(--taomni-z-content) + 40);
   pointer-events: none;
   background:
     radial-gradient(circle at bottom right, transparent 8px, var(--taomni-chrome-border) 8px 9px, var(--taomni-chrome-bg) 9px) top left,
@@ -218,7 +218,7 @@ html[data-app-theme="dark"] .taomni-main-window {
 }
 
 .taomni-platform-toolbar-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; padding: 0 5px; }
-.taomni-platform-toolbar-button { display: inline-flex; height: 24px; min-width: 24px; align-items: center; justify-content: center; gap: 4px; padding: 0 4px; border-radius: 5px; color: var(--taomni-text-muted); font-size: 11px; }
+.taomni-platform-toolbar-button { display: inline-flex; height: 24px; min-width: 24px; align-items: center; justify-content: center; gap: 4px; padding: 0 4px; border-radius: 5px; color: var(--taomni-text-muted); font-size: var(--taomni-fs-small); }
 .taomni-platform-toolbar-button svg { width: 14px; height: 14px; }
 .taomni-platform-toolbar-button:hover { background: var(--taomni-hover); color: var(--taomni-text); }
 .taomni-platform-toolbar-button[data-active="true"] { background: var(--taomni-selected); color: var(--taomni-accent); }
@@ -231,29 +231,30 @@ html[data-app-theme="dark"] .taomni-main-window {
 .taomni-layout-presets { display: flex; align-items: center; border: 1px solid var(--taomni-card-border); border-radius: 5px; padding: 1px; gap: 1px; }
 .taomni-layout-presets .taomni-platform-toolbar-button { height: 20px; min-width: 21px; }
 .taomni-toolbar-divider { width: 1px; height: 18px; margin: 0 2px; background: var(--taomni-chrome-border); }
-.taomni-toolbar-pill { display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 6px; border: 1px solid var(--taomni-card-border); border-radius: 5px; font-size: 11px; white-space: nowrap; }
+.taomni-toolbar-pill { display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 6px; border: 1px solid var(--taomni-card-border); border-radius: 5px; font-size: var(--taomni-fs-small); white-space: nowrap; }
 .taomni-toolbar-pill:hover { background: var(--taomni-hover); }
 .taomni-toolbar-pill[data-primary="true"], .taomni-toolbar-pill[aria-pressed="true"] { background: var(--taomni-selected); color: var(--taomni-accent); border-color: var(--taomni-selected-border); }
 .taomni-main-window .taomni-titlebar-actions-overflow { display: flex; }
 .taomni-main-window .taomni-titlebar-actions-overflow .taomni-titlebar-tray-btn { height: 24px; width: 24px; border-radius: 5px; }
-.taomni-tab-overview { position: fixed; inset: 4px 6px 27px 42px; z-index: 9900; display: flex; flex-direction: column; overflow-y: auto; padding: 18px 24px; color: var(--taomni-text); background: color-mix(in srgb, var(--taomni-bg) 92%, transparent); backdrop-filter: blur(10px); }
+.taomni-tab-overview { position: fixed; inset: 4px 6px 27px 42px; margin: 0; border: 0; max-width: none; max-height: none; width: auto; height: auto; z-index: var(--taomni-z-modal); display: flex; flex-direction: column; overflow-y: auto; padding: 18px 24px; color: var(--taomni-text); background: color-mix(in srgb, var(--taomni-bg) 92%, transparent); backdrop-filter: blur(10px); }
+.taomni-tab-overview::backdrop { background: transparent; }
 .taomni-overview-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .taomni-overview-search-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .taomni-overview-search { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; border: 1px solid var(--taomni-card-border); border-radius: 6px; padding: 6px 10px; background: var(--taomni-card-bg); }
 .taomni-overview-search:focus-within { border-color: var(--taomni-accent); outline: 1px solid var(--taomni-accent); }
-.taomni-overview-search input { flex: 1; min-width: 0; outline: none; background: transparent; font-size: 12px; }
+.taomni-overview-search input { flex: 1; min-width: 0; outline: none; background: transparent; font-size: var(--taomni-fs-body); }
 .taomni-overview-search button { display: inline-flex; padding: 3px; border-radius: 4px; }
 .taomni-overview-search button:hover { background: var(--taomni-hover); }
-.taomni-overview-card[data-output-active="true"] { border-color: var(--taomni-success, #16a34a); box-shadow: inset 0 0 0 1px var(--taomni-success, #16a34a); }
-.taomni-overview-output-badge { display: inline-flex; flex-shrink: 0; align-items: center; gap: 3px; color: var(--taomni-success, #16a34a); border: 1px solid currentColor; border-radius: 4px; padding: 1px 4px; font-size: 10px; }
+.taomni-overview-card[data-output-active="true"] { border-color: var(--taomni-success-icon, #16a34a); box-shadow: inset 0 0 0 1px var(--taomni-success-icon, #16a34a); }
+.taomni-overview-output-badge { display: inline-flex; flex-shrink: 0; align-items: center; gap: 3px; color: var(--taomni-success-icon, #16a34a); border: 1px solid currentColor; border-radius: 4px; padding: 1px 4px; font-size: var(--taomni-fs-caption); }
 .taomni-overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .taomni-overview-card { display: flex; min-width: 0; flex-direction: column; overflow: hidden; text-align: left; border: 1px solid var(--taomni-card-border); border-radius: 10px; background: var(--taomni-card-bg); }
 .taomni-overview-card:hover, .taomni-overview-card:focus-visible, .taomni-overview-card[data-active="true"] { border-color: var(--taomni-accent); outline-color: var(--taomni-accent); }
 .taomni-overview-card:focus-visible { outline: 2px solid var(--taomni-accent); outline-offset: 2px; }
-.taomni-overview-enlarged { position: fixed; z-index: 9901; max-height: min(460px, 67vh); cursor: pointer; border-color: var(--taomni-accent); box-shadow: 0 18px 46px #0005; }
-.taomni-overview-enlarged .taomni-overview-summary { height: clamp(180px, 50vh, 400px); max-height: calc(67vh - 72px); font-size: 14px; }
-.taomni-overview-card-header { display: flex; width: 100%; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border-bottom: 1px solid var(--taomni-chrome-border); background: var(--taomni-panel-bg); font-size: 12.5px; }
-.taomni-overview-kind { flex-shrink: 0; border-radius: 3px; padding: 1px 5px; font-size: 10px; font-weight: bold; color: var(--taomni-accent); background: var(--taomni-selected); }
+.taomni-overview-enlarged { position: fixed; z-index: var(--taomni-z-menu-over-modal); max-height: min(460px, 67vh); cursor: pointer; border-color: var(--taomni-accent); box-shadow: 0 18px 46px #0005; }
+.taomni-overview-enlarged .taomni-overview-summary { height: clamp(180px, 50vh, 400px); max-height: calc(67vh - 72px); font-size: var(--taomni-fs-title); }
+.taomni-overview-card-header { display: flex; width: 100%; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border-bottom: 1px solid var(--taomni-chrome-border); background: var(--taomni-panel-bg); font-size: var(--taomni-fs-body); }
+.taomni-overview-kind { flex-shrink: 0; border-radius: 3px; padding: 1px 5px; font-size: var(--taomni-fs-caption); font-weight: bold; color: var(--taomni-accent); background: var(--taomni-selected); }
 .taomni-overview-title { display: block; flex: 1; min-width: 0; overflow: hidden; line-height: 1.4; font-weight: 600; }
 .taomni-overview-title[data-overflowing="true"] { -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 14px), transparent 100%); }
 .taomni-overview-title-track { display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -262,8 +263,8 @@ html[data-app-theme="dark"] .taomni-main-window {
 .taomni-overview-title-track[data-marquee] .taomni-overview-title-text { flex-shrink: 0; }
 .taomni-overview-title-track[data-marquee]::after { content: attr(data-marquee); flex-shrink: 0; padding-left: 36px; }
 @keyframes taomni-overview-marquee { 0%, 15% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-.taomni-overview-summary { width: 100%; height: clamp(190px, 26vh, 250px); overflow: hidden; padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--taomni-mono-font-family, monospace); font-size: 11.5px; line-height: 1.45; color: var(--taomni-code-text); background: var(--taomni-code-bg); }
-.taomni-overview-card-footer { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--taomni-chrome-border); font-size: 10.5px; color: var(--taomni-text-muted); }
+.taomni-overview-summary { width: 100%; height: clamp(190px, 26vh, 250px); overflow: hidden; padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--taomni-mono-font-family, monospace); font-size: var(--taomni-fs-small); line-height: 1.45; color: var(--taomni-code-text); background: var(--taomni-code-bg); }
+.taomni-overview-card-footer { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--taomni-chrome-border); font-size: var(--taomni-fs-caption); color: var(--taomni-text-muted); }
 @media (max-width: 680px) { .taomni-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 460px) { .taomni-overview-grid { grid-template-columns: 1fr; } }
 @media (max-width: 800px) { .taomni-platform-toolbar-actions { gap: 1px; padding: 0 2px; } .taomni-platform-toolbar-actions .taomni-toolbar-pill { max-width: 100px; overflow: hidden; } .taomni-overview-header { flex-wrap: wrap; } }
@@ -276,3 +277,5 @@ html[data-app-theme="dark"] .taomni-main-window {
 .taomni-platform-toolbar-button, .taomni-toolbar-pill { font-size: calc(var(--taomni-ui-font-size) - 1px); }
 .taomni-main-window .taomni-control-bar { min-height: max(33px, calc(var(--taomni-ui-font-size) + 17px)); height: max(33px, calc(var(--taomni-ui-font-size) + 17px)); }
 .taomni-workspace-tab, .taomni-main-window .taomni-control-bar .taomni-tab { height: max(28px, calc(var(--taomni-ui-font-size) + 13px)); }
+
+.taomni-tab-filter-menu { z-index: var(--taomni-z-popover); }

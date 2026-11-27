@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { useState } from "react";
 import { ChevronDown, Pencil, Settings, X } from "lucide-react";
 import { HtmlThumbnail } from "./HtmlThumbnail";
@@ -89,8 +90,8 @@ export function ExplorerPreviewPane({ entries, currentPath, tabId, workspaceId, 
       <div className="ex-pv-hd">
         <span>{label("预览", "Preview")}</span>
         <span className="ex-pv-spacer" />
-        <button type="button" className="ex-pv-ibtn" data-testid="explorer-preview-settings" title={label("预览选项", "Preview options")} onClick={settings}><Settings /></button>
-        <button type="button" className="ex-pv-ibtn" data-testid="explorer-preview-close" title={label("关闭预览 (Alt+P)", "Close preview (Alt+P)")} onClick={onClose}><X /></button>
+        <IconButton type="button" className="ex-pv-ibtn" data-testid="explorer-preview-settings" label={label("预览选项", "Preview options")} onClick={settings}><Settings /></IconButton>
+        <IconButton type="button" className="ex-pv-ibtn" data-testid="explorer-preview-close" label={label("关闭预览 (Alt+P)", "Close preview (Alt+P)")} onClick={onClose}><X /></IconButton>
       </div>
       <div className="ex-pv-body">
         {entries.length === 0 ? (

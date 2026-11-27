@@ -74,7 +74,7 @@ export function SystemRdpCard({ config, onChange }: Props) {
       className="flex flex-col mb-1.5"
     >
       <FormRow label={t("servers.systemRdp.title")}>
-        <span className="text-[11px]" data-testid="rdp-system-message">
+        <span className="text-ui-small" data-testid="rdp-system-message">
           {message}
         </span>
       </FormRow>
@@ -103,7 +103,7 @@ export function SystemRdpCard({ config, onChange }: Props) {
       </FormRow>
       {chosen ? (
         <FormRow label="">
-          <span className="text-[11px]" data-testid="rdp-system-choice">
+          <span className="text-ui-small" data-testid="rdp-system-choice">
             {t("servers.systemRdp.choiceTaomni")}
           </span>
           <button

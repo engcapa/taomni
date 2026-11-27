@@ -252,6 +252,7 @@ def run(ctx, args):
         if state.get("jobId"):
             owner = getattr(ctx, "fixture_context", None) or ctx
             owner.values["module_restore_job_id"] = state["jobId"]
+            owner.values["restore_archive_name"] = Path(state["archive"]).name
         observed.update(passed=True, generation=current, registryState=native_state)
         return "module restore " + phase + " verified"
     finally:

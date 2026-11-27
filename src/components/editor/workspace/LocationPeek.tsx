@@ -57,18 +57,18 @@ export function LocationPeek({ open, state, onClose, onOpen }: LocationPeekProps
   return (
     <div
       data-testid="code-workspace-location-peek"
-      className="absolute bottom-24 left-1/2 z-40 w-[min(560px,90vw)] -translate-x-1/2 overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-xl"
+      className="absolute bottom-24 left-1/2 z-[var(--taomni-z-popover)] w-[min(560px,90vw)] -translate-x-1/2 overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-xl"
     >
-      <div className="flex h-8 items-center border-b border-[var(--taomni-code-border)] px-3 text-[11px] font-semibold text-[var(--taomni-code-text)]">
+      <div className="flex h-8 items-center border-b border-[var(--taomni-code-border)] px-3 text-ui-small font-semibold text-[var(--taomni-code-text)]">
         <span className="min-w-0 flex-1 truncate">{state.title}</span>
-        <span className="text-[10px] font-normal text-[var(--taomni-code-muted)]">
+        <span className="text-ui-caption font-normal text-[var(--taomni-code-muted)]">
           {state.locations.length} result{state.locations.length === 1 ? "" : "s"}
         </span>
       </div>
-      <div className="max-h-64 overflow-auto py-1 text-[11px]">
+      <div className="max-h-64 overflow-auto py-1 text-ui-small">
         {[...groups.entries()].map(([path, locations]) => (
           <div key={path}>
-            <div className="px-3 py-1 text-[10px] font-medium text-[var(--taomni-code-muted)]">{path}</div>
+            <div className="px-3 py-1 text-ui-caption font-medium text-[var(--taomni-code-muted)]">{path}</div>
             {locations.map((location) => {
               const current = flatIndex;
               flatIndex += 1;
@@ -90,7 +90,7 @@ export function LocationPeek({ open, state, onClose, onOpen }: LocationPeekProps
           </div>
         ))}
       </div>
-      <div className="border-t border-[var(--taomni-code-border)] px-3 py-1 text-[10px] text-[var(--taomni-code-muted)]">
+      <div className="border-t border-[var(--taomni-code-border)] px-3 py-1 text-ui-caption text-[var(--taomni-code-muted)]">
         ↑↓ select · Enter open · Esc close
       </div>
     </div>

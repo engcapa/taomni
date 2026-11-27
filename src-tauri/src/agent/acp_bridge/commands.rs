@@ -1,4 +1,4 @@
-use super::{AcpAgentInfo, AcpProcess, AcpProfileConfig, AcpRuntimeError, process_config};
+use super::{AcpAgentInfo, AcpProcess, AcpProfileConfig, process_config};
 use crate::state::AppState;
 use serde::Serialize;
 use std::path::Path;
@@ -49,70 +49,73 @@ pub async fn acp_probe_profile(
 /// before replying to the local CLI.
 #[tauri::command]
 pub async fn acp_resolve_permission(
+    window: tauri::WebviewWindow,
     thread_id: String,
+    permission_owner_id: Option<String>,
     call_id: String,
     option_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let thread_process = {
-        let registry = state.core.agent.acp_processes.lock().await;
-        registry.get(&thread_id).cloned()
-    };
-    if let Some(process) = thread_process {
-        match process.resolve_permission(&call_id, &option_id).await {
-            Ok(()) => return Ok(()),
-            // A thread can briefly retain its reusable chat process while an
-            // image/video request uses a separate short-lived ACP process.
-            // Only fall through on a missing call id; a matching prompt with
-            // an invalid option must remain an error.
-            Err(AcpRuntimeError::PermissionNotPending) => {}
-            Err(error) => return Err(error.to_string()),
-        }
-    }
-    let media_process = {
-        let registry = state.core.agent.acp_media_processes.lock().await;
-        registry.get(&thread_id).cloned()
-    };
-    if let Some(process) = media_process {
-        return process
-            .resolve_permission(&call_id, &option_id)
-            .await
-            .map_err(|error| error.to_string());
-    }
-    Err("ACP thread is no longer active".to_string())
+    submit_permission(
+        &state,
+        window.label(),
+        &thread_id,
+        permission_owner_id.as_deref(),
+        &call_id,
+        Some(&option_id),
+    )
+    .await
 }
 
-/// Cancel a single ACP native-tool permission. This sends ACP's explicit
-/// `cancelled` outcome instead of pretending a provider-defined reject option
-/// was selected.
+/// Cancel using ACP's explicit cancelled outcome.
 #[tauri::command]
 pub async fn acp_cancel_permission(
+    window: tauri::WebviewWindow,
     thread_id: String,
+    permission_owner_id: Option<String>,
     call_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let thread_process = {
-        let registry = state.core.agent.acp_processes.lock().await;
-        registry.get(&thread_id).cloned()
-    };
-    if let Some(process) = thread_process {
-        match process.cancel_permission(&call_id).await {
-            Ok(()) => return Ok(()),
-            Err(AcpRuntimeError::PermissionNotPending) => {}
-            Err(error) => return Err(error.to_string()),
+    submit_permission(
+        &state,
+        window.label(),
+        &thread_id,
+        permission_owner_id.as_deref(),
+        &call_id,
+        None,
+    )
+    .await
+}
+
+async fn submit_permission(
+    state: &AppState,
+    window: &str,
+    thread: &str,
+    owner: Option<&str>,
+    call: &str,
+    option: Option<&str>,
+) -> Result<(), String> {
+    let agent = &state.core.agent;
+    let owner = agent
+        .pending_approvals
+        .take_acp(thread, owner, call, window, option)?;
+    let chat = agent.acp_processes.lock().await.get(thread).cloned();
+    if let Some(process) = chat.filter(|p| p.permission_owner_id() == owner) {
+        return match option {
+            Some(option) => process.resolve_permission(call, option).await,
+            None => process.cancel_permission(call).await,
         }
+        .map_err(|e| e.to_string());
     }
-    let media_process = {
-        let registry = state.core.agent.acp_media_processes.lock().await;
-        registry.get(&thread_id).cloned()
-    };
-    if let Some(process) = media_process {
-        return process
-            .cancel_permission(&call_id)
-            .await
-            .map_err(|error| error.to_string());
+    let media = agent.acp_media_processes.lock().await.get(thread).cloned();
+    let process = media
+        .filter(|p| p.permission_owner_id() == owner)
+        .ok_or("ACP approval process has ended")?;
+    match option {
+        Some(option) => process.resolve_permission(call, option).await,
+        None => process.cancel_permission(call).await,
     }
-    Err("ACP thread is no longer active".to_string())
+    .map_err(|e| e.to_string())
 }
 
 pub async fn probe_profile(

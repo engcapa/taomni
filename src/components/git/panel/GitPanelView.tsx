@@ -219,7 +219,7 @@ export function GitPanelView(inputs: GitPanelViewProps) {
     >
       <header className={`${embedded ? "h-9 px-2" : "h-10 px-3"} shrink-0 flex items-center gap-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]`}>
         {embedded ? (
-          <span className="max-w-40 truncate text-[11px] text-[var(--taomni-text-muted)]" title={repoRoot}>
+          <span className="max-w-40 truncate text-ui-small text-[var(--taomni-text-muted)]" title={repoRoot}>
             {repoName}
           </span>
         ) : workspaceHeader ? (
@@ -234,11 +234,11 @@ export function GitPanelView(inputs: GitPanelViewProps) {
               <>
                 <div className="min-w-0">
                   <div className="font-semibold leading-4 truncate">Workspace Git · {workspaceHeader.title}</div>
-                  <div className="text-[11px] text-[var(--taomni-text-muted)] truncate max-w-[520px]">{workspaceHeader.summary}</div>
+                  <div className="text-ui-small text-[var(--taomni-text-muted)] truncate max-w-[520px]">{workspaceHeader.summary}</div>
                 </div>
                 <span className="taomni-divider-v h-5 mx-1" />
                 <span
-                  className="inline-flex items-center gap-1 h-6 max-w-56 rounded bg-[var(--taomni-hover)] px-2 text-[11px]"
+                  className="inline-flex items-center gap-1 h-6 max-w-56 rounded bg-[var(--taomni-hover)] px-2 text-ui-small"
                   title={workspaceHeader.selectedRepoRoot}
                 >
                   <span className="shrink-0 text-[var(--taomni-text-muted)]">Repository detail</span>
@@ -252,14 +252,14 @@ export function GitPanelView(inputs: GitPanelViewProps) {
             <GitBranch className="w-4 h-4 text-[var(--taomni-accent)]" />
             <div className="min-w-0">
               <div className="font-semibold leading-4 truncate">Git · {repoName}</div>
-              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate max-w-[520px]">{repoRoot}</div>
+              <div className="text-ui-small text-[var(--taomni-text-muted)] truncate max-w-[520px]">{repoRoot}</div>
             </div>
             <span className="taomni-divider-v h-5 mx-1" />
           </>
         )}
         {workspaceHeader?.branchBadge ?? <BranchBadge snapshot={snapshot} />}
         {workspaceHeader?.changeSummary ?? (displayedChangeCount !== null && (
-          <span className="text-[11px] text-[var(--taomni-text-muted)]">
+          <span className="text-ui-small text-[var(--taomni-text-muted)]">
             {displayedChangeCount} changes
             {snapshot && (snapshot.ahead || snapshot.behind) ? ` · ↑${snapshot.ahead} ↓${snapshot.behind}` : ""}
           </span>
@@ -302,19 +302,19 @@ export function GitPanelView(inputs: GitPanelViewProps) {
             data-testid={item === "log" ? "git-log-tab" : `git-${item}-tab`}
             data-git-view={item}
             aria-pressed={view === item}
-            className={`h-7 px-3 rounded text-[12px] capitalize ${view === item ? "bg-[var(--taomni-accent)] text-white" : "hover:bg-[var(--taomni-hover)]"}`}
+            className={`h-7 px-3 rounded text-ui-body capitalize ${view === item ? "bg-[var(--taomni-accent)] text-white" : "hover:bg-[var(--taomni-hover)]"}`}
             onClick={() => switchView(item)}
           >
             {item}
           </button>
         ))}
         {(busy || loading) && <Loader2 className="w-3.5 h-3.5 animate-spin ml-1" />}
-        {error && <span className="ml-2 text-[11px] text-red-500 truncate">{error}</span>}
+        {error && <span className="ml-2 text-ui-small text-ui-danger truncate">{error}</span>}
       </nav>
 
       {(operation && operation.kind !== "none") || hasConflicts ? (
-        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-amber-500/30 bg-amber-500/10 text-[12px]">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-ui-warning-border bg-ui-warning-surface text-ui-body">
+          <AlertTriangle className="w-4 h-4 text-ui-warning shrink-0" />
           <span className="min-w-0">
             {operationLabel(operation)}
             {operation?.conflictedPaths.length
@@ -343,7 +343,7 @@ export function GitPanelView(inputs: GitPanelViewProps) {
                 </button>
               )}
               <button
-                className="taomni-btn h-7 px-2 text-red-500"
+                className="taomni-btn h-7 px-2 text-ui-danger"
                 type="button"
                 disabled={busy}
                 onClick={() => void runAction(`Abort ${operation.kind}`, () => gitOperationAbort(repoRoot, operation.kind))}

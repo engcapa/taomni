@@ -52,7 +52,7 @@ export function CodexProxyFields({ mode, sessionId, proxyUrl, includeInherit = f
     <div className="space-y-2">
       <div className="flex flex-wrap gap-3">
         {modes.map(({ value, label }) => (
-          <label key={value} className="flex items-center gap-1.5 cursor-pointer text-[11px]">
+          <label key={value} className="flex items-center gap-1.5 cursor-pointer text-ui-small">
             <input
               type="radio"
               className="accent-[var(--taomni-accent)]"
@@ -67,7 +67,7 @@ export function CodexProxyFields({ mode, sessionId, proxyUrl, includeInherit = f
       {selectedMode === "session" &&
         (proxySessions.length > 0 ? (
           <select
-            className="taomni-input h-7 w-full text-[12px]"
+            className="taomni-input h-7 w-full text-ui-body"
             value={sessionId ?? ""}
             onChange={(e) => onChange({ proxy_session_id: e.target.value || null })}
           >
@@ -79,13 +79,13 @@ export function CodexProxyFields({ mode, sessionId, proxyUrl, includeInherit = f
             ))}
           </select>
         ) : (
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">{t("settings.appProxySessionNone")}</div>
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">{t("settings.appProxySessionNone")}</div>
         ))}
 
       {selectedMode === "manual" && (
         <input
           type="text"
-          className="taomni-input h-7 w-full text-[12px] font-mono"
+          className="taomni-input h-7 w-full text-ui-body font-mono"
           placeholder="http://127.0.0.1:31028"
           value={proxyUrl ?? ""}
           onChange={(e) => onChange({ proxy_url: e.target.value.trim() || null })}

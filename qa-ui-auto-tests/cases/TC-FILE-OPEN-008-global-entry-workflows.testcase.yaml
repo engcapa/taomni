@@ -42,7 +42,7 @@ steps:
 - reload_window: null
 - click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="ai-chat-drawer"][data-open="true"]'
-- click: '[data-testid="ai-chat-drawer"] button[title="History"]'
+- click: '[data-testid="ai-chat-drawer"] button[aria-label="History"]'
 - click: 'xpath=//*[@data-testid="ai-chat-drawer"]//div[text()="QA file path entry"]'
 - wait_for: '[data-testid="ai-file-link"]'
 - click: '[data-testid="ai-file-link"]'

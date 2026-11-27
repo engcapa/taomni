@@ -12,6 +12,7 @@
 //! Supported kinds: sftp, rdp, vnc, terminal, database, notes,
 //! servers. Anything else lands in the catch-all error branch below.
 
+pub(crate) mod pending_approvals;
 pub(crate) mod thread_delivery;
 
 use tauri::{

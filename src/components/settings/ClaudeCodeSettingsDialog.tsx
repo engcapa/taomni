@@ -1,4 +1,9 @@
+import { Button } from "../ui/Button";
+import { IconButton } from "../ui/IconButton";
+import { ModalSurface } from "../ui/ModalSurface";
+import { confirmAppDialog } from "../../lib/appDialogs";
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Sliders, Loader2, X, Plus, Trash2, Shield, AlertTriangle } from "lucide-react";
 import { useAiStore, CcCustomSettingsProfile } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
@@ -126,17 +131,6 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
     }
   };
 
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
   // Load on mount
   useEffect(() => {
     if (!config) return;
@@ -234,12 +228,12 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
     }
   };
 
-  const handleDeleteProfile = (id: string, e: React.MouseEvent) => {
+  const handleDeleteProfile = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const profile = profiles.find(p => p.id === id);
     if (!profile) return;
 
-    if (!window.confirm(t("aiSettings.ccCustomConfirmDelete", { name: profile.name }))) {
+    if (!await confirmAppDialog({ message: t("aiSettings.ccCustomConfirmDelete", { name: profile.name }), danger: true })) {
       return;
     }
 
@@ -387,47 +381,43 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
     }
   };
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(20,30,45,0.4)" }}
+  return createPortal(
+    <ModalSurface
+      initialFocus="input:enabled, button:enabled"
+      onCancel={onClose}
+      aria-label={t("aiSettings.ccCustomModalTitle")}
+      className="m-auto p-0 open:flex flex-col rounded-[6px] shadow-2xl border overflow-hidden backdrop:bg-[var(--taomni-overlay)]"
+      style={{
+        width: "min(860px, 96vw)",
+        height: "min(640px, 85vh)",
+        minWidth: "min(640px, 96vw)",
+        minHeight: "min(420px, 85vh)",
+        maxWidth: "96vw",
+        maxHeight: "85vh",
+        resize: "both",
+        background: "var(--taomni-panel-bg)",
+        borderColor: "var(--taomni-chrome-border)",
+        color: "var(--taomni-text)",
+      }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
-        style={{
-          width: "min(860px, 96vw)",
-          height: "min(640px, 85vh)",
-          minWidth: "min(640px, 96vw)",
-          minHeight: "min(420px, 85vh)",
-          maxWidth: "96vw",
-          maxHeight: "85vh",
-          resize: "both",
-          background: "var(--taomni-panel-bg)",
-          borderColor: "var(--taomni-chrome-border)",
-          color: "var(--taomni-text)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Titlebar */}
+      {/* Titlebar */}
         <div
           className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none"
           style={{
-            background: "linear-gradient(to bottom, #5895c8, #2b5d8b)",
-            color: "white",
+            background: "var(--taomni-chrome-bg)",
+            color: "var(--taomni-text)",
           }}
         >
           <Sliders className="w-3.5 h-3.5 mr-1.5" />
-          <div className="text-[12px] font-semibold">{t("aiSettings.ccCustomModalTitle")}</div>
-          <button
-            title={t("common.close")}
-            className="ml-auto hover:bg-red-500 rounded p-0.5"
+          <div className="text-ui-body font-semibold">{t("aiSettings.ccCustomModalTitle")}</div>
+          <IconButton
+            label={t("common.close")}
+            className="ml-auto hover:bg-[var(--taomni-control-hover)] rounded p-0.5"
             onClick={onClose}
             type="button"
           >
             <X className="w-3.5 h-3.5" />
-          </button>
+          </IconButton>
         </div>
 
         {/* Body columns */}
@@ -443,7 +433,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
               background: "var(--taomni-panel-bg)",
             }}
           >
-            <div className="p-2 border-b text-[11px] font-semibold" style={{ borderColor: "var(--taomni-divider)" }}>
+            <div className="p-2 border-b text-ui-small font-semibold" style={{ borderColor: "var(--taomni-divider)" }}>
               {t("aiSettings.ccCustomListHeader")}
             </div>
 
@@ -454,7 +444,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                 return (
                   <div
                     key={p.id}
-                    className={`group flex items-center justify-between p-2 rounded cursor-pointer transition-colors text-[11px] ${
+                    className={`group flex items-center justify-between p-2 rounded cursor-pointer transition-colors text-ui-small ${
                       isSelected
                         ? "bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] font-medium"
                         : "hover:bg-[var(--taomni-hover)]"
@@ -464,24 +454,24 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <span className="truncate">{p.name}</span>
                       {isActive && (
-                        <span className="px-1 text-[8px] leading-tight bg-green-500/15 text-green-400 border border-green-500/35 rounded shrink-0">
+                        <span className="px-1 text-ui-caption leading-tight bg-ui-success-surface text-ui-success border border-ui-success-border rounded shrink-0">
                           {t("aiSettings.ccCustomActiveLabel")}
                         </span>
                       )}
                       {!p.enabled && (
-                        <span className="px-1 text-[8px] leading-tight bg-[var(--taomni-divider)] text-[var(--taomni-text-muted)] border rounded shrink-0">
+                        <span className="px-1 text-ui-caption leading-tight bg-[var(--taomni-divider)] text-[var(--taomni-text-muted)] border rounded shrink-0">
                           {t("aiSettings.ccCustomDisabled")}
                         </span>
                       )}
                     </div>
-                    <button
+                    <IconButton
                       type="button"
-                      title={t("common.delete")}
-                      className="opacity-0 group-hover:opacity-100 hover:text-red-400 p-0.5 transition-opacity rounded"
+                      label={t("common.delete")}
+                      className="opacity-0 group-hover:opacity-100 hover:text-ui-danger p-0.5 transition-opacity rounded"
                       onClick={(e) => handleDeleteProfile(p.id, e)}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                   </div>
                 );
               })}
@@ -490,7 +480,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
             <div className="p-2 border-t" style={{ borderColor: "var(--taomni-divider)" }}>
               <button
                 type="button"
-                className="taomni-btn w-full h-7 px-3 text-[11px] inline-flex items-center justify-center gap-1"
+                className="taomni-btn w-full h-7 px-3 text-ui-small inline-flex items-center justify-center gap-1"
                 onClick={handleAddProfile}
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -506,19 +496,19 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                 {/* Profile fields */}
                 <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">
+                    <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">
                       {t("aiSettings.ccCustomProfileNameLabel")}
                     </label>
                     <input
                       type="text"
-                      className="taomni-input h-7 w-full text-[12px]"
+                      className="taomni-input h-7 w-full text-ui-body"
                       value={selectedProfile.name}
                       onChange={(e) => handleUpdateName(e.target.value)}
                     />
                   </div>
 
                   <div className="flex flex-wrap gap-4">
-                    <label className="flex items-center gap-2 text-[11px] cursor-pointer">
+                    <label className="flex items-center gap-2 text-ui-small cursor-pointer">
                       <input
                         type="checkbox"
                         className="taomni-checkbox"
@@ -532,7 +522,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                       <span>{t("aiSettings.ccCustomActiveLabel")}</span>
                     </label>
 
-                    <label className="flex items-center gap-2 text-[11px] cursor-pointer">
+                    <label className="flex items-center gap-2 text-ui-small cursor-pointer">
                       <input
                         type="checkbox"
                         className="taomni-checkbox"
@@ -543,7 +533,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                     </label>
                   </div>
                   <div>
-                    <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">
+                    <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">
                       {t("aiSettings.codexProxyTitle")}
                     </label>
                     <CodexProxyFields
@@ -558,7 +548,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
 
                 {/* JSON Textarea Editor */}
                 <div className="flex-1 flex flex-col min-h-[220px] mt-2 relative">
-                  <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">
+                  <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">
                     settings.json
                   </label>
                   {isSelectedLoading ? (
@@ -567,7 +557,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                     </div>
                   ) : (
                     <textarea
-                      className="taomni-input flex-1 font-mono text-[11px] leading-relaxed w-full resize-none"
+                      className="taomni-input flex-1 font-mono text-ui-small leading-relaxed w-full resize-none"
                       spellCheck={false}
                       value={selectedContent}
                       onChange={(e) => handleUpdateContent(e.target.value)}
@@ -579,12 +569,12 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                 {/* Test Section */}
                 <div className="border border-[var(--taomni-divider)] rounded p-2 bg-[var(--taomni-panel-bg)]/50 flex flex-col gap-1.5 shrink-0 mt-1">
                   <div className="flex items-center justify-between">
-                    <div className="text-[11px] font-semibold text-[var(--taomni-text)]">
+                    <div className="text-ui-small font-semibold text-[var(--taomni-text)]">
                       {t("aiSettings.ccTestTitle") || "Test Configuration"}
                     </div>
                     <button
                       type="button"
-                      className="taomni-btn h-6 px-2 text-[10px]"
+                      className="taomni-btn h-6 px-2 text-ui-caption"
                       onClick={handleTestSettings}
                       disabled={testing || isSelectedLoading}
                     >
@@ -601,8 +591,8 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                   
                   {/* Test Output Console */}
                   {(testResult !== null || testError !== null || testing) && (
-                    <div className="bg-[var(--taomni-bg)] border border-[var(--taomni-input-border)] rounded p-1.5 text-[10px] font-mono max-h-[100px] overflow-y-auto leading-relaxed relative">
-                      <div className="text-[9px] text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] pb-0.5 mb-1">
+                    <div className="bg-[var(--taomni-bg)] border border-[var(--taomni-input-border)] rounded p-1.5 text-ui-caption font-mono max-h-[100px] overflow-y-auto leading-relaxed relative">
+                      <div className="text-ui-caption text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] pb-0.5 mb-1">
                         Prompt: "Hello, My name is Taomni, Can you help me?"
                       </div>
                       {testing && !testResult && (
@@ -617,7 +607,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                         </div>
                       )}
                       {testError && (
-                        <div className="text-red-400 whitespace-pre-wrap">
+                        <div className="text-ui-danger whitespace-pre-wrap">
                           Error: {testError}
                         </div>
                       )}
@@ -625,7 +615,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                   )}
                 </div>
 
-                <div className="text-[10px] text-[var(--taomni-text-muted)] flex items-center gap-1 shrink-0">
+                <div className="text-ui-caption text-[var(--taomni-text-muted)] flex items-center gap-1 shrink-0">
                   <Shield className="w-3.5 h-3.5 shrink-0" />
                   <span>{t("aiSettings.ccCustomNote")}</span>
                 </div>
@@ -633,7 +623,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-[var(--taomni-text-muted)] gap-2">
                 <Sliders className="w-8 h-8 opacity-40" />
-                <span className="text-[11px]">{t("aiSettings.ccCustomPlaceholder")}</span>
+                <span className="text-ui-small">{t("aiSettings.ccCustomPlaceholder")}</span>
               </div>
             )}
           </div>
@@ -645,7 +635,7 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
           style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}
         >
           {error && (
-            <span className="text-[11px] text-red-400 flex items-center gap-1">
+            <span role="alert" className="text-ui-small text-ui-danger flex items-center gap-1">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate max-w-[400px]">{error}</span>
             </span>
@@ -653,26 +643,14 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
 
           <div className="flex-1" />
 
-          <button
-            className="taomni-btn"
-            onClick={onClose}
-            disabled={saving}
-            type="button"
-          >
+          <Button onClick={onClose} disabled={saving}>
             {t("common.cancel")}
-          </button>
-          <button
-            className="taomni-btn"
-            data-primary="true"
-            onClick={handleSave}
-            disabled={saving}
-            type="button"
-          >
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1 inline" /> : null}
+          </Button>
+          <Button variant="primary" onClick={handleSave} busy={saving}>
             {t("common.save")}
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+    </ModalSurface>,
+    document.body,
   );
 }

@@ -11,6 +11,7 @@ description: 'Browser regression gate for the renderer-owned Code Workspace surf
   action routing only; clipboard, LSP and disk effects remain native concerns.
 
   '
+ui_standard: [UI-DLG-06]
 covers:
 - F25.3
 - F25.5
@@ -93,6 +94,10 @@ steps:
     selector: '[data-testid="workspace-editor-appearance-clipboard-max-bytes"]'
     value: '32768'
 - click: '[data-testid="workspace-editor-appearance-clipboard-clear"]'
+- assert_text: {selector: '[data-testid="confirm-dialog-message"]', contains: Clear clipboard history}
+- assert_focus_on: '[data-testid="confirm-dialog-cancel"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
 - click: '[data-testid="workspace-editor-appearance-reset"]'
 - fill:
     selector: '[data-testid="workspace-editor-appearance-font-size-px"]'
@@ -223,42 +228,42 @@ verification:
     - 38
     - 39
     - 40
-    - 41
-    - 42
-    - 43
     - 45
+    - 46
     - 47
-    - 48
     - 49
-    - 50
+    - 51
+    - 52
     - 53
-    - 55
+    - 54
     - 57
-    - 58
     - 59
-    - 60
+    - 61
     - 62
     - 63
     - 64
-    - 65
     - 66
     - 67
     - 68
     - 69
     - 70
+    - 71
     - 72
+    - 73
     - 74
-    - 75
     - 76
-    - 77
+    - 78
     - 79
+    - 80
     - 81
     - 83
     - 85
-    - 86
-    - 88
+    - 87
     - 89
     - 90
+    - 92
+    - 93
+    - 94
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -276,49 +281,58 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
     - step: 20
       expectation: '{"wait_for": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]"}'
-    - step: 44
+    - step: 48
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]", "state":
         "detached"}}'
-    - step: 46
+    - step: 50
       expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
-    - step: 51
+    - step: 55
       expectation: '{"wait_for": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]"}'
-    - step: 52
+    - step: 56
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-editor-appearance-font-size-px\"]",
         "name": "value", "equals": "15"}}'
-    - step: 54
+    - step: 58
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]", "state":
         "detached"}}'
-    - step: 56
+    - step: 60
       expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
-    - step: 61
+    - step: 65
       expectation: '{"wait_for": "[data-testid=\"workspace-intelligence-settings-dialog\"]"}'
-    - step: 71
+    - step: 75
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-intelligence-settings-dialog\"]", "state":
         "detached"}}'
-    - step: 73
+    - step: 77
       expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
-    - step: 78
-      expectation: '{"wait_for": "[data-testid=\"workspace-intelligence-settings-dialog\"]"}'
-    - step: 80
-      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-intelligence-settings-dialog\"]", "state":
-        "detached"}}'
     - step: 82
-      expectation: '{"wait_for": "[data-testid=\"keymap-cheatsheet-dialog\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"workspace-intelligence-settings-dialog\"]"}'
     - step: 84
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-intelligence-settings-dialog\"]", "state":
+        "detached"}}'
+    - step: 86
+      expectation: '{"wait_for": "[data-testid=\"keymap-cheatsheet-dialog\"]"}'
+    - step: 88
       expectation: '{"wait_for": "[data-testid=\"keymap-item-workspace.renameSymbol\"]"}'
-    - step: 87
-      expectation: '{"wait_for": {"selector": "[data-testid=\"keymap-cheatsheet-dialog\"]", "state": "detached"}}'
     - step: 91
+      expectation: '{"wait_for": {"selector": "[data-testid=\"keymap-cheatsheet-dialog\"]", "state": "detached"}}'
+    - step: 95
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 92
+    - step: 96
       expectation: '{"assert_enabled": "[data-testid=\"editor-context-copy\"]"}'
-    - step: 93
+    - step: 97
       expectation: '{"assert_enabled": "[data-testid=\"editor-context-cut\"]"}'
     results:
-    - 91
-    - 92
-    - 93
+    - 95
+    - 96
+    - 97
+  - id: confirm-clear-history
+    ui_standard: [UI-DLG-06]
+    requirement: Clearing the session clipboard history requires explicit approval and defaults to Cancel.
+    actions: [40, 43]
+    checkpoints:
+    - {step: 41, expectation: The confirmation describes the clipboard history being cleared.}
+    - {step: 42, expectation: Cancel has keyboard focus.}
+    - {step: 44, expectation: Explicit confirmation closes the decision.}
+    results: [41, 42, 44]
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

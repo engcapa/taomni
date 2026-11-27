@@ -28,6 +28,8 @@ export interface PermissionPrompt {
    * not render here. Absent for a broadcast fallback, which every window answers.
    */
   windowLabel?: string;
+  sourceWindow?: string;
+  sourceWindowTitle?: string;
 }
 
 
@@ -47,6 +49,8 @@ export interface AcpPermissionPrompt {
   options: AcpPermissionOption[];
   /** Addressed window label; see {@link PermissionPrompt.windowLabel}. */
   windowLabel?: string;
+  sourceWindow?: string;
+  sourceWindowTitle?: string;
 }
 
 

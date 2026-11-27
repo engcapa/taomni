@@ -88,9 +88,9 @@ class CrashRegressionTests(unittest.TestCase):
         self.assertNotIn("if", plan, "PR planning must not be skipped")
         env = next(s["env"] for s in plan["steps"] if s.get("name") == "Plan exact cases and dependencies")
         self.assertIn("github.event_name == 'pull_request' && 'selected'", env["QA_SCOPE"])
-        self.assertIn("github.event_name == 'pull_request' && 'crash-regression'", env["QA_TAGS"])
+        self.assertIn("github.event_name == 'pull_request' && 'crash-regression,ui-contract'", env["QA_TAGS"])
         self.assertIn("inputs.scope == 'selected' || inputs.scope == 'impacted'", env["QA_TAGS"])
-        self.assertIn("format('{0},crash-regression', inputs.tags)", env["QA_TAGS"])
+        self.assertIn("format('{0},crash-regression,ui-contract', inputs.tags)", env["QA_TAGS"])
         triggers = workflow.get("on", workflow.get(True))
         dispatch_inputs = triggers["workflow_dispatch"]["inputs"]
         self.assertNotIn("quick", dispatch_inputs)

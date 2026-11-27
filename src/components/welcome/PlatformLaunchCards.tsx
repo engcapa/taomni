@@ -1,3 +1,5 @@
+import { Button } from "../ui/Button";
+import { IconButton } from "../ui/IconButton";
 import { showAgentsComingSoon } from "../agents/comingSoon";
 import { Bot, Boxes, ChevronDown, FileText, GitBranch, Monitor, Plus, Upload, Wrench } from "lucide-react";
 import { useContextMenu } from "../ContextMenu";
@@ -31,14 +33,14 @@ export function PlatformLaunchCards({ onNewSession, onOpenNewWorkspace }: {
         <div className="taomni-home-card-heading"><Monitor /><strong>{t("welcome.newSessionTitle")}</strong><kbd>Ctrl+Shift+N</kbd></div>
         <p>{t("welcome.newSessionDesc")}</p>
         <div className="taomni-home-card-actions">
-          <button type="button" data-testid="welcome-new-session" className="taomni-btn taomni-btn-primary" onClick={onNewSession}><Plus />{t("menu.newSession")}</button>
-          <button type="button" data-testid="home-import-sessions" className="taomni-btn" onClick={(event) => menu.show(event, [
+          <Button variant="primary" type="button" data-testid="welcome-new-session" onClick={onNewSession}><Plus />{t("menu.newSession")}</Button>
+          <IconButton labelKey="importSessions" type="button" data-testid="home-import-sessions" className="taomni-btn" onClick={(event) => menu.show(event, [
             { label: t("menu.importTaomni"), testId: "home-import-json", onClick: imports.importJson },
             { label: t("menu.importMobaXterm"), testId: "home-import-mobaxterm", onClick: imports.importMoba },
             { label: t("menu.importCsv"), testId: "home-import-csv", onClick: imports.importCsv },
             { label: t("menu.downloadCsvTemplate"), testId: "home-download-csv-template", onClick: imports.downloadCsvTemplate },
             { label: t("menu.importOpenSsh"), testId: "home-import-openssh", onClick: imports.importOpenSsh },
-          ])}><Upload /><ChevronDown /></button>
+          ])}><Upload /><ChevronDown /></IconButton>
         </div>
         <div className="taomni-home-card-footer"><button type="button" onClick={() => mode("sessions")}>{t("platform.sessions")} →</button></div>
       </section>
@@ -46,7 +48,7 @@ export function PlatformLaunchCards({ onNewSession, onOpenNewWorkspace }: {
         <div className="taomni-home-card-heading"><Boxes /><strong>{t("platform.workspaces")} &amp; {t("platform.agents")}</strong></div>
         <p>{t("platform.homeHint")}</p>
         <div className="taomni-home-card-actions">
-          <button type="button" data-testid="home-open-workspace" className="taomni-btn taomni-btn-primary" onClick={() => onOpenNewWorkspace ? onOpenNewWorkspace() : mode("workspaces")}><Plus />{t("platform.newWorkspace")}</button>
+          <Button variant="primary" type="button" data-testid="home-open-workspace" onClick={() => onOpenNewWorkspace ? onOpenNewWorkspace() : mode("workspaces")}><Plus />{t("platform.newWorkspace")}</Button>
           <button type="button" data-testid="home-clone-workspace" className="taomni-btn" onClick={() => { mode("workspaces"); useGitCloneStore.getState().openDialog(); }}><GitBranch />{t("gitClone.cloneShort")}</button>
           <button type="button" data-testid="home-open-git" className="taomni-btn" onClick={openGit}><GitBranch />Git</button>
         </div>
@@ -56,7 +58,7 @@ export function PlatformLaunchCards({ onNewSession, onOpenNewWorkspace }: {
         <div className="taomni-home-card-heading"><Wrench /><strong>{t("platform.tools")}</strong></div>
         <p>{t("platform.homeHint")}</p>
         <div className="taomni-home-card-actions">
-          <button type="button" data-testid="home-new-notepad" className="taomni-btn taomni-btn-primary" onClick={() => openUntitledNotepadDocument()}><FileText />{t("notepad.newDocument")}</button>
+          <Button variant="primary" type="button" data-testid="home-new-notepad" onClick={() => openUntitledNotepadDocument()}><FileText />{t("notepad.newDocument")}</Button>
           <button type="button" data-testid="home-open-mail" className="taomni-btn" onClick={() => command("mail-unified")}>{t("tabs.mailUnified")}</button>
           <button type="button" data-testid="home-open-network-tools" className="taomni-btn" onClick={() => command("tools")}>{t("menu.networkTools")}</button>
         </div>

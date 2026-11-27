@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useState } from "react";
 import { Save, Trash2, Pencil, Plus, RefreshCw, Braces } from "lucide-react";
 import {
@@ -51,7 +52,7 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
   if (!redisKey) {
     return (
       <div
-        className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]"
+        className="h-full flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]"
         style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
       >
         Select a key to view its value.
@@ -63,21 +64,21 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
     <div className="h-full flex flex-col min-h-0" style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}>
       {/* Metadata bar */}
       <div
-        className="shrink-0 flex items-center gap-2 px-2 h-8 text-[11px]"
+        className="shrink-0 flex items-center gap-2 px-2 h-8 text-ui-small"
         style={{
           background: "var(--taomni-quick-bg)",
           borderBottom: "1px solid var(--taomni-divider)",
           fontSize: "var(--taomni-db-font-size-sm, 11px)",
         }}
       >
-        <span className="px-1.5 rounded uppercase text-[10px]" style={{ background: "var(--taomni-accent)", color: "#fff" }}>
+        <span className="px-1.5 rounded uppercase text-ui-caption" style={{ background: "var(--taomni-info-bg)", color: "var(--taomni-info-text)" }}>
           {value?.kind ?? "?"}
         </span>
         <span className="font-mono truncate flex-1" title={redisKey}>{redisKey}</span>
         <span className="text-[var(--taomni-text-muted)]">TTL: {value ? ttlText(value.ttl) : "—"}</span>
-        <button
+        <IconButton
           type="button"
-          title="Edit TTL"
+          labelKey="editTtl"
           className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
           onClick={async () => {
             const input = await promptAppDialog({
@@ -104,17 +105,17 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
           }}
         >
           <Pencil className="w-3 h-3" />
-        </button>
+        </IconButton>
         {value?.encoding && <span className="text-[var(--taomni-text-muted)]">enc: {value.encoding}</span>}
         {value?.memoryUsage != null && <span className="text-[var(--taomni-text-muted)]">mem: {value.memoryUsage}B</span>}
-        <button type="button" title="Reload" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => void load()}>
+        <IconButton type="button" labelKey="reload" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => void load()}>
           <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           type="button"
-          title="Delete key"
+          labelKey="deleteKey"
           className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
-          style={{ color: "#d9534f" }}
+          style={{ color: "var(--taomni-danger-text)" }}
           onClick={async () => {
             const confirmed = await confirmAppDialog({
               message: `Delete key "${redisKey}"?`,
@@ -131,11 +132,11 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
           }}
         >
           <Trash2 className="w-3 h-3" />
-        </button>
+        </IconButton>
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-2">
-        {error && <div className="text-[11px] mb-2" style={{ color: "#d9534f" }}>{error}</div>}
+        {error && <div className="text-ui-small mb-2" style={{ color: "var(--taomni-danger-text)" }}>{error}</div>}
         {value && (
           <ValueEditor
             sessionId={sessionId}
@@ -182,7 +183,7 @@ function ValueEditor({
     default:
       return (
         <div
-          className="text-[12px] text-[var(--taomni-text-muted)]"
+          className="text-ui-body text-[var(--taomni-text-muted)]"
           style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
         >
           Empty or unknown value.
@@ -224,7 +225,7 @@ function StringEditor({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="taomni-btn px-2 py-0.5 text-[11px] flex items-center gap-1"
+          className="taomni-btn px-2 py-0.5 text-ui-small flex items-center gap-1"
           onClick={async () => {
             try {
               await redisSetKey(sessionId, redisKey, "string", text);
@@ -237,7 +238,7 @@ function StringEditor({
           <Save className="w-3 h-3" /> Save
         </button>
         {isJson && (
-          <label className="text-[11px] flex items-center gap-1 cursor-pointer">
+          <label className="text-ui-small flex items-center gap-1 cursor-pointer">
             <input type="checkbox" className="taomni-checkbox" checked={pretty} onChange={(e) => setPretty(e.target.checked)} />
             <Braces className="w-3 h-3" /> Format JSON
           </label>
@@ -291,10 +292,10 @@ function PairEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <button type="button" className="taomni-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={save}>
+      <button type="button" className="taomni-btn px-2 py-0.5 text-ui-small flex items-center gap-1 self-start" onClick={save}>
         <Save className="w-3 h-3" /> Save
       </button>
-      <table className="w-full text-[12px]" style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}>
+      <table className="w-full text-ui-body" style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}>
         <thead>
           <tr className="text-left text-[var(--taomni-text-muted)]">
             <th className="px-1 py-0.5 w-1/3">{headers[0]}</th>
@@ -322,15 +323,15 @@ function PairEditor({
                 />
               </td>
               <td>
-                <button type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
-                  <Trash2 className="w-3 h-3" style={{ color: "#d9534f" }} />
-                </button>
+                <IconButton labelKey="removeRow" type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
+                  <Trash2 className="w-3 h-3" style={{ color: "var(--taomni-danger-text)" }} />
+                </IconButton>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button type="button" className="taomni-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={() => setRows((r) => [...r, ["", ""]])}>
+      <button type="button" className="taomni-btn px-2 py-0.5 text-ui-small flex items-center gap-1 self-start" onClick={() => setRows((r) => [...r, ["", ""]])}>
         <Plus className="w-3 h-3" /> Add {kind === "hash" ? "field" : "member"}
       </button>
     </div>
@@ -366,26 +367,26 @@ function ListEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <button type="button" className="taomni-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={save}>
+      <button type="button" className="taomni-btn px-2 py-0.5 text-ui-small flex items-center gap-1 self-start" onClick={save}>
         <Save className="w-3 h-3" /> Save
       </button>
       <div className="flex flex-col gap-1">
         {rows.map((item, i) => (
           <div key={i} className="flex items-center gap-1">
-            <span className="text-[10px] text-[var(--taomni-text-muted)] w-8 text-right">{kind === "list" ? i : "•"}</span>
+            <span className="text-ui-caption text-[var(--taomni-text-muted)] w-8 text-right">{kind === "list" ? i : "•"}</span>
             <input
               className="taomni-input flex-1 font-mono"
               style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
               value={item}
               onChange={(e) => setRows((r) => r.map((x, j) => (j === i ? e.target.value : x)))}
             />
-            <button type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
-              <Trash2 className="w-3 h-3" style={{ color: "#d9534f" }} />
-            </button>
+            <IconButton labelKey="removeRow" type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
+              <Trash2 className="w-3 h-3" style={{ color: "var(--taomni-danger-text)" }} />
+            </IconButton>
           </div>
         ))}
       </div>
-      <button type="button" className="taomni-btn px-2 py-0.5 text-[11px] flex items-center gap-1 self-start" onClick={() => setRows((r) => [...r, ""])}>
+      <button type="button" className="taomni-btn px-2 py-0.5 text-ui-small flex items-center gap-1 self-start" onClick={() => setRows((r) => [...r, ""])}>
         <Plus className="w-3 h-3" /> Add {kind === "list" ? "item" : "member"}
       </button>
     </div>
@@ -394,7 +395,7 @@ function ListEditor({
 
 function StreamViewer({ entries }: { entries: { id: string; fields: [string, string][] }[] }) {
   return (
-    <div className="text-[12px] font-mono" style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}>
+    <div className="text-ui-body font-mono" style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}>
       <table className="w-full">
         <thead>
           <tr className="text-left text-[var(--taomni-text-muted)]">

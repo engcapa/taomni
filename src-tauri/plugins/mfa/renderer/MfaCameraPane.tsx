@@ -119,9 +119,9 @@ export function MfaCameraPane({ onTexts }: { onTexts: (texts: string[]) => MfaTe
 
   return (
     <div className="space-y-2">
-      <p className="text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>{t("mfa.cameraHint")}</p>
+      <p className="text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>{t("mfa.cameraHint")}</p>
       {devices.length > 1 ? (
-        <label className="flex items-center gap-2 text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
+        <label className="flex items-center gap-2 text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>
           {t("mfa.cameraDevice")}
           <select
             data-testid="mfa-camera-device"
@@ -137,7 +137,7 @@ export function MfaCameraPane({ onTexts }: { onTexts: (texts: string[]) => MfaTe
           </select>
         </label>
       ) : null}
-      <div className="relative overflow-hidden rounded" style={{ background: "#000", display: live ? "block" : "none" }}>
+      <div className="relative overflow-hidden rounded" style={{ background: "var(--taomni-term-bg, #000)", display: live ? "block" : "none" }}>
         <video
           ref={videoRef}
           data-testid="mfa-camera-video"
@@ -154,8 +154,8 @@ export function MfaCameraPane({ onTexts }: { onTexts: (texts: string[]) => MfaTe
           data-state={state}
           role="status"
           aria-live="polite"
-          className="flex-1 text-[12px]"
-          style={{ color: live ? "var(--taomni-text-muted)" : "var(--taomni-error, #c33)" }}
+          className="flex-1 text-ui-body"
+          style={{ color: live ? "var(--taomni-text-muted)" : "var(--taomni-danger-text, #c33)" }}
         >
           {statusText}
         </div>
@@ -163,7 +163,7 @@ export function MfaCameraPane({ onTexts }: { onTexts: (texts: string[]) => MfaTe
           <button
             type="button"
             data-testid="mfa-camera-retry"
-            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[12px] hover:bg-[var(--taomni-hover)]"
+            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-ui-body hover:bg-[var(--taomni-hover)]"
             style={{ borderColor: "var(--taomni-input-border)" }}
             onClick={() => setAttempt((value) => value + 1)}
           >

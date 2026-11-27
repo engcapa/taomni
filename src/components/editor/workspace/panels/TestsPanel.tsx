@@ -1,3 +1,4 @@
+import { IconButton } from "../../../ui/IconButton";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bug, CheckCircle2, ChevronDown, ChevronRight, CircleAlert, CircleDashed, CircleX, FlaskConical, Loader2, Play, RefreshCw, RotateCcw, Square } from "lucide-react";
 import type { JavaTestItem } from "../../../../lib/editor/lsp";
@@ -29,10 +30,10 @@ interface TestsPanelProps {
 }
 
 function statusIcon(status: StructuredTestResult["status"]) {
-  if (status === "passed") return <CheckCircle2 className="h-3 w-3 text-emerald-500" />;
-  if (status === "failed") return <CircleX className="h-3 w-3 text-red-500" />;
-  if (status === "error") return <CircleAlert className="h-3 w-3 text-orange-500" />;
-  if (status === "skipped") return <Square className="h-3 w-3 text-amber-500" />;
+  if (status === "passed") return <CheckCircle2 className="h-3 w-3 text-ui-success" />;
+  if (status === "failed") return <CircleX className="h-3 w-3 text-ui-danger" />;
+  if (status === "error") return <CircleAlert className="h-3 w-3 text-ui-warning" />;
+  if (status === "skipped") return <Square className="h-3 w-3 text-ui-warning" />;
   return <CircleDashed className="h-3 w-3 text-[var(--taomni-text-muted)]" />;
 }
 
@@ -58,7 +59,7 @@ function TestRow({
   return (
     <>
       <div
-        className="group flex items-center gap-1 py-0.5 pr-2 hover:bg-[var(--taomni-hover-bg)]"
+        className="group flex items-center gap-1 py-0.5 pr-2 hover:bg-[var(--taomni-hover)]"
         style={{ paddingLeft: `${8 + depth * 12}px` }}
         data-testid={`tests-item-${item.fullName}`}
       >
@@ -71,25 +72,25 @@ function TestRow({
         )}
         {resultStatus && <span className="shrink-0">{statusIcon(resultStatus)}</span>}
         <span className="truncate">{item.name}</span>
-        <button
+        <IconButton
           type="button"
           data-testid={`tests-run-${item.fullName}`}
           className="ml-auto shrink-0 opacity-0 group-hover:opacity-100 disabled:opacity-30"
           onClick={() => onRun(item)}
           disabled={runDisabled}
-          title={runDisabled ? "No Maven/Gradle runner detected" : "Run in terminal"}
+          labelKey="runInTerminal" hintKey={runDisabled ? "noTestRunner" : undefined}
         >
           <Play className="h-3 w-3" />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           type="button"
           data-testid={`tests-debug-${item.fullName}`}
-          className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors"
+          className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-ui-success transition-colors"
           onClick={() => onDebug(item)}
-          title="Debug test (requires java-debug + java-test bundles)"
+          labelKey="debugTest"
         >
           <Bug className="h-3.5 w-3.5" />
-        </button>
+        </IconButton>
       </div>
       {open && hasChildren && item.children.map((child) => (
         <TestRow
@@ -197,25 +198,25 @@ export function TestsPanel({
               >
                 {result.name}
               </button>
-              <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{formatTestDuration(result.durationMs)}</span>
+              <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">{formatTestDuration(result.durationMs)}</span>
               {onRerun && (
-                <button
+                <IconButton
                   type="button"
                   data-testid={`tests-rerun-${result.id}`}
                   className="shrink-0 opacity-0 group-hover:opacity-100"
-                  title="Rerun test"
+                  labelKey="rerunTest"
                   onClick={() => onRerun(result)}
                   disabled={runDisabled}
                 >
                   <RotateCcw className="h-3 w-3" />
-                </button>
+                </IconButton>
               )}
             </div>
             {(result.message || result.details) && (
               <button
                 type="button"
                 data-testid={`tests-failure-details-${result.id}`}
-                className="mt-0.5 block w-full whitespace-pre-wrap break-words border-l-2 border-red-500/50 pl-2 text-left text-[10px] text-red-500 hover:bg-[var(--taomni-hover-bg)]"
+                className="mt-0.5 block w-full whitespace-pre-wrap break-words border-l-2 border-ui-danger-border pl-2 text-left text-ui-caption text-ui-danger hover:bg-[var(--taomni-hover)]"
                 onClick={() => onOpenFailure?.(result)}
               >
                 {result.message ?? result.details}
@@ -229,11 +230,11 @@ export function TestsPanel({
   ));
 
   return (
-    <div data-testid="code-workspace-tests-panel" className="h-full min-h-0 flex flex-col text-[11px]">
+    <div data-testid="code-workspace-tests-panel" className="h-full min-h-0 flex flex-col text-ui-small">
       <div className="h-8 shrink-0 flex items-center gap-2 border-b border-[var(--taomni-code-border)] px-2">
         <FlaskConical className="h-3.5 w-3.5" />
         <span className="font-medium">Tests</span>
-        {activeFileTitle && <span className="truncate text-[10px] text-[var(--taomni-text-muted)]">{activeFileTitle}</span>}
+        {activeFileTitle && <span className="truncate text-ui-caption text-[var(--taomni-text-muted)]">{activeFileTitle}</span>}
         <button
           type="button"
           data-testid="tests-refresh"
@@ -257,17 +258,17 @@ export function TestsPanel({
       </div>
       <div className="min-h-0 flex-1 overflow-auto py-1">
         {(testResults || resultsError) && (
-          <div data-testid="tests-result-summary" className="mx-2 mb-1 rounded border border-[var(--taomni-code-border)] px-2 py-1 text-[10px]">
+          <div data-testid="tests-result-summary" className="mx-2 mb-1 rounded border border-[var(--taomni-code-border)] px-2 py-1 text-ui-caption">
             {testResults && <div className="flex items-center gap-2">
               <span className="font-medium">Results</span>
               <span>{testResults.summary.total} total</span>
-              <span className="text-emerald-500">{testResults.summary.passed} passed</span>
-              <span className="text-red-500">{testResults.summary.failed + testResults.summary.errors} failed</span>
-              <span className="text-amber-500">{testResults.summary.skipped} skipped</span>
+              <span className="text-ui-success">{testResults.summary.passed} passed</span>
+              <span className="text-ui-danger">{testResults.summary.failed + testResults.summary.errors} failed</span>
+              <span className="text-ui-warning">{testResults.summary.skipped} skipped</span>
               <span className="ml-auto">{formatTestDuration(testResults.summary.durationMs)}</span>
             </div>}
-            {testResults?.diagnostics.map((diagnostic) => <div key={diagnostic} className="mt-1 whitespace-pre-wrap text-amber-600" data-testid="tests-result-diagnostic">{diagnostic}</div>)}
-            {resultsError && <div className="mt-1 text-red-500" data-testid="tests-result-error">{resultsError}</div>}
+            {testResults?.diagnostics.map((diagnostic) => <div key={diagnostic} className="mt-1 whitespace-pre-wrap text-ui-warning" data-testid="tests-result-diagnostic">{diagnostic}</div>)}
+            {resultsError && <div className="mt-1 text-ui-danger" data-testid="tests-result-error">{resultsError}</div>}
           </div>
         )}
         {resultTree}
@@ -277,7 +278,7 @@ export function TestsPanel({
           </div>
         )}
         {canDiscover && error && (
-          <div className="px-3 py-2 text-red-500" data-testid="tests-error">{error}</div>
+          <div className="px-3 py-2 text-ui-danger" data-testid="tests-error">{error}</div>
         )}
         {canDiscover && !error && !loading && items.length === 0 && loadedFor && (
           <div className="px-3 py-2 text-[var(--taomni-text-muted)]">No tests found in this file.</div>

@@ -204,8 +204,14 @@ pub(crate) fn emit_to_window_or_broadcast<B: EventBus + ?Sized>(
 /// gone. Without this cleanup the recorded owner still answers
 /// `has_webview(..)`, so the next approval would be emitted into that dying
 /// window instead of falling back to a broadcast — and nobody would see it.
-pub(crate) fn forget_window_routes(state: &crate::state::AppState, label: &str) {
-    state.core.agent.thread_windows.forget_label(label);
+fn forget_window_routes(app: &tauri::AppHandle, label: &str, title: &str) {
+    let state = app.state::<crate::state::AppState>();
+    state.core.agent.pending_approvals.window_closed(
+        app,
+        &state.core.agent.thread_windows,
+        label,
+        title,
+    );
     if let Ok(mut owners) = state.core.agent.cc_tab_windows.lock() {
         owners.retain(|_, owner| owner != label);
     }
@@ -218,9 +224,10 @@ pub(crate) fn forget_window_routes(state: &crate::state::AppState, label: &str) 
 pub(crate) fn install_window_cleanup(window: &tauri::WebviewWindow) {
     let app = window.app_handle().clone();
     let label = window.label().to_owned();
+    let title = window.title().unwrap_or_else(|_| label.clone());
     window.on_window_event(move |event| {
         if matches!(event, tauri::WindowEvent::Destroyed) {
-            forget_window_routes(&app.state::<crate::state::AppState>(), &label);
+            forget_window_routes(&app, &label, &title);
         }
     });
 }
@@ -266,6 +273,11 @@ pub(crate) fn broadcast_cc_permission_resolved(
     call_id: Option<&str>,
     thread_id: Option<&str>,
 ) {
+    app.state::<crate::state::AppState>()
+        .core
+        .agent
+        .pending_approvals
+        .dismiss_cc(thread_id, call_id);
     let _ = app.emit(
         CC_PERMISSION_RESOLVED_EVENT,
         cc_permission_resolved_payload(call_id, thread_id),
@@ -325,6 +337,87 @@ mod tests {
                 .push((event.to_string(), payload));
             true
         }
+    }
+
+    #[test]
+    fn pending_cc_moves_once_to_main_with_its_original_identity_and_source() {
+        use crate::windowing::pending_approvals::{ApprovalId, PendingApprovals};
+        let approvals = PendingApprovals::default();
+        let bus = FakeBus::with_windows(&["main", "terminal-A", "terminal-B"]);
+        let windows = ThreadWindows::new();
+        windows.record("thread-1", "terminal-A");
+        approvals.publish(
+            &bus,
+            &windows,
+            ApprovalId::Cc("call-1".into()),
+            "thread-1",
+            prompt_payload(),
+        );
+        approvals.window_closed(&bus, &windows, "terminal-A", "Build session");
+        approvals.window_closed(&bus, &windows, "terminal-A", "Build session");
+        let target = bus.targeted.borrow();
+        assert_eq!(target.len(), 2);
+        assert_eq!(target[0].0, "terminal-A");
+        assert_eq!(target[1].0, "main");
+        assert_eq!(target[1].2["sourceWindowTitle"], "Build session");
+        assert_eq!(target[1].2["callId"], target[0].2["callId"]);
+        assert_eq!(
+            approvals.replay("main", "agent-cc-permission"),
+            vec![target[1].2.clone()]
+        );
+        assert!(
+            approvals
+                .replay("terminal-A", "agent-cc-permission")
+                .is_empty()
+        );
+        assert!(approvals.take_cc("call-1", "terminal-A").is_err());
+        assert!(approvals.take_cc("call-1", "main").is_ok());
+        assert!(approvals.take_cc("call-1", "main").is_err());
+        assert!(approvals.replay("main", "agent-cc-permission").is_empty());
+        assert!(bus.broadcasts.borrow().is_empty());
+    }
+
+    #[test]
+    fn pending_acp_handoff_preserves_provider_options_and_skips_ended_calls() {
+        use crate::windowing::pending_approvals::{ApprovalId, PendingApprovals};
+        let approvals = PendingApprovals::default();
+        let bus = FakeBus::with_windows(&["main", "terminal-A", "terminal-B"]);
+        let windows = ThreadWindows::new();
+        windows.record("thread-1", "terminal-A");
+        for owner in ["media", "chat"] {
+            approvals.publish(&bus, &windows, ApprovalId::Acp {
+                thread: "thread-1".into(), owner: owner.into(), call: "call-1".into(),
+            }, "thread-1", json!({ "threadId":"thread-1", "callId":"call-1", "permissionOwnerId":owner, "options":[{"optionId":"once", "kind":"allow_once"}]}));
+        }
+        assert!(
+            approvals
+                .take_acp("thread-1", None, "call-1", "terminal-A", Some("once"))
+                .is_err()
+        );
+        approvals.dismiss_acp("thread-1", Some("chat"), Some("call-1"));
+        approvals.window_closed(&bus, &windows, "terminal-A", "Build session");
+        let restored = approvals.replay("main", "agent-acp-permission");
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0]["permissionOwnerId"], "media");
+        assert_eq!(restored[0]["options"][0]["optionId"], "once");
+        assert!(
+            approvals
+                .take_acp("thread-1", Some("media"), "call-1", "terminal-A", None)
+                .is_err()
+        );
+        assert!(
+            approvals
+                .take_acp("thread-1", Some("media"), "call-1", "main", Some("unknown"))
+                .is_err()
+        );
+        assert_eq!(
+            approvals
+                .take_acp("thread-1", Some("media"), "call-1", "main", Some("once"))
+                .unwrap(),
+            "media"
+        );
+        assert!(approvals.replay("main", "agent-acp-permission").is_empty());
+        assert!(bus.broadcasts.borrow().is_empty());
     }
 
     fn prompt_payload() -> Value {

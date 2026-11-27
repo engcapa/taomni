@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { LockKeyhole, RefreshCw, ShieldAlert, Square } from "lucide-react";
+import { ModalSurface } from "../../../crates/taomni-plugin-api/frontend/ui/ModalSurface";
 import { useT } from "../../../../src/lib/vnc/viewerHost";
 
 /**
@@ -31,11 +32,11 @@ export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; 
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
-  const passwordRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (view.kind === "auth") passwordRef.current?.focus({ preventScroll: true });
-    else primaryRef.current?.focus({ preventScroll: true });
+    if (view.kind !== "unencrypted" && view.kind !== "auth") {
+      primaryRef.current?.focus({ preventScroll: true });
+    }
   }, [view.kind]);
 
   const backdrop = (content: React.ReactNode, testId: string) => (
@@ -60,8 +61,16 @@ export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; 
         "vnc-overlay-connecting",
       );
     case "unencrypted":
-      return backdrop(
-        <div role="dialog" aria-modal="true" aria-labelledby="vnc-unencrypted-title" aria-describedby="vnc-unencrypted-body" className="vnc-connection-card">
+      return (
+        <ModalSurface
+          role="alertdialog"
+          data-testid="vnc-overlay-unencrypted"
+          aria-labelledby="vnc-unencrypted-title"
+          aria-describedby="vnc-unencrypted-body"
+          initialFocus='[data-testid="vnc-unencrypted-continue"]'
+          onCancel={actions.cancelUnencrypted}
+          className="taomni-modal vnc-connection-card"
+        >
           <h2 id="vnc-unencrypted-title" className="vnc-connection-title">
             <span className="vnc-connection-icon"><ShieldAlert size={20} /></span>
             {t("vnc.unencryptedTitle")}
@@ -90,78 +99,73 @@ export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; 
               {t("vnc.continue")}
             </button>
           </div>
-        </div>,
-        "vnc-overlay-unencrypted",
+        </ModalSurface>
       );
     case "auth":
-      return backdrop(
-        <form
-          role="dialog"
-          aria-modal="true"
+      return (
+        <ModalSurface
+          data-testid="vnc-overlay-auth"
           aria-labelledby="vnc-auth-title"
           aria-describedby="vnc-auth-body"
-          className="vnc-connection-card"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!password) return;
-            actions.submitCredentials({ username, password, remember });
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              actions.cancelAuth();
-            }
-          }}
+          initialFocus='[data-testid="vnc-auth-password"]'
+          onCancel={actions.cancelAuth}
+          className="taomni-modal vnc-connection-card"
         >
-          <h2 id="vnc-auth-title" className="vnc-connection-title">
-            <span className="vnc-connection-icon"><LockKeyhole size={20} /></span>
-            {t("vnc.authTitle")}
-          </h2>
-          <p id="vnc-auth-body" className="vnc-connection-description">{t("vnc.authBody", { host: `${view.host}:${view.port}` })}</p>
-          {view.error && (
-            <p data-testid="vnc-auth-error" role="alert" className="vnc-connection-error">{view.error}</p>
-          )}
-          <label className="vnc-connection-field">
-            {t("vnc.authUsername")}
-            <input
-              data-testid="vnc-auth-username"
-              className="taomni-input vnc-connection-input"
-              value={username}
-              autoComplete="username"
-              onChange={(event) => setUsername(event.target.value)}
-            />
-          </label>
-          <label className="vnc-connection-field">
-            {t("vnc.authPassword")}
-            <input
-              ref={passwordRef}
-              data-testid="vnc-auth-password"
-              className="taomni-input vnc-connection-input"
-              type="password"
-              value={password}
-              autoComplete="current-password"
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </label>
-          <label className="vnc-connection-check">
-            <input
-              type="checkbox"
-              data-testid="vnc-auth-remember"
-              checked={remember}
-              onChange={(event) => setRemember(event.target.checked)}
-            />
-            {t("vnc.authRemember")}
-          </label>
-          <div className="vnc-connection-actions">
-            <button type="button" data-testid="vnc-auth-cancel" className="vnc-connection-button" onClick={actions.cancelAuth}>
-              {t("vnc.cancel")}
-            </button>
-            <button type="submit" data-testid="vnc-auth-ok" className="vnc-connection-button vnc-connection-primary" disabled={!password}>
-              {t("vnc.ok")}
-            </button>
-          </div>
-        </form>,
-        "vnc-overlay-auth",
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!password) return;
+              actions.submitCredentials({ username, password, remember });
+            }}
+          >
+            <h2 id="vnc-auth-title" className="vnc-connection-title">
+              <span className="vnc-connection-icon"><LockKeyhole size={20} /></span>
+              {t("vnc.authTitle")}
+            </h2>
+            <p id="vnc-auth-body" className="vnc-connection-description">{t("vnc.authBody", { host: `${view.host}:${view.port}` })}</p>
+            {view.error && (
+              <p data-testid="vnc-auth-error" role="alert" className="vnc-connection-error">{view.error}</p>
+            )}
+            <label className="vnc-connection-field">
+              {t("vnc.authUsername")}
+              <input
+                data-testid="vnc-auth-username"
+                className="taomni-input vnc-connection-input"
+                value={username}
+                autoComplete="username"
+                onChange={(event) => setUsername(event.target.value)}
+              />
+            </label>
+            <label className="vnc-connection-field">
+              {t("vnc.authPassword")}
+              <input
+                data-testid="vnc-auth-password"
+                className="taomni-input vnc-connection-input"
+                type="password"
+                value={password}
+                autoComplete="current-password"
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+            <label className="vnc-connection-check">
+              <input
+                type="checkbox"
+                data-testid="vnc-auth-remember"
+                checked={remember}
+                onChange={(event) => setRemember(event.target.checked)}
+              />
+              {t("vnc.authRemember")}
+            </label>
+            <div className="vnc-connection-actions">
+              <button type="button" data-testid="vnc-auth-cancel" className="vnc-connection-button" onClick={actions.cancelAuth}>
+                {t("vnc.cancel")}
+              </button>
+              <button type="submit" data-testid="vnc-auth-ok" className="vnc-connection-button vnc-connection-primary" disabled={!password}>
+                {t("vnc.ok")}
+              </button>
+            </div>
+          </form>
+        </ModalSurface>
       );
     case "reconnecting":
       return backdrop(

@@ -1,4 +1,5 @@
-import { Braces, Database as DatabaseIcon, Folder, GitBranch, KeyRound, Monitor, Network as NetworkIcon, Package, Server, Terminal as TerminalIcon, X } from "lucide-react";
+import { isWslExecutable } from "../../../types/wsl";
+import { Braces, GitBranch, KeyRound, Network as NetworkIcon, Package, Server, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useCustomDropTarget, type CustomDragData } from "../../../lib/customDnD";
 import type { Tab } from "../../../types";
@@ -6,66 +7,47 @@ import { type TabItemProps } from "./model";
 import { TAB_DRAG_MIME } from "./scroll";
 import { ExplorerTabIcon } from "../../explorer/ExplorerTabIcon";
 import { ExplorerFileIcon } from "../../explorer/ExplorerFileIcon";
+import { SessionProtocolIcon } from "../../session/SessionProtocolIcon";
 import { ViewerDirtyIndicator } from "../../viewer/ViewerDirtyIndicator";
 
-export function dbEngineColor(engine?: string): string {
-  switch (engine) {
-    case "MySQL":
-      return "#00758f";
-    case "PostgreSQL":
-      return "#336791";
-    case "PanWeiDB":
-      return "#0b8f6a";
-    case "Oracle":
-      return "#c74634";
-    case "SQLServer":
-      return "#cc2927";
-    case "StarRocks":
-      return "#0f8f8c";
-    case "ClickHouse":
-      return "#e6a817";
-    case "Presto":
-      return "#5a4fcf";
-    case "Redis":
-      return "#d82c20";
-    case "HBaseShell":
-      return "#1d7f8c";
-    default:
-      return "#2b5d8b";
-  }
-}
+export { dbEngineColor } from "../../session/SessionProtocolIcon";
 
 export function TabIcon({ tab }: { tab: Tab; }) {
-  if (tab.type === "terminal" && tab.ssh) {
-    return <TerminalIcon className="w-3 h-3" style={{ color: "#2b5d8b" }} />;
-  }
   switch (tab.type) {
-    case "terminal":
-      return <TerminalIcon className="w-3 h-3" style={{ color: "#62d36f" }} />;
+    case "terminal": {
+      const localProtocol = isWslExecutable(tab.localShell?.id) ? "WSL" : "LocalShell";
+      const protocol = tab.ssh ? "SSH" : tab.commandTerminal?.kind ?? localProtocol;
+      return <SessionProtocolIcon protocol={protocol} className="size-3" />;
+    }
+    case "mail":
+    case "mail-unified":
+      return <SessionProtocolIcon protocol="Mail" className="size-3" />;
     case "database":
+      return <SessionProtocolIcon database protocol={tab.db?.engine ?? "database"} className="size-3" />;
     case "redis":
-      return <DatabaseIcon className="w-3 h-3" style={{ color: dbEngineColor(tab.db?.engine) }} />;
+      return <SessionProtocolIcon database protocol={tab.db?.engine ?? "Redis"} className="size-3" />;
     case "hbase-shell":
-      return <DatabaseIcon className="w-3 h-3" style={{ color: dbEngineColor("HBaseShell") }} />;
+      return <SessionProtocolIcon protocol="HBaseShell" className="size-3" />;
     case "sftp":
-      return <Folder className="w-3 h-3" style={{ color: "#3b7ac2" }} />;
+      return <SessionProtocolIcon protocol="SFTP" className="size-3" />;
     case "rdp":
+      return <SessionProtocolIcon protocol="RDP" className="size-3" />;
     case "vnc":
-      return <Monitor className="w-3 h-3" style={{ color: "#a04b9c" }} />;
+      return <SessionProtocolIcon protocol="VNC" className="size-3" />;
     case "nettools":
-      return <NetworkIcon className="w-3 h-3" style={{ color: "#236a98" }} />;
+      return <NetworkIcon className="w-3 h-3" style={{ color: "var(--taomni-accent)" }} />;
     case "sockscap":
-      return <NetworkIcon className="w-3 h-3" style={{ color: "#0d9488" }} />;
+      return <NetworkIcon className="w-3 h-3" style={{ color: "var(--taomni-success-text)" }} />;
     case "proxy-test":
-      return <NetworkIcon className="w-3 h-3" style={{ color: "#6b7280" }} />;
+      return <NetworkIcon className="w-3 h-3" style={{ color: "var(--taomni-text-muted)" }} />;
     case "git":
-      return <GitBranch className="w-3 h-3" style={{ color: "#e05a47" }} />;
+      return <GitBranch className="w-3 h-3" style={{ color: "var(--taomni-danger-text)" }} />;
     case "code-workspace":
-      return <Braces className="w-3 h-3" style={{ color: "#2878d4" }} />;
+      return <Braces className="w-3 h-3" style={{ color: "var(--taomni-accent)" }} />;
     case "mfa":
-      return <KeyRound className="w-3 h-3" style={{ color: "#c98a00" }} />;
+      return <KeyRound className="w-3 h-3" style={{ color: "var(--taomni-warning-text)" }} />;
     case "servers":
-      return <Server className="w-3 h-3" style={{ color: "#2b7de9" }} />;
+      return <Server className="w-3 h-3" style={{ color: "var(--taomni-accent)" }} />;
     case "plugin":
       return <Package className="w-3 h-3" />;
     case "file-browser":
@@ -73,7 +55,7 @@ export function TabIcon({ tab }: { tab: Tab; }) {
     case "file-viewer":
       return <ExplorerFileIcon name={tab.fileViewer?.path ?? tab.title} className="w-4 h-4" />;
     default:
-      return <TerminalIcon className="w-3 h-3" style={{ color: "#2b5d8b" }} />;
+      return <SessionProtocolIcon protocol={tab.type} className="size-3" />;
   }
 }
 
@@ -219,7 +201,7 @@ export function TabItem(props: TabItemProps) {
         <TabIcon tab={tab} />
         {tab.hasNewOutput && (
           <span
-            className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 pointer-events-none"
+            className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--taomni-success-icon)] pointer-events-none"
             aria-label={t("tabs.newOutput")}
           />
         )}
@@ -257,7 +239,7 @@ export function TabItem(props: TabItemProps) {
             }}
             onFocus={(e) => e.currentTarget.select()}
             onBlur={onCommitRename}
-            className="bg-transparent border-b border-[var(--taomni-accent)] outline-none text-[12px] leading-none w-[160px] px-0"
+            className="bg-transparent border-b border-[var(--taomni-accent)] focus-visible:keyboard-outline text-ui-body leading-none w-[160px] px-0"
             style={{ color: "inherit", font: "inherit" }}
           />
         ) : (

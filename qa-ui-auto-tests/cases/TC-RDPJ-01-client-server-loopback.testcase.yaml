@@ -54,6 +54,7 @@ tags:
 - rdp-client
 - joint
 - p1
+ui_standard: [UI-KEY-06, UI-SRF-03]
 modes:
 - native
 fixtures:
@@ -175,7 +176,7 @@ steps:
 - wait_for:
     selector: '[data-testid="rdp-connection-bar"][data-visible="true"]'
     timeout_sec: 10
-- click: '[data-testid="rdp-bar-restore"]'
+- press: {selector: '[data-testid="rdp-bar-restore"]', key: Enter}
 - wait_for:
     selector: '[data-testid="rdp-connection-bar"]'
     state: detached
@@ -222,6 +223,13 @@ steps:
 verification:
   review: reviewed
   requirements:
+  - id: host-keyboard-restore
+    ui_standard: [UI-KEY-06, UI-SRF-03]
+    requirement: Enter on Restore leaves host fullscreen while the live remote desktop stays open.
+    actions: [54]
+    checkpoints:
+    - {step: 55, expectation: The fullscreen connection bar closes after activating the focused local control.}
+    results: [55]
   - id: R1
     requirement: The product client completes NLA against the product server after confirming its certificate and shows the host desktop.
     actions:

@@ -1,4 +1,39 @@
 :root {
+  --taomni-fs-caption: calc(var(--taomni-ui-font-size) - 2px);
+  --taomni-fs-small: calc(var(--taomni-ui-font-size) - 1px);
+  --taomni-fs-body: var(--taomni-ui-font-size);
+  --taomni-fs-title: calc(var(--taomni-ui-font-size) + 2px);
+  --taomni-fs-heading: calc(var(--taomni-ui-font-size) + 4px);
+  --taomni-control-h-sm: max(22px, calc(1em + 6px));
+  --taomni-control-h-md: max(26px, calc(1em + 8px));
+  --taomni-radius-sm: 2px;
+  --taomni-radius-md: 3px;
+  --taomni-radius-lg: 4px;
+  --taomni-z-content: 0;
+  --taomni-z-sticky: 100;
+  --taomni-z-docked-overlay: 500;
+  --taomni-z-popover: 900;
+  --taomni-z-modal: 1000;
+  --taomni-z-menu-over-modal: 1100;
+  --taomni-z-tooltip: 1150;
+  --taomni-z-toast: 1200;
+  --taomni-z-blocking-gate: 1300;
+  --taomni-z-drag-ghost: 1400;
+  --taomni-overlay: rgb(0 0 0 / 40%);
+  --taomni-focus-ring: #1d4ed8;
+  --taomni-primary-bg: #1e40af;
+  --taomni-primary-hover: #1d4ed8;
+  --taomni-primary-active: #1e3a8a;
+  --taomni-primary-text: #ffffff;
+  --taomni-danger: #991b1b;
+  --taomni-danger-bg: #fef2f2;
+  --taomni-danger-border: #b91c1c;
+  --taomni-danger-text: #991b1b;
+  --taomni-danger-icon: var(--taomni-danger-text);
+  --taomni-info-bg: var(--taomni-selected);
+  --taomni-info-border: var(--taomni-primary-bg);
+  --taomni-info-text: var(--taomni-accent);
+  --taomni-info-icon: var(--taomni-info-text);
   --taomni-color-scheme: light;
   --taomni-bg: #f8fafc;
   --taomni-chrome-bg: #f1f5f9;
@@ -7,6 +42,7 @@
   --taomni-titlebar-to: #cbd5e1;
   --taomni-menubar-bg: #f8fafc;
   --taomni-quick-bg: #f1f5f9;
+  --taomni-protocol-violet: #6b3491;
   --taomni-accent: #1e40af; /* More premium Royal Indigo Blue */
   --taomni-accent-soft: #3b82f6;
   --taomni-tab-active: #ffffff;
@@ -128,6 +164,8 @@
   --taomni-warning-icon: #b45309;
 
   /* Success banner + inline accent tokens — readable on light panels */
+  --taomni-git-moved-bg: #f3e8ff;
+  --taomni-git-moved-text: #581c87;
   --taomni-success-bg: #dcfce7;
   --taomni-success-border: #16a34a;
   --taomni-success-text: #14532d;
@@ -172,6 +210,21 @@ button, input, select, textarea, optgroup {
 }
 
 html[data-app-theme="dark"] {
+  --taomni-overlay: rgb(0 0 0 / 55%);
+  --taomni-focus-ring: #93c5fd;
+  --taomni-primary-bg: #8bbcff;
+  --taomni-primary-hover: #a7ceff;
+  --taomni-primary-active: #6aa6f8;
+  --taomni-primary-text: #0f172a;
+  --taomni-danger: #fca5a5;
+  --taomni-danger-bg: #450a0a;
+  --taomni-danger-border: #f87171;
+  --taomni-danger-text: #fecaca;
+  --taomni-danger-icon: var(--taomni-danger-text);
+  --taomni-info-bg: var(--taomni-selected);
+  --taomni-info-border: var(--taomni-primary-bg);
+  --taomni-info-text: var(--taomni-accent);
+  --taomni-info-icon: var(--taomni-info-text);
   --taomni-color-scheme: dark;
   --taomni-bg: #1e1f22;
   --taomni-chrome-bg: #191a1c;
@@ -180,6 +233,7 @@ html[data-app-theme="dark"] {
   --taomni-titlebar-to: #191a1c;
   --taomni-menubar-bg: #191a1c;
   --taomni-quick-bg: #26282e;
+  --taomni-protocol-violet: #deb2fb;
   --taomni-accent: #6aa6f8;
   --taomni-accent-soft: #8bbcff;
   --taomni-tab-active: #1e1f22;
@@ -294,6 +348,8 @@ html[data-app-theme="dark"] {
   --taomni-warning-icon: #fbbf24;
 
   /* Success banner + inline accent tokens — readable on dark panels */
+  --taomni-git-moved-bg: #3b2256;
+  --taomni-git-moved-text: #e9d5ff;
   --taomni-success-bg: rgba(34, 197, 94, 0.18);
   --taomni-success-border: #22c55e;
   --taomni-success-text: #bbf7d0;

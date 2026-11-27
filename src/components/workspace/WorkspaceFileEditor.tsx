@@ -193,9 +193,9 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
         className="flex h-[26px] shrink-0 items-center gap-2 border-b px-2"
         style={{ borderColor: "var(--taomni-code-border)", background: "var(--taomni-card-bg)" }}
       >
-        <span className="truncate text-[11.5px] font-semibold" data-testid="workspace-editor-title">
+        <span className="truncate text-ui-small font-semibold" data-testid="workspace-editor-title">
           {path}
-          {document?.dirty && <span style={{ color: "var(--taomni-warning, #d97706)" }}> ●</span>}
+          {document?.dirty && <span style={{ color: "var(--taomni-warning-text, #d97706)" }}> ●</span>}
         </span>
         <span className="ml-auto flex items-center gap-1">
           <button
@@ -224,7 +224,7 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
       </div>}
       <div className="relative flex min-h-0 flex-1 flex-col">
         {document?.error && (
-          <div data-testid="workspace-editor-error" className="p-3 text-[12px]" style={{ color: "var(--taomni-danger)" }}>
+          <div data-testid="workspace-editor-error" className="p-3 text-ui-body" style={{ color: "var(--taomni-danger)" }}>
             {document.error}
           </div>
         )}

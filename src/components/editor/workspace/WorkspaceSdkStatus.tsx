@@ -1,4 +1,5 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { ModalSurface } from "../../ui/ModalSurface";
+import { memo, useCallback, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -94,12 +95,12 @@ function sourceLabel(source: ResolvedSdkSource, t: TranslateFn): string {
 
 function statusTone(status: ResolvedSdkStatus): string {
   if (status === "resolved" || status === "managed") {
-    return "border-emerald-500/35 bg-emerald-500/10 text-emerald-500";
+    return "border-ui-success-border bg-ui-success-surface text-ui-success";
   }
   if (status === "missing" || status === "unresolved") {
-    return "border-amber-500/35 bg-amber-500/10 text-amber-500";
+    return "border-ui-warning-border bg-ui-warning-surface text-ui-warning";
   }
-  return "border-red-500/35 bg-red-500/10 text-red-500";
+  return "border-ui-danger-border bg-ui-danger-surface text-ui-danger";
 }
 
 function javaMajor(version: string | null): number | null {
@@ -170,13 +171,13 @@ function BindingRow({ registry, resolved, rootId, busyKey, onBindingChange, t }:
   return (
     <div className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2.5 py-2">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] font-semibold text-[var(--taomni-code-text)]">
+        <span className="text-ui-small font-semibold text-[var(--taomni-code-text)]">
           {kindLabel(resolved.kind)} · {roleLabel(resolved.role, t)}
         </span>
-        <span className="rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--taomni-code-muted)]">
+        <span className="rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 font-mono text-ui-caption text-[var(--taomni-code-muted)]">
           {constraint}
         </span>
-        <span className={`ml-auto rounded border px-1.5 py-0.5 text-[9px] font-semibold ${statusTone(resolved.status)}`}>
+        <span className={`ml-auto rounded border px-1.5 py-0.5 text-ui-caption font-semibold ${statusTone(resolved.status)}`}>
           {statusLabel(resolved.status, t)}
         </span>
       </div>
@@ -186,7 +187,7 @@ function BindingRow({ registry, resolved, rootId, busyKey, onBindingChange, t }:
           <span className="sr-only">{kindLabel(resolved.kind)} {roleLabel(resolved.role, t)}</span>
           <select
             data-testid={`workspace-sdk-binding-${rootId}-${profileTestId(resolved.scopePath)}-${resolved.kind}-${resolved.role}`}
-            className="h-7 w-full appearance-none rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 pr-7 text-[10px] text-[var(--taomni-code-text)] disabled:opacity-60"
+            className="h-7 w-full appearance-none rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 pr-7 text-ui-caption text-[var(--taomni-code-text)] disabled:opacity-60"
             value={requirement.managedByBuild ? "" : selectedId}
             disabled={requirement.managedByBuild || busyKey !== null}
             onChange={(event) => onBindingChange(
@@ -213,11 +214,11 @@ function BindingRow({ registry, resolved, rootId, busyKey, onBindingChange, t }:
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1.5 h-3.5 w-3.5 text-[var(--taomni-code-muted)]" />
         </label>
-        <div className="min-w-0 text-[9px] leading-4 text-[var(--taomni-code-muted)]">
+        <div className="min-w-0 text-ui-caption leading-4 text-[var(--taomni-code-muted)]">
           <span className="font-medium text-[var(--taomni-code-text)]">{sourceLabel(resolved.source, t)}</span>
           {` · ${resolved.reason}`}
           {resolved.installation?.lastError && resolved.installation.lastError !== resolved.reason && (
-            <div className="mt-1 whitespace-pre-wrap break-words text-red-400">
+            <div className="mt-1 whitespace-pre-wrap break-words text-ui-danger">
               {resolved.installation.lastError}
             </div>
           )}
@@ -230,7 +231,7 @@ function BindingRow({ registry, resolved, rootId, busyKey, onBindingChange, t }:
       </div>
 
       {requirement.evidence.length > 0 && (
-        <details className="mt-1.5 text-[9px] text-[var(--taomni-code-muted)]">
+        <details className="mt-1.5 text-ui-caption text-[var(--taomni-code-muted)]">
           <summary className="cursor-pointer select-none">{t("settings.workspaceSdkEvidence", { count: requirement.evidence.length })}</summary>
           <ul className="mt-1 space-y-1 border-l border-[var(--taomni-code-border)] pl-2">
             {requirement.evidence.map((evidence, index) => (
@@ -266,11 +267,11 @@ function ToolingJavaRow({ registry, scopePath, rootId, busyKey, onBindingChange,
   return (
     <div className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2.5 py-2">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] font-semibold text-[var(--taomni-code-text)]">
+        <span className="text-ui-small font-semibold text-[var(--taomni-code-text)]">
           Java / JDK · {roleLabel("tooling", t)}
         </span>
-        <span className="rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--taomni-code-muted)]">JDK 21+</span>
-        <span className={`ml-auto rounded border px-1.5 py-0.5 text-[9px] font-semibold ${statusTone(status)}`}>
+        <span className="rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 font-mono text-ui-caption text-[var(--taomni-code-muted)]">JDK 21+</span>
+        <span className={`ml-auto rounded border px-1.5 py-0.5 text-ui-caption font-semibold ${statusTone(status)}`}>
           {statusLabel(status, t)}
         </span>
       </div>
@@ -279,7 +280,7 @@ function ToolingJavaRow({ registry, scopePath, rootId, busyKey, onBindingChange,
           <span className="sr-only">Java / JDK {roleLabel("tooling", t)}</span>
           <select
             data-testid={`workspace-sdk-binding-${rootId}-${profileTestId(scopePath)}-java-tooling`}
-            className="h-7 w-full appearance-none rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 pr-7 text-[10px] text-[var(--taomni-code-text)] disabled:opacity-60"
+            className="h-7 w-full appearance-none rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 pr-7 text-ui-caption text-[var(--taomni-code-text)] disabled:opacity-60"
             value={selectedId}
             disabled={busyKey !== null}
             onChange={(event) => onBindingChange(key, scopePath, "java", "tooling", event.target.value)}
@@ -298,7 +299,7 @@ function ToolingJavaRow({ registry, scopePath, rootId, busyKey, onBindingChange,
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1.5 h-3.5 w-3.5 text-[var(--taomni-code-muted)]" />
         </label>
-        <div className="text-[9px] leading-4 text-[var(--taomni-code-muted)]">
+        <div className="text-ui-caption leading-4 text-[var(--taomni-code-muted)]">
           {t("settings.workspaceSdkToolingHint")}
           {binding && normalizedPath(binding.scopePath) !== normalizedPath(scopePath) && (
             <div className="truncate" title={binding.scopePath}>
@@ -327,11 +328,11 @@ function KotlinProfileDetails({ profile, t }: { profile: ProjectSdkProfile; t: T
     [t("settings.workspaceSdkGradleLauncher"), kotlin.gradleLauncherJavaHome],
   ];
   return (
-    <div data-testid={`workspace-kotlin-profile-${profileTestId(profile.scopePath)}`} className="mt-2 rounded border border-violet-500/25 bg-violet-500/5 p-2">
-      <div className="mb-1.5 text-[10px] font-semibold text-violet-400">
+    <div data-testid={`workspace-kotlin-profile-${profileTestId(profile.scopePath)}`} className="mt-2 rounded border border-ui-info-border bg-ui-info-surface p-2">
+      <div className="mb-1.5 text-ui-caption font-semibold text-ui-info">
         {t("settings.workspaceSdkKotlinTitle")}
       </div>
-      <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-[9px] sm:grid-cols-2 xl:grid-cols-4">
+      <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-ui-caption sm:grid-cols-2 xl:grid-cols-4">
         {fields.map(([label, value]) => (
           <div key={label} className="min-w-0">
             <dt className="text-[var(--taomni-code-muted)]">{label}</dt>
@@ -352,15 +353,6 @@ export const WorkspaceSdkStatus = memo(function WorkspaceSdkStatus({ roots, auto
   const { loading, loaded, registry, rootStates, error, setError, load } = useWorkspaceSdkResolution(
     roots, autoResolve || open,
   );
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open]);
 
   const issueCount = useMemo(() => rootStates.reduce((count, state) => {
     if (state.error) return count + 1;
@@ -412,9 +404,9 @@ export const WorkspaceSdkStatus = memo(function WorkspaceSdkStatus({ roots, auto
         data-testid="code-workspace-sdk-status"
         aria-label={t("settings.workspaceSdkTitle")}
         title={t("settings.workspaceSdkTitle")}
-        className={`inline-flex h-7 shrink-0 items-center gap-1 rounded border px-2 text-[10px] ${
+        className={`inline-flex h-7 shrink-0 items-center gap-1 rounded border px-2 text-ui-caption ${
           issueCount > 0
-            ? "border-amber-500/40 bg-amber-500/10 text-amber-500"
+            ? "border-ui-warning-border bg-ui-warning-surface text-ui-warning"
             : "border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[var(--taomni-code-muted)]"
         }`}
         onClick={() => setOpen(true)}
@@ -424,177 +416,173 @@ export const WorkspaceSdkStatus = memo(function WorkspaceSdkStatus({ roots, auto
           : issueCount > 0
             ? <AlertTriangle className="h-3 w-3" />
             : loaded
-              ? <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+              ? <CheckCircle2 className="h-3 w-3 text-ui-success" />
               : <Wrench className="h-3 w-3" />}
         {buttonText}
       </button>
 
       {open && (
-        <div
+        <ModalSurface
           data-testid="workspace-sdk-dialog"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setOpen(false)}
+          initialFocus="[data-testid=workspace-sdk-close]"
+          onCancel={() => setOpen(false)}
+          aria-label="Workspace SDKs"
+          className="taomni-modal taomni-workspace-modal"
+          data-bleed="true"
+          style={{ width: "min(860px, calc(100vw - 32px))", height: "min(78vh, 680px)" }}
         >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="workspace-sdk-dialog-title"
-            className="flex h-[min(780px,92vh)] w-[min(1080px,96vw)] flex-col overflow-hidden rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="flex min-h-12 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3 py-2">
-              <Wrench className="h-4 w-4 shrink-0 text-[var(--taomni-accent)]" />
-              <div className="min-w-0 flex-1">
-                <h2 id="workspace-sdk-dialog-title" className="text-[12px] font-semibold text-[var(--taomni-code-text)]">
-                  {t("settings.workspaceSdkTitle")}
-                </h2>
-                <div className="text-[9px] text-[var(--taomni-code-muted)]">
-                  {t("settings.workspaceSdkSubtitle")}
-                </div>
+          <header className="flex min-h-12 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3 py-2">
+            <Wrench className="h-4 w-4 shrink-0 text-[var(--taomni-accent)]" />
+            <div className="min-w-0 flex-1">
+              <h2 id="workspace-sdk-dialog-title" className="text-ui-body font-semibold text-[var(--taomni-code-text)]">
+                {t("settings.workspaceSdkTitle")}
+              </h2>
+              <div className="text-ui-caption text-[var(--taomni-code-muted)]">
+                {t("settings.workspaceSdkSubtitle")}
               </div>
-              <button
-                type="button"
-                data-testid="workspace-sdk-refresh"
-                aria-label={t("settings.workspaceSdkRefresh")}
-                title={t("settings.workspaceSdkRefresh")}
-                disabled={loading || busyKey !== null}
-                className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-50"
-                onClick={() => void load()}
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-              </button>
-              <button
-                type="button"
-                data-testid="workspace-sdk-open-settings"
-                className="inline-flex h-7 items-center gap-1 rounded px-2 text-[10px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
-                onClick={() => openSettingsSection("sdks")}
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                {t("settings.workspaceSdkOpenSettings")}
-              </button>
-              <button
-                type="button"
-                data-testid="workspace-sdk-close"
-                aria-label={t("settings.workspaceSdkClose")}
-                className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)]"
-                onClick={() => setOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </header>
-
-            <div className="min-h-0 flex-1 overflow-auto p-3">
-              {error && (
-                <div data-testid="workspace-sdk-error" className="mb-2 rounded border border-red-500/35 bg-red-500/10 px-2.5 py-2 text-[10px] text-red-400">
-                  {error}
-                </div>
-              )}
-              {loading && rootStates.length === 0 ? (
-                <div className="flex items-center justify-center gap-2 py-12 text-[11px] text-[var(--taomni-code-muted)]">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("settings.workspaceSdkLoading")}
-                </div>
-              ) : roots.length === 0 ? (
-                <div className="py-12 text-center text-[11px] text-[var(--taomni-code-muted)]">
-                  {t("settings.workspaceSdkNoRoots")}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {rootStates.map(({ root, resolution, error: rootError }) => (
-                    <article key={root.id} data-testid={`workspace-sdk-root-${root.id}`} className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/30 p-2.5">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate text-[11px] font-semibold text-[var(--taomni-code-text)]">{root.name}</h3>
-                          <div className="truncate font-mono text-[9px] text-[var(--taomni-code-muted)]" title={root.path}>{root.path}</div>
-                        </div>
-                        {resolution && (
-                          <span className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[9px] text-[var(--taomni-code-muted)]">
-                            {t("settings.workspaceSdkProfiles", { count: resolution.analysis.profiles.length })}
-                          </span>
-                        )}
-                      </div>
-
-                      {rootError && (
-                        <div className="mt-2 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[9px] text-red-400">
-                          {t("settings.workspaceSdkDetectionFailed")}: {rootError}
-                        </div>
-                      )}
-
-                      {resolution?.analysis.warnings.map((warning) => (
-                        <div key={warning} className="mt-2 flex gap-1.5 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[9px] text-amber-400">
-                          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                          {warning}
-                        </div>
-                      ))}
-
-                      <div className="mt-2 space-y-2">
-                        {resolution?.analysis.profiles.map((profile) => {
-                          const profileResolved = resolution.resolved.filter(
-                            (item) => normalizedPath(item.scopePath) === normalizedPath(profile.scopePath),
-                          );
-                          return (
-                            <section key={profile.scopePath} className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] p-2.5">
-                              <div className="flex flex-wrap items-start gap-2">
-                                <div className="min-w-0 flex-1">
-                                  <h4 className="truncate text-[11px] font-medium text-[var(--taomni-code-text)]">{profile.displayName}</h4>
-                                  <div className="truncate font-mono text-[9px] text-[var(--taomni-code-muted)]" title={profile.scopePath}>
-                                    {profile.relativePath || "."} · {profile.scopePath}
-                                  </div>
-                                </div>
-                                <div className="flex flex-wrap justify-end gap-1">
-                                  {profile.buildSystems.map((buildSystem) => (
-                                    <span key={buildSystem} title={t("settings.workspaceSdkBuildSystems")} className="rounded bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-medium text-sky-400">{buildSystem}</span>
-                                  ))}
-                                  {profile.languages.map((language) => (
-                                    <span key={language} title={t("settings.workspaceSdkLanguages")} className="rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 text-[9px] text-[var(--taomni-code-muted)]">{kindLabel(language)}</span>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <KotlinProfileDetails profile={profile} t={t} />
-
-                              <div className="mt-2 text-[9px] font-semibold uppercase tracking-wide text-[var(--taomni-code-muted)]">
-                                {t("settings.workspaceSdkRequirements")}
-                              </div>
-                              <div className="mt-1.5 space-y-1.5">
-                                {profileResolved.map((resolved) => (
-                                  <BindingRow
-                                    key={`${resolved.kind}:${resolved.role}`}
-                                    registry={registry}
-                                    resolved={resolved}
-                                    rootId={root.id}
-                                    busyKey={busyKey}
-                                    onBindingChange={changeBinding}
-                                    t={t}
-                                  />
-                                ))}
-                                {profile.languages.includes("java") && (
-                                  <ToolingJavaRow
-                                    registry={registry}
-                                    scopePath={profile.scopePath}
-                                    rootId={root.id}
-                                    busyKey={busyKey}
-                                    onBindingChange={changeBinding}
-                                    t={t}
-                                  />
-                                )}
-                                {profileResolved.length === 0 && !profile.languages.includes("java") && (
-                                  <div className="rounded border border-dashed border-[var(--taomni-code-border)] px-2 py-3 text-center text-[9px] text-[var(--taomni-code-muted)]">
-                                    {t("settings.workspaceSdkNoRequirements")}
-                                  </div>
-                                )}
-                              </div>
-                            </section>
-                          );
-                        })}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
             </div>
-          </section>
-        </div>
+            <button
+              type="button"
+              data-testid="workspace-sdk-refresh"
+              aria-label={t("settings.workspaceSdkRefresh")}
+              title={t("settings.workspaceSdkRefresh")}
+              disabled={loading || busyKey !== null}
+              className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-50"
+              onClick={() => void load()}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            <button
+              type="button"
+              data-testid="workspace-sdk-open-settings"
+              className="inline-flex h-7 items-center gap-1 rounded px-2 text-ui-caption text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+              onClick={() => openSettingsSection("sdks")}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              {t("settings.workspaceSdkOpenSettings")}
+            </button>
+            <button
+              type="button"
+              data-testid="workspace-sdk-close"
+              aria-label={t("settings.workspaceSdkClose")}
+              className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)]"
+              onClick={() => setOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </header>
+
+          <div className="min-h-0 flex-1 overflow-auto p-3">
+            {error && (
+              <div data-testid="workspace-sdk-error" className="mb-2 rounded border border-ui-danger-border bg-ui-danger-surface px-2.5 py-2 text-ui-caption text-ui-danger">
+                {error}
+              </div>
+            )}
+            {loading && rootStates.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 py-12 text-ui-small text-[var(--taomni-code-muted)]">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t("settings.workspaceSdkLoading")}
+              </div>
+            ) : roots.length === 0 ? (
+              <div className="py-12 text-center text-ui-small text-[var(--taomni-code-muted)]">
+                {t("settings.workspaceSdkNoRoots")}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {rootStates.map(({ root, resolution, error: rootError }) => (
+                  <article key={root.id} data-testid={`workspace-sdk-root-${root.id}`} className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/30 p-2.5">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate text-ui-small font-semibold text-[var(--taomni-code-text)]">{root.name}</h3>
+                        <div className="truncate font-mono text-ui-caption text-[var(--taomni-code-muted)]" title={root.path}>{root.path}</div>
+                      </div>
+                      {resolution && (
+                        <span className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-ui-caption text-[var(--taomni-code-muted)]">
+                          {t("settings.workspaceSdkProfiles", { count: resolution.analysis.profiles.length })}
+                        </span>
+                      )}
+                    </div>
+
+                    {rootError && (
+                      <div className="mt-2 rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1.5 text-ui-caption text-ui-danger">
+                        {t("settings.workspaceSdkDetectionFailed")}: {rootError}
+                      </div>
+                    )}
+
+                    {resolution?.analysis.warnings.map((warning) => (
+                      <div key={warning} className="mt-2 flex gap-1.5 rounded border border-ui-warning-border bg-ui-warning-surface px-2 py-1.5 text-ui-caption text-ui-warning">
+                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                        {warning}
+                      </div>
+                    ))}
+
+                    <div className="mt-2 space-y-2">
+                      {resolution?.analysis.profiles.map((profile) => {
+                        const profileResolved = resolution.resolved.filter(
+                          (item) => normalizedPath(item.scopePath) === normalizedPath(profile.scopePath),
+                        );
+                        return (
+                          <section key={profile.scopePath} className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] p-2.5">
+                            <div className="flex flex-wrap items-start gap-2">
+                              <div className="min-w-0 flex-1">
+                                <h4 className="truncate text-ui-small font-medium text-[var(--taomni-code-text)]">{profile.displayName}</h4>
+                                <div className="truncate font-mono text-ui-caption text-[var(--taomni-code-muted)]" title={profile.scopePath}>
+                                  {profile.relativePath || "."} · {profile.scopePath}
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap justify-end gap-1">
+                                {profile.buildSystems.map((buildSystem) => (
+                                  <span key={buildSystem} title={t("settings.workspaceSdkBuildSystems")} className="rounded bg-ui-info-surface px-1.5 py-0.5 text-ui-caption font-medium text-ui-info">{buildSystem}</span>
+                                ))}
+                                {profile.languages.map((language) => (
+                                  <span key={language} title={t("settings.workspaceSdkLanguages")} className="rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 text-ui-caption text-[var(--taomni-code-muted)]">{kindLabel(language)}</span>
+                                ))}
+                              </div>
+                            </div>
+
+                            <KotlinProfileDetails profile={profile} t={t} />
+
+                            <div className="mt-2 text-ui-caption font-semibold uppercase tracking-wide text-[var(--taomni-code-muted)]">
+                              {t("settings.workspaceSdkRequirements")}
+                            </div>
+                            <div className="mt-1.5 space-y-1.5">
+                              {profileResolved.map((resolved) => (
+                                <BindingRow
+                                  key={`${resolved.kind}:${resolved.role}`}
+                                  registry={registry}
+                                  resolved={resolved}
+                                  rootId={root.id}
+                                  busyKey={busyKey}
+                                  onBindingChange={changeBinding}
+                                  t={t}
+                                />
+                              ))}
+                              {profile.languages.includes("java") && (
+                                <ToolingJavaRow
+                                  registry={registry}
+                                  scopePath={profile.scopePath}
+                                  rootId={root.id}
+                                  busyKey={busyKey}
+                                  onBindingChange={changeBinding}
+                                  t={t}
+                                />
+                              )}
+                              {profileResolved.length === 0 && !profile.languages.includes("java") && (
+                                <div className="rounded border border-dashed border-[var(--taomni-code-border)] px-2 py-3 text-center text-ui-caption text-[var(--taomni-code-muted)]">
+                                  {t("settings.workspaceSdkNoRequirements")}
+                                </div>
+                              )}
+                            </div>
+                          </section>
+                        );
+                      })}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </ModalSurface>
       )}
     </>
   );

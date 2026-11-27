@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { startCustomDrag } from "../../lib/customDnD";
 import { observeElementOffsetClean } from "../../lib/virtualOffsetObserver";
 import { effectiveFileType } from "../../lib/sftp";
 import { getAppPlatform } from "../../lib/runtime";
+import { useAppStore } from "../../stores/appStore";
 import { useSftpStore } from "../../stores/sftpStore";
 import type { FilePanelViewProps } from "../filebrowser/filePanel/FilePanelView";
 import { ExplorerFileIcon } from "./ExplorerFileIcon";
@@ -25,6 +26,8 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
   const { operations, dropPath, searchActive, searchPaths } = useExplorerContext();
   const preferences = useExplorerPreferences();
   const label = useExplorerLabels();
+  const listId = useId();
+  const uiFontSize = useAppStore((state) => state.uiFontSize);
   const clipboard = useExplorerClipboard();
   const selected = useMemo(() => new Set(pane.selection), [pane.selection]);
   const cut = useMemo(() => new Set(clipboard?.cut ? clipboard.paths : []), [clipboard]);
@@ -39,7 +42,9 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
   const headerHeight = icons ? 0 : 26;
   const columnSizing = useExplorerColumns(details, preferences.columnWidths, entries, label, scroll);
   const columns = icons ? Math.max(1, Math.floor((width - 16) / 96)) : 1;
-  const rowHeight = icons ? 96 : preferences.view === "list" ? 24 : 28;
+  const compact = preferences.view === "list";
+  const rowHeight = icons ? Math.max(96, 68 + 2 * uiFontSize)
+    : Math.max(compact ? 24 : 28, Math.ceil(1.4 * uiFontSize) + (compact ? 6 : 10));
   const virtual = useVirtualizer({
     count: Math.ceil(entries.length / columns), getScrollElement: () => scroll.current,
     estimateSize: () => rowHeight, overscan: 8, observeElementOffset: observeElementOffsetClean,
@@ -73,10 +78,25 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
   const rows = entries.length > 200
     ? virtualItems.map(row => ({ ...row, start: row.start - headerHeight }))
     : Array.from({ length: Math.ceil(entries.length / columns) }, (_, index) => ({ index, start: index * rowHeight }));
+  const activeIndex = focused ? entries.findIndex((entry) => entry.path === focused) : -1;
+  const activeMounted = activeIndex >= 0 && rows.some((row) => row.index === Math.floor(activeIndex / columns));
   // Use the same store as FilePanel; Explorer has no independent selection model.
   const selectNow = (paths: string[]) => useSftpStore.getState().setSelection(inputs.sessionId, "local", paths);
   const handleKeys = (event: React.KeyboardEvent) => {
     if (event.nativeEvent.isComposing || (event.target as HTMLElement).closest("input,textarea,button,[role=columnheader],[contenteditable=true]")) return;
+    if ((event.key === "ContextMenu" || (event.shiftKey && event.key === "F10"))
+      && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const list = event.currentTarget;
+      const row = list.ownerDocument.getElementById(list.getAttribute("aria-activedescendant") ?? "");
+      const target = row && list.contains(row) ? row : list;
+      const bounds = target.getBoundingClientRect();
+      event.preventDefault();
+      event.stopPropagation();
+      target.dispatchEvent(new MouseEvent("contextmenu", {
+        bubbles: true, cancelable: true, clientX: bounds.left + 8, clientY: bounds.top + 8,
+      }));
+      return;
+    }
     const mod = getAppPlatform() === "macos" ? event.metaKey : event.ctrlKey;
     if (mod && !event.altKey && !event.shiftKey && !(getAppPlatform() === "macos" ? event.ctrlKey : event.metaKey) && event.key.toLowerCase() === "a") {
       event.preventDefault(); event.stopPropagation(); selectNow(entries.map((entry) => entry.path)); return;
@@ -106,13 +126,14 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
     if (!element) return;
     event.preventDefault(); element.focus();
     const rect = element.getBoundingClientRect();
-    const startX = event.clientX - rect.left + element.scrollLeft;
-    const startY = event.clientY - rect.top + element.scrollTop;
+    const scale = element.offsetWidth > 0 ? rect.width / element.offsetWidth || 1 : 1;
+    const startX = (event.clientX - rect.left) / scale + element.scrollLeft;
+    const startY = (event.clientY - rect.top) / scale + element.scrollTop;
     const original = event.ctrlKey || event.metaKey ? pane.selection : [];
     let moved = false;
     const update = (next: PointerEvent) => {
-      const x = next.clientX - rect.left + element.scrollLeft;
-      const y = next.clientY - rect.top + element.scrollTop;
+      const x = (next.clientX - rect.left) / scale + element.scrollLeft;
+      const y = (next.clientY - rect.top) / scale + element.scrollTop;
       const box = { left: Math.min(x, startX), top: Math.min(y, startY), width: Math.abs(x - startX), height: Math.abs(y - startY) };
       if (!moved && box.width + box.height < 4) return;
       moved = true; setRubber({ ...box, top: box.top - headerHeight });
@@ -122,7 +143,7 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
       const last = Math.min(Math.ceil(entries.length / columns) - 1, Math.floor((box.top + box.height - offset) / rowHeight));
       for (let row = first; row <= last; row++) {
         const top = offset + row * rowHeight;
-        const bottom = top + (icons ? 92 : rowHeight);
+        const bottom = top + rowHeight - (icons ? 4 : 0);
         if (bottom <= box.top || top >= box.top + box.height) continue;
         for (let col = 0; col < columns; col++) {
           const index = row * columns + col;
@@ -144,8 +165,8 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
     window.addEventListener("pointercancel", finish); window.addEventListener("blur", finish);
   };
   return <div className={`ex-files ${preferences.view === "list" ? "compact" : ""}`} data-testid="explorer-files" data-explorer-view={preferences.view} data-explorer-drop={pane.path}
-    style={{ "--ex-columns": columnSizing.template } as CSSProperties}>
-    <div ref={scroll} className={`ex-fbody ${dropPath === pane.path ? "ex-drop" : ""}`} data-testid="explorer-file-list" role="listbox" aria-multiselectable="true" aria-label={label("文件", "Files")} tabIndex={0}
+    style={{ "--ex-row-height": `${rowHeight}px`, "--ex-columns": columnSizing.template } as CSSProperties}>
+    <div ref={scroll} className={`ex-fbody ${dropPath === pane.path ? "ex-drop" : ""}`} data-testid="explorer-file-list" role="listbox" aria-activedescendant={activeMounted ? `${listId}-row-${activeIndex}` : undefined} aria-multiselectable="true" aria-label={label("文件", "Files")} tabIndex={0}
       onKeyDown={handleKeys} onPointerDown={rubberStart} onContextMenu={interactions.handleEmptyContext}>
       {!icons && <ExplorerFileColumns details={details} inputs={inputs} columns={columnSizing} label={label} />}
       {inputs.skippedEntryCount > 0 && <div className="ex-warning" role="status" title={inputs.diagnosticTitle}>{label(`${inputs.skippedEntryCount} 个项目无法读取`, `${inputs.skippedEntryCount} unreadable items`)}</div>}
@@ -157,7 +178,7 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
           if (!entry) return null;
           const directory = effectiveFileType(entry) === "dir";
           const renaming = operations.renamePath === entry.path;
-          return <div key={entry.path} data-row data-testid="explorer-file-row" data-path={entry.path} data-name={entry.name} role="option" aria-selected={selected.has(entry.path)}
+          return <div key={entry.path} id={`${listId}-row-${row.index * columns + col}`} data-row data-testid="explorer-file-row" data-path={entry.path} data-name={entry.name} role="option" aria-selected={selected.has(entry.path)}
             data-explorer-drop={directory ? entry.path : undefined}
             className={`${icons ? "ex-tile" : "ex-frow"} ${selected.has(entry.path) ? "sel" : ""} ${cut.has(entry.path) ? "cut" : ""} ${focused === entry.path ? "focus" : ""} ${dropPath === entry.path ? "ex-drop" : ""}`}
             style={{ top: row.start + (icons ? 8 : 0), ...(icons ? { left: 8 + col * 96 } : {}) }} title={entry.path}

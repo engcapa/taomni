@@ -59,7 +59,7 @@ export function TaoPrivacySettings() {
     <h4>{zh ? "本地资料与清理状态" : "Local records and privacy cleanup"}</h4>
     {!isTauriRuntime() ? <p>{zh ? "本地索引和迁移状态需要桌面应用。" : "Local indexing and migration status require the desktop app."}</p> : null}
     {summary && <p data-testid="tao-privacy-summary">{zh ? `清理版本 ${summary.version}：命令 ${summary.commandsCleaned} 条，SQL ${summary.queriesCleaned} 条。` : `Cleanup version ${summary.version}: ${summary.commandsCleaned} commands, ${summary.queriesCleaned} SQL records.`}</p>}
-    <p className="text-[11px]">{zh ? "关闭来源会立即清除其索引；重新启用时从已脱敏的原始记录重建。检索在本机完成。" : "Disabling a source clears its index immediately. Re-enabling rebuilds it from redacted records. Search stays on this device."}</p>
+    <p className="text-ui-small">{zh ? "关闭来源会立即清除其索引；重新启用时从已脱敏的原始记录重建。检索在本机完成。" : "Disabling a source clears its index immediately. Re-enabling rebuilds it from redacted records. Search stays on this device."}</p>
     {sources && <>
       <button type="button" ref={popup.triggerRef} className="taomni-btn flex min-h-8 items-center gap-2 px-3"
         data-testid="tao-search-sources" aria-haspopup="dialog" aria-expanded={popup.open}

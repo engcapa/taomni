@@ -1,0 +1,39 @@
+id: TC-UIC-034-global-command-palette
+title: Global command palette opens in the top layer, focuses search, and restores trigger focus on Escape
+covers: [F-WS-6]
+modes: [browser, native]
+fixtures: [reset_db]
+tags: [ui-contract, workspace, keyboard]
+ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-07, UI-FOC-03]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="global-search-trigger"]'
+- press: {selector: '[data-testid="global-search-trigger"]', key: Enter}
+- wait_for: '[data-testid="global-search-modal"]:modal'
+- assert_element_geometry: {selector: '[data-testid="global-search-modal"]', min_width: 400, min_height: 180, viewport_margin: 12}
+- assert_focus_on: '[data-testid="global-search-input"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Settings}
+- press: ArrowDown
+- press: Escape
+- wait_for: {selector: '[data-testid="global-search-modal"]', state: detached}
+- assert_focus_on: '[data-testid="global-search-trigger"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: command-palette-top-layer
+    ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-07, UI-FOC-03]
+    requirement: Opening the global command palette from its toolbar trigger enters the modal top layer within the viewport, focuses search immediately, and restores trigger focus on Escape.
+    actions: [3, 7, 8, 9]
+    checkpoints:
+    - {step: 4, expectation: The command palette owns the window modal top layer.}
+    - {step: 5, expectation: The palette fits within the viewport bounds.}
+    - {step: 6, expectation: Initial keyboard focus lands on the search input.}
+    - {step: 10, expectation: Escape closes the palette.}
+    - {step: 11, expectation: Trigger button regains keyboard focus after Escape.}
+    - {step: 12, expectation: No runtime errors occur.}
+    results: [4, 5, 6, 10, 11, 12]
+  visual:
+  - {check: Modal geometry inside viewport, method: automated, reason: Checks the top-layer dialog bounds and margin.}
+  native:
+  - {check: WebView top layer and trigger refocus, method: automated, reason: Exercises native top-layer <dialog> activation and focus restoration.}

@@ -86,10 +86,10 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
       >
         <Terminal className={`w-4 h-4 shrink-0 ${enabled ? "text-[var(--taomni-accent)]" : "text-[var(--taomni-text-muted)]"}`} />
         <div className="flex-1">
-          <div className="text-[13px] font-semibold">
+          <div className="text-ui-body font-semibold">
             {t("aiSettings.aiShellTitle")}{" "}
             <span
-              className="text-[10px] ml-1 rounded px-1.5 py-0.5 align-middle"
+              className="text-ui-caption ml-1 rounded px-1.5 py-0.5 align-middle"
               style={{
                 background: "var(--taomni-badge-warning-bg)",
                 color: "var(--taomni-badge-warning-text)",
@@ -99,7 +99,7 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
               {t("aiSettings.aiShellExperimental")}
             </span>
           </div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">
             {t("aiSettings.aiShellDescription")}
           </div>
         </div>
@@ -119,13 +119,13 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
       {/* Demo input (only shown when enabled) */}
       {enabled && (
         <div className="space-y-2">
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">
             {t("aiSettings.aiShellTest")}
           </div>
           <div className="flex gap-2">
             <input
               type="text"
-              className="taomni-input h-8 flex-1 text-[12px]"
+              className="taomni-input h-8 flex-1 text-ui-body"
               placeholder={t("aiSettings.aiShellPlaceholder")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -133,7 +133,7 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
             />
             <button
               type="button"
-              className="taomni-btn h-8 px-3 text-[12px] inline-flex items-center gap-1.5 shrink-0"
+              className="taomni-btn h-8 px-3 text-ui-body inline-flex items-center gap-1.5 shrink-0"
               onClick={handleGenerate}
               disabled={loading || !description.trim()}
             >
@@ -142,7 +142,7 @@ export function AiShellPanel({ enabled, onToggle }: AiShellPanelProps) {
           </div>
 
           {error && (
-            <div className="text-[11px] text-red-400 rounded border border-red-500/30 bg-red-500/5 px-2 py-1.5">
+            <div className="text-ui-small text-ui-danger rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1.5">
               {error}
             </div>
           )}

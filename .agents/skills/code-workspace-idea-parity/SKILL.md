@@ -63,3 +63,5 @@ description: 统筹 Taomni Code Workspace 的 IntelliJ IDEA 功能、UI 与交�
 - `使用 $code-workspace-idea-parity plan，规划指定能力的 IDEA UI 与交互改版，先不实施。`
 - `使用 $code-workspace-idea-parity next，按给定任务板交付一个工作包，允许重构现有交互。`
 - `使用 $code-workspace-idea-parity verify，补指定场景的证据，先检查是否需要重新构建。`
+
+桌面控件与交互对齐遵循 `docs-feature/ui-standard/UI-STANDARD.md` §0.2，偏离须登记在 §9。

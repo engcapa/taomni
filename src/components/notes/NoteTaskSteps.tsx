@@ -24,12 +24,12 @@ function TaskStep({ step, prefix }: { step: NoteStep; prefix: string }) {
       title={t(done ? "notes.reopen" : "notes.complete")} aria-label={t(done ? "notes.reopen" : "notes.complete")}
       onClick={() => { void change(step.note_id, (steps) => steps.map((item) => item.id === step.id
         ? { ...item, completed_at: item.completed_at == null ? nowSecs() : null } : item)); }}>
-      {done ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : <Circle className="h-3.5 w-3.5" />}
+      {done ? <CheckCircle2 className="h-3.5 w-3.5 text-ui-success" /> : <Circle className="h-3.5 w-3.5" />}
     </button>
-    <input type="text" className={`taomni-input h-6 min-w-0 flex-1 text-[11px] ${done ? "line-through text-[var(--taomni-text-muted)]" : ""}`}
+    <input type="text" className={`taomni-input h-6 min-w-0 flex-1 text-ui-small ${done ? "line-through text-[var(--taomni-text-muted)]" : ""}`}
       aria-label={t("notes.steps")} value={title} onChange={(event) => { revision.current += 1; setTitle(event.target.value); setDirty(true); }} onBlur={commit}
       onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); commit(); } }} />
-    <button type="button" className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:text-red-400"
+    <button type="button" className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:text-ui-danger"
       data-testid={`${prefix}-step-delete`} title={t("notes.delete")} aria-label={t("notes.delete")}
       onClick={() => { void change(step.note_id, (steps) => steps.filter((item) => item.id !== step.id)); }}><X className="h-3 w-3" /></button>
   </div>;
@@ -50,10 +50,10 @@ export function NoteTaskSteps({ note, prefix }: { note: NoteItem; prefix: string
       .finally(() => setAdding(false));
   };
   return <div className="flex min-w-0 flex-col gap-1">
-    <span className="text-[11px] text-[var(--taomni-text-muted)]">{t("notes.steps")}</span>
+    <span className="text-ui-small text-[var(--taomni-text-muted)]">{t("notes.steps")}</span>
     {note.steps.map((step) => <TaskStep key={step.id} step={step} prefix={prefix} />)}
     <div className="flex items-center gap-1.5">
-      <input type="text" className="taomni-input h-6 min-w-0 flex-1 text-[11px]" value={newStep}
+      <input type="text" className="taomni-input h-6 min-w-0 flex-1 text-ui-small" value={newStep}
         placeholder={t("notes.stepPlaceholder")} aria-label={t("notes.addStep")} data-testid={`${prefix}-new-step`}
         onChange={(event) => setNewStep(event.target.value)}
         onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); add(); } }} />

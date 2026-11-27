@@ -36,7 +36,7 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
   const setTabHasNewOutput = useAppStore((s) => s.setTabHasNewOutput);
   const confirmDialog = useConfirmDialog();
   const rootRef = useRef<HTMLDivElement | null>(null);
-  useDbSessionFontSize(visible, rootRef);
+  const { fontSize } = useDbSessionFontSize(visible, rootRef);
 
   const transport: HBaseTransport = (info.connectionMode as HBaseTransport) ?? "rest";
 
@@ -135,7 +135,7 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
       { separator: true, label: "" },
       {
         label: "Run all commands",
-        icon: <Play className="w-3 h-3" style={{ color: "#62d36f" }} />,
+        icon: <Play className="w-3 h-3" style={{ color: "var(--taomni-success-text)" }} />,
         onClick: () => void execution.runStatements(workspace.activePanel.id, handle?.getValue() ?? workspace.activePanel.doc),
         disabled: !connectionSessionId || panelRunning,
       },
@@ -272,10 +272,11 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
   }
 
   const panelRunning = workspace.activePanel.sheets.some((s) => s.running);
-  const btn = "h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
+  const btn = "h-6 px-2 inline-flex items-center gap-1 rounded text-ui-small hover:bg-[var(--taomni-hover)] disabled:opacity-40";
 
   return <HBaseWorkspaceView
     rootRef={rootRef}
+    fontSize={fontSize}
     chatToggle={chatToggle}
     visible={visible}
     t={t}

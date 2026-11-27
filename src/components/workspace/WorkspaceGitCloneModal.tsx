@@ -1,5 +1,8 @@
+import { Button } from "../ui/Button";
+import { ModalSurface } from "../ui/ModalSurface";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useT } from "../../lib/i18n";
 import { selectFolderPath } from "../../lib/ipc";
 import {
@@ -7,7 +10,6 @@ import {
   type GitCloneProbeResult,
 } from "../../lib/gitClone";
 import { useGitCloneStore } from "../../stores/gitCloneStore";
-import { useFocusReturn } from "../editor/workspace/useFocusReturn";
 import { GitCloneFields } from "./gitClone/GitCloneFields";
 import { GitCloneProgressView } from "./gitClone/GitCloneProgressView";
 import {
@@ -42,14 +44,12 @@ export function WorkspaceGitCloneModal() {
   const [probeError, setProbeError] = useState<string | null>(null);
   const [branchOptions, setBranchOptions] = useState<string[]>([]);
   const [picking, setPicking] = useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const probeGeneration = useRef(0);
   const defaultsKey = useRef<string | null>(null);
-  useFocusReturn(open);
 
   const focusUrl = useCallback(() => {
-    dialogRef.current
-      ?.querySelector<HTMLElement>('[data-testid="workspace-git-clone-url"]')
+    document
+      .querySelector<HTMLElement>('[data-testid="workspace-git-clone-url"]')
       ?.focus();
   }, []);
 
@@ -82,9 +82,7 @@ export function WorkspaceGitCloneModal() {
     if (!open) return;
     setFormError(null);
     setSubmitted(false);
-    const timer = window.setTimeout(() => focusUrl(), 0);
-    return () => window.clearTimeout(timer);
-  }, [focusUrl, open]);
+  }, [open]);
 
   const patchForm = useCallback((patch: Partial<GitCloneFormState>) => {
     setForm((previous) => {
@@ -197,115 +195,88 @@ export function WorkspaceGitCloneModal() {
     primaryAction = { label: t("gitClone.clone"), testId: "workspace-git-clone-start", onClick: () => void submit(), kind: "primary" };
   }
 
-  return (
-    <div
-      className="fixed inset-0 z-[900] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.45)" }}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) closeDialog();
-      }}
+  return createPortal(
+    <ModalSurface
+      dismissOnBackdrop
+      initialFocus='[data-testid="workspace-git-clone-url"]:enabled, [data-testid="workspace-git-clone-close"]'
+      onCancel={closeDialog}
+      data-testid="workspace-git-clone-modal"
+      aria-label={title}
+      aria-labelledby="workspace-git-clone-title"
+      className="m-auto p-0 open:flex max-h-[calc(100vh-48px)] w-[640px] max-w-[calc(100vw-24px)] flex-col rounded-xl border shadow-2xl backdrop:bg-[var(--taomni-overlay)]"
+      style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-panel-bg)", color: "var(--taomni-text)" }}
     >
-      <div
-        ref={dialogRef}
-        data-testid="workspace-git-clone-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        aria-labelledby="workspace-git-clone-title"
-        className="flex max-h-[calc(100vh-48px)] w-[640px] max-w-[calc(100vw-24px)] flex-col rounded-xl border shadow-2xl"
-        style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-panel-bg)" }}
-        onKeyDown={(event) => {
-          if (event.nativeEvent.isComposing) return;
-          if (event.key === "Escape") {
-            event.stopPropagation();
-            closeDialog();
-          }
-          if (event.key === "Tab") {
-            const nodes = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
-              "input:not(:disabled),button:not(:disabled),[tabindex]:not([tabindex='-1'])",
-            ) ?? []);
-            if (!nodes.length) return;
-            if (event.shiftKey && document.activeElement === nodes[0]) {
-              event.preventDefault();
-              nodes.at(-1)?.focus();
-            } else if (!event.shiftKey && document.activeElement === nodes.at(-1)) {
-              event.preventDefault();
-              nodes[0]?.focus();
-            }
-          }
-        }}
-      >
-        <header className="shrink-0 border-b px-4 py-3" style={{ borderColor: "var(--taomni-divider)" }}>
-          <h2 id="workspace-git-clone-title" className="text-[15px] font-semibold text-[var(--taomni-text)]">{title}</h2>
-          <p className="mt-0.5 text-[11.5px] text-[var(--taomni-text-muted)]">{t("gitClone.subtitle")}</p>
-        </header>
+      <header className="shrink-0 border-b px-4 py-3" style={{ borderColor: "var(--taomni-divider)" }}>
+        <h2 id="workspace-git-clone-title" className="text-ui-title font-semibold text-[var(--taomni-text)]">{title}</h2>
+        <p className="mt-0.5 text-ui-small text-[var(--taomni-text-muted)]">{t("gitClone.subtitle")}</p>
+      </header>
 
-        <div data-testid="workspace-git-clone-body" className="min-h-0 flex-1 overflow-auto px-4 py-3">
-          {showForm && (
-            <>
-              {defaultsStatus === "error" && (
-                <div data-testid="workspace-git-clone-defaults-error" role="alert" className="mb-3 flex items-center justify-between gap-2 rounded border px-3 py-2 text-[11.5px]"
-                  style={{ borderColor: "var(--taomni-danger, #ef4444)" }}>
-                  <span className="min-w-0 break-words">{t("gitClone.defaultsFailed", { error: defaultsError ?? "" })}</span>
-                  <button type="button" className="taomni-btn h-6 shrink-0 px-2" onClick={() => void loadDefaults(true)}>
-                    {t("gitClone.retry")}
-                  </button>
-                </div>
-              )}
-              {defaults && !defaults.gitAvailable && (
-                <div data-testid="workspace-git-clone-git-missing" role="alert" className="mb-3 rounded border px-3 py-2 text-[11.5px]"
-                  style={{ borderColor: "var(--taomni-warning, #d97706)" }}>
-                  {t("gitClone.gitUnavailable")}
-                </div>
-              )}
-              <GitCloneFields
-                form={form}
-                errors={submitted ? errors : {}}
-                defaults={defaults}
-                branchOptions={branchOptions}
-                probing={probing}
-                probeError={probeError}
-                disabled={active || picking || defaultsStatus === "loading"}
-                onChange={patchForm}
-                onDetect={() => void runProbe()}
-                onBrowse={() => void browse()}
-              />
-              {formError && (
-                <p data-testid="workspace-git-clone-form-error" role="alert" className="mt-3 break-words text-[11.5px] text-red-500">{formError}</p>
-              )}
-              <p data-testid="workspace-git-clone-destination-path" className="sr-only">{cloneDestination(form)}</p>
-            </>
-          )}
-          {task && <GitCloneProgressView task={task} />}
-        </div>
-
-        <footer className="flex shrink-0 items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "var(--taomni-divider)" }}>
-          {defaultsStatus === "loading" && showForm && (
-            <span data-testid="workspace-git-clone-loading" className="mr-auto inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              {t("gitClone.loadingDefaults")}
-            </span>
-          )}
-          <button
-            type="button"
-            data-testid="workspace-git-clone-close"
-            className="taomni-btn h-8 px-3"
-            onClick={closeDialog}
-          >
-            {t("gitClone.close")}
-          </button>
-          <button
-            type="button"
-            data-testid={primaryAction.testId}
-            className={`taomni-btn h-8 px-3 ${primaryAction.kind === "primary" ? "taomni-btn-primary" : ""}`}
-            style={primaryAction.kind === "danger" ? { background: "var(--taomni-danger, #ef4444)", color: "white" } : undefined}
-            disabled={picking || (showForm && defaultsStatus === "loading")}
-            onClick={primaryAction.onClick}
-          >
-            {primaryAction.label}
-          </button>
-        </footer>
+      <div data-testid="workspace-git-clone-body" className="min-h-0 flex-auto overflow-auto px-4 py-3">
+        {showForm && (
+          <>
+            {defaultsStatus === "error" && (
+              <div data-testid="workspace-git-clone-defaults-error" role="alert" className="mb-3 flex items-center justify-between gap-2 rounded border px-3 py-2 text-ui-small"
+                style={{ borderColor: "var(--taomni-danger, #ef4444)" }}>
+                <span className="min-w-0 break-words">{t("gitClone.defaultsFailed", { error: defaultsError ?? "" })}</span>
+                <button type="button" className="taomni-btn h-6 shrink-0 px-2" onClick={() => void loadDefaults(true)}>
+                  {t("gitClone.retry")}
+                </button>
+              </div>
+            )}
+            {defaults && !defaults.gitAvailable && (
+              <div data-testid="workspace-git-clone-git-missing" role="alert" className="mb-3 rounded border px-3 py-2 text-ui-small"
+                style={{ borderColor: "var(--taomni-warning-text, #d97706)" }}>
+                {t("gitClone.gitUnavailable")}
+              </div>
+            )}
+            <GitCloneFields
+              form={form}
+              errors={submitted ? errors : {}}
+              defaults={defaults}
+              branchOptions={branchOptions}
+              probing={probing}
+              probeError={probeError}
+              disabled={active || picking || defaultsStatus === "loading"}
+              onChange={patchForm}
+              onDetect={() => void runProbe()}
+              onBrowse={() => void browse()}
+            />
+            {formError && (
+              <p data-testid="workspace-git-clone-form-error" role="alert" className="mt-3 break-words text-ui-small text-ui-danger">{formError}</p>
+            )}
+            <p data-testid="workspace-git-clone-destination-path" className="sr-only">{cloneDestination(form)}</p>
+          </>
+        )}
+        {task && <GitCloneProgressView task={task} />}
       </div>
-    </div>
+
+      <footer className="flex shrink-0 items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "var(--taomni-divider)" }}>
+        {defaultsStatus === "loading" && showForm && (
+          <span data-testid="workspace-git-clone-loading" className="mr-auto inline-flex items-center gap-1 text-ui-small text-[var(--taomni-text-muted)]">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            {t("gitClone.loadingDefaults")}
+          </span>
+        )}
+        <button
+          type="button"
+          data-testid="workspace-git-clone-close"
+          className="taomni-btn h-8 px-3"
+          onClick={closeDialog}
+        >
+          {t("gitClone.close")}
+        </button>
+        <Button
+          type="button"
+          data-testid={primaryAction.testId}
+          className="h-8 px-3"
+          variant={primaryAction.kind === "secondary" ? "default" : primaryAction.kind}
+          disabled={picking || (showForm && defaultsStatus === "loading")}
+          onClick={primaryAction.onClick}
+        >
+          {primaryAction.label}
+        </Button>
+      </footer>
+    </ModalSurface>,
+    document.body,
   );
 }

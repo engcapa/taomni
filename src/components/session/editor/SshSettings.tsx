@@ -52,7 +52,7 @@ export function AdvancedSshSettings({
   onBrowseKey: () => void;
 }) {
   return (
-    <div data-testid="advanced-ssh-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+    <div data-testid="advanced-ssh-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-ui-body">
       {sessionType === "SSH" && <Field label={t("sessionEditor2.fieldX11")}>
         <label className="flex items-center gap-1.5">
           <Checkbox dataTestId="session-x11-forwarding-toggle" checked={x11} onChange={setX11} />
@@ -144,7 +144,7 @@ export function AdvancedSshSettings({
               }}
             />
             <label
-              className="flex items-center gap-1 text-[11px] cursor-pointer"
+              className="flex items-center gap-1 text-ui-small cursor-pointer"
               title={
                 vaultState === "empty"
                   ? t("sessionEditor2.saveInVaultTitleSetup")

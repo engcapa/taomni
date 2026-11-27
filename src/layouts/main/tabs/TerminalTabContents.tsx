@@ -135,7 +135,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
     data-testid="terminal-split-stage"
     data-active={terminalSplitVisible || undefined}
     data-split-layout={terminalSplitVisible ? terminalSplitLayout : undefined}
-    className={terminalSplitVisible ? "absolute inset-0 z-10 flex flex-col" : "contents"}
+    className={terminalSplitVisible ? "absolute inset-0 z-[var(--taomni-z-content)] flex flex-col" : "contents"}
   >
     <div style={{ display: terminalSplitVisible ? "block" : "none" }}>
       <TerminalSplitToolbar
@@ -339,7 +339,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
               }}
             >
               <div
-                className="h-7 shrink-0 items-center gap-2 px-2 text-[11px]"
+                className="h-7 shrink-0 items-center gap-2 px-2 text-ui-small"
                 style={{
                   display: terminalSplitVisible ? "flex" : "none",
                   background: isActive ? "var(--taomni-selected)" : "var(--taomni-chrome-bg)",
@@ -357,7 +357,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
                 </button>
                 <span
                   data-testid={`terminal-split-activity-${tab.id}`}
-                  className="max-w-[150px] truncate rounded px-1.5 py-0.5 text-[10px] text-[var(--taomni-text-muted)]"
+                  className="max-w-[150px] truncate rounded px-1.5 py-0.5 text-ui-caption text-[var(--taomni-text-muted)]"
                   style={{ background: "var(--taomni-hover)" }}
                   title={tabDetails.activityLabel}
                 >
@@ -442,7 +442,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
             <div
               key={`grid-col-${index}`}
               data-testid="terminal-split-grid-column-resize-handle"
-              className="absolute top-0 bottom-0 z-30 w-1.5 -translate-x-1/2 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/70"
+              className="absolute top-0 bottom-0 z-[var(--taomni-z-sticky)] w-1.5 -translate-x-1/2 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/70"
               style={{ left: `${cumulativeWeightPercent(splitGridColumnWeightsForLayout, index)}%` }}
               onPointerDown={(event) => startGridSplitResize("column", index, event)}
               role="separator"
@@ -454,7 +454,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
             <div
               key={`grid-row-${index}`}
               data-testid="terminal-split-grid-row-resize-handle"
-              className="absolute left-0 right-0 z-30 h-1.5 -translate-y-1/2 cursor-row-resize bg-transparent hover:bg-[var(--taomni-accent)]/70"
+              className="absolute left-0 right-0 z-[var(--taomni-z-sticky)] h-1.5 -translate-y-1/2 cursor-row-resize bg-transparent hover:bg-[var(--taomni-accent)]/70"
               style={{ top: `${cumulativeWeightPercent(splitGridRowWeightsForLayout, index)}%` }}
               onPointerDown={(event) => startGridSplitResize("row", index, event)}
               role="separator"

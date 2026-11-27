@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { AppDialogProvider } from "../../../lib/appDialogs";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_EDITOR_APPEARANCE_PROFILE,
@@ -158,19 +159,18 @@ describe("WorkspaceEditorAppearanceSettingsDialog", () => {
     expect(screen.queryByTestId("workspace-editor-appearance-settings-dialog")).toBeNull();
   });
 
-  it("edits clipboard history settings and confirms clear history", () => {
+  it("edits clipboard history settings and confirms clear history", async () => {
     const onApply = vi.fn();
     const onClearClipboardHistory = vi.fn();
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 
     render(
-      <WorkspaceEditorAppearanceSettingsDialog
+      <AppDialogProvider><WorkspaceEditorAppearanceSettingsDialog
         open
         profile={DEFAULT_EDITOR_APPEARANCE_PROFILE}
         onApply={onApply}
         onClose={vi.fn()}
         onClearClipboardHistory={onClearClipboardHistory}
-      />,
+      /></AppDialogProvider>,
     );
 
     fireEvent.click(screen.getByTestId("workspace-editor-appearance-clipboard-history-enabled"));
@@ -182,8 +182,9 @@ describe("WorkspaceEditorAppearanceSettingsDialog", () => {
     });
 
     fireEvent.click(screen.getByTestId("workspace-editor-appearance-clipboard-clear"));
-    expect(confirmSpy).toHaveBeenCalledOnce();
-    expect(onClearClipboardHistory).toHaveBeenCalledOnce();
+    expect(onClearClipboardHistory).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(onClearClipboardHistory).toHaveBeenCalledOnce());
 
     fireEvent.click(screen.getByTestId("workspace-editor-appearance-apply"));
     expect(onApply).toHaveBeenCalledWith(
@@ -196,6 +197,5 @@ describe("WorkspaceEditorAppearanceSettingsDialog", () => {
       }),
     );
 
-    confirmSpy.mockRestore();
   });
 });

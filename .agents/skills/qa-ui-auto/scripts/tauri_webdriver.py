@@ -522,6 +522,14 @@ class NativeSession(WebDriverTransport):
     def count(self, selector: str) -> int:
         return count_elements(self, selector, selector_strategy(selector))
 
+    def hover_x11_target(self, selector: str) -> None:
+        from native_pointer_buttons import prepare_x11_button_target
+        from native_pointer import prepare_pointer_target
+
+        origin = {"element-6066-11e4-a52e-4f735466cecf": self.find(selector, interactive=True)}
+        prepare_x11_button_target(self, origin, data_home=self._window_focus.data_home,
+                                  allow_alternate=False, prepare_target=prepare_pointer_target)
+
     def right_click(self, selector: str) -> str:
         return self.pointer_button_click(selector, 2)
 

@@ -72,7 +72,7 @@ export const FileTreeToolbar = memo(function FileTreeToolbar({
             data-testid="code-workspace-tree-view-selector"
             aria-haspopup="menu"
             title="Select view"
-            className="h-6 min-w-0 inline-flex items-center gap-0.5 rounded px-1.5 text-[12px] font-semibold text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            className="h-6 min-w-0 inline-flex items-center gap-0.5 rounded px-1.5 text-ui-body font-semibold text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={openViewSelector}
           >
             <span className="truncate">{treeViewTitle(viewMode)}</span>

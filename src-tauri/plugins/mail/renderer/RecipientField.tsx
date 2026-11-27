@@ -159,7 +159,7 @@ export function RecipientField({
             return (
               <span
                 key={`${recipient.email}-${index}`}
-                className={`max-w-full h-6 px-1.5 rounded border inline-flex items-center gap-1 text-[12px] leading-none ${valid ? "border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]" : "border-red-500/70 bg-red-500/10 text-red-200"}`}
+                className={`max-w-full h-6 px-1.5 rounded border inline-flex items-center gap-1 text-ui-body leading-none ${valid ? "border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]" : "border-ui-danger-border bg-ui-danger-surface text-ui-danger"}`}
                 title={formatRecipientForSend(recipient)}
                 data-testid="mail-recipient-chip"
                 data-invalid={!valid || undefined}
@@ -179,7 +179,7 @@ export function RecipientField({
           })}
           <input
             id={id}
-            className="min-w-[120px] flex-1 h-6 bg-transparent outline-none text-[12px]"
+            className="min-w-[120px] flex-1 h-6 bg-transparent focus-visible:keyboard-outline text-ui-body"
             value={input}
             disabled={disabled}
             aria-label={label}
@@ -196,18 +196,18 @@ export function RecipientField({
         </div>
         {focused && query && (visibleSuggestions.length > 0 || loading) && (
           <div
-            className="absolute left-0 right-0 top-[calc(100%+4px)] z-[170] max-h-52 overflow-auto rounded border bg-[var(--taomni-bg)] shadow-xl"
+            className="absolute left-0 right-0 top-[calc(100%+4px)] z-[var(--taomni-z-menu-over-modal,1100)] max-h-52 overflow-auto rounded border bg-[var(--taomni-bg)] shadow-xl"
             style={{ borderColor: "var(--taomni-divider)" }}
             data-testid="mail-recipient-suggestions"
           >
             {loading && visibleSuggestions.length === 0 ? (
-              <div className="px-2 py-1.5 text-[12px] text-[var(--taomni-text-muted)]">Searching</div>
+              <div className="px-2 py-1.5 text-ui-body text-[var(--taomni-text-muted)]">Searching</div>
             ) : (
               visibleSuggestions.map((suggestion, index) => (
                 <button
                   key={`${suggestion.source}-${suggestion.email}`}
                   type="button"
-                  className={`w-full min-w-0 px-2 py-1.5 flex items-center gap-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] ${index === activeIndex ? "bg-[var(--taomni-selected)]" : ""}`}
+                  className={`w-full min-w-0 px-2 py-1.5 flex items-center gap-2 text-left text-ui-body hover:bg-[var(--taomni-hover)] ${index === activeIndex ? "bg-[var(--taomni-selected)]" : ""}`}
                   data-testid="mail-recipient-suggestion"
                   data-active={index === activeIndex || undefined}
                   onMouseDown={(event) => {
@@ -216,7 +216,7 @@ export function RecipientField({
                   }}
                 >
                   <span className="min-w-0 flex-1 truncate">{suggestionLabel(suggestion)}</span>
-                  <span className="shrink-0 text-[11px] text-[var(--taomni-text-muted)]">{suggestionSourceLabel(suggestion.source)}</span>
+                  <span className="shrink-0 text-ui-small text-[var(--taomni-text-muted)]">{suggestionSourceLabel(suggestion.source)}</span>
                 </button>
               ))
             )}

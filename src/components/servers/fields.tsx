@@ -14,7 +14,7 @@ const LABEL_WIDTH = 120;
 /** A label + control row. Label is fixed-width, right-aligned, muted. */
 export function FormRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-center gap-2 mb-1.5 text-[12px]">
+    <div className="flex items-center gap-2 mb-1.5 text-ui-body">
       <label
         className="shrink-0 text-right"
         style={{ width: LABEL_WIDTH, color: "var(--taomni-text-muted)" }}
@@ -179,7 +179,7 @@ export function CheckboxField({
 }: CheckboxFieldProps) {
   return (
     <FormRow label={label}>
-      <label className="flex items-center gap-1.5 text-[12px] cursor-pointer">
+      <label className="flex items-center gap-1.5 text-ui-body cursor-pointer">
         <input
           type="checkbox"
           className="taomni-checkbox"
@@ -373,7 +373,7 @@ export function RadioField({
         {options.map((opt) => (
           <label
             key={opt.value}
-            className="flex items-center gap-1.5 text-[12px] cursor-pointer"
+            className="flex items-center gap-1.5 text-ui-body cursor-pointer"
           >
             <input
               type="radio"
@@ -408,7 +408,7 @@ export function FieldNote({ children, tone = "info" }: FieldNoteProps) {
   const warning = tone === "warning";
   return (
     <div
-      className="flex items-start gap-1.5 text-[11px] rounded px-2 py-1.5 mb-1.5 leading-relaxed"
+      className="flex items-start gap-1.5 text-ui-small rounded px-2 py-1.5 mb-1.5 leading-relaxed"
       style={{
         marginLeft: LABEL_WIDTH + 8,
         background: warning ? "var(--taomni-warning-bg)" : "transparent",

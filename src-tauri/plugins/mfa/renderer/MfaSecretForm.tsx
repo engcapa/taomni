@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { Button } from "../../../crates/taomni-plugin-api/frontend/ui/Button";
+import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useT } from "../../../../src/lib/i18n";
 import { secretProblem } from "../../../../src/lib/mfa/base32";
@@ -7,7 +8,7 @@ import { MfaImportError, isOtpauthLink, parseImportText, parseOtpauthUri, type M
 import { defaultMfaInput, type MfaAccountInput, type MfaAlgorithm, type MfaKind } from "../../../../src/lib/mfa/types";
 import { useMfaStore } from "../../../../src/stores/mfaStore";
 
-const labelClass = "block text-[12px] mb-1";
+const labelClass = "block text-ui-body mb-1";
 const labelStyle = { color: "var(--taomni-text-muted)" };
 
 /** Manual entry: issuer/account/secret with advanced parameters or an otpauth link. */
@@ -15,7 +16,13 @@ export function MfaSecretForm({
   onAdded,
   onCancel,
   onParsedItems,
+  busy,
+  setBusy,
+  onDirtyChange,
 }: {
+  busy: boolean;
+  setBusy: (busy: boolean) => void;
+  onDirtyChange: (dirty: boolean) => void;
   onAdded: (count: number) => void;
   onCancel: () => void;
   /** A pasted migration link holds several accounts; hand them to the preview. */
@@ -28,11 +35,25 @@ export function MfaSecretForm({
   const [advanced, setAdvanced] = useState(false);
   const [error, setError] = useState<{ field: string; message: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const firstRef = useRef<HTMLInputElement>(null);
 
+  const errorId = useId();
+  const formRef = useRef<HTMLFormElement>(null);
+  const defaults = defaultMfaInput();
+  const dirty = !!uri || (Object.keys(defaults) as (keyof MfaAccountInput)[]).some(key => input[key] !== defaults[key]);
+  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
+
   useEffect(() => {
-    firstRef.current?.focus();
+    if (!error || error.field === "uri") return;
+    formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [error]);
+
+  useEffect(() => {
+    const control = firstRef.current;
+    const dialog = control?.closest('[role="dialog"]');
+    const focus = document.activeElement;
+    if (focus?.getAttribute("role") === "tab" && dialog?.contains(focus)) return;
+    control?.focus();
   }, []);
 
   const update = (patch: Partial<MfaAccountInput>) => {
@@ -96,6 +117,7 @@ export function MfaSecretForm({
 
   return (
     <form
+      ref={formRef} aria-busy={busy}
       data-testid="mfa-secret-form"
       className="space-y-2"
       onSubmit={(event) => {
@@ -103,97 +125,99 @@ export function MfaSecretForm({
         void submit();
       }}
     >
-      <div>
-        <label className={labelClass} style={labelStyle} htmlFor="mfa-add-uri">{t("mfa.uri")}</label>
-        <input
-          id="mfa-add-uri"
-          data-testid="mfa-add-uri"
-          className="taomni-input w-full font-mono text-[12px]"
-          value={uri}
-          placeholder={t("mfa.uriPlaceholder")}
-          onChange={(event) => applyUri(event.target.value)}
-          aria-invalid={invalid("uri")}
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
+      <fieldset disabled={busy} className="min-w-0 space-y-2">
         <div>
-          <label className={labelClass} style={labelStyle} htmlFor="mfa-add-issuer">{t("mfa.issuer")}</label>
-          <input id="mfa-add-issuer" ref={firstRef} data-testid="mfa-add-issuer" className="taomni-input w-full" value={input.issuer} placeholder={t("mfa.issuerPlaceholder")} onChange={(event) => update({ issuer: event.target.value })} aria-invalid={invalid("issuer")} />
+          <label className={labelClass} style={labelStyle} htmlFor="mfa-add-uri">{t("mfa.uri")}</label>
+          <input
+            id="mfa-add-uri"
+            data-testid="mfa-add-uri"
+            className="taomni-input w-full font-mono text-ui-body"
+            value={uri}
+            placeholder={t("mfa.uriPlaceholder")}
+            onChange={(event) => applyUri(event.target.value)}
+            aria-invalid={invalid("uri")} aria-describedby={invalid("uri") ? errorId : undefined}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={labelClass} style={labelStyle} htmlFor="mfa-add-issuer">{t("mfa.issuer")}</label>
+            <input id="mfa-add-issuer" ref={firstRef} data-testid="mfa-add-issuer" className="taomni-input w-full" value={input.issuer} placeholder={t("mfa.issuerPlaceholder")} onChange={(event) => update({ issuer: event.target.value })} aria-invalid={invalid("issuer")} aria-describedby={invalid("issuer") ? errorId : undefined} />
+          </div>
+          <div>
+            <label className={labelClass} style={labelStyle} htmlFor="mfa-add-account">{t("mfa.accountName")}</label>
+            <input id="mfa-add-account" data-testid="mfa-add-account" className="taomni-input w-full" value={input.accountName} placeholder={t("mfa.accountPlaceholder")} onChange={(event) => update({ accountName: event.target.value })} aria-invalid={invalid("accountName")} />
+          </div>
         </div>
         <div>
-          <label className={labelClass} style={labelStyle} htmlFor="mfa-add-account">{t("mfa.accountName")}</label>
-          <input id="mfa-add-account" data-testid="mfa-add-account" className="taomni-input w-full" value={input.accountName} placeholder={t("mfa.accountPlaceholder")} onChange={(event) => update({ accountName: event.target.value })} aria-invalid={invalid("accountName")} />
+          <label className={labelClass} style={labelStyle} htmlFor="mfa-add-secret">{t("mfa.secret")}</label>
+          <input id="mfa-add-secret" data-testid="mfa-add-secret" className="taomni-input w-full font-mono" value={input.secret} placeholder={t("mfa.secretPlaceholder")} onChange={(event) => update({ secret: event.target.value })} aria-invalid={invalid("secret")} aria-describedby={invalid("secret") ? errorId : undefined} autoComplete="off" spellCheck={false} />
+          <div className="mt-0.5 text-ui-small" style={labelStyle}>{t("mfa.secretHint")}</div>
         </div>
-      </div>
-      <div>
-        <label className={labelClass} style={labelStyle} htmlFor="mfa-add-secret">{t("mfa.secret")}</label>
-        <input id="mfa-add-secret" data-testid="mfa-add-secret" className="taomni-input w-full font-mono" value={input.secret} placeholder={t("mfa.secretPlaceholder")} onChange={(event) => update({ secret: event.target.value })} aria-invalid={invalid("secret")} autoComplete="off" spellCheck={false} />
-        <div className="mt-0.5 text-[11px]" style={labelStyle}>{t("mfa.secretHint")}</div>
-      </div>
-      <div>
-        <label className={labelClass} style={labelStyle} htmlFor="mfa-add-group">{t("mfa.group")}</label>
-        <input id="mfa-add-group" data-testid="mfa-add-group" className="taomni-input w-full" value={input.group} placeholder={t("mfa.groupPlaceholder")} onChange={(event) => update({ group: event.target.value })} aria-invalid={invalid("group")} />
-      </div>
-      <button
-        type="button"
-        data-testid="mfa-add-advanced"
-        aria-expanded={advanced}
-        className="inline-flex items-center gap-1 text-[12px] hover:underline"
-        style={labelStyle}
-        onClick={() => setAdvanced((value) => !value)}
-      >
-        {advanced ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        {t("mfa.advanced")}
-      </button>
-      {advanced ? (
-        <div data-testid="mfa-add-advanced-panel" className="grid grid-cols-2 gap-2">
-          <div>
-            <label className={labelClass} style={labelStyle} htmlFor="mfa-add-kind">{t("mfa.kind")}</label>
-            <select id="mfa-add-kind" data-testid="mfa-add-kind" className="taomni-input w-full" value={input.kind} onChange={(event) => update({ kind: event.target.value as MfaKind })}>
-              <option value="totp">{t("mfa.kindTotp")}</option>
-              <option value="hotp">{t("mfa.kindHotp")}</option>
-            </select>
-          </div>
-          <div>
-            <label className={labelClass} style={labelStyle} htmlFor="mfa-add-algorithm">{t("mfa.algorithm")}</label>
-            <select id="mfa-add-algorithm" data-testid="mfa-add-algorithm" className="taomni-input w-full" value={input.algorithm} onChange={(event) => update({ algorithm: event.target.value as MfaAlgorithm })}>
-              <option value="SHA1">SHA1</option>
-              <option value="SHA256">SHA256</option>
-              <option value="SHA512">SHA512</option>
-            </select>
-          </div>
-          <div>
-            <label className={labelClass} style={labelStyle} htmlFor="mfa-add-digits">{t("mfa.digits")}</label>
-            <select id="mfa-add-digits" data-testid="mfa-add-digits" className="taomni-input w-full" value={String(input.digits)} onChange={(event) => update({ digits: Number(event.target.value) })} aria-invalid={invalid("digits")}>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-            </select>
-          </div>
-          {input.kind === "totp" ? (
-            <div>
-              <label className={labelClass} style={labelStyle} htmlFor="mfa-add-period">{t("mfa.period")}</label>
-              <input id="mfa-add-period" data-testid="mfa-add-period" type="number" min={15} max={300} className="taomni-input w-full" value={input.period} onChange={(event) => update({ period: Number(event.target.value) })} aria-invalid={invalid("period")} />
-            </div>
-          ) : (
-            <div>
-              <label className={labelClass} style={labelStyle} htmlFor="mfa-add-counter">{t("mfa.counter")}</label>
-              <input id="mfa-add-counter" data-testid="mfa-add-counter" type="number" min={0} className="taomni-input w-full" value={input.counter} onChange={(event) => update({ counter: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} />
-            </div>
-          )}
+        <div>
+          <label className={labelClass} style={labelStyle} htmlFor="mfa-add-group">{t("mfa.group")}</label>
+          <input id="mfa-add-group" data-testid="mfa-add-group" className="taomni-input w-full" value={input.group} placeholder={t("mfa.groupPlaceholder")} onChange={(event) => update({ group: event.target.value })} aria-invalid={invalid("group")} aria-describedby={invalid("group") ? errorId : undefined} />
         </div>
-      ) : null}
-      {notice && !error ? <div data-testid="mfa-add-notice" className="text-[12px]" style={{ color: "var(--taomni-success-text, #2f855a)" }}>{notice}</div> : null}
-      {error ? <div data-testid="mfa-add-error" role="alert" className="text-[12px]" style={{ color: "var(--taomni-error, #c33)" }}>{error.message}</div> : null}
+        <button
+          type="button"
+          data-testid="mfa-add-advanced"
+          aria-expanded={advanced}
+          className="inline-flex items-center gap-1 text-ui-body hover:underline"
+          style={labelStyle}
+          onClick={() => setAdvanced((value) => !value)}
+        >
+          {advanced ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          {t("mfa.advanced")}
+        </button>
+        {advanced ? (
+          <div data-testid="mfa-add-advanced-panel" className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={labelClass} style={labelStyle} htmlFor="mfa-add-kind">{t("mfa.kind")}</label>
+              <select id="mfa-add-kind" data-testid="mfa-add-kind" className="taomni-input w-full" value={input.kind} onChange={(event) => update({ kind: event.target.value as MfaKind })}>
+                <option value="totp">{t("mfa.kindTotp")}</option>
+                <option value="hotp">{t("mfa.kindHotp")}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelClass} style={labelStyle} htmlFor="mfa-add-algorithm">{t("mfa.algorithm")}</label>
+              <select id="mfa-add-algorithm" data-testid="mfa-add-algorithm" className="taomni-input w-full" value={input.algorithm} onChange={(event) => update({ algorithm: event.target.value as MfaAlgorithm })}>
+                <option value="SHA1">SHA1</option>
+                <option value="SHA256">SHA256</option>
+                <option value="SHA512">SHA512</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelClass} style={labelStyle} htmlFor="mfa-add-digits">{t("mfa.digits")}</label>
+              <select id="mfa-add-digits" data-testid="mfa-add-digits" className="taomni-input w-full" value={String(input.digits)} onChange={(event) => update({ digits: Number(event.target.value) })} aria-invalid={invalid("digits")} aria-describedby={invalid("digits") ? errorId : undefined}>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+              </select>
+            </div>
+            {input.kind === "totp" ? (
+              <div>
+                <label className={labelClass} style={labelStyle} htmlFor="mfa-add-period">{t("mfa.period")}</label>
+                <input id="mfa-add-period" data-testid="mfa-add-period" type="number" min={15} max={300} className="taomni-input w-full" value={input.period} onChange={(event) => update({ period: Number(event.target.value) })} aria-invalid={invalid("period")} aria-describedby={invalid("period") ? errorId : undefined} />
+              </div>
+            ) : (
+              <div>
+                <label className={labelClass} style={labelStyle} htmlFor="mfa-add-counter">{t("mfa.counter")}</label>
+                <input id="mfa-add-counter" data-testid="mfa-add-counter" type="number" min={0} className="taomni-input w-full" value={input.counter} onChange={(event) => update({ counter: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} />
+              </div>
+            )}
+          </div>
+        ) : null}
+      </fieldset>
+      {notice && !error ? <div data-testid="mfa-add-notice" className="text-ui-body" style={{ color: "var(--taomni-success-text, #2f855a)" }}>{notice}</div> : null}
+      {error ? <div id={errorId} data-testid="mfa-add-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-danger-text, #c33)" }}>{error.message}</div> : null}
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" data-testid="mfa-add-cancel" className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]" onClick={onCancel} disabled={busy}>
+        <Button data-testid="mfa-add-cancel" onClick={onCancel} disabled={busy}>
           {t("mfa.cancel")}
-        </button>
-        <button type="submit" data-testid="mfa-add-submit" className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50" style={{ background: "var(--taomni-accent)" }} disabled={busy}>
-          {t("mfa.submit")}
-        </button>
+        </Button>
+        <Button type="submit" data-testid="mfa-add-submit" variant="primary" busy={busy}>
+          {busy ? t("mfa.savingEdit") : t("mfa.submit")}
+        </Button>
       </div>
     </form>
   );

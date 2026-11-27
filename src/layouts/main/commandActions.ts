@@ -1,3 +1,4 @@
+import { zoomFromMenu } from "../../lib/pageZoom";
 import type { AppCommand } from "../../components/menubar/commands";
 import type { Tab } from "../../types";
 import { openServersTab } from "../../lib/serversTab";
@@ -143,6 +144,9 @@ export function createHandleCommand(controllerContext: HandleCommandContext): (c
       case "toggle-xserver":
         controllerContext.toggleXServer();
         break;
+      case "zoom-in": zoomFromMenu("in"); break;
+      case "zoom-out": zoomFromMenu("out"); break;
+      case "zoom-reset": zoomFromMenu("reset"); break;
       case "view":
         controllerContext.toggleSidebar();
         break;

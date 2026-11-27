@@ -172,8 +172,7 @@ export function CommonCommandsPalette({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh]"
-      style={{ background: "rgba(0,0,0,0.4)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-start justify-center pt-[12vh]"
       onMouseDown={onClose}
       onKeyDown={handleKeyDown}
     >
@@ -205,13 +204,13 @@ export function CommonCommandsPalette({
         <div className="flex-1 overflow-auto" data-testid="commands-list">
           {filtered.length === 0 ? (
             <div
-              className="px-3 py-4 text-[12px]"
+              className="px-3 py-4 text-ui-body"
               style={{ color: "var(--taomni-text-muted)" }}
             >
               {t("terminal.commandPaletteEmpty")}
             </div>
           ) : (
-            <ul ref={listRef} className="text-[12px]" role="listbox">
+            <ul ref={listRef} className="text-ui-body" role="listbox">
               {filtered.map((c, i) => (
                 <li
                   key={`${c.source}:${c.command}`}
@@ -242,7 +241,7 @@ export function CommonCommandsPalette({
                     </span>
                   )}
                   <span
-                    className="ml-auto shrink-0 px-1.5 py-0 rounded text-[10px]"
+                    className="ml-auto shrink-0 px-1.5 py-0 rounded text-ui-caption"
                     style={{
                       background: "var(--taomni-card-bg)",
                       color: "var(--taomni-text-muted)",
@@ -257,7 +256,7 @@ export function CommonCommandsPalette({
           )}
         </div>
         <div
-          className="px-3 py-1.5 text-[11px] border-t"
+          className="px-3 py-1.5 text-ui-small border-t"
           style={{
             color: "var(--taomni-text-muted)",
             borderColor: "var(--taomni-divider)",

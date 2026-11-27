@@ -1,3 +1,4 @@
+import { Button } from "../../../crates/taomni-plugin-api/frontend/ui/Button";
 import { useEffect, useMemo, useState } from "react";
 import { useT } from "../../../../src/lib/i18n";
 import { errorText } from "../../../../src/lib/mfa/format";
@@ -18,7 +19,13 @@ export function MfaImportPreview({
   items,
   onBack,
   onImported,
+  busy,
+  setBusy,
+  onDirtyChange,
 }: {
+  busy: boolean;
+  setBusy: (busy: boolean) => void;
+  onDirtyChange: (dirty: boolean) => void;
   items: MfaParsedItem[];
   onBack: () => void;
   onImported: (count: number) => void;
@@ -30,7 +37,6 @@ export function MfaImportPreview({
   const [group, setGroup] = useState("");
   const [single, setSingle] = useState<{ issuer: string; accountName: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +67,12 @@ export function MfaImportPreview({
   const selected = useMemo(() => (rows ?? []).filter((row) => row.checked && row.input), [rows]);
   const allDuplicates = !!rows && rows.length > 0 && rows.every((row) => row.duplicate || !row.input);
 
+  const original = rows?.length === 1 ? rows[0].input : null;
+  const dirty = !!group || !!(single && original &&
+    (single.issuer !== original.issuer || single.accountName !== original.accountName)) ||
+    !!rows?.some(row => row.checked !== !!(row.input && !row.error && !row.duplicate));
+  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
+
   const confirm = async () => {
     if (busy || selected.length === 0) return;
     setBusy(true);
@@ -87,7 +99,7 @@ export function MfaImportPreview({
 
   return (
     <div data-testid="mfa-import-preview" className="space-y-3">
-      <div className="text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
+      <div className="text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>
         {rows ? t("mfa.previewCount", { count: rows.length }) : t("mfa.previewChecking")}
       </div>
       <ul className="max-h-[220px] space-y-1 overflow-y-auto">
@@ -97,7 +109,7 @@ export function MfaImportPreview({
             data-testid="mfa-import-item"
             data-issuer={row.input?.issuer ?? ""}
             data-duplicate={row.duplicate ? "true" : "false"}
-            className="flex items-center gap-2 rounded border px-2 py-1.5 text-[12px]"
+            className="flex items-center gap-2 rounded border px-2 py-1.5 text-ui-body"
             style={{ borderColor: "var(--taomni-divider)" }}
           >
             <input
@@ -105,7 +117,7 @@ export function MfaImportPreview({
               data-testid="mfa-import-item-check"
               aria-label={row.label}
               checked={row.checked}
-              disabled={!row.input || !!row.error || row.duplicate}
+              disabled={busy || !row.input || !!row.error || row.duplicate}
               onChange={(event) =>
                 setRows((current) => (current ?? []).map((entry, i) => (i === index ? { ...entry, checked: event.target.checked } : entry)))
               }
@@ -114,53 +126,50 @@ export function MfaImportPreview({
               <div data-testid="mfa-import-item-label" className="truncate font-semibold">{row.label}</div>
               {row.input ? <div style={{ color: "var(--taomni-text-muted)" }}>{kindLabel(row.input)}</div> : null}
               {row.error ? (
-                <div data-testid="mfa-import-invalid" style={{ color: "var(--taomni-error, #c33)" }}>
+                <div data-testid="mfa-import-invalid" style={{ color: "var(--taomni-danger-text, #c33)" }}>
                   {t("mfa.previewInvalid", { error: row.error })}
                 </div>
               ) : null}
             </div>
             {row.duplicate ? (
-              <span data-testid="mfa-import-duplicate" className="taomni-pill shrink-0 text-[10px]">{t("mfa.previewDuplicate")}</span>
+              <span data-testid="mfa-import-duplicate" className="taomni-pill shrink-0 text-ui-caption">{t("mfa.previewDuplicate")}</span>
             ) : null}
           </li>
         ))}
       </ul>
       {single ? (
         <div className="grid grid-cols-2 gap-2">
-          <label className="text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
+          <label className="text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>
             {t("mfa.issuer")}
-            <input data-testid="mfa-import-issuer" className="taomni-input mt-1 w-full" value={single.issuer} onChange={(event) => setSingle({ ...single, issuer: event.target.value })} />
+            <input readOnly={busy} data-testid="mfa-import-issuer" className="taomni-input mt-1 w-full" value={single.issuer} onChange={(event) => setSingle({ ...single, issuer: event.target.value })} />
           </label>
-          <label className="text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
+          <label className="text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>
             {t("mfa.accountName")}
-            <input data-testid="mfa-import-account" className="taomni-input mt-1 w-full" value={single.accountName} onChange={(event) => setSingle({ ...single, accountName: event.target.value })} />
+            <input readOnly={busy} data-testid="mfa-import-account" className="taomni-input mt-1 w-full" value={single.accountName} onChange={(event) => setSingle({ ...single, accountName: event.target.value })} />
           </label>
         </div>
       ) : null}
-      <label className="block text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
+      <label className="block text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>
         {t("mfa.group")}
-        <input data-testid="mfa-import-group" className="taomni-input mt-1 w-full" value={group} placeholder={t("mfa.groupPlaceholder")} onChange={(event) => setGroup(event.target.value)} />
+        <input readOnly={busy} data-testid="mfa-import-group" className="taomni-input mt-1 w-full" value={group} placeholder={t("mfa.groupPlaceholder")} onChange={(event) => setGroup(event.target.value)} />
       </label>
       {allDuplicates ? (
-        <div data-testid="mfa-import-all-duplicates" className="text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
+        <div data-testid="mfa-import-all-duplicates" className="text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>
           {t("mfa.previewAllDuplicates")}
         </div>
       ) : null}
-      {error ? <div data-testid="mfa-import-error" role="alert" className="text-[12px]" style={{ color: "var(--taomni-error, #c33)" }}>{error}</div> : null}
+      {error ? <div data-testid="mfa-import-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-danger-text, #c33)" }}>{error}</div> : null}
       <div className="flex justify-end gap-2">
-        <button type="button" data-testid="mfa-import-back" className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]" onClick={onBack} disabled={busy}>
+        <Button data-testid="mfa-import-back" onClick={onBack} disabled={busy}>
           {t("mfa.previewBack")}
-        </button>
-        <button
-          type="button"
-          data-testid="mfa-import-confirm"
-          className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
-          style={{ background: "var(--taomni-accent)" }}
-          disabled={busy || selected.length === 0}
+        </Button>
+        <Button
+          data-testid="mfa-import-confirm" variant="primary" busy={busy}
+          disabled={selected.length === 0}
           onClick={() => void confirm()}
         >
-          {t("mfa.previewImport", { count: selected.length })}
-        </button>
+          {busy ? t("mfa.savingEdit") : t("mfa.previewImport", { count: selected.length })}
+        </Button>
       </div>
     </div>
   );

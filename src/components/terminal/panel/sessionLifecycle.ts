@@ -225,7 +225,7 @@ function setupTerminalSession(controllerContext: TerminalSessionLifecycleContext
       controllerContext.fallbackSearchRef.current = { query, index: nextIndex };
       controllerContext.setSearchMatches(matches);
       controllerContext.setActiveSearchIndex(nextIndex);
-      controllerContext.setSearchStatus(nextIndex >= 0 ? `Match ${nextIndex + 1}/${matches.length}` : "No matches");
+      controllerContext.setSearchComplete(true);
     }
     controllerContext.setViewportVersion((v) => v + 1);
     controllerContext.appendEvent("resize", `${cols}x${rows}`);

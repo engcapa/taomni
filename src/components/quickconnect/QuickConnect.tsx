@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Home, RefreshCw } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -51,21 +52,21 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
   return (
     <div
       data-testid="quick-connect"
-      className="h-7 flex items-center gap-1 px-2 text-[12px]"
+      className="h-7 flex items-center gap-1 px-2 text-ui-body"
       style={{
         background: "var(--taomni-quick-bg)",
         borderBottom: "1px solid var(--taomni-divider)",
       }}
     >
-      <button data-testid="qc-back" className="p-0.5 hover:bg-[var(--taomni-control-hover)] rounded" title={t("quickConnect.back")} onClick={() => window.history.back()} type="button">
+      <IconButton data-testid="qc-back" className="p-0.5 hover:bg-[var(--taomni-control-hover)] rounded" label={t("quickConnect.back")} onClick={() => window.history.back()} type="button">
         <ArrowLeft className="w-3.5 h-3.5" />
-      </button>
-      <button data-testid="qc-forward" className="p-0.5 hover:bg-[var(--taomni-control-hover)] rounded" title={t("quickConnect.forward")} onClick={() => window.history.forward()} type="button">
+      </IconButton>
+      <IconButton data-testid="qc-forward" className="p-0.5 hover:bg-[var(--taomni-control-hover)] rounded" label={t("quickConnect.forward")} onClick={() => window.history.forward()} type="button">
         <ArrowRight className="w-3.5 h-3.5" />
-      </button>
-      <button data-testid="qc-home" className="p-0.5 hover:bg-[var(--taomni-control-hover)] rounded" title={t("quickConnect.homeButton")} onClick={onHome} type="button">
+      </IconButton>
+      <IconButton data-testid="qc-home" className="p-0.5 hover:bg-[var(--taomni-control-hover)] rounded" label={t("quickConnect.homeButton")} onClick={onHome} type="button">
         <Home className="w-3.5 h-3.5" />
-      </button>
+      </IconButton>
       <span className="taomni-divider-v h-4 mx-1" />
       <span className="text-[var(--taomni-text-muted)]">{t("quickConnect.label")}:</span>
       <input
@@ -104,16 +105,16 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
           );
         })
       )}
-      <button
+      <IconButton
         data-testid="qc-refresh"
         className="p-0.5 hover:bg-[var(--taomni-control-hover)] rounded disabled:opacity-50"
-        title={refreshing ? t("quickConnect.refreshingTitle") : t("quickConnect.refreshTitle")}
+        label={refreshing ? t("quickConnect.refreshingTitle") : t("quickConnect.refreshTitle")}
         onClick={() => void refreshSessions()}
         disabled={refreshing}
         type="button"
       >
         <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-      </button>
+      </IconButton>
       {refreshing && <span className="text-[var(--taomni-text-muted)]">{t("quickConnect.refreshing")}</span>}
     </div>
   );

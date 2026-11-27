@@ -192,6 +192,8 @@ fn html_csp_blocks_network_ipc_frames_forms_and_preserves_nonce_bridge() {
     // Parent never grants remote frame navigation, even network-resource opt-in.
     let config: serde_json::Value =
         serde_json::from_str(include_str!("../../../tauri.conf.json")).unwrap();
+    let windows: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tauri.windows.conf.json")).unwrap();
     for key in ["csp", "devCsp"] {
         let csp = config["app"]["security"][key].as_str().unwrap();
         let frames = csp
@@ -203,6 +205,10 @@ fn html_csp_blocks_network_ipc_frames_forms_and_preserves_nonce_bridge() {
             !frames
                 .split_whitespace()
                 .any(|value| value == "http:" || value == "https:" || value == "*")
+        );
+        assert_eq!(
+            windows["app"]["security"][key].as_str().unwrap(),
+            csp.replace(frames, &format!("{frames} http://127.0.0.1:*"))
         );
     }
     close_html(&session.token, "test-csp").unwrap();

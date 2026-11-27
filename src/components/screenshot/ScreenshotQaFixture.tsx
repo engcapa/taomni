@@ -160,7 +160,7 @@ function PixelFixture({ animated }: { animated: boolean }) {
   return (
     // Keep the native scene consistent with the retained canvas original while
     // real OS wheel input moves the pointer through the fixture.
-    <div ref={rootRef} data-testid="screenshot-qa-fixture-ready" style={{ position: "fixed", inset: 0, paddingRight: animated ? 0 : 8, overflowY: animated ? "hidden" : "scroll", background: "#ffffff", scrollBehavior: "auto", cursor: "none" }}>
+    <div ref={rootRef} data-testid="screenshot-qa-fixture-ready" className="screenshot-qa-capture-target" style={{ position: "fixed", inset: 0, paddingRight: animated ? 0 : 8, overflowY: animated ? "hidden" : "scroll", scrollBehavior: "auto", cursor: "none" }}>
       <canvas ref={canvasRef} style={{ display: "block" }} />
     </div>
   );
@@ -168,7 +168,7 @@ function PixelFixture({ animated }: { animated: boolean }) {
 
 function OcrFixture() {
   return (
-    <div data-testid="screenshot-qa-fixture-ready" style={{ position: "fixed", inset: 0, background: "#ffffff", color: "#000000", padding: 24, font: "28px Arial, sans-serif" }}>
+    <div data-testid="screenshot-qa-fixture-ready" className="screenshot-qa-capture-target" style={{ position: "fixed", inset: 0, padding: 24, font: "28px Arial, sans-serif" }}>
       <p style={{ margin: "12px 0 28px" }}>QA screenshot text</p>
       <p style={{ margin: "12px 0 28px" }}>user@example.com</p>
       <p style={{ margin: "12px 0 28px" }}>13812345678</p>

@@ -1,5 +1,7 @@
-import { Shield, FileText, Info } from "lucide-react";
-import { selectFilePath, hbaseParseSiteXml, hbaseParseKeytabPrincipal } from "../../../lib/ipc";
+import { SessionFilePathInput } from "./SessionFilePathInput";
+import { useT } from "../../../lib/i18n";
+import { Shield, Info } from "lucide-react";
+import { hbaseParseSiteXml, hbaseParseKeytabPrincipal } from "../../../lib/ipc";
 import { Field, Checkbox } from "./Fields";
 
 
@@ -54,65 +56,26 @@ export function HBaseSettings({
   // REST and Thrift both connect to an explicit host:port endpoint.
   const showHostPort = !isNative;
 
-  const handleBrowseSiteXml = async () => {
-    try {
-      const selected = await selectFilePath(hbaseSitePath || undefined);
-      if (selected) setHBaseSitePath(selected.trim());
-    } catch (err) {
-      alert("Failed to choose file: " + err);
-    }
-  };
+  const t = useT();
+  async function readSiteConfig(path: string) {
+    const properties = await hbaseParseSiteXml(path);
+    const quorum = properties["hbase.zookeeper.quorum"];
+    const root = properties["zookeeper.znode.parent"];
+    const principal = properties["hbase.regionserver.kerberos.principal"] || properties["hbase.master.kerberos.principal"];
+    return () => {
+      if (quorum) setZkQuorum(quorum);
+      if (root) setZkRoot(root);
+      if (principal) setServicePrincipal(principal);
+    };
+  }
 
-  const handleBrowseKeytab = async () => {
-    try {
-      const selected = await selectFilePath(keytabPath || undefined);
-      if (selected) setKeytabPath(selected.trim());
-    } catch (err) {
-      alert("Failed to choose file: " + err);
-    }
-  };
-
-  const handleBrowseKrb5Conf = async () => {
-    try {
-      const selected = await selectFilePath(krb5ConfPath || undefined);
-      if (selected) setKrb5ConfPath(selected.trim());
-    } catch (err) {
-      alert("Failed to choose file: " + err);
-    }
-  };
-
-  const handleAnalyzeSiteXml = async () => {
-    if (!hbaseSitePath.trim()) return;
-    try {
-      const props = await hbaseParseSiteXml(hbaseSitePath.trim());
-      if (props["hbase.zookeeper.quorum"]) {
-        setZkQuorum(props["hbase.zookeeper.quorum"]);
-      }
-      if (props["zookeeper.znode.parent"]) {
-        setZkRoot(props["zookeeper.znode.parent"]);
-      }
-      if (props["hbase.regionserver.kerberos.principal"] || props["hbase.master.kerberos.principal"]) {
-        setServicePrincipal(props["hbase.regionserver.kerberos.principal"] || props["hbase.master.kerberos.principal"]);
-      }
-    } catch (err) {
-      alert("Failed to parse hbase-site.xml: " + err);
-    }
-  };
-
-  const handleAnalyzeKeytab = async () => {
-    if (!keytabPath.trim()) return;
-    try {
-      const parsedPrincipal = await hbaseParseKeytabPrincipal(keytabPath.trim());
-      if (parsedPrincipal) {
-        setPrincipal(parsedPrincipal);
-      }
-    } catch (err) {
-      alert("Failed to parse keytab: " + err);
-    }
-  };
+  async function readKeytab(path: string) {
+    const principal = await hbaseParseKeytabPrincipal(path);
+    return () => { if (principal) setPrincipal(principal); };
+  }
 
   return (
-    <div data-testid="hbase-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+    <div data-testid="hbase-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-ui-body">
       <Field label="Mode">
         <select
           className="taomni-input w-64"
@@ -131,7 +94,7 @@ export function HBaseSettings({
         >
           <option value="native">Native RPC (ZooKeeper + RegionServer)</option>
           <option value="rest">REST / Stargate gateway</option>
-          <option value="thrift">Thrift2 (Lindorm / HBase 增强版, 9190)</option>
+          <option value="thrift">{t("sessionEditor2.hbaseThriftMode")}</option>
         </select>
         <span className="ml-2 text-[var(--taomni-text-muted)]">
           {isNative
@@ -170,30 +133,9 @@ export function HBaseSettings({
       {isNative && (
         <>
           <Field label="HBase-site.xml path">
-            <input
-              className="taomni-input w-96 min-w-0"
-              value={hbaseSitePath}
-              aria-label="HBase site config file path"
-              placeholder="(optional) /etc/hbase/conf/hbase-site.xml"
-              onChange={(e) => setHBaseSitePath(e.target.value)}
-            />
-            <button
-              type="button"
-              className="taomni-btn px-2 shrink-0 py-1"
-              title="Browse file"
-              onClick={handleBrowseSiteXml}
-            >
-              <FileText className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              className="taomni-btn px-2 shrink-0 py-1"
-              title="Auto-analyze hbase-site.xml and populate fields"
-              disabled={!hbaseSitePath.trim()}
-              onClick={handleAnalyzeSiteXml}
-            >
-              Analyze
-            </button>
+            <SessionFilePathInput value={hbaseSitePath} onChange={setHBaseSitePath}
+              label="HBase site config file path" placeholder="(optional) /etc/hbase/conf/hbase-site.xml"
+              analysis={{ label: t("sessionEditor2.analyzeSite"), title: t("sessionEditor2.analyzeSiteHint"), read: readSiteConfig }} />
           </Field>
           <Field label="ZK quorum">
             <input
@@ -248,52 +190,16 @@ export function HBaseSettings({
                 />
               </Field>
               <Field label="Keytab path">
-                <input
-                  className="taomni-input w-96 min-w-0"
-                  data-testid="hbase-keytab-path"
-                  aria-label="HBase keytab file path"
-                  value={keytabPath}
-                  placeholder="(optional) /etc/security/keytabs/user.keytab"
-                  onChange={(e) => setKeytabPath(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="taomni-btn px-2 shrink-0 py-1"
-                  title="Browse file"
-                  onClick={handleBrowseKeytab}
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  className="taomni-btn px-2 shrink-0 py-1"
-                  title="Auto-analyze keytab and extract principal"
-                  disabled={!keytabPath.trim()}
-                  onClick={handleAnalyzeKeytab}
-                >
-                  Parse
-                </button>
+                <SessionFilePathInput value={keytabPath} onChange={setKeytabPath} testId="hbase-keytab-path"
+                  label="HBase keytab file path" placeholder="(optional) /etc/security/keytabs/user.keytab"
+                  analysis={{ label: t("sessionEditor2.parseKeytab"), title: t("sessionEditor2.parseKeytabHint"), read: readKeytab }} />
                 <span className="w-full text-[var(--taomni-text-muted)] mt-0.5 pl-1 block">
                   Auto-authenticates using keytab on connect.
                 </span>
               </Field>
               <Field label="Krb5 config path">
-                <input
-                  className="taomni-input w-96 min-w-0"
-                  data-testid="hbase-krb5-conf-path"
-                  aria-label="HBase krb5 config file path"
-                  value={krb5ConfPath}
-                  placeholder="(optional) /etc/krb5.conf"
-                  onChange={(e) => setKrb5ConfPath(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="taomni-btn px-2 shrink-0 py-1"
-                  title="Browse file"
-                  onClick={handleBrowseKrb5Conf}
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                </button>
+                <SessionFilePathInput value={krb5ConfPath} onChange={setKrb5ConfPath} testId="hbase-krb5-conf-path"
+                  label="HBase krb5 config file path" placeholder="(optional) /etc/krb5.conf" />
               </Field>
               {keytabPath.trim() && (
                 <Field label="Principal">
@@ -308,7 +214,7 @@ export function HBaseSettings({
                 </Field>
               )}
               {!keytabPath.trim() && (
-                <div className="col-span-12 text-[11px] text-[var(--taomni-text-muted)] flex items-center gap-1.5 pl-1">
+                <div className="col-span-12 text-ui-small text-[var(--taomni-text-muted)] flex items-center gap-1.5 pl-1">
                   <Info className="w-3 h-3 shrink-0" />
                   No keytab configured. Run <code className="taomni-mono">kinit</code> manually before connecting.
                 </div>
@@ -341,7 +247,7 @@ export function HBaseSettings({
             }}
           />
         <label
-          className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
+          className="flex items-center gap-1 text-ui-small cursor-pointer ml-2"
           title={vaultState === "empty" ? "Set up the vault on save to store passwords" : "Encrypt and store this password in the vault"}
         >
           <input

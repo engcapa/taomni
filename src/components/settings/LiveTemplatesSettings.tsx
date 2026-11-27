@@ -1,3 +1,5 @@
+import { Button } from "../ui/Button";
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useMemo, useState } from "react";
 import { FileCode2, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useT } from "../../lib/i18n";
@@ -165,15 +167,15 @@ export function LiveTemplatesSettings() {
       <div className="mb-3 flex items-center gap-3">
         <FileCode2 className="h-4 w-4 text-[var(--taomni-accent)]" />
         <div className="min-w-0">
-          <div className="text-[14px] font-semibold">{t("settings.liveTemplatesTitle")}</div>
-          <div className="text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-title font-semibold">{t("settings.liveTemplatesTitle")}</div>
+          <div className="text-ui-body text-[var(--taomni-text-muted)]">
             {t("settings.liveTemplatesSubtitle")}
           </div>
         </div>
         <button
           type="button"
           data-testid="live-templates-reset"
-          className="taomni-btn ml-auto h-7 px-2.5 inline-flex shrink-0 items-center gap-1 text-[11px]"
+          className="taomni-btn ml-auto h-7 px-2.5 inline-flex shrink-0 items-center gap-1 text-ui-small"
           onClick={() => {
             cancelEdit();
             persist({ ...DEFAULT_LIVE_TEMPLATE_PREFERENCES, customTemplates: [] });
@@ -186,7 +188,7 @@ export function LiveTemplatesSettings() {
       </div>
 
       <div className="space-y-3 border-t border-[var(--taomni-divider)] pt-3">
-        <label className="flex items-start gap-2 text-[12px]">
+        <label className="flex items-start gap-2 text-ui-body">
           <input
             data-testid="live-templates-enabled"
             className="taomni-checkbox mt-0.5"
@@ -196,13 +198,13 @@ export function LiveTemplatesSettings() {
           />
           <span>
             <span className="block font-medium">{t("settings.liveTemplatesEnabled")}</span>
-            <span className="block text-[11px] text-[var(--taomni-text-muted)]">
+            <span className="block text-ui-small text-[var(--taomni-text-muted)]">
               {t("settings.liveTemplatesEnabledHint")}
             </span>
           </span>
         </label>
 
-        <label className="flex items-start gap-2 text-[12px]">
+        <label className="flex items-start gap-2 text-ui-body">
           <input
             data-testid="live-templates-postfix-enabled"
             className="taomni-checkbox mt-0.5"
@@ -213,7 +215,7 @@ export function LiveTemplatesSettings() {
           />
           <span>
             <span className="block font-medium">{t("settings.liveTemplatesPostfixEnabled")}</span>
-            <span className="block text-[11px] text-[var(--taomni-text-muted)]">
+            <span className="block text-ui-small text-[var(--taomni-text-muted)]">
               {t("settings.liveTemplatesPostfixEnabledHint")}
             </span>
           </span>
@@ -221,13 +223,13 @@ export function LiveTemplatesSettings() {
 
         <div className="flex flex-wrap items-end gap-2">
           <div>
-            <label className="mb-1 block text-[11px] text-[var(--taomni-text-muted)]" htmlFor="live-templates-lang">
+            <label className="mb-1 block text-ui-small text-[var(--taomni-text-muted)]" htmlFor="live-templates-lang">
               {t("settings.liveTemplatesLanguageFilter")}
             </label>
             <select
               id="live-templates-lang"
               data-testid="live-templates-language-filter"
-              className="taomni-input h-8 min-w-[8rem] text-[12px]"
+              className="taomni-input h-8 min-w-[8rem] text-ui-body"
               value={languageFilter}
               onChange={(event) => setLanguageFilter(event.target.value as LanguageFilter)}
             >
@@ -238,13 +240,13 @@ export function LiveTemplatesSettings() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-[var(--taomni-text-muted)]" htmlFor="live-templates-kind">
+            <label className="mb-1 block text-ui-small text-[var(--taomni-text-muted)]" htmlFor="live-templates-kind">
               {t("settings.liveTemplatesKindFilter")}
             </label>
             <select
               id="live-templates-kind"
               data-testid="live-templates-kind-filter"
-              className="taomni-input h-8 min-w-[8rem] text-[12px]"
+              className="taomni-input h-8 min-w-[8rem] text-ui-body"
               value={kindFilter}
               onChange={(event) => setKindFilter(event.target.value as KindFilter)}
             >
@@ -254,14 +256,14 @@ export function LiveTemplatesSettings() {
             </select>
           </div>
           <div className="min-w-[12rem] flex-1">
-            <label className="mb-1 block text-[11px] text-[var(--taomni-text-muted)]" htmlFor="live-templates-search">
+            <label className="mb-1 block text-ui-small text-[var(--taomni-text-muted)]" htmlFor="live-templates-search">
               {t("settings.liveTemplatesSearch")}
             </label>
             <input
               id="live-templates-search"
               type="search"
               data-testid="live-templates-search"
-              className="taomni-input h-8 w-full text-[12px]"
+              className="taomni-input h-8 w-full text-ui-body"
               value={query}
               placeholder={t("settings.liveTemplatesSearchPlaceholder")}
               onChange={(event) => setQuery(event.target.value)}
@@ -269,7 +271,7 @@ export function LiveTemplatesSettings() {
           </div>
         </div>
 
-        <div className="text-[11px] text-[var(--taomni-text-muted)]" data-testid="live-templates-builtin-summary">
+        <div className="text-ui-small text-[var(--taomni-text-muted)]" data-testid="live-templates-builtin-summary">
           {t("settings.liveTemplatesBuiltinSummary")
             .replace("{enabled}", String(enabledBuiltinCount))
             .replace("{total}", String(builtins.length))
@@ -281,7 +283,7 @@ export function LiveTemplatesSettings() {
           className="max-h-72 overflow-auto rounded border border-[var(--taomni-divider)]"
         >
           {filteredBuiltins.length === 0 ? (
-            <div className="px-3 py-4 text-center text-[12px] text-[var(--taomni-text-muted)]">
+            <div className="px-3 py-4 text-center text-ui-body text-[var(--taomni-text-muted)]">
               {t("settings.liveTemplatesEmptyFilter")}
             </div>
           ) : (
@@ -289,7 +291,7 @@ export function LiveTemplatesSettings() {
               {filteredBuiltins.map((item) => (
                 <li
                   key={item.key}
-                  className="flex items-start gap-2 px-2 py-2 text-[12px]"
+                  className="flex items-start gap-2 px-2 py-2 text-ui-body"
                   data-testid={`live-template-builtin-${item.key}`}
                 >
                   <input
@@ -304,22 +306,22 @@ export function LiveTemplatesSettings() {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <code className="rounded bg-[var(--taomni-surface-2,transparent)] px-1 font-mono text-[12px] font-semibold">
+                      <code className="rounded bg-[var(--taomni-surface-2,transparent)] px-1 font-mono text-ui-body font-semibold">
                         {item.abbreviation}
                       </code>
-                      <span className="rounded border border-[var(--taomni-divider)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
+                      <span className="rounded border border-[var(--taomni-divider)] px-1 text-ui-caption text-[var(--taomni-text-muted)]">
                         {item.postfix
                           ? t("settings.liveTemplatesKindPostfix")
                           : t("settings.liveTemplatesKindLive")}
                       </span>
-                      <span className="text-[10px] text-[var(--taomni-text-muted)]">
+                      <span className="text-ui-caption text-[var(--taomni-text-muted)]">
                         {item.languages.map(languageLabel).join(", ")}
                       </span>
                     </div>
-                    <div className="mt-0.5 text-[11px] text-[var(--taomni-text-muted)]">
+                    <div className="mt-0.5 text-ui-small text-[var(--taomni-text-muted)]">
                       {item.description}
                     </div>
-                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all rounded bg-[var(--taomni-code-gutter-bg,rgba(0,0,0,0.15))] px-1.5 py-1 font-mono text-[10px] leading-snug text-[var(--taomni-text-muted)]">
+                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all rounded bg-[var(--taomni-code-gutter-bg,rgba(0,0,0,0.15))] px-1.5 py-1 font-mono text-ui-caption leading-snug text-[var(--taomni-text-muted)]">
                       {item.body}
                     </pre>
                   </div>
@@ -330,11 +332,11 @@ export function LiveTemplatesSettings() {
         </div>
 
         <div className="flex items-center gap-2 pt-1">
-          <div className="text-[12px] font-medium">{t("settings.liveTemplatesCustomHeading")}</div>
+          <div className="text-ui-body font-medium">{t("settings.liveTemplatesCustomHeading")}</div>
           <button
             type="button"
             data-testid="live-templates-add-custom"
-            className="taomni-btn ml-auto h-7 px-2.5 inline-flex items-center gap-1 text-[11px]"
+            className="taomni-btn ml-auto h-7 px-2.5 inline-flex items-center gap-1 text-ui-small"
             onClick={startAddCustom}
             disabled={!preferences.enabled}
           >
@@ -342,7 +344,7 @@ export function LiveTemplatesSettings() {
             {t("settings.liveTemplatesAddCustom")}
           </button>
         </div>
-        <div className="text-[11px] text-[var(--taomni-text-muted)]">
+        <div className="text-ui-small text-[var(--taomni-text-muted)]">
           {t("settings.liveTemplatesCustomHint")}
         </div>
 
@@ -353,49 +355,49 @@ export function LiveTemplatesSettings() {
           >
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-[11px] font-medium" htmlFor="live-template-abbr">
+                <label className="mb-1 block text-ui-small font-medium" htmlFor="live-template-abbr">
                   {t("settings.liveTemplatesAbbreviation")}
                 </label>
                 <input
                   id="live-template-abbr"
                   data-testid="live-template-custom-abbreviation"
-                  className="taomni-input h-8 w-full font-mono text-[12px]"
+                  className="taomni-input h-8 w-full font-mono text-ui-body"
                   value={draft.abbreviation}
                   onChange={(event) => setDraft({ ...draft, abbreviation: event.target.value })}
                   placeholder="sout"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[11px] font-medium" htmlFor="live-template-desc">
+                <label className="mb-1 block text-ui-small font-medium" htmlFor="live-template-desc">
                   {t("settings.liveTemplatesDescription")}
                 </label>
                 <input
                   id="live-template-desc"
                   data-testid="live-template-custom-description"
-                  className="taomni-input h-8 w-full text-[12px]"
+                  className="taomni-input h-8 w-full text-ui-body"
                   value={draft.description}
                   onChange={(event) => setDraft({ ...draft, description: event.target.value })}
                 />
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-[11px] font-medium" htmlFor="live-template-body">
+              <label className="mb-1 block text-ui-small font-medium" htmlFor="live-template-body">
                 {t("settings.liveTemplatesBody")}
               </label>
               <textarea
                 id="live-template-body"
                 data-testid="live-template-custom-body"
-                className="taomni-input min-h-[5rem] w-full font-mono text-[12px]"
+                className="taomni-input min-h-[5rem] w-full font-mono text-ui-body"
                 value={draft.body}
                 onChange={(event) => setDraft({ ...draft, body: event.target.value })}
                 placeholder={'System.out.println(${});'}
               />
-              <div className="mt-1 text-[10px] text-[var(--taomni-text-muted)]">
+              <div className="mt-1 text-ui-caption text-[var(--taomni-text-muted)]">
                 {t("settings.liveTemplatesBodyHint")}
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
-              <label className="flex items-center gap-1.5 text-[12px]">
+              <label className="flex items-center gap-1.5 text-ui-body">
                 <input
                   type="checkbox"
                   className="taomni-checkbox"
@@ -405,7 +407,7 @@ export function LiveTemplatesSettings() {
                 />
                 {t("settings.liveTemplatesKindPostfix")}
               </label>
-              <label className="flex items-center gap-1.5 text-[12px]">
+              <label className="flex items-center gap-1.5 text-ui-body">
                 <input
                   type="checkbox"
                   className="taomni-checkbox"
@@ -417,12 +419,12 @@ export function LiveTemplatesSettings() {
               </label>
             </div>
             <div>
-              <div className="mb-1 text-[11px] font-medium">{t("settings.liveTemplatesLanguages")}</div>
+              <div className="mb-1 text-ui-small font-medium">{t("settings.liveTemplatesLanguages")}</div>
               <div className="flex flex-wrap gap-2" data-testid="live-template-custom-languages">
                 {LIVE_TEMPLATE_LANGUAGE_OPTIONS.filter((lang) => lang !== "generic").map((lang) => {
                   const checked = draft.languages.includes(lang);
                   return (
-                    <label key={lang} className="flex items-center gap-1 text-[11px]">
+                    <label key={lang} className="flex items-center gap-1 text-ui-small">
                       <input
                         type="checkbox"
                         className="taomni-checkbox"
@@ -444,23 +446,23 @@ export function LiveTemplatesSettings() {
               </div>
             </div>
             {formError && (
-              <div className="text-[11px] text-red-500" data-testid="live-template-custom-error">
+              <div className="text-ui-small text-ui-danger" data-testid="live-template-custom-error">
                 {formError}
               </div>
             )}
             <div className="flex gap-2">
-              <button
+              <Button variant="primary"
                 type="button"
                 data-testid="live-template-custom-save"
-                className="taomni-btn-primary h-7 px-3 text-[11px]"
+                className="h-7 px-3 text-ui-small"
                 onClick={saveDraft}
               >
                 {t("settings.liveTemplatesSave")}
-              </button>
+              </Button>
               <button
                 type="button"
                 data-testid="live-template-custom-cancel"
-                className="taomni-btn h-7 px-3 text-[11px]"
+                className="taomni-btn h-7 px-3 text-ui-small"
                 onClick={cancelEdit}
               >
                 {t("settings.liveTemplatesCancel")}
@@ -474,7 +476,7 @@ export function LiveTemplatesSettings() {
           className="rounded border border-[var(--taomni-divider)]"
         >
           {filteredCustom.length === 0 ? (
-            <div className="px-3 py-3 text-[12px] text-[var(--taomni-text-muted)]">
+            <div className="px-3 py-3 text-ui-body text-[var(--taomni-text-muted)]">
               {t("settings.liveTemplatesCustomEmpty")}
             </div>
           ) : (
@@ -482,7 +484,7 @@ export function LiveTemplatesSettings() {
               {filteredCustom.map((item) => (
                 <li
                   key={item.id}
-                  className="flex items-start gap-2 px-2 py-2 text-[12px]"
+                  className="flex items-start gap-2 px-2 py-2 text-ui-body"
                   data-testid={`live-template-custom-${item.id}`}
                 >
                   <input
@@ -496,7 +498,7 @@ export function LiveTemplatesSettings() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <code className="font-mono font-semibold">{item.abbreviation}</code>
-                      <span className="text-[10px] text-[var(--taomni-text-muted)]">
+                      <span className="text-ui-caption text-[var(--taomni-text-muted)]">
                         {item.postfix
                           ? t("settings.liveTemplatesKindPostfix")
                           : t("settings.liveTemplatesKindLive")}
@@ -505,30 +507,30 @@ export function LiveTemplatesSettings() {
                       </span>
                     </div>
                     {item.description && (
-                      <div className="text-[11px] text-[var(--taomni-text-muted)]">{item.description}</div>
+                      <div className="text-ui-small text-[var(--taomni-text-muted)]">{item.description}</div>
                     )}
-                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-[10px] text-[var(--taomni-text-muted)]">
+                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-ui-caption text-[var(--taomni-text-muted)]">
                       {item.body}
                     </pre>
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <button
                       type="button"
-                      className="taomni-btn h-7 px-2 text-[11px]"
+                      className="taomni-btn h-7 px-2 text-ui-small"
                       data-testid={`live-template-custom-edit-${item.id}`}
                       onClick={() => startEditCustom(item)}
                     >
                       {t("settings.liveTemplatesEdit")}
                     </button>
-                    <button
+                    <IconButton
                       type="button"
-                      className="taomni-btn h-7 px-2 text-[11px] text-red-500"
+                      className="taomni-btn h-7 px-2 text-ui-small text-ui-danger"
                       data-testid={`live-template-custom-delete-${item.id}`}
                       onClick={() => removeCustom(item.id)}
-                      title={t("settings.liveTemplatesDelete")}
+                      label={t("settings.liveTemplatesDelete")}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </IconButton>
                   </div>
                 </li>
               ))}

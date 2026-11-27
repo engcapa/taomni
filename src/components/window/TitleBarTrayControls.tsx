@@ -55,12 +55,12 @@ function TitleBarOverflow({ children, slotRef, visible, contextKey }: {
   return <>
     <div ref={anchorRef} className="relative flex items-center self-stretch shrink-0" hidden={!visible}>
       {visible && <button type="button" data-testid="titlebar-actions-more"
-        title={t("titlebar.moreActions")} aria-label={t("titlebar.moreActions")} aria-haspopup="menu" aria-expanded={expanded}
+        title={t("titlebar.moreActions")} aria-label={t("titlebar.moreActions")} aria-haspopup="true" aria-expanded={expanded}
         className="taomni-platform-toolbar-button" onClick={() => setOpen((value) => !value)}><MoreHorizontal className="h-4 w-4" /></button>}
     </div>
-    {createPortal(<div ref={menuRef} data-testid="titlebar-actions-menu" data-taomni-context-menu="" role="menu"
+    {createPortal(<div ref={menuRef} data-testid="titlebar-actions-menu" data-taomni-context-menu="" role="region"
       aria-label={t("titlebar.moreActions")} hidden={!expanded}
-      className="taomni-titlebar-actions-menu fixed z-[9999] w-64 max-w-[calc(100vw-16px)] max-h-[75vh] overflow-y-auto rounded-lg border p-1 shadow-xl"
+      className="taomni-titlebar-actions-menu fixed z-[var(--taomni-z-popover)] w-64 max-w-[calc(100vw-16px)] max-h-[75vh] overflow-y-auto rounded-lg border p-1 shadow-xl"
       style={{ ...position, display: expanded ? undefined : "none", background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
       onClick={(event) => {
         const button = (event.target as Element).closest<HTMLButtonElement>("button");
@@ -90,8 +90,8 @@ function TitleBarOverflow({ children, slotRef, visible, contextKey }: {
 export function ToolbarMenuAction({ testId, title, icon, active, onClick, disabled }: {
   testId: string; title: string; icon: ReactNode; active?: boolean; onClick: () => void; disabled?: boolean;
 }) {
-  return <button type="button" role={active === undefined ? "menuitem" : "menuitemcheckbox"}
-    data-testid={testId} title={title} aria-label={title} aria-checked={active} data-active={active || undefined}
+  return <button type="button"
+    data-testid={testId} title={title} aria-label={title} aria-pressed={active} data-active={active || undefined}
     disabled={disabled} onClick={onClick}
     className="taomni-toolbar-menu-action flex min-h-7 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left hover:bg-[var(--taomni-hover)] disabled:opacity-40 data-[active=true]:text-[var(--taomni-accent)]">
     <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>

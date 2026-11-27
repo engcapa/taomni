@@ -21,7 +21,7 @@ export function RemoteBackupPanel() {
   const config = draft.remote.config;
   return <div data-testid="backup-cloud-panel" className="space-y-3">
     {config.targets.map((target) => <BackupDestination key={target.id} target={target} applications={applications} initiallyOpen={added === target.id} />)}
-    <button data-testid="backup-feishu-add" className={backupButton} onClick={() => { const target = newFeishuTarget(); editControl({ op: "addTarget", target }); setAdded(target.id); }}>{t("remoteBackup.addFeishu")}</button>
+    <button type="button" data-testid="backup-feishu-add" className={backupButton} onClick={() => { const target = newFeishuTarget(); editControl({ op: "addTarget", target }); setAdded(target.id); }}>{t("remoteBackup.addFeishu")}</button>
     <details data-testid="backup-device-settings" className="rounded-lg border border-theme-border p-3"><summary className="cursor-pointer text-xs text-theme-muted">{t("remoteBackup.deviceName")}</summary>
       <div className="mt-3 space-y-2"><BackupTextSetting value={config.device.name} label={t("remoteBackup.deviceName")} testId="backup-device-name" onCommit={(name) => editControl({ op: "setDeviceName", name })} />
         <p className="text-xs text-theme-muted">{t("remoteBackup.deviceIdentity", { id: config.device.id })}</p><p className="text-xs text-theme-muted">{t("remoteBackup.deviceNameHint")}</p></div>

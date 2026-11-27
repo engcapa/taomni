@@ -30,6 +30,7 @@ steps:
     expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-git-clone-location"]')?.value
     contains: taomni-workspaces
     expect_truthy: true
+    timeout_sec: 30
 - fill:
     selector: '[data-testid="workspace-git-clone-url"]'
     value: ${fixture.git_clone_url}

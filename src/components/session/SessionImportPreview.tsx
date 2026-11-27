@@ -3,6 +3,7 @@ import type { SessionImportResult } from "../../lib/sessionImportExport";
 import { folderOptionLabel } from "../../lib/sessionPaths";
 import { sessionTypeLabel } from "../../lib/terminalProfile";
 import { useT } from "../../lib/i18n";
+import { Modal } from "../ui/Modal";
 
 export interface SessionImportPreviewProps {
   source: string;
@@ -21,6 +22,7 @@ export function SessionImportPreview({
 }: SessionImportPreviewProps) {
   const t = useT();
   const total = result.sessions.length;
+  const hasRows = total > 0;
   const previewRows = result.sessions.slice(0, 80);
   const remaining = total - previewRows.length;
   const target = folderOptionLabel(targetFolder);
@@ -79,53 +81,58 @@ export function SessionImportPreview({
     return { sessionPasswordCount: passwords, standaloneSecretCount: standalone };
   }, [result.secrets, selected]);
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      onCancel();
-    }
-  };
-
   const handleConfirm = () => {
     if (noneSelected) return;
     onConfirm(selected);
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)" }}
-      onClick={onCancel}
-      onKeyDown={handleKeyDown}
+    <Modal
+      size="wide"
+      title={t("importPreviewExt.titleSource", { source })}
+      testId="session-import-preview"
+      initialFocus={hasRows ? '[data-testid="session-import-preview-confirm"]' : '[data-testid="session-import-preview-cancel"]'}
+      dismissOnBackdrop={false}
+      onCancel={onCancel}
+      footer={
+        <>
+          <button
+            type="button"
+            data-testid="session-import-preview-cancel"
+            className="taomni-btn"
+            onClick={onCancel}
+          >
+            {t("importPreview.cancel")}
+          </button>
+          <button
+            type="button"
+            data-testid="session-import-preview-confirm"
+            className="taomni-btn"
+            data-primary="true"
+            disabled={noneSelected}
+            onClick={handleConfirm}
+          >
+            {t("importPreview.confirmImport")}
+          </button>
+        </>
+      }
     >
-      <div
-        role="dialog"
-        aria-label={t("importPreviewExt.ariaLabel")}
-        aria-modal="true"
-        data-testid="session-import-preview"
-        className="w-[760px] max-w-[94vw] max-h-[86vh] flex flex-col rounded shadow-lg"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div
-          className="px-4 py-3 border-b"
-          style={{ borderColor: "var(--taomni-divider)" }}
-        >
-          <div className="text-sm font-semibold">{t("importPreviewExt.titleSource", { source })}</div>
+      <div className="flex flex-col gap-3">
+        <div>
           <div
-            className="text-[12px] text-[var(--taomni-text-muted)] mt-1"
+            className="text-ui-body text-[var(--taomni-text-muted)]"
             data-testid="session-import-preview-summary"
           >
             {selectedCount} of {total} session{total === 1 ? "" : "s"} will be imported into {target}
             {result.skipped ? `, ${result.skipped} skipped` : ""}.
           </div>
           {sessionPasswordCount > 0 && (
-            <div className="text-[12px] text-[var(--taomni-text-muted)] mt-1">
+            <div className="text-ui-body text-[var(--taomni-text-muted)] mt-1">
               {sessionPasswordCount} saved password{sessionPasswordCount === 1 ? "" : "s"} will be stored in the Taomni credential vault.
             </div>
           )}
           {standaloneSecretCount > 0 && (
-            <div className="text-[12px] text-[var(--taomni-text-muted)] mt-1">
+            <div className="text-ui-body text-[var(--taomni-text-muted)] mt-1">
               + {standaloneSecretCount} standalone secret{standaloneSecretCount === 1 ? "" : "s"} (e.g. private-key passphrases) will be saved as separate vault entries.
             </div>
           )}
@@ -134,8 +141,7 @@ export function SessionImportPreview({
         {result.warnings.length > 0 && (
           <div
             data-testid="session-import-preview-warnings"
-            className="mx-4 mt-3 rounded border p-2 text-[12px]"
-            style={{ borderColor: "#c78b2d", background: "rgba(199,139,45,0.12)" }}
+            className="rounded border p-2 text-ui-body border-[var(--taomni-warning-border)] bg-[var(--taomni-warning-bg)] text-[var(--taomni-warning-text)]"
           >
             <div className="font-semibold mb-1">{t("importPreviewExt.warningsHeading")}</div>
             <ul className="list-disc pl-5 space-y-0.5">
@@ -144,18 +150,18 @@ export function SessionImportPreview({
               ))}
             </ul>
             {result.warnings.length > 6 && (
-              <div className="mt-1 text-[var(--taomni-text-muted)]">
+              <div className="mt-1 opacity-90">
                 {t("importPreviewExt.warningsMore", { count: result.warnings.length - 6, plural: result.warnings.length - 6 === 1 ? "" : "s" })}
               </div>
             )}
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-auto p-4">
+        <div>
           {previewRows.length > 0 ? (
             <table
               data-testid="session-import-preview-table"
-              className="w-full border-collapse text-[12px]"
+              className="w-full border-collapse text-ui-body"
             >
               <thead>
                 <tr style={{ background: "var(--taomni-hover)" }}>
@@ -210,41 +216,17 @@ export function SessionImportPreview({
               </tbody>
             </table>
           ) : (
-            <div className="text-[12px] text-[var(--taomni-text-muted)]">
+            <div className="text-ui-body text-[var(--taomni-text-muted)]">
               {t("importPreviewExt.noImportable")}
             </div>
           )}
           {remaining > 0 && (
-            <div className="mt-2 text-[12px] text-[var(--taomni-text-muted)]">
+            <div className="mt-2 text-ui-body text-[var(--taomni-text-muted)]">
               {t("importPreviewExt.moreNotShown", { count: remaining, plural: remaining === 1 ? "" : "s" })}
             </div>
           )}
         </div>
-
-        <div
-          className="flex items-center justify-end gap-2 px-4 py-3 border-t"
-          style={{ borderColor: "var(--taomni-divider)" }}
-        >
-          <button
-            type="button"
-            data-testid="session-import-preview-cancel"
-            className="taomni-btn h-8 px-3"
-            onClick={onCancel}
-          >
-            {t("importPreview.cancel")}
-          </button>
-          <button
-            type="button"
-            data-testid="session-import-preview-confirm"
-            className="taomni-btn h-8 px-3"
-            data-primary="true"
-            disabled={noneSelected}
-            onClick={handleConfirm}
-          >
-            {t("importPreview.confirmImport")}
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

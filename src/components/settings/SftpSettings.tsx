@@ -71,17 +71,17 @@ export function SftpSettings() {
           <FolderSync className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-semibold leading-tight">
+          <div className="text-ui-title font-semibold leading-tight">
             {t("settings.sftpTitle")}
           </div>
-          <div className="mt-0.5 text-[12px] leading-snug text-[var(--taomni-text-muted)]">
+          <div className="mt-0.5 text-ui-body leading-snug text-[var(--taomni-text-muted)]">
             {t("settings.sftpSubtitle")}
           </div>
         </div>
         <button
           type="button"
           data-testid="sftp-settings-reset"
-          className="taomni-btn ml-1 h-7 shrink-0 px-2.5 inline-flex items-center gap-1 text-[11px]"
+          className="taomni-btn ml-1 h-7 shrink-0 px-2.5 inline-flex items-center gap-1 text-ui-small"
           onClick={() => {
             setPreferences(DEFAULT_SFTP_PREFERENCES);
             saveSftpPreferences(DEFAULT_SFTP_PREFERENCES);
@@ -96,10 +96,10 @@ export function SftpSettings() {
       {/* Body */}
       <div className="space-y-3 px-3.5 py-3.5">
         <div>
-          <div className="text-[12px] font-medium">
+          <div className="text-ui-body font-medium">
             {t("settings.sftpLocalDoubleClickLabel")}
           </div>
-          <div className="mt-0.5 text-[11px] leading-snug text-[var(--taomni-text-muted)]">
+          <div className="mt-0.5 text-ui-small leading-snug text-[var(--taomni-text-muted)]">
             {t("settings.sftpLocalDoubleClickHint")}
           </div>
         </div>
@@ -170,12 +170,12 @@ export function SftpSettings() {
                   </span>
                   <div className="min-w-0 flex-1 pt-0.5">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[12.5px] font-semibold leading-tight">
+                      <span className="text-ui-body font-semibold leading-tight">
                         {t(action.labelKey)}
                       </span>
                       {action.isDefault ? (
                         <span
-                          className="rounded px-1.5 py-px text-[10px] font-medium leading-4"
+                          className="rounded px-1.5 py-px text-ui-caption font-medium leading-4"
                           style={{
                             background: active
                               ? "color-mix(in srgb, var(--taomni-accent) 18%, transparent)"
@@ -214,7 +214,7 @@ export function SftpSettings() {
                     {active ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
                   </span>
                 </div>
-                <p className="text-[11px] leading-snug text-[var(--taomni-text-muted)]">
+                <p className="text-ui-small leading-snug text-[var(--taomni-text-muted)]">
                   {t(action.hintKey)}
                 </p>
               </button>

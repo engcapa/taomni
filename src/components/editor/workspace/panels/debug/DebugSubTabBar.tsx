@@ -67,7 +67,7 @@ export function DebugSubTabBar({
       role="tablist"
       aria-orientation="horizontal"
       data-testid="debug-sub-tab-bar"
-      className="h-7 shrink-0 flex items-center border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-1.5 text-[10px] select-none"
+      className="h-7 shrink-0 flex items-center border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-1.5 text-ui-caption select-none"
     >
       <div className="flex items-center gap-0.5" role="presentation">
         {SUB_TABS.map((tab, index) => {
@@ -92,7 +92,7 @@ export function DebugSubTabBar({
               className={`h-5 px-2 rounded-t flex items-center gap-1.5 font-medium transition-colors ${
                 isActive
                   ? "bg-[var(--taomni-code-bg)] text-[var(--taomni-text)] shadow-2xs border-b-2 border-b-[var(--taomni-accent)]"
-                  : "text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover-bg)]"
+                  : "text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)]"
               }`}
             >
               <Icon className="h-3 w-3 shrink-0" />
@@ -100,7 +100,7 @@ export function DebugSubTabBar({
               {badge !== undefined && (
                 <span
                   data-testid={`${tab.testId}-badge`}
-                  className="rounded-full bg-[var(--taomni-code-border)] px-1 text-[9px] font-mono text-[var(--taomni-text-muted)]"
+                  className="rounded-full bg-[var(--taomni-code-border)] px-1 text-ui-caption font-mono text-[var(--taomni-text-muted)]"
                 >
                   {badge}
                 </span>
@@ -111,7 +111,7 @@ export function DebugSubTabBar({
       </div>
       {toolbar && <div className="ml-2 flex items-center">{toolbar}</div>}
       {statusText && (
-        <span data-testid="debug-status-text" className="ml-2 text-[10px] text-[var(--taomni-text-muted)] truncate">
+        <span data-testid="debug-status-text" className="ml-2 text-ui-caption text-[var(--taomni-text-muted)] truncate">
           {statusText}
         </span>
       )}

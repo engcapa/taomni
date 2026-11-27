@@ -109,3 +109,26 @@ it("rejects empty workspace names and IME Enter, while cancellation has no mutat
   expect(onSubmit).not.toHaveBeenCalled();
   expect(onCancel).toHaveBeenCalledOnce();
 });
+
+it("uses top-layer dialog semantics, respects IME Escape, and restores opener focus on dismissal", () => {
+  const opener = document.createElement("button");
+  document.body.append(opener);
+  opener.focus();
+  const onCancel = vi.fn();
+
+  const view = render(<WorkspaceFsModals request={{ kind: "file", directory: "src" }} onCancel={onCancel} onSubmit={vi.fn()} />);
+  const dialog = screen.getByTestId("workspace-fs-modal");
+  expect(dialog.tagName).toBe("DIALOG");
+  const input = screen.getByTestId("workspace-fs-modal-input");
+  expect(input).toHaveFocus();
+
+  fireEvent.keyDown(input, { key: "Escape", isComposing: true });
+  expect(onCancel).not.toHaveBeenCalled();
+
+  fireEvent.keyDown(input, { key: "Escape" });
+  expect(onCancel).toHaveBeenCalledTimes(1);
+
+  view.rerender(<WorkspaceFsModals request={null} onCancel={onCancel} onSubmit={vi.fn()} />);
+  expect(opener).toHaveFocus();
+  opener.remove();
+});

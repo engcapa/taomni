@@ -1,5 +1,6 @@
+import { NotepadDialog } from "./NotepadDialog";
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardCopy, FileText, MonitorUp, Search, X } from "lucide-react";
+import { ClipboardCopy, FileText, MonitorUp, Search } from "lucide-react";
 import type { OpenFileMode } from "../../../lib/openFile";
 import { isHandlerAvailable, isOfficeExtension } from "../../../lib/openFile/handlers";
 import type { FileHandler } from "../../../lib/openFile/preferences";
@@ -64,153 +65,133 @@ export function PickerDialogs({
   return (
     <>
       {modal?.kind === "openWith" && (
-        <div className="np-modal-backdrop" role="dialog" aria-modal="true" data-testid="notepad-open-with-dialog">
-          <div className="np-modal">
-            <div className="np-modal-header">
-              <span>{label("打开方式", "Open With")}</span>
-              <button type="button" className="np-btn" data-testid="notepad-open-with-close" onClick={onClose}><X size={14} /></button>
-            </div>
-            <p className="np-dialog-hint">{label("选择打开此文件的应用；可勾选“记住”把选择保存为该扩展名的默认打开方式。", "Choose the application for this file. Check Remember to store the choice for this extension.")}</p>
-            <div className="np-pick-list">
-              {openWithOptions.map((option) => {
-                const handlerId = (option.mode === "taomni" ? "taomni" : option.mode) as FileHandler;
-                const disabled = option.disabled ?? !isHandlerAvailable(handlerId);
-                const remembered = Boolean(rememberFor[option.mode]);
-                return (
-                  <div key={option.mode} className="np-pick-row" data-disabled={disabled || undefined}>
-                    <button
-                      type="button"
-                      className="np-pick-main"
-                      data-testid={`notepad-open-with-${option.mode}`}
+        <NotepadDialog testId="notepad-open-with-dialog" onClose={onClose} closeId="notepad-open-with-close"
+          title={label("打开方式", "Open With")}
+          footer={<>
+            <button type="button" className="np-btn" onClick={onClose}>{label("关闭", "Close")}</button>
+          </>}>
+          <p className="np-dialog-hint">{label("选择打开此文件的应用；可勾选“记住”把选择保存为该扩展名的默认打开方式。", "Choose the application for this file. Check Remember to store the choice for this extension.")}</p>
+          <div className="np-pick-list">
+            {openWithOptions.map((option) => {
+              const handlerId = (option.mode === "taomni" ? "taomni" : option.mode) as FileHandler;
+              const disabled = option.disabled ?? !isHandlerAvailable(handlerId);
+              const remembered = Boolean(rememberFor[option.mode]);
+              return (
+                <div key={option.mode} className="np-pick-row" data-disabled={disabled || undefined}>
+                  <button
+                    type="button"
+                    className="np-pick-main"
+                    data-testid={`notepad-open-with-${option.mode}`}
+                    disabled={disabled}
+                    onClick={() => {
+                      if (remembered) onRememberHandler(option.mode as Exclude<OpenFileMode, "source">);
+                      onOpenWith(option.mode);
+                    }}
+                  >
+                    {option.icon}
+                    <span>{label(option.zh, option.en)}</span>
+                    {option.disabled && <span className="np-chip">{label("开发中", "In development")}</span>}
+                  </button>
+                  <label className="np-pick-remember">
+                    <input
+                      type="checkbox"
+                      data-testid={`notepad-open-with-remember-${option.mode}`}
                       disabled={disabled}
-                      onClick={() => {
-                        if (remembered) onRememberHandler(option.mode as Exclude<OpenFileMode, "source">);
-                        onOpenWith(option.mode);
+                      checked={remembered}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        setRememberFor((prev) => ({ ...prev, [option.mode]: checked }));
                       }}
-                    >
-                      {option.icon}
-                      <span>{label(option.zh, option.en)}</span>
-                      {option.disabled && <span className="np-chip">{label("开发中", "In development")}</span>}
-                    </button>
-                    <label className="np-pick-remember">
-                      <input
-                        type="checkbox"
-                        data-testid={`notepad-open-with-remember-${option.mode}`}
-                        disabled={disabled}
-                        checked={remembered}
-                        onChange={(event) => {
-                          const checked = event.target.checked;
-                          setRememberFor((prev) => ({ ...prev, [option.mode]: checked }));
-                        }}
-                      />
-                      {label("记住", "Remember")}
-                    </label>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex justify-end">
-              <button type="button" className="np-btn" onClick={onClose}>{label("关闭", "Close")}</button>
-            </div>
+                    />
+                    {label("记住", "Remember")}
+                  </label>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        </NotepadDialog>
       )}
 
       {modal?.kind === "pasteSpecial" && (
-        <div className="np-modal-backdrop" role="dialog" aria-modal="true" data-testid="notepad-paste-special-dialog">
-          <div className="np-modal">
-            <div className="np-modal-header">
-              <span>{label("特殊粘贴", "Paste Special")}</span>
-              <button type="button" className="np-btn" data-testid="notepad-paste-special-close" onClick={onClose}><X size={14} /></button>
-            </div>
-            <div className="np-pick-list">
-              <button type="button" className="np-pick-main" data-testid="notepad-paste-plain" onClick={() => void readClipboard().then((text) => onPaste(text, "plain"))}>
-                <ClipboardCopy size={14} />{label("纯文本", "Plain text")}
-              </button>
-              <button type="button" className="np-pick-main" data-testid="notepad-paste-html" onClick={() => void readClipboard().then((text) => onPaste(text, "html"))}>
-                <ClipboardCopy size={14} />{label("HTML 源码", "HTML source")}
-              </button>
-              <button type="button" className="np-pick-main" data-testid="notepad-paste-rtf" onClick={() => void readClipboard().then((text) => onPaste(text, "rtf"))}>
-                <ClipboardCopy size={14} />{label("RTF 源码", "RTF source")}
-              </button>
-              <button type="button" className="np-pick-main" data-testid="notepad-paste-binary" onClick={() => void readClipboard().then((text) => onPaste(text, "binary"))}>
-                <ClipboardCopy size={14} />{label("二进制（保留 NUL）", "Binary (keep NUL)")}
-              </button>
-            </div>
-            <p className="np-dialog-hint">{label("系统剪贴板中的富文本格式由浏览器/宿主提供；不可用时回退为纯文本内容。", "Rich clipboard formats depend on the host; plain text is used when unavailable.")}</p>
-            <div className="flex justify-end">
-              <button type="button" className="np-btn" onClick={onClose}>{label("取消", "Cancel")}</button>
-            </div>
+        <NotepadDialog testId="notepad-paste-special-dialog" onClose={onClose} closeId="notepad-paste-special-close"
+          title={label("特殊粘贴", "Paste Special")}
+          footer={<>
+            <button type="button" className="np-btn" onClick={onClose}>{label("取消", "Cancel")}</button>
+          </>}>
+          <div className="np-pick-list">
+            <button type="button" className="np-pick-main" data-testid="notepad-paste-plain" onClick={() => void readClipboard().then((text) => onPaste(text, "plain"))}>
+              <ClipboardCopy size={14} />{label("纯文本", "Plain text")}
+            </button>
+            <button type="button" className="np-pick-main" data-testid="notepad-paste-html" onClick={() => void readClipboard().then((text) => onPaste(text, "html"))}>
+              <ClipboardCopy size={14} />{label("HTML 源码", "HTML source")}
+            </button>
+            <button type="button" className="np-pick-main" data-testid="notepad-paste-rtf" onClick={() => void readClipboard().then((text) => onPaste(text, "rtf"))}>
+              <ClipboardCopy size={14} />{label("RTF 源码", "RTF source")}
+            </button>
+            <button type="button" className="np-pick-main" data-testid="notepad-paste-binary" onClick={() => void readClipboard().then((text) => onPaste(text, "binary"))}>
+              <ClipboardCopy size={14} />{label("二进制（保留 NUL）", "Binary (keep NUL)")}
+            </button>
           </div>
-        </div>
+          <p className="np-dialog-hint">{label("系统剪贴板中的富文本格式由浏览器/宿主提供；不可用时回退为纯文本内容。", "Rich clipboard formats depend on the host; plain text is used when unavailable.")}</p>
+        </NotepadDialog>
       )}
 
       {modal?.kind === "clipboardHistory" && (
-        <div className="np-modal-backdrop" role="dialog" aria-modal="true" data-testid="notepad-clipboard-history-dialog">
-          <div className="np-modal">
-            <div className="np-modal-header">
-              <span>{label("剪贴板历史", "Clipboard History")}</span>
-              <button type="button" className="np-btn" data-testid="notepad-clipboard-history-close" onClick={onClose}><X size={14} /></button>
+        <NotepadDialog testId="notepad-clipboard-history-dialog" onClose={onClose} closeId="notepad-clipboard-history-close"
+          title={label("剪贴板历史", "Clipboard History")}
+          footer={<>
+            <button type="button" className="np-btn" data-testid="notepad-clipboard-history-clear" onClick={() => useNotepadStore.setState({ clipboardHistory: [] })}>{label("清空", "Clear")}</button>
+            <button type="button" className="np-btn primary" onClick={onClose}>{label("关闭", "Close")}</button>
+          </>}>
+          {clipboardHistory.length === 0 ? (
+            <p className="np-dialog-hint" data-testid="notepad-clipboard-history-empty">{label("暂无历史条目。", "No history entries yet.")}</p>
+          ) : (
+            <div className="np-pick-list" data-testid="notepad-clipboard-history-list">
+              {clipboardHistory.map((entry, index) => (
+                <button
+                  key={`${index}-${entry.slice(0, 16)}`}
+                  type="button"
+                  className="np-pick-main np-pick-pre"
+                  data-testid={`notepad-clipboard-history-item-${index}`}
+                  title={entry}
+                  onClick={() => { onPaste(entry, "plain"); onClose(); }}
+                >
+                  {entry.length > 160 ? `${entry.slice(0, 160)}…` : entry}
+                </button>
+              ))}
             </div>
-            {clipboardHistory.length === 0 ? (
-              <p className="np-dialog-hint" data-testid="notepad-clipboard-history-empty">{label("暂无历史条目。", "No history entries yet.")}</p>
-            ) : (
-              <div className="np-pick-list" data-testid="notepad-clipboard-history-list">
-                {clipboardHistory.map((entry, index) => (
-                  <button
-                    key={`${index}-${entry.slice(0, 16)}`}
-                    type="button"
-                    className="np-pick-main np-pick-pre"
-                    data-testid={`notepad-clipboard-history-item-${index}`}
-                    title={entry}
-                    onClick={() => { onPaste(entry, "plain"); onClose(); }}
-                  >
-                    {entry.length > 160 ? `${entry.slice(0, 160)}…` : entry}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <button type="button" className="np-btn" data-testid="notepad-clipboard-history-clear" onClick={() => useNotepadStore.setState({ clipboardHistory: [] })}>{label("清空", "Clear")}</button>
-              <button type="button" className="np-btn primary" onClick={onClose}>{label("关闭", "Close")}</button>
-            </div>
-          </div>
-        </div>
+          )}
+        </NotepadDialog>
       )}
 
       {modal?.kind === "insertDate" && <InsertDateDialog onClose={onClose} onInsert={onInsertText} />}
 
       {modal?.kind === "comparePick" && (
-        <div className="np-modal-backdrop" role="dialog" aria-modal="true" data-testid="notepad-compare-pick-dialog">
-          <div className="np-modal">
-            <div className="np-modal-header">
-              <span>{label("选择对比目标", "Choose Compare Target")}</span>
-              <button type="button" className="np-btn" data-testid="notepad-compare-pick-close" onClick={onClose}><X size={14} /></button>
-            </div>
-            <div className="np-pick-list">
-              <button
-                type="button"
-                className="np-pick-main"
-                data-testid="notepad-compare-pick-saved"
-                onClick={() => onCompare(label(`${modal.savedTitle}（磁盘版本）`, `${modal.savedTitle} (saved)`), modal.savedContent)}
-              >
-                <FileText size={14} />{label("与磁盘版本对比", "Compare with saved version")}
-              </button>
-              <button
-                type="button"
-                className="np-pick-main"
-                data-testid="notepad-compare-pick-clipboard"
-                onClick={() => onCompare(label("剪贴板", "Clipboard"), modal.clipboardText)}
-              >
-                <ClipboardCopy size={14} />{label("与剪贴板对比", "Compare with clipboard")}
-              </button>
-              <ComparePickDocuments onPick={(doc, content) => onCompare(doc.title || doc.path || doc.docKey, content)} />
-            </div>
-            <div className="flex justify-end">
-              <button type="button" className="np-btn" onClick={onClose}>{label("取消", "Cancel")}</button>
-            </div>
+        <NotepadDialog testId="notepad-compare-pick-dialog" onClose={onClose} closeId="notepad-compare-pick-close"
+          title={label("选择对比目标", "Choose Compare Target")}
+          footer={<>
+            <button type="button" className="np-btn" onClick={onClose}>{label("取消", "Cancel")}</button>
+          </>}>
+          <div className="np-pick-list">
+            <button
+              type="button"
+              className="np-pick-main"
+              data-testid="notepad-compare-pick-saved"
+              onClick={() => onCompare(label(`${modal.savedTitle}（磁盘版本）`, `${modal.savedTitle} (saved)`), modal.savedContent)}
+            >
+              <FileText size={14} />{label("与磁盘版本对比", "Compare with saved version")}
+            </button>
+            <button
+              type="button"
+              className="np-pick-main"
+              data-testid="notepad-compare-pick-clipboard"
+              onClick={() => onCompare(label("剪贴板", "Clipboard"), modal.clipboardText)}
+            >
+              <ClipboardCopy size={14} />{label("与剪贴板对比", "Compare with clipboard")}
+            </button>
+            <ComparePickDocuments onPick={(doc, content) => onCompare(doc.title || doc.path || doc.docKey, content)} />
           </div>
-        </div>
+        </NotepadDialog>
       )}
     </>
   );
@@ -244,40 +225,35 @@ function InsertDateDialog({ onClose, onInsert }: { onClose: () => void; onInsert
   const [pattern, setPattern] = useState("yyyy-MM-dd HH:mm:ss");
   const preview = useMemo(() => formatDateWithPattern(new Date(), pattern), [pattern]);
   return (
-    <div className="np-modal-backdrop" role="dialog" aria-modal="true" data-testid="notepad-insert-date-dialog">
-      <div className="np-modal">
-        <div className="np-modal-header">
-          <span>{label("插入日期时间（自定义）", "Insert Date Time (Custom)")}</span>
-          <button type="button" className="np-btn" data-testid="notepad-insert-date-close" onClick={onClose}><X size={14} /></button>
-        </div>
-        <label className="np-field-row">
-          <span>{label("格式", "Pattern")}</span>
-          <input
-            className="np-input"
-            data-testid="notepad-insert-date-pattern"
-            value={pattern}
-            onChange={(event) => setPattern(event.target.value)}
-            placeholder="yyyy-MM-dd HH:mm:ss"
-          />
-        </label>
-        <label className="np-field-row">
-          <span>{label("预览", "Preview")}</span>
-          <output className="np-input" data-testid="notepad-insert-date-preview">{preview}</output>
-        </label>
-        <p className="np-dialog-hint">{label("可用字段：yyyy yy MM M dd d HH H mm m ss s", "Tokens: yyyy yy MM M dd d HH H mm m ss s")}</p>
-        <div className="flex justify-end gap-2">
-          <button type="button" className="np-btn" onClick={onClose}>{label("取消", "Cancel")}</button>
-          <button
-            type="button"
-            className="np-btn primary"
-            data-testid="notepad-insert-date-confirm"
-            onClick={() => { onInsert(preview); onClose(); }}
-          >
-            {label("插入", "Insert")}
-          </button>
-        </div>
-      </div>
-    </div>
+    <NotepadDialog testId="notepad-insert-date-dialog" onClose={onClose} closeId="notepad-insert-date-close" initialFocus='[data-testid="notepad-insert-date-pattern"]'
+      title={label("插入日期时间（自定义）", "Insert Date Time (Custom)")}
+      footer={<>
+        <button type="button" className="np-btn" onClick={onClose}>{label("取消", "Cancel")}</button>
+        <button
+          type="button"
+          className="np-btn primary"
+          data-testid="notepad-insert-date-confirm"
+          onClick={() => { onInsert(preview); onClose(); }}
+        >
+          {label("插入", "Insert")}
+        </button>
+      </>}>
+      <label className="np-field-row">
+        <span>{label("格式", "Pattern")}</span>
+        <input
+          className="np-input"
+          data-testid="notepad-insert-date-pattern"
+          value={pattern}
+          onChange={(event) => setPattern(event.target.value)}
+          placeholder="yyyy-MM-dd HH:mm:ss"
+        />
+      </label>
+      <label className="np-field-row">
+        <span>{label("预览", "Preview")}</span>
+        <output className="np-input" data-testid="notepad-insert-date-preview">{preview}</output>
+      </label>
+      <p className="np-dialog-hint">{label("可用字段：yyyy yy MM M dd d HH H mm m ss s", "Tokens: yyyy yy MM M dd d HH H mm m ss s")}</p>
+    </NotepadDialog>
   );
 }
 

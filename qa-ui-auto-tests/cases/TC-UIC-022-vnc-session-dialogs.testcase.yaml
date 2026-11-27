@@ -1,0 +1,97 @@
+id: TC-UIC-022-vnc-session-dialogs
+title: VNC Properties protects its draft and returns control to the connected desktop
+covers: [F9.6]
+tags: [vnc, desktop-ui]
+modes: [browser, native]
+fixtures: [reset_db, vnc_required]
+ui_standard: [UI-DLG-06, UI-DLG-07, UI-DLG-10, UI-SRF-03]
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-vnc"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${fixture.vnc_host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${fixture.vnc_port}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-vnc-menu
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-menu"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-menu"]'
+- wait_for:
+    selector: '[data-testid="vnc-unencrypted-continue"]'
+    timeout_sec: 20
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- wait_for:
+    selector: '[data-testid="vnc-auth-password"]'
+    timeout_sec: 20
+- fill:
+    selector: '[data-testid="vnc-auth-password"]'
+    value: ${env.QA_VNC_PASSWORD}
+- click: '[data-testid="vnc-auth-ok"]'
+- wait_for:
+    selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
+    timeout_sec: 20
+- click: '[data-testid="vnc-canvas"]'
+- press:
+    key: F8
+    selector: '[data-testid="vnc-canvas"]'
+- click: '[data-testid="vnc-menu-properties"]'
+- assert_focus_on: '[data-testid="vnc-prop-quality"]'
+- select_option: {selector: '[data-testid="vnc-prop-quality"]', value: low}
+- click: '[data-testid="vnc-prop-cancel"]'
+- assert_focus_on: '[data-testid="confirm-dialog-cancel"]'
+- press: Escape
+- wait_for: '[data-testid="vnc-prop-quality"]:has(option[value="low"]:checked)'
+- click: '[data-testid="vnc-prop-cancel"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_focus_on: '[data-testid="vnc-canvas"]'
+- press: F8
+- click: '[data-testid="vnc-menu-properties"]'
+- wait_for: '[data-testid="vnc-prop-quality"]:has(option[value="automatic"]:checked)'
+- press: Escape
+- assert_focus_on: '[data-testid="vnc-canvas"]'
+- press: F8
+- click: '[data-testid="vnc-menu-info"]'
+- assert_focus_on: '[data-testid="vnc-session-info-ok"]'
+- assert_text: {selector: '[data-testid="vnc-session-info"]', contains: '1280 x 720'}
+- press: Enter
+- assert_focus_on: '[data-testid="vnc-canvas"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: property-draft
+    ui_standard: [UI-DLG-06, UI-DLG-07, UI-DLG-10]
+    requirement: Properties offers to keep edited settings and applies a discard only after an explicit decision.
+    actions: [21, 22, 24, 25, 27, 29, 30, 32, 33, 35]
+    checkpoints:
+    - {step: 23, expectation: The quality selector receives initial focus.}
+    - {step: 26, expectation: Keep editing receives the safe initial focus.}
+    - {step: 28, expectation: Returning from the discard prompt retains the unsaved Low quality.}
+    - {step: 31, expectation: Discard returns keyboard control to the connected canvas.}
+    - {step: 34, expectation: Reopened properties show the original Automatic quality.}
+    - {step: 36, expectation: Clean cancellation returns to the canvas directly.}
+    results: [23, 26, 28, 31, 34, 36]
+  - id: session-info
+    ui_standard: [UI-DLG-07, UI-SRF-03]
+    requirement: The session menu opens negotiated desktop information and returns input to the same connection.
+    actions: [37, 38, 41]
+    checkpoints:
+    - {step: 39, expectation: The acknowledgement button owns keyboard focus.}
+    - {step: 40, expectation: Session information reports the negotiated framebuffer size.}
+    - {step: 42, expectation: Keyboard activation returns to the live canvas.}
+    - {step: 43, expectation: The interaction produces no uncaught renderer errors.}
+    results: [39, 40, 42, 43]
+  native:
+  - {check: Connect to the disposable RFB server through the native relay and inspect the negotiated desktop size., method: automated, reason: The native app owns the transport and WebView focus.}
+  visual:
+  - {check: The open information window shows the negotiated desktop dimensions., method: automated, reason: The rendered description is checked against the fixture desktop.}

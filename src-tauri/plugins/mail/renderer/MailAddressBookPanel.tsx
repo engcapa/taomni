@@ -23,7 +23,7 @@ export interface MailAddressBookPanelProps {
   onStatus?: (message: string) => void;
 }
 
-const inputClass = "h-7 px-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[12px] min-w-0";
+const inputClass = "h-7 px-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-ui-body min-w-0";
 
 function ListEditor({
   label,
@@ -64,7 +64,7 @@ function ListEditor({
             </button>
           </div>
         ))}
-        <button type="button" className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]" onClick={() => onChange([...rows, ""])}>
+        <button type="button" className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-ui-small" onClick={() => onChange([...rows, ""])}>
           <Plus className="w-3 h-3" /> {label}
         </button>
       </div>
@@ -179,7 +179,7 @@ export function MailAddressBookPanel({ info, initialDraft, onCompose, onStatus }
   if (draft) {
     const canSave = !!(draft.displayName.trim() || draft.emails.some((email) => email.trim()));
     return (
-      <div className="flex-1 min-h-0 flex flex-col text-[12px]" data-testid="mail-contact-editor">
+      <div className="flex-1 min-h-0 flex flex-col text-ui-body" data-testid="mail-contact-editor">
         <div className="flex-1 min-h-0 overflow-auto p-3 space-y-2">
           <label className="flex items-center gap-2">
             <span className="w-20 shrink-0 text-[var(--taomni-text-muted)]">Name</span>
@@ -199,9 +199,9 @@ export function MailAddressBookPanel({ info, initialDraft, onCompose, onStatus }
           </label>
           <label className="flex items-start gap-2">
             <span className="w-20 shrink-0 pt-1 text-[var(--taomni-text-muted)]">Note</span>
-            <textarea className="flex-1 min-h-[60px] p-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[12px]" value={draft.note ?? ""} aria-label="Note" onChange={(event) => setDraft({ ...draft, note: event.target.value })} />
+            <textarea className="flex-1 min-h-[60px] p-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-ui-body" value={draft.note ?? ""} aria-label="Note" onChange={(event) => setDraft({ ...draft, note: event.target.value })} />
           </label>
-          {error && <div className="text-red-500" data-testid="mail-contact-error">{error}</div>}
+          {error && <div className="text-ui-danger" data-testid="mail-contact-error">{error}</div>}
         </div>
         <div className="h-11 shrink-0 px-3 flex items-center gap-2 border-t border-[var(--taomni-divider)]">
           <span className="text-[var(--taomni-text-muted)]">
@@ -225,7 +225,7 @@ export function MailAddressBookPanel({ info, initialDraft, onCompose, onStatus }
 
   const iconButton = "taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center";
   return (
-    <div className="flex-1 min-h-0 flex flex-col text-[12px]" data-testid="mail-address-book">
+    <div className="flex-1 min-h-0 flex flex-col text-ui-body" data-testid="mail-address-book">
       <div className="h-9 shrink-0 px-3 flex items-center gap-1.5 border-b border-[var(--taomni-divider)]">
         <button type="button" className="taomni-btn h-7 px-2 inline-flex items-center gap-1" data-testid="mail-contact-new" onClick={() => setDraft(emptyAddressBookEntry())}>
           <Plus className="w-3.5 h-3.5" /> New contact
@@ -258,9 +258,9 @@ export function MailAddressBookPanel({ info, initialDraft, onCompose, onStatus }
           <Download className="w-3.5 h-3.5" />
         </button>
       </div>
-      {error && <div className="px-3 py-1.5 text-red-500 border-b border-[var(--taomni-divider)]" data-testid="mail-address-book-error">{error}</div>}
+      {error && <div className="px-3 py-1.5 text-ui-danger border-b border-[var(--taomni-divider)]" data-testid="mail-address-book-error">{error}</div>}
       {syncErrors.length > 0 && (
-        <div className="px-3 py-1.5 border-b border-[var(--taomni-divider)] text-red-500" data-testid="mail-carddav-errors">
+        <div className="px-3 py-1.5 border-b border-[var(--taomni-divider)] text-ui-danger" data-testid="mail-carddav-errors">
           {syncErrors.map((message) => <div key={message}>{message}</div>)}
         </div>
       )}
@@ -280,9 +280,9 @@ export function MailAddressBookPanel({ info, initialDraft, onCompose, onStatus }
                 {entry.displayName}
                 {entry.org ? <span className="ml-1 font-normal text-[var(--taomni-text-muted)]">· {entry.org}</span> : null}
               </div>
-              <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">{[...entry.emails, ...entry.phones].join(", ")}</div>
+              <div className="truncate text-ui-small text-[var(--taomni-text-muted)]">{[...entry.emails, ...entry.phones].join(", ")}</div>
             </div>
-            {entry.pendingSync && <span title="Not yet on the CardDAV server"><CloudOff className="w-3 h-3 text-amber-500" /></span>}
+            {entry.pendingSync && <span title="Not yet on the CardDAV server"><CloudOff className="w-3 h-3 text-ui-warning" /></span>}
             {onCompose && entry.emails.length > 0 && (
               <button type="button" className={iconButton} title={`Write to ${entry.emails[0]}`} aria-label={`Write to ${entry.displayName}`} data-testid="mail-contact-compose" onClick={() => onCompose(entry)}>
                 <MailIcon className="w-3 h-3" />

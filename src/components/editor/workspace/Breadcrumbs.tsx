@@ -239,8 +239,8 @@ export function Breadcrumbs({
       data-testid="code-workspace-breadcrumbs"
       data-variant={variant}
       className={variant === "statusbar"
-        ? "relative flex h-full min-w-0 flex-1 items-center overflow-hidden text-[11px] text-[var(--taomni-status-text)] outline-none"
-        : "relative flex h-7 shrink-0 items-center overflow-hidden border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 text-[11px] text-[var(--taomni-code-muted)] outline-none"}
+        ? "relative flex h-full min-w-0 flex-1 items-center overflow-hidden text-ui-small text-[var(--taomni-status-text)] outline-none"
+        : "relative flex h-7 shrink-0 items-center overflow-hidden border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 text-ui-small text-[var(--taomni-code-muted)] outline-none"}
     >
       <BreadcrumbTrail
         fullItems={fullItems}

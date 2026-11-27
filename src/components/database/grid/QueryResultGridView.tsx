@@ -23,7 +23,7 @@ import {
   Table2,
   Trash2,
 } from "lucide-react";
-import { type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
+import { useRef, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
 import { type MenuItem } from "../../ContextMenu";
 import { GridSearchBar } from "./GridSearchBar";
 import type { useGridSearch } from "./useGridSearch";
@@ -146,6 +146,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
     setCellValueViewer,
     menu,
   } = inputs;
+  const listRef = useRef<HTMLDivElement>(null);
   return ((
     <div
       className="flex-1 min-h-0 flex flex-col"
@@ -313,13 +314,13 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
         />
         <Divider />
         {filters.filterOpen && (
-          <label className="h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--taomni-text-muted)]">
+          <label className="h-6 inline-flex items-center gap-1 px-1 text-ui-small text-[var(--taomni-text-muted)]">
             <Filter className="w-3.5 h-3.5" />
             <input
               type="search"
               value={filters.filterText}
               onChange={(event) => filters.setFilterText(event.target.value)}
-              className="taomni-input h-6 w-[150px] text-[11px]"
+              className="taomni-input h-6 w-[150px] text-ui-small"
               placeholder="Filter rows"
               aria-label="Filter rows"
             />
@@ -328,7 +329,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
         {(filters.filterText.trim() || filters.activeColumnFilterCount > 0) && (
           <button
             type="button"
-            className="h-6 px-1.5 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)]"
+            className="h-6 px-1.5 inline-flex items-center gap-1 rounded text-ui-small hover:bg-[var(--taomni-hover)]"
             title="Clear filters"
             onClick={filters.clearAllFilters}
           >
@@ -349,13 +350,13 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
         <span
           data-testid="query-result-row-count"
           data-filtered={filters.rowsFiltered ? "true" : "false"}
-          className="px-1 text-[10px] tabular-nums text-[var(--taomni-text-muted)]"
+          className="px-1 text-ui-caption tabular-nums text-[var(--taomni-text-muted)]"
           title={filters.rowsFiltered ? "Rows shown [total rows] / columns" : "Rows / columns"}
         >
           {filters.rowsFiltered ? `${filters.orderedRows.length} [${rows.length}]` : rows.length}/{visibleColumnIndexes.length}
         </span>
         {(pendingChangeCount > 0 || localNotice) && (
-          <span className="max-w-[320px] truncate px-1 text-[10px] text-[var(--taomni-text-muted)]" title={localNotice}>
+          <span className="max-w-[320px] truncate px-1 text-ui-caption text-[var(--taomni-text-muted)]" title={localNotice}>
             {pendingChangeCount > 0
               ? `${changeCounts.inserted} add / ${changeCounts.updated} edit / ${changeCounts.deleted} delete`
               : localNotice}
@@ -366,14 +367,14 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
       {generatedSql && (
         <div
           data-testid="query-result-generated-sql-bar"
-          className="min-h-7 shrink-0 flex items-center gap-1.5 px-2 py-1 text-[11px]"
+          className="min-h-7 shrink-0 flex items-center gap-1.5 px-2 py-1 text-ui-small"
           style={{ background: "var(--taomni-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
         >
           <FileText className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
           <span className="shrink-0 font-semibold text-[var(--taomni-text-muted)]">SQL</span>
           <code
             data-testid="query-result-generated-sql"
-            className="min-w-0 flex-1 truncate rounded px-1.5 py-0.5 font-mono text-[10px]"
+            className="min-w-0 flex-1 truncate rounded px-1.5 py-0.5 font-mono text-ui-caption"
             style={{ background: "var(--taomni-quick-bg)", border: "1px solid var(--taomni-divider)" }}
             title={displayGeneratedSqlTitle ?? undefined}
           >
@@ -382,7 +383,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
           <button
             type="button"
             data-testid="query-result-generated-sql-query"
-            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
+            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-ui-small"
             data-primary="true"
             title="Apply local filters and sort as a database query"
             aria-label="Query generated SQL"
@@ -395,7 +396,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
           <button
             type="button"
             data-testid="query-result-generated-sql-copy"
-            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
+            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-ui-small"
             title="Copy generated SQL"
             aria-label="Copy generated SQL"
             disabled={generatedSqlActionsDisabled}
@@ -407,7 +408,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
           <button
             type="button"
             data-testid="query-result-generated-sql-sync"
-            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
+            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-ui-small"
             title="Sync generated SQL to a query editor"
             aria-label="Sync generated SQL"
             disabled={generatedSqlActionsDisabled}
@@ -421,7 +422,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
 
       {showStats && (
         <div
-          className="max-h-[132px] shrink-0 overflow-auto taomni-scroll-y text-[11px]"
+          className="max-h-[132px] shrink-0 overflow-auto taomni-scroll-y text-ui-small"
           style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-bg)" }}
         >
           <div className="min-w-full inline-grid grid-cols-[minmax(120px,1fr)_repeat(6,minmax(70px,auto))]">
@@ -447,7 +448,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
           >
             <div
               data-testid="query-result-grid-header-scroll"
-              className="flex text-[11px] font-semibold"
+              className="flex text-ui-small font-semibold"
               style={{
                 fontSize: "var(--taomni-db-font-size-sm, 11px)",
                 transform: `translateX(${-scrollLeft}px)`,
@@ -459,7 +460,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                 style={{ borderRight: "1px solid var(--taomni-divider)" }}
               >
                 <span>#</span>
-                <span className="text-[10px]">{selection.selectionRowCount || ""}</span>
+                <span className="text-ui-caption">{selection.selectionRowCount || ""}</span>
               </div>
               {visibleColumnIndexes.map((columnIndex) => {
                 const col = result.columns[columnIndex];
@@ -486,7 +487,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                       {columnSort?.dir === "asc" && <ArrowUp className="w-3 h-3" />}
                       {columnSort?.dir === "desc" && <ArrowDown className="w-3 h-3" />}
                       {filters.sorts.length > 1 && sortIndex >= 0 && (
-                        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded px-1 text-[9px] text-[var(--taomni-accent)]" style={{ background: "var(--taomni-selected)" }}>
+                        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded px-1 text-ui-caption text-[var(--taomni-accent)]" style={{ background: "var(--taomni-selected)" }}>
                           {sortIndex + 1}
                         </span>
                       )}
@@ -541,13 +542,12 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                       background: selected
                         ? "var(--taomni-selected)"
                         : row.status === "deleted"
-                          ? "rgba(217, 83, 79, 0.12)"
+                          ? "var(--taomni-danger-bg)"
                           : row.status === "inserted"
-                            ? "rgba(98, 211, 111, 0.10)"
+                            ? "var(--taomni-success-bg)"
                             : row.status === "updated"
-                              ? "rgba(230, 168, 23, 0.10)"
+                              ? "var(--taomni-warning-bg)"
                               : undefined,
-                      opacity: row.status === "deleted" ? 0.65 : undefined,
                     }}
                   >
                     <button
@@ -557,7 +557,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                       onClick={(event) => selection.selectRow(row.id, event)}
                       title={row.status === "clean" ? `Row ${(row.originalIndex ?? rowIndex) + 1}` : row.status}
                     >
-                      <span className="mr-1 text-[10px]">
+                      <span className="mr-1 text-ui-caption">
                         {row.status === "inserted" ? "+" : row.status === "updated" ? "~" : row.status === "deleted" ? "-" : ""}
                       </span>
                       {(row.originalIndex ?? rowIndex) + 1}
@@ -579,11 +579,11 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                             ...columnStyle(columnIndex),
                             borderRight: "1px solid var(--taomni-divider)",
                             outline: active ? "1px solid var(--taomni-accent)" : undefined,
-                            background: blockSelected
-                              ? "var(--taomni-editor-selection-bg)"
-                              : searchHit
-                                ? "rgba(230, 168, 23, 0.22)"
-                                : undefined,
+                            background: searchHit
+                              ? "var(--taomni-warning-bg)"
+                              : blockSelected ? "var(--taomni-editor-selection-bg)" : undefined,
+                            color: searchHit ? "var(--taomni-warning-text)" : undefined,
+                            boxShadow: searchHit && blockSelected ? "inset 0 -2px var(--taomni-focus-ring)" : undefined,
                           }}
                           title={cell ?? "NULL"}
                           onMouseDown={(event) => selection.startCellBlockSelection(event, row.id, columnIndex)}
@@ -600,7 +600,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                           {editing ? (
                             <input
                               autoFocus
-                              className="taomni-input h-5 w-full text-[12px]"
+                              className="taomni-input h-5 w-full text-ui-body"
                               value={editSession.editValue}
                               onChange={(event) => editSession.setEditValue(event.target.value)}
                               onBlur={editSession.commitEdit}
@@ -611,7 +611,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                             />
                           ) : cell === null ? (
                             <span
-                              className="text-[10px] px-1 rounded"
+                              className="text-ui-caption px-1 rounded"
                               style={{ background: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}
                             >
                               NULL
@@ -632,7 +632,8 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
 
       {viewMode === "list" && (
         <div
-          className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-2 text-[12px]"
+          ref={listRef}
+          className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-2 text-ui-body"
           tabIndex={0}
           onKeyDown={handleGridKeyDown}
         >
@@ -642,7 +643,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
               className="mb-2 rounded p-2"
               style={{ border: "1px solid var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}
             >
-              <div className="mb-1 text-[11px] text-[var(--taomni-text-muted)]">Row {(row.originalIndex ?? rowIndex) + 1}</div>
+              <div className="mb-1 text-ui-small text-[var(--taomni-text-muted)]">Row {(row.originalIndex ?? rowIndex) + 1}</div>
               <div className="grid grid-cols-[minmax(90px,180px)_1fr] gap-x-3 gap-y-1">
                 {visibleColumnIndexes.map((columnIndex) => (
                   <div key={columnIndex} className="contents">
@@ -669,14 +670,14 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
       )}
 
       {viewMode === "chart" && (
-        <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-3 text-[12px]">
+        <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-3 text-ui-body">
           {!chartData ? (
             <div className="h-full flex items-center justify-center text-[var(--taomni-text-muted)]">
               No numeric column is available for chart view.
             </div>
           ) : (
             <div className="min-w-[420px]">
-              <div className="mb-2 text-[11px] text-[var(--taomni-text-muted)]">
+              <div className="mb-2 text-ui-small text-[var(--taomni-text-muted)]">
                 {chartData.column.name} (first {chartData.points.length} rows)
               </div>
               <div className="space-y-1">
@@ -688,7 +689,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                         className="h-4"
                         style={{
                           width: `${Math.max(2, (Math.abs(point.value) / chartData.max) * 100)}%`,
-                          background: point.value < 0 ? "#d9534f" : "var(--taomni-accent)",
+                          background: point.value < 0 ? "var(--taomni-danger-icon)" : "var(--taomni-accent)",
                         }}
                       />
                     </div>
@@ -722,6 +723,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
       {cellValueViewer && (
         <CellValueDialog
           viewer={cellValueViewer}
+          returnFocus={viewMode === "list" ? listRef.current : containerRef.current}
           onCopy={() => void copyCellViewerValue(cellValueViewer)}
           onClose={() => setCellValueViewer(null)}
         />

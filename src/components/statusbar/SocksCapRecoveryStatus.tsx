@@ -10,7 +10,7 @@ export function SocksCapRecoveryStatus() {
 
   return (
     <button type="button" data-testid="status-sockscap-recovery"
-      className="flex shrink-0 items-center gap-1 text-amber-700 dark:text-amber-300"
+      className="flex shrink-0 items-center gap-1 text-ui-warning"
       title={recovery.message} onClick={() => openSettingsSection("module-store")}>
       <TriangleAlert className="h-3 w-3" />
       {t("settings.moduleStoreSocksCapRecovery")}

@@ -1,3 +1,4 @@
+import { NotepadDialog } from "./dialogs/NotepadDialog";
 import { useEffect, useRef } from "react";
 import type { NotepadHostContext } from "../../lib/notepad/host/types";
 import { acceptTamperedMacros, normalizeMacroSteps, saveMacrosList, type SavedMacroEntry } from "../../lib/notepad/macro/macroManager";
@@ -291,23 +292,18 @@ export function NotepadDialogsHost({
       />
 
       {aboutOpen && (
-        <div className="np-modal-backdrop" role="dialog" aria-modal="true" data-testid="notepad-about-dialog">
-          <div className="np-modal">
-            <div className="np-modal-header">
-              <span>Taomni Notepad</span>
-              <button type="button" className="np-btn" onClick={() => setAboutOpen(false)}>×</button>
-            </div>
-            <p className="text-[12px]">
-              {label(
-                "Taomni 原生多文档记事本工作台：支持列块编辑、宏录制、定期磁盘备份与多编码无损转换。",
-                "Taomni native Notepad workbench: column selection, recorded macros, disk backups, and safe multi-encoding editing.",
-              )}
-            </p>
-            <div className="flex justify-end">
-              <button type="button" className="np-btn primary" onClick={() => setAboutOpen(false)}>{label("关闭", "Close")}</button>
-            </div>
-          </div>
-        </div>
+        <NotepadDialog testId="notepad-about-dialog" onClose={() => setAboutOpen(false)}
+          title={<span>Taomni Notepad</span>}
+          footer={<>
+            <button type="button" className="np-btn primary" onClick={() => setAboutOpen(false)}>{label("关闭", "Close")}</button>
+          </>}>
+          <p className="text-ui-body">
+            {label(
+              "Taomni 原生多文档记事本工作台：支持列块编辑、宏录制、定期磁盘备份与多编码无损转换。",
+              "Taomni native Notepad workbench: column selection, recorded macros, disk backups, and safe multi-encoding editing.",
+            )}
+          </p>
+        </NotepadDialog>
       )}
     </>
   );

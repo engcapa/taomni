@@ -24,19 +24,17 @@ export function ScreenshotOverlay() {
     return (
       <div
         data-testid="screenshot-overlay"
-        className="fixed inset-0 flex items-center justify-center"
-        style={{ background: "#141414", color: "#ffffff" }}
+        className="fixed inset-0 flex items-center justify-center bg-[var(--taomni-panel-bg)] text-[var(--taomni-text)]"
       >
         <div className="text-center px-6 max-w-xl">
-          <p data-testid="screenshot-overlay-error" className="mb-4 text-[14px] break-words">
+          <p data-testid="screenshot-overlay-error" role="alert" className="mb-4 text-ui-title break-words">
             {state.t("screenshot.openFailed", { error: state.loadError })}
           </p>
           <button
             type="button"
             data-testid="screenshot-cancel"
             onClick={state.close}
-            className="rounded-lg px-4 py-1.5 text-[13px]"
-            style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
+            className="taomni-btn" data-primary="true"
           >
             {state.t("screenshot.cancel")}
           </button>

@@ -1,3 +1,5 @@
+import { useZoomTarget } from "../../../../hooks/useZoomTarget";
+import { contentZoomShortcut, type ContentZoomAction } from "../../../../lib/contentZoomShortcut";
 import { useCallback, useEffect } from "react";
 import { CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE } from "../codeWorkspaceModel";
 import { useWorkspacePreferences } from "../controller/useWorkspacePreferences";
@@ -24,57 +26,34 @@ export function useWorkspaceZoom(context: UseWorkspaceZoomContext) {
     return "editor";
   }, []);
 
+  const change = useCallback((action: ContentZoomAction, focus: Element | null) => {
+    if (zoomTargetForNode(focus) === "tree") {
+      if (action === "reset") appearance.setTreeFontSize(CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE);
+      else appearance.stepTreeFontSize(action === "in" ? 1 : -1);
+    } else if (action === "reset") {
+      appearance.setCodeViewFontSize(DEFAULT_EDITOR_APPEARANCE_PROFILE.fontSizePx);
+    } else {
+      appearance.stepCodeViewFontSize(action === "in" ? 1 : -1);
+    }
+  }, [appearance.setCodeViewFontSize, appearance.setTreeFontSize, appearance.stepCodeViewFontSize, appearance.stepTreeFontSize, zoomTargetForNode]);
+  useZoomTarget(rootRef, visible, change);
+
   useEffect(() => {
     if (!visible) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || event.altKey || event.metaKey) return;
-      const targetElement = event.target instanceof Element ? event.target : null;
-      if (targetElement?.closest('[data-testid="code-workspace-todos-panel"]')) return;
-
-      const increase =
-        event.key === "+" ||
-        event.key === "=" ||
-        event.code === "NumpadAdd";
-      const decrease =
-        event.key === "-" ||
-        event.key === "_" ||
-        event.code === "NumpadSubtract";
-      const reset =
-        event.key === "0" ||
-        event.code === "Digit0" ||
-        event.code === "Numpad0";
-
-      if (!increase && !decrease && !reset) return;
-
-      // Ctrl+0 is also the IDEA mnemonic-bookmark jump. A live [0] bookmark
-      // owns the key; only an unclaimed stroke remains the zoom reset.
-      if (reset && findBookmarkByMnemonic(preferences.bookmarksRef.current, "0")) return;
-
+      const action = contentZoomShortcut(event);
+      if (!action || event.defaultPrevented || document.querySelector("dialog[open]")) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target && target !== document.body && !rootRef.current?.contains(target)) return;
+      if (target?.closest('[data-testid="code-workspace-todos-panel"]')) return;
+      if (action === "reset" && findBookmarkByMnemonic(preferences.bookmarksRef.current, "0")) return;
       event.preventDefault();
-      event.stopPropagation();
       event.stopImmediatePropagation();
-
-      const target = zoomTargetForNode(event.target);
-      if (target === "tree") {
-        if (increase) {
-          appearance.stepTreeFontSize(1);
-        } else if (decrease) {
-          appearance.stepTreeFontSize(-1);
-        } else {
-          appearance.setTreeFontSize(CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE);
-        }
-      } else if (increase) {
-        appearance.stepCodeViewFontSize(1);
-      } else if (decrease) {
-        appearance.stepCodeViewFontSize(-1);
-      } else {
-        appearance.setCodeViewFontSize(DEFAULT_EDITOR_APPEARANCE_PROFILE.fontSizePx);
-      }
+      change(action, target);
     };
-
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [appearance.setCodeViewFontSize, appearance.setTreeFontSize, appearance.stepCodeViewFontSize, appearance.stepTreeFontSize, visible, zoomTargetForNode]);
+  }, [change, preferences.bookmarksRef, rootRef, visible]);
 
   useEffect(() => {
     if (!visible) return;

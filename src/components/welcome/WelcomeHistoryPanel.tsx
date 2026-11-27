@@ -1,3 +1,4 @@
+import { SectionTabs, sectionTab } from "../ui/SectionTabs";
 import { FolderOpen, Folder, History } from "lucide-react";
 import { type TranslateFn } from "../../lib/i18n";
 import { type WelcomeHistoryTab } from "./types";
@@ -57,9 +58,8 @@ export function WelcomeHistoryPanel({
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex flex-wrap items-center gap-2 border-b p-2" style={{ borderColor: "var(--taomni-divider)" }}>
-        <div
+        <SectionTabs
           className="flex min-w-0 flex-1 flex-wrap items-center gap-1"
-          role="tablist"
           aria-label={t("welcome.historyTabsLabel")}
         >
           {tabs.map((tab) => {
@@ -69,27 +69,26 @@ export function WelcomeHistoryPanel({
                 key={tab.id}
                 id={`welcome-history-tab-${tab.id}`}
                 data-testid={`welcome-history-tab-${tab.id}`}
-                className="h-8 min-w-0 rounded px-3 inline-flex items-center gap-1.5 text-[12px] font-medium"
+                className="h-8 min-w-0 rounded px-3 inline-flex items-center gap-1.5 text-ui-body font-medium"
                 style={{
                   background: selected ? "var(--taomni-selected)" : "transparent",
                   color: selected ? "var(--taomni-text)" : "var(--taomni-text-muted)",
                   border: `1px solid ${selected ? "var(--taomni-selected-border)" : "transparent"}`,
                 }}
                 type="button"
-                role="tab"
-                aria-selected={selected}
+                {...sectionTab(selected)}
                 aria-controls={`welcome-history-tabpanel-${tab.id}`}
                 onClick={() => onActiveTabChange(tab.id)}
               >
                 <span className="shrink-0 text-[var(--taomni-accent)]">{tab.icon}</span>
                 <span className="truncate">{tab.label}</span>
-                <span className="shrink-0 text-[11px] taomni-mono text-[var(--taomni-text-muted)]">
+                <span className="shrink-0 text-ui-small taomni-mono text-[var(--taomni-text-muted)]">
                   {tab.count}
                 </span>
               </button>
             );
           })}
-        </div>
+        </SectionTabs>
       </div>
       <div
         id={`welcome-history-tabpanel-${activeTab}`}

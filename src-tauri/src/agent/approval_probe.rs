@@ -45,6 +45,9 @@ use tauri::WebviewWindow;
 use uuid::Uuid;
 
 const PROBE_THREAD_DEFAULT: &str = "qa-agent-approval-thread";
+// A detached probe caller may be destroyed before its invoke promise resolves.
+// The surviving QA window can query the actual outcome of the original waiter.
+static LAST_OUTCOME: Mutex<Option<serde_json::Value>> = Mutex::new(None);
 
 /// Threads with a blocking probe currently waiting for a decision.
 fn probe_guard() -> &'static Mutex<HashSet<String>> {
@@ -121,6 +124,15 @@ pub async fn qa_agent_approval_probe(
     // single-flight per document, but the stimulus can reach the backend twice
     // (observed with the WebKitGTK automation transport after a window switch),
     // and two pending prompts for one thread would later surface as two cards.
+    if mode == "read-result" {
+        return Ok(LAST_OUTCOME
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .filter(|result| result["threadId"] == thread_id)
+            .cloned()
+            .unwrap_or_default());
+    }
     let _guard = match mode.as_str() {
         "own" | "fallback" | "stale" => match ProbeGuard::acquire(&thread_id) {
             Some(guard) => Some(guard),
@@ -259,11 +271,13 @@ pub async fn qa_agent_approval_probe(
         "manual",
     )
     .await;
-    Ok(json!({
+    let result = json!({
         "threadId": thread_id,
         "mode": mode,
         "windowLabel": window.label(),
         "delivery": delivery_name(&planned),
         "decision": decision,
-    }))
+    });
+    *LAST_OUTCOME.lock().unwrap_or_else(|e| e.into_inner()) = Some(result.clone());
+    Ok(result)
 }

@@ -15,7 +15,7 @@ export function KeymapMigrationNotice({ onOpenKeymap, onDismiss }: KeymapMigrati
       role="status"
       aria-live="polite"
       data-testid="keymap-migration-notice"
-      className="pointer-events-auto absolute bottom-8 right-3 z-30 w-[340px] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] p-3 text-[11px] text-[var(--taomni-code-text)] shadow-lg"
+      className="pointer-events-auto absolute bottom-8 right-3 z-[var(--taomni-z-toast)] w-[340px] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] p-3 text-ui-small text-[var(--taomni-code-text)] shadow-lg"
     >
       <div className="flex items-start gap-2">
         <Keyboard className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--taomni-code-muted)]" aria-hidden="true" />
@@ -47,7 +47,7 @@ export function KeymapMigrationNotice({ onOpenKeymap, onDismiss }: KeymapMigrati
         <button
           type="button"
           aria-label="Close keymap notice"
-          className="rounded p-0.5 hover:bg-[var(--taomni-code-hover)]"
+          className="rounded p-0.5 hover:bg-[var(--taomni-code-active-line-bg)]"
           onClick={onDismiss}
         >
           <X size={12} />

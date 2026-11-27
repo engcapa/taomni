@@ -134,6 +134,7 @@ export default function RdpPanel({
     osFullscreen,
     setBarReveal,
     canvasRef,
+    imeInputRef,
   });
 
   /* ── Render ──────────────────────────────────────────────────────── */

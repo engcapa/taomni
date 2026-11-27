@@ -108,15 +108,16 @@ steps:
     contains: '"type": "auth", "ok": true, "security": "VNCAuth"'
 - host_write_file:
     path: ${fixture.vnc_control}
-    text: 'drop
-
-      '
-- click: '[data-testid="titlebar-actions-more"]'
+    text: |
+      auth-delay 12000
+      drop
 - wait_for:
-    selector: '[data-testid="vnc-reconnect"]'
+    selector: '[data-testid="vnc-connect-stop"]'
     timeout_sec: 15
-- click: '[data-testid="vnc-reconnect-stop"]'
+- click: '[data-testid="vnc-connect-stop"]'
+- wait_for: '[data-testid="vnc-overlay-disconnected"] [data-testid="vnc-reconnect"]'
 - screenshot: 157-disconnected-dark.png
+- host_write_file: {path: '${fixture.vnc_control}', text: 'auth-delay 0'}
 - click: '[data-testid="vnc-reconnect"]'
 - wait_for:
     selector: '[data-testid="vnc-unencrypted-continue"]'
@@ -202,26 +203,15 @@ verification:
     results:
     - 47
   - id: R3
-    requirement: A remote disconnect exposes a readable reconnect action; reconnect confirms the unencrypted connection and paints a new framebuffer.
-    actions:
-    - 48
-    - 49
-    - 51
-    - 53
-    - 55
+    requirement: A user can stop a slow automatic retry, inspect the disconnected state, and manually reconnect to the same desktop.
+    actions: [48, 50, 53, 54, 56]
     checkpoints:
-    - step: 50
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-reconnect\"]", "timeout_sec": 15}}'
-    - step: 54
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-unencrypted-continue\"]", "timeout_sec": 20}}'
-    - step: 56
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1280\"][height=\"720\"]", "timeout_sec": 20}}'
-    - step: 57
-      expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('.vnc-container canvas').getContext('2d').getImageData(16, 16, 1, 1).data[3] === 255\", \"\
-        timeout_sec\": 10}}"
-    results:
-    - 56
-    - 57
+    - {step: 49, expectation: The delayed authentication leaves the automatic connection attempt available to stop.}
+    - {step: 51, expectation: Stopping the attempt shows a stable disconnected card with a manual reconnect action.}
+    - {step: 55, expectation: A manual attempt asks for unencrypted connection consent again.}
+    - {step: 57, expectation: The server negotiates its original desktop dimensions.}
+    - {step: 58, expectation: The reconnected framebuffer contains a painted pixel.}
+    results: [49, 51, 55, 57, 58]
   visual:
   - check: 'Review dialog screenshots: opaque theme-appropriate cards; readable titles, descriptions, field labels, entered username, buttons and error text; visible focus
       and no clipping. Check the disconnected card and reconnect button too.'

@@ -12,6 +12,10 @@ RegisterVerb = Callable[[str], Callable[[NativeVerb], NativeVerb]]
 
 
 def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
+    from . import ui_control_assertions
+    for name in ui_control_assertions.VERBS:
+        register_verb(name)(ui_control_assertions.native(name))
+
     from .core_profile_observation import run as assert_core_profile_generation
     from .core_profile_observation import assert_headless_profile_blocked
     register_verb("assert_core_profile_generation")(assert_core_profile_generation)

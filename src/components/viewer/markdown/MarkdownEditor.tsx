@@ -183,7 +183,7 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
       <MarkdownToolbar view={() => editor.current} readOnly={effectiveReadOnly} mode={mode} focus={focus} outline={outline} heading={heading}
         onMode={changeMode} onFocus={() => setFocus(!focus)} onOutline={() => setOutline(!outline)} onImage={chooseImage}
         drawioImport={<MarkdownDrawioImport key={current.key} view={() => editor.current} readOnly={effectiveReadOnly} onError={report} />} />
-      {mode === "live" && <button className="fv-button outline" data-testid="markdown-live-edit" aria-pressed={editing} disabled={current.readOnly || current.truncated}
+      {mode === "live" && <button type="button" className="fv-button outline" data-testid="markdown-live-edit" aria-pressed={editing} disabled={current.readOnly || current.truncated}
         onClick={() => setEditing(!editing)}>{editing ? label("完成编辑", "Done editing") : label("编辑", "Edit")}</button>}
       <PreviewAppearanceControl value={appearance} onChange={setAppearance} />
       <MarkdownExportMenu key={`export:${current.key}`} document={current} onError={report} printRequest={printRequest} onExport={owner?.onExport} />
@@ -194,7 +194,7 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
       {outline && <aside className="fv-md-outline" data-testid="markdown-outline" aria-label={label("大纲", "Outline")}>
         <div className="fv-md-outline-title"><ListTree />{label("大纲", "Outline")}</div>
         {!headings.length && <p className="fv-md-empty-outline">{label("暂无标题", "No headings")}</p>}
-        {headings.map((item) => <button key={item.from} className={activeHeading === item.from ? "on" : ""} data-heading-from={item.from} style={{ paddingLeft: `${8 + (item.level - 1) * 12}px` }} title={item.text} aria-current={activeHeading === item.from ? "location" : undefined} onClick={() => {
+        {headings.map((item) => <button type="button" key={item.from} className={activeHeading === item.from ? "on" : ""} data-heading-from={item.from} style={{ paddingLeft: `${8 + (item.level - 1) * 12}px` }} title={item.text} aria-current={activeHeading === item.from ? "location" : undefined} onClick={() => {
           const view = editor.current;
           if (!view) return;
           view.dispatch({ selection: { anchor: item.from }, effects: EditorView.scrollIntoView(item.from, { y: "start" }) });
@@ -209,7 +209,7 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
         <div className={`fv-md-editor-pane ${mode === "live" ? "fv-md-live-pane" : "fv-md-source-pane"}`} data-preview-theme={mode === "live" ? previewTheme : undefined} style={mode === "live" ? previewThemeStyle(previewTheme) : undefined}>
           <EditorSurface document={surfaceDocument} extensions={extensions} onView={onView} onChange={owner?.onChange} onSave={save}
             className={mode === "live" ? "fv-md-live-surface" : "fv-md-source-surface"} nativeSelection={mode === "live" && effectiveReadOnly} createSearchPanel={createWorkspaceSearchPanel} />
-          {slash !== null && <MarkdownInsertMenu from={slash} onInsert={insert} />}
+          {slash !== null && <MarkdownInsertMenu from={slash} onInsert={insert} onClose={() => setSlash(null)} />}
         </div>
         {mode === "split" ? <MarkdownPreviewPane content={current.content} path={current.path} onError={report} onWarning={onRenderWarning}
           theme={previewTheme} readImage={readImage} label={label} /> : null}
@@ -218,7 +218,7 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
     </div>
     <MarkdownDiagramActions key={`visual:${current.key}`} root={root} docPath={current.path} sourceOnDisk={!owner} enabled={active !== false} onError={report} />
     <MarkdownLiveMenu key={`live-menu:${current.key}`} root={root} enabled={active !== false && mode === "live" && effectiveReadOnly} onError={report} />
-    {pasteStatus && <div className="fv-md-paste-status" role="status" data-testid="markdown-paste-status">{pasteStatus}<button aria-label={label("关闭提示", "Dismiss")} onClick={() => setPasteStatus("")}>×</button></div>}
+    {pasteStatus && <div className="fv-md-paste-status" role="status" data-testid="markdown-paste-status">{pasteStatus}<button type="button" aria-label={label("关闭提示", "Dismiss")} onClick={() => setPasteStatus("")}>×</button></div>}
     <input ref={imageInput} type="file" accept="image/*" hidden data-testid="markdown-image-input" multiple onChange={(event) => {
       const files = Array.from(event.target.files || []);
       event.target.value = "";

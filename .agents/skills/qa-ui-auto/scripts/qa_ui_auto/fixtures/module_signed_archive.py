@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 from pathlib import Path
 import shutil
 import socket
@@ -79,6 +80,26 @@ def load_artifact(root: Path, source_sha: str, expected_platform: str, slug: str
     return receipt, archive, detached, frontend
 
 
+def restore_package_source(ctx, core_source, slug):
+    """Allow a local core restore against a retained, independently signed module."""
+    retained = (ctx.cfg.get("fixtures") or {}).get("retained_restore_module_sha")
+    if not retained:
+        return core_source
+    cases = SIGNED_BACKUP_STATES if slug == "mfa" else {"TC-MODULES-033", "TC-MODULES-034", "TC-MODULES-035"}
+    if ctx.case_id not in cases or os.environ.get("GITHUB_ACTIONS") == "true":
+        raise RuntimeError("A retained module is an input to local restore compatibility cases only")
+    if not isinstance(retained, str) or not re.fullmatch(r"[0-9a-f]{40}", retained):
+        raise RuntimeError("Specify the full commit of the retained signed module")
+    subprocess.run(["git", "merge-base", "--is-ancestor", retained, core_source], check=True)
+    # The module producer and its dependencies must still match this checkout.
+    # The core's renderer/host is evaluated at its own source in the runner receipt.
+    inputs = [f"src-tauri/plugins/{slug}", "src-tauri/crates", "src-tauri/Cargo.lock", "src-tauri/Cargo.toml",
+              ".cargo", "rust-toolchain.toml", "src/lib/mfa", "package.json", "pnpm-lock.yaml",
+              "scripts/plugin-package", ".github/workflows/qa-modular-packages.yml"]
+    subprocess.run(["git", "diff", "--quiet", retained, "--", *inputs], check=True)
+    return retained
+
+
 def setup(ctx):
     if (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Official signed module fixture requires the native verifier")
@@ -86,7 +107,10 @@ def setup(ctx):
     if not raw:
         raise RuntimeError("QA_SIGNED_MODULE_ROOT is required; build official QA artifacts first")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    receipt, archive, signature, frontend = load_artifact(Path(raw), source, platform_key())
+    package_source = restore_package_source(ctx, source, "hello-plugin")
+    receipt, archive, signature, frontend = load_artifact(Path(raw), package_source, platform_key())
+    if package_source != source:
+        receipt["restoreCoreSourceSha"] = source
     owned = Path(ctx.case_dir).resolve() / "official-module"
     owned.mkdir(parents=True, exist_ok=False)
     destination = owned / archive.name
@@ -121,7 +145,10 @@ def setup_mfa(ctx):
     if not raw:
         raise RuntimeError("QA_SIGNED_MFA_ROOT is required; build the signed MFA artifact first")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    receipt, archive, signature, frontend = load_artifact(Path(raw), source, platform_key(), "mfa", version=None)
+    package_source = restore_package_source(ctx, source, "mfa")
+    receipt, archive, signature, frontend = load_artifact(Path(raw), package_source, platform_key(), "mfa", version=None)
+    if package_source != source:
+        receipt["restoreCoreSourceSha"] = source
     receipt["frontendSha256"] = hashlib.sha256(frontend).hexdigest()
     if ctx.case_id in SIGNED_BACKUP_STATES:
         receipt["hostSha256"] = mfa_host_digest(archive, receipt["platform"])

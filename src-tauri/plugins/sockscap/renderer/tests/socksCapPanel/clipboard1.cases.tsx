@@ -60,6 +60,16 @@ export function registerSocksCapPanelClipboard1Cases() {
 
     fireEvent.click(warning);
 
+    const dialog = await screen.findByTestId("sockscap-tun-warning-dialog");
+    expect(dialog).toHaveTextContent("OpenVPN Wintun");
+    const closeBtn = screen.getByTestId("sockscap-tun-warning-close");
+    expect(closeBtn).toHaveFocus();
+    fireEvent.keyDown(closeBtn, { key: "Escape", isComposing: true });
+    expect(screen.getByTestId("sockscap-tun-warning-dialog")).toBeInTheDocument();
+    fireEvent.keyDown(closeBtn, { key: "Escape" });
+    expect(screen.queryByTestId("sockscap-tun-warning-dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(warning);
     expect(await screen.findByTestId("sockscap-tun-warning-dialog")).toHaveTextContent("OpenVPN Wintun");
     fireEvent.click(screen.getByTestId("sockscap-tun-warning-close"));
     expect(screen.queryByTestId("sockscap-tun-warning-dialog")).not.toBeInTheDocument();

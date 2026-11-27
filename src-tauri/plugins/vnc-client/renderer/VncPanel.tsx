@@ -571,12 +571,12 @@ export default function VncPanel({
         height: "100%",
         overflow: displaySize.scrolls ? "auto" : "hidden",
         display: "flex",
-        backgroundColor: "#1a1a2e",
+        backgroundColor: "var(--taomni-term-bg, #1a1a2e)",
         position: "relative",
         // Screen-level full screen covers the whole WebView (tab strip, title
         // bar and status bar included) while the OS window is full screen.
         ...(screenFullScreen
-          ? { position: "fixed", inset: 0, width: "100vw", height: "100vh", zIndex: 1000 }
+          ? { position: "fixed", inset: 0, width: "100vw", height: "100vh", zIndex: "var(--taomni-z-modal, 1000)" }
           : {}),
       }}
     >
@@ -588,7 +588,7 @@ export default function VncPanel({
         {showCanvas && (
           <>
             {!viewOnly && (
-              <button
+              <button type="button"
                 data-testid="vnc-send-cad"
                 onClick={sendCtrlAltDel}
                 style={FT_ICON_BUTTON_STYLE}
@@ -598,7 +598,7 @@ export default function VncPanel({
                 <ShieldAlert size={14} />
               </button>
             )}
-            <button
+            <button type="button"
               data-testid="vnc-scale-toggle"
               onClick={() => changeScaling(scaling === "auto" ? 100 : "auto")}
               style={FT_ICON_BUTTON_STYLE}
@@ -609,7 +609,7 @@ export default function VncPanel({
               {scaling === "auto" ? <Maximize size={14} /> : <Minimize size={14} />}
             </button>
             {!detachedWindowControls && canFullScreen && (
-              <button
+              <button type="button"
                 data-testid="vnc-fullscreen"
                 onClick={toggleFullScreen}
                 style={FT_ICON_BUTTON_STYLE}
@@ -619,7 +619,7 @@ export default function VncPanel({
                 {fullScreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
               </button>
             )}
-            <button
+            <button type="button"
               data-testid="vnc-session-menu"
               onClick={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
@@ -637,7 +637,7 @@ export default function VncPanel({
         {onDetach && (
           <>
             <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
-            <button
+            <button type="button"
               data-testid="vnc-detach"
               onClick={onDetach}
               title={t("rdp.detach")}
@@ -652,7 +652,7 @@ export default function VncPanel({
           <>
             <ScreenshotMenuButton />
             <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
-            <button
+            <button type="button"
               data-testid="detached-reattach"
               onClick={detachedWindowControls.onReattach}
               title={t("rdp.reattach")}
@@ -662,7 +662,7 @@ export default function VncPanel({
               <ExternalLink size={14} />
               <span>{t("rdp.reattach")}</span>
             </button>
-            <button
+            <button type="button"
               data-testid="detached-os-fullscreen"
               onClick={detachedWindowControls.onToggleOsFullscreen}
               title={t("rdp.osFullscreen")}
@@ -753,6 +753,7 @@ export default function VncPanel({
       {sessionMenu.render}
       {infoOpen && (
         <VncSessionInfoDialog
+          returnFocus={canvasRef.current}
           info={{
             desktopName: conn?.name ?? "",
             device: `${host}:${port}`,
@@ -770,6 +771,7 @@ export default function VncPanel({
       )}
       {propertiesOpen && (
         <VncPropertiesDialog
+          returnFocus={canvasRef.current}
           initial={{
             viewer: { ...viewer, scaling, preserveAspect },
             viewOnly: pendingSessionSettingsRef.current?.viewOnly ?? viewOnly,

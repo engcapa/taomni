@@ -142,6 +142,22 @@ describe("§8.19.2 two-stroke shortcut recorder", () => {
     expect(onApplyScheme).not.toHaveBeenCalled();
   });
 
+  it("wraps reverse Tab in the recorder when WebKitGTK only supplies its physical code", () => {
+    setup();
+    const addShortcut = screen.getByTestId("keymap-add-test.action");
+    fireEvent.click(addShortcut);
+    const field = screen.getByRole("textbox", { name: "Press shortcut keys" });
+    expect(field).toHaveFocus();
+
+    fireEvent.keyDown(field, { key: "Unidentified", code: "Tab", shiftKey: true });
+
+    const cancel = screen.getByTestId("keymap-recorder-cancel");
+    expect(cancel).toHaveFocus();
+    expect(screen.getByTestId("keymap-recorder-ok")).toBeDisabled();
+    fireEvent.keyDown(cancel, { key: "Escape", code: "Escape" });
+    expect(addShortcut).toHaveFocus();
+  });
+
   it("replaces an existing binding at its index instead of appending", () => {
     const base = createKeymapScheme({ id: "s1", name: "User", base: "idea-windows-linux", now: 1 });
     const existing: Shortcut = {

@@ -54,7 +54,7 @@ steps:
 - click: '[data-testid="mfa-account-pin"]:is([data-issuer="Mid Bank"] *)'
 - assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Mid Bank, Zeta Cloud, Alpha Mail, Beta Git]}
 - assert_attribute: {selector: '[data-testid="mfa-account-row"][data-issuer="Mid Bank"]', name: data-pinned, equals: 'true'}
-- click: '[data-testid="mfa-account-menu"]:is([data-issuer="Beta Git"] *)'
+- press: {selector: '[data-testid="mfa-account-drag"]:is([data-issuer="Beta Git"] *)', key: Enter}
 - click: '[data-testid="mfa-menu-move-up"]'
 - assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Mid Bank, Zeta Cloud, Beta Git, Alpha Mail]}
 - drag_to: {from: '[data-testid="mfa-account-drag"]:is([data-issuer="Alpha Mail"] *)', to: '[data-testid="mfa-account-row"][data-issuer="Zeta Cloud"]'}
@@ -78,6 +78,7 @@ steps:
 - assert_attribute: {selector: '[data-testid="mfa-account-row"][data-issuer="Mid Bank"]', name: data-pinned, equals: 'false'}
 - assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Alpha Mail, Beta Git, Zeta Cloud, Mid Bank]}
 - screenshot: mfa-010-sorted.png
+ui_standard: [UI-A11Y-01, UI-MNU-04]
 verification:
   review: reviewed
   requirements:
@@ -93,6 +94,7 @@ verification:
     - {step: 31, expectation: newest first}
     results: [23, 25, 27, 29, 31]
   - id: R2
+    ui_standard: [UI-A11Y-01, UI-MNU-04]
     requirement: Reordering is offered only in custom order; pins stay on top; Move up, Move down and drag reorder (AC-12).
     actions: [33, 35, 37, 39, 42, 43, 45, 47, 48]
     checkpoints:

@@ -67,7 +67,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
           Drafts
           {outboxCount > 0 && (
             <span
-              className="ml-0.5 rounded px-1 text-[10px] leading-4 bg-[var(--taomni-accent)] text-white"
+              className="ml-0.5 rounded px-1 text-ui-caption leading-4 bg-[var(--taomni-accent)] text-white"
               data-testid="mail-outbox-count"
               data-count={outboxCount}
               title={`${outboxCount} message${outboxCount === 1 ? "" : "s"} in the Outbox`}
@@ -92,7 +92,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
         </button>
         {idleEnabled && (
           <span
-            className="h-7 w-14 shrink-0 px-1.5 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]"
+            className="h-7 w-14 shrink-0 px-1.5 inline-flex items-center gap-1 text-ui-small text-[var(--taomni-text-muted)]"
             data-testid="mail-idle-status"
             data-state={idleState ?? "connecting"}
             data-active={idleState === "ready" || idleState === "changed" ? "true" : "false"}
@@ -103,7 +103,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
             <span
               aria-hidden="true"
               className={`w-1.5 h-1.5 rounded-full ${idleState === "ready" || idleState === "changed"
-                ? "bg-[var(--taomni-success,#22c55e)]"
+                ? "bg-[var(--taomni-success-icon,#22c55e)]"
                 : "bg-[var(--taomni-text-muted)]"}`}
             />
             {!idleState || idleState === "ready" || idleState === "changed" ? "Push" : "Poll"}
@@ -147,7 +147,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
           <input
             ref={searchInputRef}
             type="search"
-            className="taomni-input h-7 w-full pl-7 text-[12px]"
+            className="taomni-input h-7 w-full pl-7 text-ui-body"
             placeholder={searchScope === "all" ? "Search all folders" : "Search this folder"}
             aria-label="Search mail"
             data-testid="mail-search-input"
@@ -162,7 +162,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
           />
         </div>
         <select
-          className="taomni-input h-7 text-[12px] w-[92px]"
+          className="taomni-input h-7 text-ui-body w-[92px]"
           value={searchField}
           aria-label="Search field"
           data-testid="mail-search-field"
@@ -175,7 +175,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
           <option value="body">Body</option>
         </select>
         <select
-          className="taomni-input h-7 text-[12px] w-[96px]"
+          className="taomni-input h-7 text-ui-body w-[96px]"
           value={searchScope}
           aria-label="Search scope"
           data-testid="mail-search-scope"
@@ -187,7 +187,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
         {searchActive && (
           <button
             type="button"
-            className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5 text-[12px]"
+            className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5 text-ui-body"
             data-testid="mail-search-server"
             onClick={() => void runServerSearch()}
             disabled={serverSearching}
@@ -217,7 +217,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
             </button>
           ))}
           <select
-            className="taomni-input h-7 text-[12px] w-[92px] ml-0.5"
+            className="taomni-input h-7 text-ui-body w-[92px] ml-0.5"
             value={tagFilter}
             aria-label="Filter by tag"
             data-testid="mail-quick-filter-tag"
@@ -263,7 +263,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
           {clearing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
           Cache
         </button>
-        <div className="text-[11px] text-[var(--taomni-text-muted)] truncate max-w-[240px]" title={info.emailAddress || info.imap.username || info.imap.host}>
+        <div className="text-ui-small text-[var(--taomni-text-muted)] truncate max-w-[240px]" title={info.emailAddress || info.imap.username || info.imap.host}>
           {info.emailAddress || info.imap.username || info.imap.host}
         </div>
       </div>);

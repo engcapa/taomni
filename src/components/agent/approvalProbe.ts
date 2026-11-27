@@ -60,6 +60,7 @@ export const APPROVAL_PROBE_FOREIGN_LABEL = "qa-other-window";
 export type ApprovalProbeMode =
   | "own"
   | "fallback"
+  | "read-result"
   | "stale"
   | "foreign"
   | "duplicate"

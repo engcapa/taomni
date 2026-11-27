@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { eventLogicalKey } from "../workspaceCommands";
 import {
   deriveEditableScheme,
   displaceStroke,
@@ -12,7 +13,7 @@ import {
   type ShortcutStroke,
 } from "../workspaceKeymapScheme";
 import { guessBase, toShortcut, upsertScheme } from "./bindings";
-import { type CaptureTarget, type MouseCaptureTarget, type RowMenuState } from "./model";
+import { type CaptureTarget } from "./model";
 
 export interface UseKeymapRecorderContext {
   setCapture: import("react").Dispatch<import("react").SetStateAction<CaptureTarget | null>>;
@@ -33,10 +34,6 @@ export interface UseKeymapRecorderContext {
   baseBindings: Map<string, readonly Shortcut[]>;
   open: boolean;
   captureRef: import("react").RefObject<CaptureTarget | null>;
-  overlayStateRef: import("react").RefObject<{ mouse: boolean; menu: boolean; findField: boolean; }>;
-  shortcutFilterFieldRef: import("react").RefObject<HTMLDivElement | null>;
-  setRowMenu: import("react").Dispatch<import("react").SetStateAction<RowMenuState | null>>;
-  setMouseCapture: import("react").Dispatch<import("react").SetStateAction<MouseCaptureTarget | null>>;
   capturedStrokesRef: import("react").RefObject<ShortcutStroke[]>;
   secondStrokeEnabledRef: import("react").RefObject<boolean>;
 }
@@ -61,10 +58,6 @@ export function useKeymapRecorder(context: UseKeymapRecorderContext) {
     baseBindings,
     open,
     captureRef,
-    overlayStateRef,
-    shortcutFilterFieldRef,
-    setRowMenu,
-    setMouseCapture,
     capturedStrokesRef,
     secondStrokeEnabledRef,
   } = context;
@@ -122,32 +115,14 @@ export function useKeymapRecorder(context: UseKeymapRecorderContext) {
   useEffect(() => {
     if (!open) return;
     const handler = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
       const target = captureRef.current;
-      const overlays = overlayStateRef.current;
-      if (!target) {
-        if (event.key !== "Escape") return;
-        // Esc peels one layer at a time: row menu → mouse recorder →
-        // find-by-shortcut field (owns its Esc) → the dialog itself.
-        const eventTarget = event.target instanceof Node ? event.target : null;
-        if (overlays.findField || (eventTarget && shortcutFilterFieldRef.current?.contains(eventTarget))) return;
-        event.preventDefault();
-        event.stopPropagation();
-        if (overlays.menu) {
-          setRowMenu(null);
-          return;
-        }
-        if (overlays.mouse) {
-          setMouseCapture(null);
-          return;
-        }
-        // DEC-03: discarding the draft is the Cancel path — zero writes.
-        onClose();
-        return;
-      }
+      if (!target) return;
       // Bare Tab/Space stay navigation keys so the Keyboard Shortcut dialog
       // (Second stroke checkbox, OK, Cancel) is reachable without a mouse.
-      const bare = !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey;
-      if (bare && (event.key === "Tab" || event.key === " ")) return;
+      const bare = !event.ctrlKey && !event.altKey && !event.metaKey;
+      if (bare && (eventLogicalKey(event) === "tab" || event.key === " ")) return;
+      if (bare && event.key === "Enter" && event.target instanceof HTMLButtonElement) return;
       // §8.19.2 keystroke recording: Backspace removes the last stroke, Esc
       // cancels the capture, Enter confirms; modifier-only presses wait.
       event.preventDefault();

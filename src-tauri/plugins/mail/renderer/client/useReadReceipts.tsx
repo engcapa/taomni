@@ -62,14 +62,14 @@ export function useReadReceipts(context: UseReadReceiptsContext) {
     if (!address || (info.receiptPolicy ?? "ask") !== "ask") return null;
     return (
       <div
-        className="mx-4 mt-3 px-3 py-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] flex flex-wrap items-center gap-2 text-[12px]"
+        className="mx-4 mt-3 px-3 py-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] flex flex-wrap items-center gap-2 text-ui-body"
         data-testid="mail-receipt-banner"
       >
         <span className="min-w-0 flex-1">The sender asked for a read receipt to {address}.</span>
-        <button type="button" className="taomni-btn h-6 px-2 text-[11px]" data-testid="mail-receipt-send" disabled={receiptBusy} onClick={() => void answerReceipt(message, true)}>
+        <button type="button" className="taomni-btn h-6 px-2 text-ui-small" data-testid="mail-receipt-send" disabled={receiptBusy} onClick={() => void answerReceipt(message, true)}>
           Send receipt
         </button>
-        <button type="button" className="taomni-btn h-6 px-2 text-[11px]" data-testid="mail-receipt-ignore" disabled={receiptBusy} onClick={() => void answerReceipt(message, false)}>
+        <button type="button" className="taomni-btn h-6 px-2 text-ui-small" data-testid="mail-receipt-ignore" disabled={receiptBusy} onClick={() => void answerReceipt(message, false)}>
           Ignore
         </button>
       </div>

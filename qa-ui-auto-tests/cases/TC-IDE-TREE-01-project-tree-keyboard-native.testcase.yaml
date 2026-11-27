@@ -9,6 +9,7 @@ description: 'ED-TREE-001: real nested host fixture without a Java/provider setu
   WebDriver keys prove the packaged WebView path, not physical OS input or IME.
 
   '
+ui_standard: [UI-LST-03]
 covers:
 - F25.5
 tags:
@@ -184,6 +185,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
+    ui_standard: [UI-LST-03]
     requirement: Project tree navigation preserves tabs and editing：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1

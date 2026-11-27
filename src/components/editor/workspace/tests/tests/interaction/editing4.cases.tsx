@@ -91,7 +91,7 @@ export function registerinteractionEditing4Cases(caseContext: registerinteractio
     // The document must be open with the provider before Alt+Enter asks it.
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspOpenDocument).toHaveBeenCalled());
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "Rename file" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Rename file" }));
 
     await waitFor(() => expect(confirmAppDialog).toHaveBeenCalled());
     await waitFor(() => expect(caseContext.workspaceTestHarness.workspaceMocks.workspaceApplyResourceOperation).toHaveBeenCalled());

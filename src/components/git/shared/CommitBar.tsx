@@ -40,11 +40,11 @@ export function CommitBar({
   return (
     <div className="shrink-0 border-t border-[var(--taomni-divider)] p-2 space-y-2">
       {onTargetBranchChange ? (
-        <label className="flex items-center gap-2 text-[12px]" data-testid="commit-target-branch">
+        <label className="flex items-center gap-2 text-ui-body" data-testid="commit-target-branch">
           <GitBranch className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
           <span className="shrink-0 text-[var(--taomni-text-muted)]">Branch</span>
           <input
-            className="taomni-input h-7 flex-1 min-w-0 text-[12px]"
+            className="taomni-input h-7 flex-1 min-w-0 text-ui-body"
             list={listId}
             value={targetBranch ?? ""}
             placeholder={branchPlaceholder}
@@ -67,13 +67,13 @@ export function CommitBar({
       />
       <div className="flex items-center gap-2">
         {amend ? (
-          <label className="flex items-center gap-1 text-[12px] select-none">
+          <label className="flex items-center gap-1 text-ui-body select-none">
             <input data-testid="git-commit-amend" type="checkbox" checked={amend.checked} onChange={(event) => amend.onChange(event.target.checked)} />
             Amend
           </label>
         ) : null}
         {summary ? (
-          <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--taomni-text-muted)]">
+          <span className="min-w-0 flex-1 truncate text-ui-small text-[var(--taomni-text-muted)]">
             {summary}
           </span>
         ) : (

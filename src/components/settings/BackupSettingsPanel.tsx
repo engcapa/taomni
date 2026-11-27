@@ -1,5 +1,7 @@
+import { confirmAppDialog } from "../../lib/appDialogs";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { basename } from "../../lib/filePaths";
 import type { BackupManifest } from "../../lib/backup";
 import { useT } from "../../lib/i18n";
 import { selectFilePath, selectSaveDirectory, selectSaveFilePath } from "../../lib/ipc";
@@ -41,12 +43,15 @@ export function BackupSettingsPanel() {
 
   // Restore inspection dialog state
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
+  const restoreRequest = useRef(0);
+  const staging = useRef(false);
   const [selectedRestorePath, setSelectedRestorePath] = useState<string | null>(null);
   const [inspecting, setInspecting] = useState(false);
   const [manifest, setManifest] = useState<BackupManifest | null>(null);
   const [restorePassword, setRestorePassword] = useState("");
   const [restoreVaultPassword, setRestoreVaultPassword] = useState("");
   const [inspectError, setInspectError] = useState<string | null>(null);
+  const [relaunchError, setRelaunchError] = useState<string | null>(null);
   const [restoreStaged, setRestoreStaged] = useState(false);
 
   useEffect(() => {
@@ -143,54 +148,63 @@ export function BackupSettingsPanel() {
     }
   };
 
+  const dismissRestore = () => {
+    if (staging.current || (restoreStaged && relaunchError === null)) return;
+    ++restoreRequest.current;
+    setRestoreModalOpen(false);
+    setSelectedRestorePath(null);
+    setRestorePassword("");
+    setRestoreVaultPassword("");
+  };
+
+  const inspect = async (filePath: string, archivePassword?: string) => {
+    const request = ++restoreRequest.current;
+    setInspecting(true);
+    setInspectError(null);
+    try {
+      const meta = await inspectArchive(filePath, archivePassword);
+      if (request === restoreRequest.current) setManifest(meta);
+    } catch (error) {
+      if (request !== restoreRequest.current) return;
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("BACKUP_PASSWORD_REQUIRED")) setInspectError("backupSettings.inputPasswordForDecrypt");
+      else if (message.includes("BACKUP_BAD_PASSWORD")) setInspectError("backupSettings.badArchivePassword");
+      else setInspectError(message);
+    } finally {
+      if (request === restoreRequest.current) setInspecting(false);
+    }
+  };
+
   const openRestoreModal = async (filePath: string) => {
     setSelectedRestorePath(filePath);
     setRestoreModalOpen(true);
-    setInspectError(null);
     setManifest(null);
     setRestorePassword("");
     setRestoreVaultPassword("");
     setRestoreStaged(false);
-    setInspecting(true);
-
-    try {
-      const meta = await inspectArchive(filePath);
-      setManifest(meta);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("BACKUP_PASSWORD_REQUIRED")) {
-        setInspectError("backupSettings.inputPasswordForDecrypt");
-      } else {
-        setInspectError(msg);
-      }
-    } finally {
-      setInspecting(false);
-    }
+    setRelaunchError(null);
+    await inspect(filePath);
   };
 
-  // Retry inspect with password
   const handleRetryInspectWithPassword = async () => {
-    if (!selectedRestorePath) return;
-    setInspecting(true);
-    setInspectError(null);
+    if (selectedRestorePath) await inspect(selectedRestorePath, restorePassword);
+  };
+
+  const restartAfterRestore = async () => {
+    staging.current = true;
+    setRelaunchError(null);
     try {
-      const meta = await inspectArchive(selectedRestorePath, restorePassword);
-      setManifest(meta);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setInspectError(
-        msg.includes("BACKUP_BAD_PASSWORD")
-          ? "backupSettings.badArchivePassword"
-          : msg,
-      );
-    } finally {
-      setInspecting(false);
+      await relaunchApp();
+    } catch (error) {
+      staging.current = false;
+      setRelaunchError(error instanceof Error ? error.message : String(error));
     }
   };
 
   // Execute restore and relaunch
-  const handleConfirmRestore = async () => {
-    if (!selectedRestorePath) return;
+  const handleConfirmRestore = async (confirmation: string) => {
+    if (!manifest || !selectedRestorePath || confirmation !== basename(selectedRestorePath) ||
+        staging.current || restoreStaged) return;
     setInspectError(null);
 
     if (vaultState !== "empty" && !restoreVaultPassword.trim()) {
@@ -198,6 +212,7 @@ export function BackupSettingsPanel() {
       return;
     }
 
+    staging.current = true;
     try {
       await performStageRestore(
         selectedRestorePath,
@@ -205,14 +220,9 @@ export function BackupSettingsPanel() {
         vaultState !== "empty" ? restoreVaultPassword.trim() : undefined,
       );
       setRestoreStaged(true);
-      setTimeout(async () => {
-        try {
-          await relaunchApp();
-        } catch (relaunchErr) {
-          console.error("Failed to relaunch app", relaunchErr);
-        }
-      }, 1500);
+      setTimeout(() => void restartAfterRestore(), 1500);
     } catch (e) {
+      staging.current = false;
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("VAULT_BAD_PASSWORD")) {
         setInspectError("backupSettings.vaultBadPassword");
@@ -226,7 +236,7 @@ export function BackupSettingsPanel() {
   };
 
   const handleDeleteItem = async (fileName: string) => {
-    if (window.confirm(t("backupSettings.confirmDelete"))) {
+    if (await confirmAppDialog({ message: t("backupSettings.confirmDelete"), danger: true })) {
       try {
         await deleteBackup(fileName);
       } catch (e) {
@@ -258,7 +268,8 @@ export function BackupSettingsPanel() {
     refreshHistory={refreshHistory}
     handleDeleteItem={handleDeleteItem}
     restoreModalOpen={restoreModalOpen}
-    setRestoreModalOpen={setRestoreModalOpen}
+    archiveName={basename(selectedRestorePath ?? "")}
+    dismissRestore={dismissRestore}
     inspecting={inspecting}
     manifest={manifest}
     vaultState={vaultState}
@@ -269,6 +280,8 @@ export function BackupSettingsPanel() {
     restorePassword={restorePassword}
     setRestorePassword={setRestorePassword}
     handleRetryInspectWithPassword={handleRetryInspectWithPassword}
+    relaunchError={relaunchError}
+    restartAfterRestore={restartAfterRestore}
     restoreStaged={restoreStaged}
     restoring={restoring}
     handleConfirmRestore={handleConfirmRestore}

@@ -1,3 +1,4 @@
+import { PageZoomPanel } from "../ui/PageZoomPanel";
 import type { Tab } from "../../types";
 import { useEffect } from "react";
 import { usePluginFrontendRegistry } from "../../lib/usePluginFrontendRegistry";
@@ -31,7 +32,7 @@ export function PluginTabPanels({ tabs, activeTabId, onOpenSettings, onClose, on
   const t = useT();
   useEffect(() => attachPluginTabPersistence(), []);
   return tabs.filter((tab) => tab.type === "plugin" || isLegacyPluginTab(tab)).map((tab) => (
-    <div
+    <PageZoomPanel active={tab.id === activeTabId && !["rdp", "vnc", "mail"].includes(tab.type)}
       key={tab.id}
       data-testid={tab.type === "servers" ? "servers-tab-panel" : undefined}
       className="absolute inset-0"
@@ -52,7 +53,7 @@ export function PluginTabPanels({ tabs, activeTabId, onOpenSettings, onClose, on
         onEditMailSession={onEditMailSession}
       /> : <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 justify-end border-b border-[var(--taomni-divider)] p-1">
-          <button data-testid="plugin-tab-detach" className="taomni-btn px-2 py-1 text-[12px]" onClick={() => {
+          <button type="button" data-testid="plugin-tab-detach" className="taomni-btn px-2 py-1 text-ui-body" onClick={() => {
             void detachPluginTab(tab).catch((error) => useAppStore.getState().setStatusMessage(String(error)));
           }}>{t("plugins.detach")}</button>
         </div>
@@ -61,6 +62,6 @@ export function PluginTabPanels({ tabs, activeTabId, onOpenSettings, onClose, on
           onOpenSettings();
         }} /></div>
       </div>}
-    </div>
+    </PageZoomPanel>
   ));
 }

@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../../ui/IconButton";
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -66,13 +67,13 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
     >
       <div className="space-y-1 px-3 py-1">
         <div className="flex items-center gap-1">
-          <span className="w-24 shrink-0 text-[10px] font-medium text-[var(--taomni-text-muted)]">
+          <span className="w-24 shrink-0 text-ui-caption font-medium text-[var(--taomni-text-muted)]">
             Instruction
           </span>
           <input
             data-testid="debug-instruction-breakpoint-reference"
             aria-label="Instruction reference"
-            className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none disabled:opacity-40"
+            className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline disabled:opacity-40"
             placeholder="Address or instruction reference"
             maxLength={4096}
             value={reference}
@@ -83,7 +84,7 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
           <button
             type="button"
             data-testid="debug-instruction-breakpoint-add"
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30"
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-30"
             title={canAdd ? "Add instruction breakpoint" : "The active adapter does not support instruction breakpoints"}
             aria-label="Add instruction breakpoint"
             disabled={!canAdd || !reference.trim()}
@@ -95,12 +96,12 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
         <div className="grid grid-cols-[6rem_minmax(0,1fr)] items-start gap-1">
           <span aria-hidden="true" />
           <div className="flex min-w-0 flex-wrap items-center gap-1">
-            <label className="flex min-w-0 flex-1 basis-24 items-center gap-1 text-[10px] text-[var(--taomni-text-muted)]">
+            <label className="flex min-w-0 flex-1 basis-24 items-center gap-1 text-ui-caption text-[var(--taomni-text-muted)]">
               <span className="shrink-0">Offset</span>
               <input
                 data-testid="debug-instruction-breakpoint-offset"
                 aria-label="Instruction breakpoint offset"
-                className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none disabled:opacity-40"
+                className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline disabled:opacity-40"
                 inputMode="numeric"
                 placeholder="optional"
                 value={offset}
@@ -114,7 +115,7 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
                 data-testid="debug-instruction-breakpoint-mode"
                 aria-label="Instruction breakpoint mode"
                 title={modes.find((entry) => entry.mode === mode)?.description}
-                className="h-5 min-w-0 max-w-full flex-1 basis-24 truncate rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1 text-[10px]"
+                className="h-5 min-w-0 max-w-full flex-1 basis-24 truncate rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1 text-ui-caption"
                 value={mode ?? modes[0].mode}
                 disabled={!canAdd}
                 onChange={(event) => setPreferredMode(event.target.value)}
@@ -128,12 +129,12 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
         </div>
       </div>
       {active && !supported && (
-        <div data-testid="debug-instruction-breakpoint-unsupported" className="px-3 pb-1 text-[10px] text-amber-500">
+        <div data-testid="debug-instruction-breakpoint-unsupported" className="px-3 pb-1 text-ui-caption text-ui-warning">
           The active debug adapter does not support instruction breakpoints.
         </div>
       )}
       {notice && (
-        <div data-testid="debug-instruction-breakpoint-notice" role="status" className="px-3 pb-1 text-[10px] text-rose-500">
+        <div data-testid="debug-instruction-breakpoint-notice" role="status" className="px-3 pb-1 text-ui-caption text-ui-danger">
           {notice}
         </div>
       )}
@@ -158,7 +159,7 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
             data-instruction-reference={breakpoint.instructionReference}
             className="border-t border-[var(--taomni-code-border)]/40"
           >
-            <div className="group flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover-bg)]">
+            <div className="group flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover)]">
               <input
                 type="checkbox"
                 data-testid={`debug-instruction-breakpoint-enabled-${index}`}
@@ -177,14 +178,14 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
                     {breakpoint.offset >= 0 ? "+" : ""}{breakpoint.offset}
                   </span>
                 )}
-                <span className="ml-2 text-[10px] text-[var(--taomni-text-muted)]">{breakpoint.adapterId}</span>
-                {breakpoint.condition && <span className="ml-2 text-amber-500">if {breakpoint.condition}</span>}
-                {breakpoint.hitCondition && <span className="ml-2 text-amber-500">hit {breakpoint.hitCondition}</span>}
-                {rowModeLabel && <span className="ml-2 text-emerald-600 dark:text-emerald-400">{rowModeLabel}</span>}
+                <span className="ml-2 text-ui-caption text-[var(--taomni-text-muted)]">{breakpoint.adapterId}</span>
+                {breakpoint.condition && <span className="ml-2 text-ui-warning">if {breakpoint.condition}</span>}
+                {breakpoint.hitCondition && <span className="ml-2 text-ui-warning">hit {breakpoint.hitCondition}</span>}
+                {rowModeLabel && <span className="ml-2 text-ui-success">{rowModeLabel}</span>}
                 {bindingHint && (
                   <span
                     data-testid={`debug-instruction-breakpoint-binding-${index}`}
-                    className={`ml-2 ${bindingHint.status === "failed" ? "text-rose-500" : "text-[var(--taomni-text-muted)]"}`}
+                    className={`ml-2 ${bindingHint.status === "failed" ? "text-ui-danger" : "text-[var(--taomni-text-muted)]"}`}
                     title={bindingHint.message ?? undefined}
                   >
                     {bindingHint.status === "failed" ? "not bound" : "pending"}
@@ -194,20 +195,20 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
               <button
                 type="button"
                 data-testid={`debug-instruction-breakpoint-edit-${index}`}
-                className="shrink-0 text-[10px] text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100"
+                className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100"
                 onClick={() => setEditingKey(open ? null : key)}
               >
                 {open ? "Done" : "Edit"}
               </button>
-              <button
+              <IconButton
                 type="button"
                 data-testid={`debug-instruction-breakpoint-remove-${index}`}
-                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-rose-500"
-                title="Remove instruction breakpoint"
+                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-ui-danger"
+                labelKey="removeInstructionBreakpoint"
                 onClick={() => debug.removeInstructionBreakpoint(key)}
               >
                 <Trash2 className="h-3 w-3" />
-              </button>
+              </IconButton>
             </div>
             {open && (
               <InstructionBreakpointEditor
@@ -237,7 +238,7 @@ export function InstructionBreakpointEditor({
     options: Partial<Pick<DebugInstructionBreakpoint, "condition" | "hitCondition" | "mode">>,
   ) => void;
 }) {
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline";
   const mode = resolveBreakpointMode(breakpoint.mode, modes, "instruction");
   return (
     <div className="space-y-1 bg-[var(--taomni-code-bg)] px-3 pb-1.5 pt-1">
@@ -260,7 +261,7 @@ export function InstructionBreakpointEditor({
         onCommit={(value) => onChange({ hitCondition: value.trim() || undefined })}
       />
       {modes.length > 0 && (
-        <label className="flex items-center gap-2 text-[10px] text-[var(--taomni-text-muted)]">
+        <label className="flex items-center gap-2 text-ui-caption text-[var(--taomni-text-muted)]">
           <span className="w-20 shrink-0">Mode</span>
           <select
             data-testid={`debug-instruction-breakpoint-row-mode-${index}`}

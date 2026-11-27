@@ -177,6 +177,7 @@ steps:
 - fill:
     selector: '[data-testid="backup-restore-vault-password"]'
     value: qa-module-restore-original
+- fill: {selector: '[data-testid="backup-restore-name"]', value: '${fixture.restore_archive_name}'}
 - click: '[data-testid="backup-restore-confirm"]'
 - assert_text_equals:
     selector: '[data-testid="backup-restore-error"]'
@@ -245,55 +246,55 @@ verification:
     actions:
     - 72
     - 74
-    - 79
+    - 80
     checkpoints:
     - step: 76
       expectation: The actual native inventory lists the MFA snapshot.
     - step: 77
       expectation: The actual native inventory lists the Vault snapshot.
-    - step: 80
-      expectation: The real confirmation reports the translated bad-current-password error.
     - step: 81
+      expectation: The real confirmation reports the translated bad-current-password error.
+    - step: 82
       expectation: Rejected verification leaves staged success absent.
-    - step: 84
+    - step: 85
       expectation: The original renderer has no runtime errors before automatic relaunch.
     results:
     - 76
     - 77
-    - 80
     - 81
-    - 84
+    - 82
+    - 85
   - id: R3
     requirement: One valid confirmation stages and performs its own normal native relaunch while retaining the exact isolated profile.
     actions:
-    - 83
-    - 85
+    - 84
+    - 86
     checkpoints:
-    - step: 85
+    - step: 86
       expectation: The observer clicks once, sees staged success/disabled confirmation, reaps the original at exit=0, validates a different
         PID/start-time and identical executable/QA environment, and attaches without spawning an app.
-    - step: 88
+    - step: 89
       expectation: Independent disk/host observations prove original module values, unchanged active pointer, new generation, clean
         restore state, original lifecycle and correct writer lease.
     results:
-    - 85
-    - 88
+    - 86
+    - 89
   - id: R4
     requirement: The restored paired Vault/MFA accepts only the original password and decrypts the original account.
     actions:
-    - 91
-    - 95
+    - 92
+    - 96
     checkpoints:
-    - step: 92
+    - step: 93
       expectation: The changed password is rejected after actual restore.
-    - step: 102
-      expectation: Exactly one restored account decrypts and displays the original HOTP 755224.
     - step: 103
+      expectation: Exactly one restored account decrypts and displays the original HOTP 755224.
+    - step: 104
       expectation: Expected password rejection and native relaunch produce no renderer runtime errors.
     results:
-    - 92
-    - 102
+    - 93
     - 103
+    - 104
   visual:
   - check: Restored original HOTP and usable MFA pane.
     method: manual

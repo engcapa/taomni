@@ -114,14 +114,14 @@ export function RecentWorkspacesPanel({
         {workspaces.length === 0 ? (
           <div
             data-testid="welcome-recent-workspace-empty"
-            className="py-4 text-[12px] text-[var(--taomni-text-muted)]"
+            className="py-4 text-ui-body text-[var(--taomni-text-muted)]"
           >
             {t("welcome.recentWorkspacesEmpty")}
           </div>
         ) : filteredWorkspaces.length === 0 ? (
           <div
             data-testid="welcome-recent-workspace-no-matches"
-            className="py-4 text-[12px] text-[var(--taomni-text-muted)]"
+            className="py-4 text-ui-body text-[var(--taomni-text-muted)]"
           >
             {t("welcome.recentWorkspacesNoMatches")}
           </div>
@@ -166,14 +166,14 @@ export function RecentWorkspacesPanel({
                   <div className="min-w-0 text-left">
                     <div className="min-w-0 flex items-center gap-2">
                       <Folder className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
-                      <span className="min-w-0 truncate text-[12px] font-medium text-[var(--taomni-accent)]">
+                      <span className="min-w-0 truncate text-ui-body font-medium text-[var(--taomni-accent)]">
                         {workspace.name}
                       </span>
-                      <span className="shrink-0 text-[10px] taomni-mono px-1.5 py-0.5 rounded border text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
+                      <span className="shrink-0 text-ui-caption taomni-mono px-1.5 py-0.5 rounded border text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
                         {workspace.isGitRepo ? t("welcome.recentWorkspacesGit") : t("welcome.recentWorkspacesFolder")}
                       </span>
                     </div>
-                    <div className="mt-0.5 truncate text-[11px] text-[var(--taomni-text-muted)]">
+                    <div className="mt-0.5 truncate text-ui-small text-[var(--taomni-text-muted)]">
                       {primaryPath} · {meta} · {t("welcome.recentWorkspacesUpdated", { time: formatRecentSessionTime(workspace.lastOpenedAt, t) })}
                     </div>
                   </div>

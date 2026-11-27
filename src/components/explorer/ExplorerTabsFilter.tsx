@@ -73,7 +73,7 @@ export function ExplorerTabsFilter() {
       onClick={() => setOpen((value) => !value)}><Filter /></button>
     {open && createPortal(<div ref={menuRef} data-testid="explorer-tabs-filter-menu" role="dialog"
       aria-label={label("筛选文件浏览器标签", "Filter File Explorer tabs")}
-      className="taomni-tab-filter-menu fixed z-[9999] flex w-80 max-w-[calc(100vw-16px)] max-h-[70vh] flex-col rounded-lg border shadow-xl"
+      className="taomni-tab-filter-menu fixed flex w-80 max-w-[calc(100vw-16px)] max-h-[70vh] flex-col rounded-lg border shadow-xl"
       style={{ ...position, background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}>
       <div className="flex items-center gap-2 px-3 py-2">
         <Search className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
@@ -81,7 +81,7 @@ export function ExplorerTabsFilter() {
           aria-activedescendant={highlightedId ? `explorer-filter-row-${highlightedId}` : undefined}
           data-testid="explorer-tabs-filter-search" aria-label={label("搜索打开的标签", "Search open tabs")}
           placeholder={label("搜索打开的标签…", "Search open tabs…")}
-          value={filter.query} className="min-w-0 flex-1 bg-transparent outline-none"
+          value={filter.query} className="min-w-0 flex-1 bg-transparent focus-visible:keyboard-outline"
           onChange={(event) => apply({ ...filter, query: event.target.value })}
           onKeyDown={(event) => {
             if (event.nativeEvent.isComposing) return;
@@ -110,7 +110,7 @@ export function ExplorerTabsFilter() {
           {categoryLabel(category)}<span className="ml-1 opacity-60">{category === "all" ? tabs.length : counts.get(category) ?? 0}</span>
         </button>)}
       </div>
-      <div className="border-t px-3 py-1 text-[10px] text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
+      <div className="border-t px-3 py-1 text-ui-caption text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
         {label(`当前可见 ${matches.length} / 全部 ${tabs.length}`, `${matches.length} visible / ${tabs.length} total`)}
       </div>
       <div id="explorer-filter-tab-list" role="listbox" aria-label={label("已打开的标签", "Open tabs")} className="min-h-0 overflow-y-auto p-1">
@@ -120,7 +120,7 @@ export function ExplorerTabsFilter() {
           aria-selected={tab.id === activeTabId} data-highlighted={highlightedId === tab.id || undefined}
           title={explorerTabPath(tab) || tab.title} onClick={() => pick(tab.id)}
           className="flex w-full min-w-0 items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-[var(--taomni-hover)] aria-selected:text-[var(--taomni-accent)] data-[highlighted=true]:bg-[var(--taomni-selected)]">
-          <span className="w-12 shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{categoryLabel(explorerTabCategory(tab))}</span>
+          <span className="w-12 shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">{categoryLabel(explorerTabCategory(tab))}</span>
           <span className="min-w-0 truncate">{tab.title}</span>
         </button>)}
       </div>

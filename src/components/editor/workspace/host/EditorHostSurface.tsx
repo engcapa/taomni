@@ -34,10 +34,10 @@ export function EditorHostSurface(props: EditorHostSurfaceProps) {
         <div
           data-testid="completion-resolve-gate"
           role="alert"
-          className="cm-lsp-resolve-gate absolute z-50 flex max-w-[calc(100%-16px)] flex-wrap items-center gap-2 rounded border border-amber-500/70 bg-[var(--taomni-bg-elevated,#1f2228)] px-2 py-1.5 text-xs shadow-lg"
+          className="cm-lsp-resolve-gate absolute z-[var(--taomni-z-popover)] flex max-w-[calc(100%-16px)] flex-wrap items-center gap-2 rounded border border-ui-warning-border bg-[var(--taomni-bg-elevated,#1f2228)] px-2 py-1.5 text-xs shadow-lg"
           style={{ top: resolveGateUi.top, left: resolveGateUi.left, width: "min(460px, calc(100% - 16px))" }}
         >
-          <TriangleAlert aria-hidden="true" size={14} className="shrink-0 text-amber-400" />
+          <TriangleAlert aria-hidden="true" size={14} className="shrink-0 text-ui-warning" />
           <span className="min-w-0 flex-1 break-words" title={`${resolveGateUi.label} - ${resolveGateUi.message}`}>
             <strong className="font-medium">{resolveGateUi.label}</strong>
             {" - "}
@@ -47,7 +47,7 @@ export function EditorHostSurface(props: EditorHostSurfaceProps) {
             type="button"
             data-testid="completion-resolve-gate-retry"
             disabled={resolveGateUi.retrying}
-            className="shrink-0 rounded border border-[var(--taomni-border,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
+            className="shrink-0 rounded border border-[var(--taomni-divider,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
             onClick={() => {
               const id = resolveGateUi.id;
               editor.setResolveGateUi((gate) => gate?.id === id ? { ...gate, retrying: true, failed: false } : gate);
@@ -68,7 +68,7 @@ export function EditorHostSurface(props: EditorHostSurfaceProps) {
             type="button"
             data-testid="completion-resolve-gate-insert-without-import"
             disabled={resolveGateUi.retrying}
-            className="shrink-0 rounded border border-[var(--taomni-border,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
+            className="shrink-0 rounded border border-[var(--taomni-divider,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
             onClick={() => {
               const inserted = resolveGateUi.insertWithoutImport();
               if (inserted) {
@@ -91,7 +91,7 @@ export function EditorHostSurface(props: EditorHostSurfaceProps) {
             <X aria-hidden="true" size={14} />
           </button>
           {resolveGateUi.failed && (
-            <span className="shrink-0 text-red-400" data-testid="completion-resolve-gate-failed-note">
+            <span className="shrink-0 text-ui-danger" data-testid="completion-resolve-gate-failed-note">
               retry failed
             </span>
           )}

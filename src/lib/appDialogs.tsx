@@ -173,6 +173,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
       {children}
       {active?.kind === "confirm" && (
         <ConfirmDialog
+          key={active.id}
           title={active.title}
           message={active.message}
           confirmLabel={active.confirmLabel}
@@ -184,6 +185,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
       )}
       {active?.kind === "prompt" && (
         <TextInputDialog
+          key={active.id}
           title={active.title}
           label={active.label}
           initialValue={active.initialValue}
@@ -197,6 +199,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
       )}
       {active?.kind === "choice" && (
         <ChoiceDialog
+          key={active.id}
           title={active.title}
           message={active.message}
           primaryLabel={active.primaryLabel}
@@ -210,6 +213,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
       )}
       {active?.kind === "alert" && (
         <AlertDialog
+          key={active.id}
           title={active.title}
           message={active.message}
           okLabel={active.okLabel}

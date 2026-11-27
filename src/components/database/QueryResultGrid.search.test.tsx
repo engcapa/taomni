@@ -23,6 +23,7 @@ it("navigates matching cells in display order, wraps and leaves unrelated rows v
   searchFor(" ANN ");
   expect(screen.getByTestId("query-result-search-count")).toHaveTextContent("1/3");
   expect(current()).toHaveTextContent("Ann");
+  expect(current()).toHaveStyle({ background: "var(--taomni-warning-bg)", color: "var(--taomni-warning-text)" });
   fireEvent.click(screen.getByLabelText("Next match"));
   expect(current()).toHaveTextContent("ann again");
   const input = screen.getByLabelText("Search result set");

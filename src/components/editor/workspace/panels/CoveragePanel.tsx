@@ -1,3 +1,4 @@
+import { IconButton } from "../../../ui/IconButton";
 import { useMemo, useState } from "react";
 import { Eye, EyeOff, FileCode, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import type { FileCoverage, WorkspaceCoverageReport } from "../coverageModel";
@@ -43,23 +44,23 @@ export function CoveragePanel({
   };
 
   const getPercentageColor = (pct: number) => {
-    if (pct >= 80) return "text-emerald-500 bg-emerald-500/10 border-emerald-500/30";
-    if (pct >= 50) return "text-amber-500 bg-amber-500/10 border-amber-500/30";
-    return "text-rose-500 bg-rose-500/10 border-rose-500/30";
+    if (pct >= 80) return "text-ui-success bg-ui-success-surface border-ui-success-border";
+    if (pct >= 50) return "text-ui-warning bg-ui-warning-surface border-ui-warning-border";
+    return "text-ui-danger bg-ui-danger-surface border-ui-danger-border";
   };
 
   const getBarColor = (pct: number) => {
-    if (pct >= 80) return "bg-emerald-500";
-    if (pct >= 50) return "bg-amber-500";
-    return "bg-rose-500";
+    if (pct >= 80) return"bg-[var(--taomni-success-icon)]";
+    if (pct >= 50) return"bg-[var(--taomni-warning-icon)]";
+    return"bg-[var(--taomni-danger-icon)]";
   };
 
   if (!report) {
     return (
-      <div data-testid="coverage-panel-empty" className="flex h-full flex-col items-center justify-center p-6 text-[12px] text-[var(--taomni-code-muted)]">
+      <div data-testid="coverage-panel-empty" className="flex h-full flex-col items-center justify-center p-6 text-ui-body text-[var(--taomni-code-muted)]">
         <ShieldCheck className="h-10 w-10 text-[var(--taomni-code-muted)] opacity-40 mb-2" />
-        <p className="font-medium text-[var(--taomni-code-fg)]">No test coverage data loaded</p>
-        <p className="text-[11px] mt-1 max-w-md text-center">
+        <p className="font-medium text-[var(--taomni-code-text)]">No test coverage data loaded</p>
+        <p className="text-ui-small mt-1 max-w-md text-center">
           Run tests with coverage enabled (e.g. `pnpm test --coverage`, `mvn test -Pjacoco`, or `pytest --cov`) to generate `lcov.info` or `jacoco.xml`.
         </p>
         {onRefreshCoverage && (
@@ -67,7 +68,7 @@ export function CoveragePanel({
             type="button"
             data-testid="coverage-panel-reload-btn"
             onClick={onRefreshCoverage}
-            className="mt-3 flex items-center gap-1.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-3 py-1 text-[11px] text-[var(--taomni-code-fg)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            className="mt-3 flex items-center gap-1.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-3 py-1 text-ui-small text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             <span>Scan for Coverage Reports</span>
@@ -78,12 +79,12 @@ export function CoveragePanel({
   }
 
   return (
-    <div data-testid="coverage-panel" className="flex h-full flex-col text-[12px] text-[var(--taomni-code-fg)]">
+    <div data-testid="coverage-panel" className="flex h-full flex-col text-ui-body text-[var(--taomni-code-text)]">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/30 px-3 py-2 text-[11px]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/30 px-3 py-2 text-ui-small">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-[var(--taomni-code-fg)]">Overall Coverage:</span>
+            <span className="font-semibold text-[var(--taomni-code-text)]">Overall Coverage:</span>
             <span
               data-testid="coverage-overall-badge"
               className={`rounded border px-2 py-0.5 font-mono font-bold ${getPercentageColor(
@@ -108,7 +109,7 @@ export function CoveragePanel({
               placeholder="Filter file..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-6 w-44 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-6 pr-2 text-[11px]"
+              className="h-6 w-44 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-6 pr-2 text-ui-small"
             />
           </div>
 
@@ -120,7 +121,7 @@ export function CoveragePanel({
             title={coverageEnabled ? "Hide coverage marks in editor gutter" : "Show coverage marks in editor gutter"}
             className={`flex items-center gap-1 rounded border px-2 py-0.5 transition-colors ${
               coverageEnabled
-                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                ? "border-ui-success-border bg-ui-success-surface text-ui-success"
                 : "border-[var(--taomni-code-border)] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
             }`}
           >
@@ -129,23 +130,23 @@ export function CoveragePanel({
           </button>
 
           {onRefreshCoverage && (
-            <button
+            <IconButton
               type="button"
               data-testid="coverage-refresh-btn"
               onClick={onRefreshCoverage}
-              title="Refresh coverage data"
-              className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-fg)]"
+              labelKey="refreshCoverage"
+              className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-            </button>
+            </IconButton>
           )}
         </div>
       </div>
 
       {/* Files Table */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <table className="w-full text-left border-collapse font-mono text-[11px]">
-          <thead className="sticky top-0 z-10 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[10px] text-[var(--taomni-code-muted)] uppercase tracking-wider">
+        <table className="w-full text-left border-collapse font-mono text-ui-small">
+          <thead className="sticky top-0 z-[var(--taomni-z-sticky)] border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-caption text-[var(--taomni-code-muted)] uppercase tracking-wider">
             <tr>
               <th className="px-3 py-1.5 font-semibold">File</th>
               <th className="px-3 py-1.5 font-semibold w-28 text-right">Lines</th>

@@ -37,7 +37,7 @@ steps:
     key: taomni.fileOpen.preferences.v1
     value: '{"associations":{"md":"workspace","txt":"workspace"}}'
 - reload_window: null
-- wait_for: '[data-testid="welcome-panel"]'
+- wait_for: '[data-testid="nav-mode-workspaces"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - click: '[data-testid="code-workspace-tree-root"]'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'

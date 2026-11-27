@@ -30,7 +30,7 @@ export function TerminalThemeLinePreview({ theme }: { theme: ITheme }) {
   const fg = valueOr(theme.foreground, "#eaeaea");
   return (
     <span
-      className="h-7 min-w-0 rounded border px-2 inline-flex items-center gap-1 overflow-hidden taomni-mono text-[11px]"
+      className="h-7 min-w-0 rounded border px-2 inline-flex items-center gap-1 overflow-hidden taomni-mono text-ui-small"
       style={{ background: bg, color: fg, borderColor: valueOr(theme.selectionBackground, bg) }}
     >
       <span style={{ color: valueOr(theme.green, "#62d36f") }}>user@host</span>
@@ -52,7 +52,7 @@ export function CodeThemeLinePreview({ vars }: { vars: CodeThemeVars | null }) {
   const border = vars?.["--taomni-code-border"] ?? "var(--taomni-code-border)";
   return (
     <span
-      className="h-7 min-w-0 rounded border px-2 inline-flex items-center overflow-hidden taomni-mono text-[11px]"
+      className="h-7 min-w-0 rounded border px-2 inline-flex items-center overflow-hidden taomni-mono text-ui-small"
       style={{ background: bg, color: fg, borderColor: border }}
     >
       <span style={{ color: keyword }}>const</span>
@@ -72,7 +72,7 @@ export function MailThemeLinePreview({ theme }: { theme: ITheme }) {
   const border = valueOr(theme.selectionBackground, bg);
   return (
     <span
-      className="h-7 min-w-0 rounded border px-2 inline-flex items-center gap-2 overflow-hidden text-[11px]"
+      className="h-7 min-w-0 rounded border px-2 inline-flex items-center gap-2 overflow-hidden text-ui-small"
       style={{ background: bg, color: fg, borderColor: border }}
     >
       <span className="font-semibold truncate">Subject</span>
@@ -90,7 +90,7 @@ export function SplitMailThemeLinePreview({
   dark: ITheme;
 }) {
   return (
-    <span className="h-7 min-w-0 rounded border border-[var(--taomni-divider)] inline-flex overflow-hidden text-[11px]">
+    <span className="h-7 min-w-0 rounded border border-[var(--taomni-divider)] inline-flex overflow-hidden text-ui-small">
       <span className="w-1/2 min-w-0 overflow-hidden">
         <MailThemeLinePreview theme={light} />
       </span>
@@ -109,7 +109,7 @@ export function SplitThemeLinePreview({
   right: CSSProperties;
 }) {
   return (
-    <span className="h-7 min-w-0 rounded border border-[var(--taomni-divider)] inline-flex overflow-hidden text-[11px]">
+    <span className="h-7 min-w-0 rounded border border-[var(--taomni-divider)] inline-flex overflow-hidden text-ui-small">
       <span className="w-1/2 px-2 inline-flex items-center gap-1 overflow-hidden" style={left}>
         <span className="font-semibold">Aa</span>
         <span className="truncate opacity-80">Light</span>
@@ -122,17 +122,22 @@ export function SplitThemeLinePreview({
   );
 }
 
+const APP_PREVIEW_SWATCHES = {
+  light: { surface: { background: "#f8fafc", color: "#0f172a" }, borderColor: "#cbd5e1", accent: "#4f46e5" },
+  dark: { surface: { background: "#111827", color: "#f8fafc" }, borderColor: "#334155", accent: "#60a5fa" },
+} as const;
+
 export function AppThemeLinePreview({ mode }: { mode: AppThemeMode }) {
-  const light: CSSProperties = { background: "#f8fafc", color: "#0f172a" };
-  const dark: CSSProperties = { background: "#111827", color: "#f8fafc" };
+  const light = APP_PREVIEW_SWATCHES.light.surface;
+  const dark = APP_PREVIEW_SWATCHES.dark.surface;
   if (mode === "system") return <SplitThemeLinePreview left={light} right={dark} />;
-  const style = mode === "dark" ? dark : light;
+  const swatch = mode === "dark" ? APP_PREVIEW_SWATCHES.dark : APP_PREVIEW_SWATCHES.light;
   return (
     <span
-      className="h-7 min-w-0 rounded border px-2 inline-flex items-center gap-2 overflow-hidden text-[11px]"
-      style={{ ...style, borderColor: mode === "dark" ? "#334155" : "#cbd5e1" }}
+      className="h-7 min-w-0 rounded border px-2 inline-flex items-center gap-2 overflow-hidden text-ui-small"
+      style={{ ...swatch.surface, borderColor: swatch.borderColor }}
     >
-      <span className="h-2.5 w-2.5 rounded-full" style={{ background: mode === "dark" ? "#60a5fa" : "#4f46e5" }} />
+      <span className="h-2.5 w-2.5 rounded-full" style={{ background: swatch.accent }} />
       <span className="font-semibold">Aa</span>
       <span className="truncate opacity-80">Inbox preview</span>
     </span>
@@ -147,7 +152,7 @@ export function NotesThemeLinePreview({ theme }: { theme: NotesTheme }) {
   const accent = style["--taomni-accent"] ?? "var(--taomni-accent)";
   return (
     <span
-      className="h-7 min-w-0 rounded border px-2 inline-flex items-center gap-2 overflow-hidden text-[11px]"
+      className="h-7 min-w-0 rounded border px-2 inline-flex items-center gap-2 overflow-hidden text-ui-small"
       style={{ background: bg, color: fg, borderColor: border }}
     >
       <span className="h-2.5 w-2.5 rounded-sm" style={{ background: accent }} />

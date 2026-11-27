@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useId, useState } from "react";
+import { useT } from "../../../lib/i18n";
+import { Modal } from "../../ui/Modal";
 import { useFocusReturn } from "./useFocusReturn";
 
 export interface GoToLineTarget {
@@ -34,75 +36,32 @@ interface GoToLineDialogProps {
 export function GoToLineDialog({ current, lineCount, onGo, onCancel, restoreFocusFallback }: GoToLineDialogProps) {
   useFocusReturn(true, restoreFocusFallback);
   const [value, setValue] = useState(`${current.line}:${current.column}`);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const t = useT();
+  const errorId = useId();
   const target = parseGoToLineInput(value, lineCount);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, []);
-
-  return (
-    <div
-      className="fixed inset-0 z-[880] flex items-start justify-center pt-24"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onCancel();
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Go to Line:Column"
-        data-testid="code-workspace-goto-line-dialog"
-        className="w-[320px] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] p-3 text-[12px] text-[var(--taomni-code-text)] shadow-xl"
-      >
-        <label className="mb-1 block text-[11px] text-[var(--taomni-code-muted)]" htmlFor="code-workspace-goto-line-input">
-          [Line] [:column]:
-        </label>
-        <input
-          id="code-workspace-goto-line-input"
-          ref={inputRef}
-          data-testid="code-workspace-goto-line-input"
-          value={value}
-          aria-invalid={!target}
-          className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 py-1 outline-none focus:border-[var(--taomni-accent)]"
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              if (target) onGo(target);
-            } else if (event.key === "Escape") {
-              event.preventDefault();
-              event.stopPropagation();
-              onCancel();
-            }
-          }}
-        />
-        {!target && (
-          <div role="alert" data-testid="code-workspace-goto-line-error" className="mt-1 text-[11px] text-red-500">
-            Enter a line between 1 and {Math.max(1, lineCount)}, optionally followed by :column
-          </div>
-        )}
-        <div className="mt-3 flex justify-end gap-2">
-          <button
-            type="button"
-            data-testid="code-workspace-goto-line-ok"
-            disabled={!target}
-            className="rounded border border-[var(--taomni-accent)] px-3 py-0.5 disabled:opacity-40"
-            onClick={() => target && onGo(target)}
-          >
-            OK
-          </button>
-          <button
-            type="button"
-            data-testid="code-workspace-goto-line-cancel"
-            className="rounded border border-[var(--taomni-code-border)] px-3 py-0.5"
-            onClick={onCancel}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return <Modal title={t("goToLine.title")} testId="code-workspace-goto-line-dialog"
+    initialFocus='[data-testid="code-workspace-goto-line-input"]' onCancel={onCancel} dismissOnBackdrop
+    footer={<>
+      <button type="button" data-testid="code-workspace-goto-line-cancel" className="taomni-btn" onClick={onCancel}>
+        {t("common.cancel")}
+      </button>
+      <button type="button" data-testid="code-workspace-goto-line-ok" className="taomni-btn" data-primary="true"
+        disabled={!target} onClick={() => target && onGo(target)}>
+        {t("goToLine.jump")}
+      </button>
+    </>}>
+    <label className="mb-1 block text-ui-small" htmlFor="code-workspace-goto-line-input">{t("goToLine.position")}</label>
+    <input id="code-workspace-goto-line-input" data-testid="code-workspace-goto-line-input" className="taomni-input w-full"
+      value={value} aria-invalid={!target} aria-describedby={target ? undefined : errorId}
+      onChange={(event) => setValue(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+        event.preventDefault();
+        if (target) onGo(target);
+      }} />
+    {!target && <div id={errorId} role="alert" data-testid="code-workspace-goto-line-error" className="mt-1 text-ui-small text-ui-danger">
+      {t("goToLine.range", { count: Math.max(1, lineCount) })}
+    </div>}
+  </Modal>;
 }

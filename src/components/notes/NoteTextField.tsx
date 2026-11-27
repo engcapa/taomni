@@ -128,12 +128,12 @@ export function NoteTextField({ kind, value, onChange, onBlur }: NoteTextFieldPr
   };
   return <div className="notes-link-field-shell" data-has-url={hasUrl || undefined}>
     {hasUrl && <div ref={overlay} aria-hidden="true" data-testid={`${testId}-link-preview`}
-      className={`notes-link-overlay ${title ? "notes-link-overlay-title text-[13px] font-semibold" : "notes-link-overlay-body text-[12px]"}`}>
+      className={`notes-link-overlay ${title ? "notes-link-overlay-title text-ui-body font-semibold" : "notes-link-overlay-body text-ui-body"}`}>
       {preview}
     </div>}
-    {title ? <input {...props} type="text" className="taomni-input h-7 text-[13px] font-semibold w-full"
+    {title ? <input {...props} type="text" className="taomni-input h-7 text-ui-body font-semibold w-full"
       onChange={(event) => onChange(event.target.value)} />
-      : <textarea {...props} className="taomni-input notes-link-textarea text-[12px] w-full resize-none min-h-[80px]" rows={4}
+      : <textarea {...props} className="taomni-input notes-link-textarea text-ui-body w-full resize-none min-h-[80px]" rows={4}
         onChange={(event) => onChange(event.target.value)}
         onScroll={(event) => {
           if (overlay.current) {

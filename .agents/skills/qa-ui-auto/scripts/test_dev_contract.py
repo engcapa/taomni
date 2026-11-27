@@ -6,18 +6,27 @@ from qa_ui_auto.dev_contract import evaluate, is_product_path, is_unit_test_path
 class DevelopmentContractTests(unittest.TestCase):
     def test_product_change_without_case_is_advisory(self):
         result = evaluate(
-            ["src/components/editor/CodeWorkspaceTab.tsx"],
+            ["src-tauri/src/windowing/thread_delivery.rs"],
             case_ids={"TC-001"},
             policy_ids={"TC-001"},
         )
         self.assertTrue(result["ok"])
         self.assertEqual(len(result["warnings"]), 1)
 
+    def test_desktop_ui_requires_a_rule_mapped_case(self):
+        for path in ("src/components/editor/CodeWorkspaceTab.tsx",
+                     "src-tauri/crates/taomni-plugin-api/frontend/ui/ModalSurface.tsx",
+                     "src-tauri/plugins/mail/renderer/client/mail.css"):
+            with self.subTest(path=path):
+                result = evaluate([path], case_ids={"TC-001"}, policy_ids={"TC-001"})
+                self.assertFalse(result["ok"])
+                self.assertIn("UI-STANDARD", result["errors"][0])
+
     def test_case_change_with_matching_catalog_is_clean(self):
         result = evaluate(
             [
                 "src/components/editor/CodeWorkspaceTab.tsx",
-                "qa-ui-auto-tests/cases/TC-NEW.testcase.yaml",
+                "qa-ui-auto-tests/cases/TC-EXPLORER-012-explorer-rail-only-layout.testcase.yaml",
             ],
             case_ids={"TC-001", "TC-NEW"},
             policy_ids={"TC-001", "TC-NEW"},

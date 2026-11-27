@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SftpDetachedWindow, writeDetachedHandoff } from "./SftpDetachedWindow";
 import { useSftpStore } from "../../stores/sftpStore";
@@ -51,4 +51,26 @@ it("shows a close failure and allows retrying the restore action", async () => {
   await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("window busy"));
   fireEvent.click(screen.getByTestId("sftp-reattach"));
   await waitFor(() => expect(closeCurrentDetachedWindow).toHaveBeenCalledTimes(2));
+});
+
+it("lets the user retry closing an expired child window without touching an SFTP session", async () => {
+  vi.useFakeTimers();
+  try {
+    const detach = vi.spyOn(useSftpStore.getState(), "detach");
+    vi.mocked(closeCurrentDetachedWindow).mockRejectedValueOnce(new Error("window busy"));
+    render(<SftpDetachedWindow sessionId="expired-connection" />);
+    expect(screen.getByRole("status")).toHaveTextContent("Opening session");
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(screen.getByRole("status")).toHaveTextContent("expired-connection");
+    const close = screen.getByRole("button", { name: "Close window" });
+    await act(async () => { fireEvent.click(close); });
+    expect(screen.getByRole("alert")).toHaveTextContent("window busy");
+    await act(async () => { fireEvent.click(close); });
+    expect(closeCurrentDetachedWindow).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(broadcastReattach).not.toHaveBeenCalled();
+    expect(detach).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
 });

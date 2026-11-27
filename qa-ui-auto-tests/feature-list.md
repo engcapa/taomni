@@ -607,6 +607,21 @@ files:
   - src-tauri/src/webview_recovery/mod.rs
   - src-tauri/src/webview_recovery/lifecycle.rs
 controls:
+  - id: recovery-page
+    selector: '[data-testid="recovery-page"]'
+    kind: display
+  - id: recovery-view-menu
+    selector: '[data-testid="recovery-view-menu"]'
+    kind: interactive
+  - id: recovery-zoom-in
+    selector: '[data-testid="recovery-zoom-in"]'
+    kind: interactive
+  - id: recovery-zoom-out
+    selector: '[data-testid="recovery-zoom-out"]'
+    kind: interactive
+  - id: recovery-zoom-reset
+    selector: '[data-testid="recovery-zoom-reset"]'
+    kind: interactive
   - id: recovery-background-refresh
     selector: '[data-testid="recovery-background-refresh"]'
     kind: interactive
@@ -1817,6 +1832,9 @@ controls:
   - id: about-check-update
     selector: '[data-testid="about-check-update"]'
     kind: interactive
+  - id: about-close
+    selector: '[data-testid="about-close"]'
+    kind: interactive
   - id: about-version
     selector: '[data-testid="about-version"]'
     kind: interactive
@@ -2368,7 +2386,16 @@ status: done
 area: terminal/right-menu
 files:
   - src/components/terminal/TerminalPanel.tsx
-controls: []   # F4.8 covers OS-level keyboard shortcuts (Ctrl+0 / F11 / Ctrl+Shift+F / etc.) — exercised via `press` verb against [data-testid="terminal-pane"] (F2.2). No dedicated DOM surface.
+controls:
+  - id: terminal-find-input
+    selector: 'input[aria-label="Find"]'
+    kind: interactive
+  - id: terminal-search-bar
+    selector: '[data-testid="terminal-search-bar"]'
+    kind: display
+  - id: terminal-find-status
+    selector: '[data-testid="terminal-find-status"]'
+    kind: display
 -->
 
 - Shift+Insert 粘贴、Ctrl+Shift+F 查找、F11 全屏、Ctrl+0 重置字号、Ctrl+滚轮缩放字号
@@ -2710,6 +2737,10 @@ controls:
     selector: 'button[aria-label="Cycle application theme"]'
     kind: interactive
     optional: true       # AppThemeIconButton — currently unused outside the title-bar tray
+  - id: desktop-control-tooltip
+    selector: '[role="tooltip"]'
+    kind: display
+    optional: true
   - id: root-theme-attr
     selector: 'html'
     kind: display
@@ -2764,6 +2795,9 @@ controls:
     kind: interactive
   - id: session-tree
     selector: '[data-testid="session-tree"]'
+    kind: display
+  - id: session-protocol-label
+    selector: '[data-testid="session-protocol-label"]'
     kind: display
   - id: session-tree-item       # individual row; pair with [data-session-name=...] / [data-session-type=...]
     selector: '[data-testid="session-tree-item"]'
@@ -4179,6 +4213,18 @@ controls:
     selector: '[data-testid="vnc-session-menu"]'
     kind: interactive
     optional: true          # connected; same menu as F8 (VNC-SESS-001)
+  - id: vnc-menu-properties
+    selector: '[data-testid="vnc-menu-properties"]'
+    kind: interactive
+  - id: vnc-prop-quality
+    selector: '[data-testid="vnc-prop-quality"]'
+    kind: interactive
+  - id: vnc-prop-cancel
+    selector: '[data-testid="vnc-prop-cancel"]'
+    kind: interactive
+  - id: vnc-session-info-ok
+    selector: '[data-testid="vnc-session-info-ok"]'
+    kind: interactive
   - id: menu-info
     selector: '[data-testid="vnc-menu-info"]'
     kind: interactive
@@ -4201,12 +4247,18 @@ controls:
     optional: true          # Session Information dialog (VNC-SESS-002)
   - id: reconnect
     selector: '[data-testid="vnc-reconnect"]'
+    aliases:
+      - '[data-testid="vnc-overlay-disconnected"] [data-testid="vnc-reconnect"]'
     kind: interactive
-    optional: true          # only on disconnected/error state
+    optional: true          # manual retry after a disconnect
+  - id: connect-stop
+    selector: '[data-testid="vnc-connect-stop"]'
+    kind: interactive
+    optional: true          # can stop the RFB handshake before authentication completes
   - id: reconnect-stop
     selector: '[data-testid="vnc-reconnect-stop"]'
     kind: interactive
-    optional: true          # cancels the automatic reconnect countdown in the disconnected card; TC-157 uses it to keep the reconnect state deterministic
+    optional: true          # available during the automatic reconnect countdown
   - id: unencrypted-continue
     selector: '[data-testid="vnc-unencrypted-continue"]'
     kind: interactive
@@ -4273,7 +4325,7 @@ controls:
 id: F9.7
 status: partial
 area: rdp
-components: [RdpPanel, RdpOptionsForm]
+components: [RdpPanel, RdpConnectionBar, RdpOptionsForm]
 files:
   - src-tauri/plugins/rdp-client/**
   - src-tauri/crates/taomni-rdp-client-api/**
@@ -4377,6 +4429,8 @@ controls:
     kind: interactive
     optional: true       # only in OS full screen while connected
 -->
+
+全屏连接栏的按钮在本地响应 Tab、Enter 和 Space。画布和 IME 输入继续向远端投递按键。连接状态文字及工具栏跟随当前窗口主题和界面字号。
 
 - Tauri desktop 模式下通过 IronRDP 0.17 驱动真实 RDP 会话：CredSSP/NLA、active-stage 图像解码、键盘/鼠标/滚轮输入、画布绘制
 - 传输路径支持 direct TCP、HTTP/SOCKS5 proxy，以及 RD Gateway（MS-TSGU）代码路径；RD Gateway 当前无真实环境，只以 unit test + ignored live smoke 作为验收
@@ -5006,10 +5060,11 @@ controls:
 id: F-AI-2.1
 status: done
 area: ai/settings
-components: [AiMasterSwitch, PrivacyToggle, SettingsPanel]
+components: [AiMasterSwitch, PrivacyToggle, SettingsSwitch, SettingsPanel]
 files:
   - src/components/settings/AiMasterSwitch.tsx
   - src/components/settings/PrivacyToggle.tsx
+  - src/components/ui/SettingsSwitch.tsx
   - src/components/settings/SettingsPanel.tsx
   - src/stores/aiStore.ts
 controls:
@@ -5031,6 +5086,7 @@ controls:
 
 - `AiMasterSwitch`：一键关闭所有 AI 入口（Drawer 按钮、PTT、命令重写等），内存占用与网络调用全部归零
 - `PrivacyToggle`：保持 AI 启用，但强制把请求路由到 loopback / 本地 provider
+- 两个开关都支持 Tab、Space 和 Enter，保存期间保留焦点，失败后可在原开关重试。
 - 状态由 `aiStore.config.fully_disabled` 持久化；勾选后Chat 听写与共享 Chat 入口立即从 DOM 中移除
 
 ### 14.2 终端补全与命令重写 ✅
@@ -5276,6 +5332,8 @@ files:
   - src/components/settings/GoProviderFields.tsx
   - src/components/settings/LlmProvidersPanel.tsx
   - src/stores/opencodeGoStore.ts
+  - src/components/agent/bridge/usePendingApprovals.ts
+  - src-tauri/src/windowing/pending_approvals.rs
   - src-tauri/src/llm/opencode_go/
   - src/components/chat/ChatThreadList.tsx
   - src/components/chat/Composer.tsx
@@ -5342,7 +5400,7 @@ controls:
     kind: interactive
     optional: true
   - id: ai-chat-history
-    selector: 'button[title="History"]'
+    selector: 'button[aria-label="History"]'
     kind: interactive
     optional: true
   - id: ai-chat-copy-all
@@ -6073,6 +6131,14 @@ controls:
   # Declaring it here too would be a duplicate-selector lint error, so this
   # feature only documents it in prose — TC-111 exercises the click.
   # Detached-window shell + the controls that only exist inside it.
+  - id: detached-handoff
+    selector: '[data-testid="detached-handoff"]'
+    kind: display
+    optional: true
+  - id: detached-handoff-close
+    selector: '[data-testid="detached-handoff-close"]'
+    kind: interactive
+    optional: true
   - id: detached-window
     selector: '[data-testid="detached-session-window"]'
     kind: display
@@ -7075,6 +7141,22 @@ controls:
   - id: connection-mode
     selector: '[data-testid="hbase-connection-mode"]'
     kind: interactive
+    optional: true
+  - id: site-path
+    selector: 'input[aria-label="HBase site config file path"]'
+    kind: interactive
+    optional: true
+  - id: connection-quorum
+    selector: 'input[aria-label="HBase ZooKeeper quorum"]'
+    kind: interactive
+    optional: true
+  - id: analyze-site
+    selector: '[data-testid="hbase-settings"] button[title="Read hbase-site.xml and populate the connection fields"]'
+    kind: interactive
+    optional: true
+  - id: site-analysis-error
+    selector: '[data-testid="hbase-settings"] [role="alert"]'
+    kind: display
     optional: true
   - id: remote-host
     selector: 'input[aria-label="Remote host"]'
@@ -8463,7 +8545,7 @@ controls:
 - 签名 Mail 宿主读取未归档、未缓存的 IMAP 附件，核心验证字节数后写入目标。TC-MODULES-059/060 核对只读预览的文件字节与关闭后的清理，宿主协议用例检查整封邮件提取和 IMAP 分段下载。
 - 会话设置 “Attachment cache” 开启后，下载过的附件写入 `<app_data>/mail-cache/attachments/`，再次打开直接使用本地副本。
 - 发送被服务器以大小拒绝（552 / SIZE）时给出明确提示。
-- 附件提醒：正文（不含引用部分）或主题提到 “attached/附件” 而没有附件时，发送前提醒，可 “Attach…” 或 “Send anyway”。
+- 附件提醒：正文（不含引用部分）或主题提到 “attached/附件” 而没有附件时，发送前提醒。默认聚焦取消，Tab 在三个操作间循环。Esc 保留草稿并恢复焦点；可显式添加附件或继续发送。
 
 ---
 
@@ -11275,7 +11357,7 @@ controls:
     selector: '[data-testid="keymap-no-shortcut-editor.find"]'
     kind: display
     optional: true
-  - id: keymap-recorder               # inline keystroke recorder (never a modal)
+  - id: keymap-recorder               # keyboard recorder in the Keymap dialog's top layer
     selector: '[data-testid="keymap-recorder"]'
     kind: display
     optional: true       # only while recording
@@ -12424,6 +12506,9 @@ files:
   - src/components/git/workspace/changeMenu.ts
   - src/components/git/DiffViewer.tsx
 controls:
+  - id: git-change-row
+    selector: '[data-testid="git-change-row"]'
+    kind: interactive
   - id: git-change-status
     selector: '[data-testid="git-change-status"]'
     kind: display
@@ -13348,6 +13433,9 @@ controls:
 - id: restore-dialog
   selector: '[data-testid="backup-restore-dialog"]'
   kind: display
+- id: restore-name
+  selector: '[data-testid="backup-restore-name"]'
+  kind: interactive
 - id: restore-vault-password
   selector: '[data-testid="backup-restore-vault-password"]'
   kind: interactive
@@ -13440,6 +13528,9 @@ controls:
   kind: interactive
 - id: local-completed-restore
   selector: '[data-testid="backup-local-restore"]'
+  kind: interactive
+- id: first-completed-local-restore
+  selector: ':nth-child(1 of [data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]) [data-testid="backup-local-restore"]'
   kind: interactive
 - id: destination-select
   selector: '[data-testid="backup-destination-select"]'
@@ -14094,6 +14185,14 @@ controls:
   - id: screenshot-edit-panel
     selector: '[data-testid="screenshot-edit-panel"]'
     kind: display
+    optional: true
+  - id: screenshot-edit-close
+    selector: '[data-testid="screenshot-edit-close"]'
+    kind: interactive
+    optional: true
+  - id: screenshot-edit-width
+    selector: '[data-testid="screenshot-edit-width"]'
+    kind: interactive
     optional: true
   - id: screenshot-edit-redo
     selector: '[data-testid="screenshot-edit-redo"]'
@@ -16648,6 +16747,9 @@ controls:
   - id: explorer-refresh
     selector: '[data-testid="explorer-refresh"]'
     kind: interactive
+  - id: explorer-rename-error
+    selector: '[data-testid="explorer-rename-error"]'
+    kind: display
   - id: explorer-rename-input
     selector: '[data-testid="explorer-rename-input"]'
     kind: interactive
@@ -17544,7 +17646,7 @@ controls:
     selector: '[data-testid="mail-attachment-system"]'
     kind: interactive
   - id: file-open-chat-history
-    selector: '[data-testid="ai-chat-drawer"] button[title="History"]'
+    selector: '[data-testid="ai-chat-drawer"] button[aria-label="History"]'
     kind: interactive
   - id: file-open-chat-thread
     selector: 'xpath=//*[@data-testid="ai-chat-drawer"]//div[text()="QA file path entry"]'

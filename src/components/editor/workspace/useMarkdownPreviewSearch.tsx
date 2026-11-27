@@ -82,7 +82,7 @@ export function useMarkdownPreviewSearch(
           fragment.append(document.createTextNode(text.slice(start, found)));
           const mark = document.createElement("mark");
           mark.dataset.testid = "markdown-search-match";
-          mark.className = "rounded bg-yellow-200 text-black data-[current=true]:bg-orange-300";
+          mark.className = "rounded bg-[var(--taomni-code-selection-match-bg)] text-[var(--taomni-code-text)] ring-1 ring-[var(--taomni-code-selection-match-border)] data-[current=true]:bg-[var(--taomni-code-find-match-bg)] data-[current=true]:text-[var(--taomni-code-find-match-fg)] data-[current=true]:ring-[var(--taomni-code-find-match-border)]";
           mark.textContent = text.slice(found, found + query.length);
           matches.current.push(mark);
           fragment.append(mark);
@@ -104,7 +104,7 @@ export function useMarkdownPreviewSearch(
   }, [index, count, query]);
 
   const toolbar = open ? <div data-testid="markdown-preview-search" role="search"
-    className="sticky top-0 z-10 flex items-center gap-1 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 py-1 text-[12px]"
+    className="sticky top-0 z-[var(--taomni-z-sticky)] flex items-center gap-1 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 py-1 text-ui-body"
     onKeyDown={(event) => {
       if (event.nativeEvent.isComposing) return;
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
@@ -112,7 +112,7 @@ export function useMarkdownPreviewSearch(
       else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") { event.preventDefault(); openSearch(); }
     }}>
     <input ref={input} type="search" aria-label="Find in preview" value={query}
-      className="min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-transparent px-2 py-1 outline-none"
+      className="min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-transparent px-2 py-1 focus-visible:keyboard-outline"
       onChange={(event) => setQuery(event.target.value)} />
     <span data-testid="markdown-search-count" aria-live="polite">{count ? `${index + 1}/${count}` : "0/0"}</span>
     <button type="button" aria-label="Previous match" disabled={!count} onClick={() => move(-1)}>↑</button>

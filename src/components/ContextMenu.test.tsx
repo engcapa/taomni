@@ -329,3 +329,80 @@ describe("ContextMenu", () => {
   });
 });
 
+
+it("exposes the active command, checked value and unavailable state to assistive technology", () => {
+  const apply = vi.fn();
+  render(<ContextMenu x={20} y={20} onClose={vi.fn()} items={[
+    { label: "Show details", checked: true, onClick: apply },
+    { label: "Remove", disabled: true, disabledReason: "Select a file" },
+    { label: "Refresh", onClick: apply },
+  ]} />);
+  const menu = screen.getByRole("menu");
+  expect(menu).toHaveFocus();
+  const checked = screen.getByRole("menuitemcheckbox", { name: /Show details/ });
+  expect(checked).toHaveAttribute("aria-checked", "true");
+  expect(menu).toHaveAttribute("aria-activedescendant", checked.id);
+  expect(screen.getByRole("menuitem", { name: "Remove" })).toHaveAttribute("title", "Select a file");
+  fireEvent.keyDown(menu, { key: "Enter", isComposing: true });
+  expect(apply).not.toHaveBeenCalled();
+  fireEvent.keyDown(menu, { key: "ArrowDown" });
+  expect(menu).toHaveAttribute("aria-activedescendant", screen.getByRole("menuitem", { name: "Refresh" }).id);
+  fireEvent.keyDown(menu, { key: "Enter" });
+  expect(apply).toHaveBeenCalledTimes(1);
+});
+
+it("supports section headers, keepOpen items, preventMouseDownFocus, anchorRef toggle exclusion, and capture outside dismissal", () => {
+  const onClose = vi.fn();
+  const onToggle = vi.fn();
+  const onApply = vi.fn();
+  const anchor = document.createElement("button");
+  document.body.append(anchor);
+  const anchorRef = { current: anchor };
+
+  render(
+    <>
+      <div
+        data-testid="stopping-widget"
+        onPointerDown={(event) => event.stopPropagation()}
+      />
+      <ContextMenu
+        x={20}
+        y={20}
+        anchorRef={anchorRef}
+        dismissOnFocusOut
+        onClose={onClose}
+        items={[
+          { label: "Stage", sectionHeader: true },
+          { label: "Modified", testId: "filter-mod", checked: true, keepOpen: true, preventMouseDownFocus: true, onClick: onToggle },
+          { label: "Apply", testId: "filter-apply", onClick: onApply },
+        ]}
+      />
+    </>,
+  );
+
+  expect(screen.getByText("Stage")).toBeInTheDocument();
+  const mod = screen.getByTestId("filter-mod");
+  expect(mod).toHaveAttribute("data-active", "true");
+
+  const md = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+  mod.dispatchEvent(md);
+  expect(md.defaultPrevented).toBe(true);
+
+  fireEvent.click(mod);
+  expect(onToggle).toHaveBeenCalledTimes(1);
+  expect(onClose).not.toHaveBeenCalled();
+
+  fireEvent.keyDown(window, { key: "Enter" });
+  expect(onToggle).toHaveBeenCalledTimes(2);
+  expect(onClose).not.toHaveBeenCalled();
+
+  // Clicking the trigger anchor does not prematurely fire outside close.
+  fireEvent.pointerDown(anchor, { button: 0 });
+  expect(onClose).not.toHaveBeenCalled();
+
+  // Capture-phase listener catches pointerdown even when a widget stops propagation.
+  fireEvent.pointerDown(screen.getByTestId("stopping-widget"), { button: 0 });
+  expect(onClose).toHaveBeenCalledWith("outside");
+
+  anchor.remove();
+});

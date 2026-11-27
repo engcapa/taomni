@@ -6,7 +6,12 @@
  * pre backgrounds inside a dark code tooltip). Force code-theme tokens here.
  */
 .cm-tooltip {
-  z-index: 50 !important;
+  z-index: calc(var(--taomni-z-content) + 50) !important;
+}
+
+.taomni-doc-minimap {
+  font-size: 3px;
+  line-height: 5px;
 }
 
 .cm-tooltip.cm-tooltip-hover {

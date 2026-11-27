@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EditorCompareDialog } from "./EditorCompareDialog";
@@ -134,10 +135,16 @@ describe("EditorCompareDialog", () => {
     const applyButton = screen.getByTestId("compare-apply-left-to-right");
     const closeButton = screen.getByTestId("compare-dialog-close");
     await vi.waitFor(() => expect(document.activeElement).toBe(applyButton));
-    fireEvent.keyDown(applyButton, { key: "Tab" });
+    const user = userEvent.setup();
+    await user.tab();
     expect(document.activeElement).toBe(closeButton);
-    fireEvent.keyDown(closeButton, { key: "Tab", shiftKey: true });
+    await user.tab({ shift: true });
     expect(document.activeElement).toBe(applyButton);
+
+    await user.tab({ shift: true });
+    expect(screen.getByTestId("compare-copy-right")).toHaveFocus();
+    await user.tab();
+    expect(applyButton).toHaveFocus();
 
     fireEvent.click(applyButton);
     expect(await screen.findByTestId("compare-apply-error")).toHaveTextContent("buffer changed");

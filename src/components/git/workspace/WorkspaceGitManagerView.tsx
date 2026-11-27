@@ -140,13 +140,13 @@ export function WorkspaceGitManagerView(inputs: WorkspaceGitManagerViewProps) {
                 />
               ),
               branchBadge: repositories.repoScopeIsMulti ? (
-                <span className="inline-flex items-center gap-1 h-6 px-2 rounded bg-[var(--taomni-hover)] text-[12px]">
+                <span className="inline-flex items-center gap-1 h-6 px-2 rounded bg-[var(--taomni-hover)] text-ui-body">
                   <GitCommitHorizontal className="w-3.5 h-3.5" />
                   {repositories.repoScopeIsAll ? "All Repositories" : `${scopeRepoCount} Repositories`}
                 </span>
               ) : undefined,
               changeSummary: (
-                <span className="text-[11px] text-[var(--taomni-text-muted)]">
+                <span className="text-ui-small text-[var(--taomni-text-muted)]">
                   {totalChangedFiles} changes
                   {aggregate.ahead || aggregate.behind ? ` · ↑${aggregate.ahead} ↓${aggregate.behind}` : ""}
                 </span>

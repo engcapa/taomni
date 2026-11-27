@@ -86,7 +86,7 @@ export function CodeInsightNotice({ notice, onClose, onConfigure }: CodeInsightN
       ref={ref}
       role="status"
       data-testid="code-workspace-code-insight-notice"
-      className="fixed z-[860] max-w-[420px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 text-[12px] text-[var(--taomni-code-text)] shadow-lg flex items-center gap-2"
+      className="fixed z-[var(--taomni-z-toast)] max-w-[420px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 text-ui-body text-[var(--taomni-code-text)] shadow-lg flex items-center gap-2"
       style={{ left: position.left, top: position.top }}
     >
       <span className="min-w-0 break-words">{notice.message}</span>

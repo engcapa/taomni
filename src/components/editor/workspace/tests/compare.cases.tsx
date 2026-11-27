@@ -84,7 +84,7 @@ describe("ED-COMPARE-001 editor compare workflow", () => {
       );
       expect(tab).not.toBeNull();
       fireEvent.contextMenu(tab!);
-      fireEvent.click(await screen.findByRole("button", { name: /^Local History/ }));
+      fireEvent.click(await screen.findByRole("menuitem", { name: /^Local History/ }));
 
       await screen.findByTestId("code-workspace-local-history-dialog");
       await waitFor(() => expect(workspaceTestHarness.localHistoryMocks.historyRead).toHaveBeenCalledWith(42));

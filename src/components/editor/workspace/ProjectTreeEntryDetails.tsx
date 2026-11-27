@@ -20,16 +20,16 @@ export function GitStatusBadge({ change }: { change: GitChange | undefined }): R
         ? "R"
         : change.status[0]?.toUpperCase() ?? "?";
   const color = change.conflict
-    ? "border-red-500/30 bg-red-500/10 text-red-500"
+    ? "border-ui-danger-border bg-ui-danger-surface text-ui-danger"
     : change.status === "untracked"
-      ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
+      ? "border-ui-warning-border bg-ui-warning-surface text-ui-warning"
       : change.staged
-        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
-        : "border-blue-500/30 bg-blue-500/10 text-blue-500";
+        ? "border-ui-success-border bg-ui-success-surface text-ui-success"
+        : "border-ui-info-border bg-ui-info-surface text-ui-info";
   return (
     <span
       data-testid="code-workspace-git-status"
-      className={`inline-flex h-4 min-w-4 items-center justify-center rounded border px-1 text-[10px] font-semibold ${color}`}
+      className={`inline-flex h-4 min-w-4 items-center justify-center rounded border px-1 text-ui-caption font-semibold ${color}`}
       title={gitChangeLabel(change)}
     >
       {label}

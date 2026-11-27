@@ -122,7 +122,7 @@ export function NotesPanel({ showPanelModeToggle = true }: NotesPanelProps = {})
               <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
               <input
                 type="search"
-                className="taomni-input h-6 w-full text-[11px] pl-6"
+                className="taomni-input h-6 w-full text-ui-small pl-6"
                 placeholder={t("notes.searchPlaceholder")}
                 aria-label={t("notes.searchAria")}
                 value={search}
@@ -167,18 +167,18 @@ export function NotesPanel({ showPanelModeToggle = true }: NotesPanelProps = {})
           {/* List */}
           <div className="flex-1 min-h-0 overflow-y-auto">
             {loading && notes.length === 0 ? (
-              <div className="p-4 text-center text-[11px] text-[var(--taomni-text-muted)]">
+              <div className="p-4 text-center text-ui-small text-[var(--taomni-text-muted)]">
                 {t("notes.loading")}
               </div>
             ) : notes.length === 0 ? (
-              <div className="p-6 text-center text-[12px] text-[var(--taomni-text-muted)]">
+              <div className="p-6 text-center text-ui-body text-[var(--taomni-text-muted)]">
                 <div>
                   {search || filter !== "recent_incomplete" || statusFilters.length !== 1 || tagFilterId
                     ? t("notes.emptyFiltered")
                     : t("notes.empty")}
                 </div>
                 {!search && filter === "recent_incomplete" && statusFilters.length === 1 && !tagFilterId && (
-                  <div className="mt-1 text-[11px]">{t("notes.emptyHint")}</div>
+                  <div className="mt-1 text-ui-small">{t("notes.emptyHint")}</div>
                 )}
               </div>
             ) : (

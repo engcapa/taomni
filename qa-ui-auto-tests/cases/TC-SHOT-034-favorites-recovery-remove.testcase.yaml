@@ -6,6 +6,7 @@ tags:
 - screenshot
 - regression
 - p1
+ui_standard: [UI-DLG-05, UI-DST-01]
 modes:
 - browser
 fixtures:
@@ -41,7 +42,7 @@ steps:
 - wait_for: '[data-testid="screenshot-favorite-remove"]'
 - click: '[data-testid="screenshot-favorite-remove"]'
 - wait_for: '[data-testid="confirm-dialog"]'
-- click: '[data-testid="confirm-dialog-cancel"]'
+- press: Enter
 - assert_count:
     selector: '[data-testid="screenshot-favorite-item"]'
     equal: 1
@@ -59,7 +60,8 @@ verification:
   review: reviewed
   requirements:
   - id: recovery
-    requirement: A failed list read shows a persistent error and Refresh recovers. Cancelling removal retains the favorite;
+    ui_standard: [UI-DLG-05, UI-DST-01]
+    requirement: A failed list read shows a persistent error and Refresh recovers. Pressing Enter on the default safe action retains the favorite;
       confirming removes it and the empty dialog closes with Escape.
     actions:
     - 1

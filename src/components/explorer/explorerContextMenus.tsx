@@ -12,7 +12,8 @@ export function explorerItemMenu(entries: FileEntry[], path: string, operations:
   const first = entries[0];
   const multi = entries.length !== 1;
   const directory = !multi && effectiveFileType(first) === "dir";
-  const mod = getAppPlatform() === "macos" ? "⌘" : "Ctrl+";
+  const mac = getAppPlatform() === "macos";
+  const mod = mac ? "⌘" : "Ctrl+";
   return [
     ...(!multi && !directory ? [{ label: label("打开方式", "Open with"), testId: "explorer-context-open-with", children: fileOpenMenu(first.path, workspaceId, label, (message, error) => operations.notify(message, true, error)) }] : []),
     { label: label("打开", "Open"), testId: "explorer-context-open", icon: <ExternalLink />, shortcut: "Enter", onClick: () => { for (const entry of entries) void operations.open(entry); } },
@@ -23,10 +24,11 @@ export function explorerItemMenu(entries: FileEntry[], path: string, operations:
     { label: label("复制", "Copy"), testId: "explorer-context-copy", icon: <Copy />, shortcut: `${mod}C`, onClick: () => void operations.copy(entries, false) },
     { label: label("复制路径", "Copy path"), testId: "explorer-context-copy-path", icon: <Link />, onClick: () => void operations.copyPath(entries.map((entry) => entry.path)) },
     { label: "", separator: true },
-    { label: label("重命名", "Rename"), testId: "explorer-context-rename", icon: <Pencil />, shortcut: "F2", disabled: multi || operations.busy, onClick: () => operations.setRenamePath(first.path) },
-    { label: label("删除…", "Delete…"), testId: "explorer-context-delete", icon: <Trash2 />, shortcut: "Del", danger: true, disabled: operations.busy, onClick: () => operations.remove(entries) },
+    { label: label("重命名", "Rename"), testId: "explorer-context-rename", icon: <Pencil />, shortcut: "F2", disabled: multi || operations.busy, disabledReason: multi ? label("请选择单个文件", "Select a single item") : label("正在处理文件", "File operation in progress"), onClick: () => operations.setRenamePath(first.path) },
     { label: "", separator: true },
     { label: label("属性", "Properties"), testId: "explorer-context-properties", icon: <Info />, shortcut: "Alt+Enter", onClick: () => operations.setProperties(entries) },
+    { label: "", separator: true },
+    { label: label("删除…", "Delete…"), testId: "explorer-context-delete", icon: <Trash2 />, shortcut: mac ? "⌘⌫" : "Del", danger: true, disabled: operations.busy, onClick: () => operations.remove(entries) },
   ];
 }
 export function explorerEmptyMenu(path: string, operations: ExplorerOperations, label: Label, refresh: () => void): MenuItem[] {

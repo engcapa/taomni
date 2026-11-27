@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { AnchoredMenu } from "../../ui/AnchoredMenu";
+import { ModalSurface } from "../../ui/ModalSurface";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import type { StructuralScope, StructuralSearchSession } from "./useStructuralSearchSession";
 import {
@@ -30,7 +32,7 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
     templateVariables, cancel, find, activeFileAvailable,
   } = session;
   const templateRef = useRef<HTMLTextAreaElement | null>(null);
-  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
   const [selectedVariable, setSelectedVariable] = useState<string | null>(null);
   const [recentTemplates, setRecentTemplates] = useState<readonly string[]>([]);
   const [addFilterOpen, setAddFilterOpen] = useState(false);
@@ -40,36 +42,14 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
     if (dialogOpen) setRecentTemplates(readRecentStructuralTemplates());
   }, [dialogOpen]);
 
-  useEffect(() => {
-    if (!dialogOpen) return;
-    // Return focus to the invoker (normally the editor) when the dialog closes.
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    templateRef.current?.focus();
-    return () => {
-      if (previous?.isConnected) previous.focus();
-    };
-  }, [dialogOpen]);
-
-  // Esc must cancel even after Find disabled the focused button and focus fell
-  // back to <body> (a running search is the case users most need to abort).
-  useEffect(() => {
-    if (!dialogOpen) return;
-    const onWindowKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      cancel();
-    };
-    window.addEventListener("keydown", onWindowKeyDown, true);
-    return () => window.removeEventListener("keydown", onWindowKeyDown, true);
-  }, [cancel, dialogOpen]);
-
-  useEffect(() => {
-    // Find becomes disabled under the pointer while running; keep keyboard
-    // focus inside the modal so Esc/Tab stay with it.
-    if (phase !== "running") return;
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.contains(document.activeElement)) dialog.focus();
+  useLayoutEffect(() => {
+    const template = templateRef.current;
+    if (phase !== "running" || !template) return;
+    const dialog = template.closest("dialog");
+    const active = document.activeElement;
+    if (dialog && (!dialog.contains(active) || active?.matches(":disabled"))) {
+      template.focus({ preventScroll: true });
+    }
   }, [phase]);
 
   useEffect(() => {
@@ -108,7 +88,8 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
     templateRef.current?.focus();
   };
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const onKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       event.stopPropagation();
@@ -117,21 +98,20 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onMouseDown={cancel}>
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        data-testid="structural-search-dialog"
-        data-phase={phase}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Structural Search"
-        className="flex h-[460px] w-[900px] max-w-[calc(100vw-32px)] flex-col rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[12px] text-[var(--taomni-code-text)] shadow-xl outline-none"
-        onMouseDown={(event) => event.stopPropagation()}
-        onKeyDown={onKeyDown}
-      >
+    <ModalSurface
+      data-testid="structural-search-dialog"
+      data-phase={phase}
+      aria-labelledby="structural-search-title"
+      aria-describedby={unavailable ? "structural-search-status" : undefined}
+      initialFocus='[data-testid="structural-search-template"]'
+      onCancel={cancel}
+      onKeyDown={onKeyDown}
+      className="taomni-modal taomni-workspace-modal"
+      data-bleed="true"
+      style={{ width: "min(900px, calc(100vw - 32px))", height: "min(460px, calc(100vh - 32px))" }}
+    >
         <header className="flex h-9 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3">
-          <span className="font-medium">Structural Search</span>
+          <h2 id="structural-search-title" className="font-medium">Structural Search</h2>
           <div className="flex-1" />
           <button
             type="button"
@@ -148,9 +128,9 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
             aria-label="Templates"
             className="flex w-[190px] shrink-0 flex-col overflow-auto border-r border-[var(--taomni-code-border)] py-1"
           >
-            <div className="px-3 py-1 text-[10px] font-medium uppercase text-[var(--taomni-code-muted)]">Recent</div>
+            <div className="px-3 py-1 text-ui-caption font-medium uppercase text-[var(--taomni-code-muted)]">Recent</div>
             {recentTemplates.length === 0 ? (
-              <div className="px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]">No recent templates</div>
+              <div className="px-3 py-1 text-ui-small text-[var(--taomni-code-muted)]">No recent templates</div>
             ) : recentTemplates.map((pattern) => (
               <button
                 key={`recent:${pattern}`}
@@ -158,13 +138,13 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
                 data-testid="structural-search-template-item"
                 data-template-kind="recent"
                 title={pattern}
-                className="w-full truncate px-3 py-0.5 text-left font-mono text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+                className="w-full truncate px-3 py-0.5 text-left font-mono text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
                 onClick={() => loadTemplate(pattern)}
               >
                 {pattern}
               </button>
             ))}
-            <div className="mt-2 px-3 py-1 text-[10px] font-medium uppercase text-[var(--taomni-code-muted)]">Existing Templates · Java</div>
+            <div className="mt-2 px-3 py-1 text-ui-caption font-medium uppercase text-[var(--taomni-code-muted)]">Existing Templates · Java</div>
             {EXISTING_JAVA_TEMPLATES.map((template) => (
               <button
                 key={template.id}
@@ -173,7 +153,7 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
                 data-template-kind="existing"
                 data-template-id={template.id}
                 title={template.pattern}
-                className="w-full truncate px-3 py-0.5 text-left text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+                className="w-full truncate px-3 py-0.5 text-left text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
                 onClick={() => loadTemplate(template.pattern)}
               >
                 {template.label}
@@ -188,7 +168,7 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
                 Language:
                 <select
                   data-testid="structural-search-language"
-                  className="taomni-input h-6 px-1 text-[11px]"
+                  className="taomni-input h-6 px-1 text-ui-small"
                   value="java"
                   onChange={() => undefined}
                 >
@@ -201,7 +181,7 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
               ref={templateRef}
               data-testid="structural-search-template"
               spellCheck={false}
-              className="mx-3 min-h-0 flex-1 resize-none rounded border border-[var(--taomni-code-border)] bg-transparent p-2 font-mono text-[12px] outline-none focus:border-[var(--taomni-accent)]"
+              className="mx-3 min-h-0 flex-1 resize-none rounded border border-[var(--taomni-code-border)] bg-transparent p-2 font-mono text-ui-body focus-visible:keyboard-outline focus:border-[var(--taomni-accent)]"
               value={draft.pattern}
               onChange={(event) => setDraft((current) => ({ ...current, pattern: event.target.value }))}
             />
@@ -238,7 +218,7 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
                   >
                     <span>${name}$</span>
                     {variable?.text ? (
-                      <span className="min-w-0 truncate text-[10px] text-[var(--taomni-code-muted)]">
+                      <span className="min-w-0 truncate text-ui-caption text-[var(--taomni-code-muted)]">
                         {variable.invert ? "!" : ""}text={variable.text}
                       </span>
                     ) : null}
@@ -248,43 +228,35 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
             </div>
             {selectedVariable && selected ? (
               <div className="shrink-0 space-y-1.5 border-t border-[var(--taomni-code-border)] p-2">
-                <div className="flex items-center gap-1 text-[10px] text-[var(--taomni-code-muted)]">
+                <div className="flex items-center gap-1 text-ui-caption text-[var(--taomni-code-muted)]">
                   <span className="min-w-0 flex-1 truncate">Count [1,1] · ${selectedVariable}$</span>
                   <button
                     type="button"
+                    ref={filterButtonRef}
                     data-testid="structural-search-add-filter"
+                    aria-haspopup="menu"
                     aria-expanded={addFilterOpen}
                     className="shrink-0 text-[var(--taomni-accent)] hover:underline"
-                    onClick={() => setAddFilterOpen((open) => !open)}
+                    onClick={(event) => {
+                      event.currentTarget.focus({ preventScroll: true });
+                      setAddFilterOpen((open) => !open);
+                    }}
                   >
                     Add filter
                   </button>
                 </div>
                 {addFilterOpen && (
-                  // DEC-016-02: IDEA's filter kinds; only Text runs on the syntax backend.
-                  <div role="menu" data-testid="structural-search-filter-menu" className="rounded border border-[var(--taomni-code-border)] py-0.5">
-                    {STRUCTURAL_FILTER_KINDS.map((kind) => (
-                      <button
-                        key={kind.id}
-                        type="button"
-                        role="menuitem"
-                        data-testid={`structural-search-filter-option-${kind.id}`}
-                        disabled={!kind.supported}
-                        title={kind.supported ? undefined : UNSUPPORTED_FILTER_REASON}
-                        className="flex w-full items-center justify-between px-2 py-0.5 text-left text-[11px] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-50"
-                        onClick={() => {
-                          setAddFilterOpen(false);
-                          textFilterRef.current?.focus();
-                        }}
-                      >
-                        <span>{kind.label}</span>
-                        {!kind.supported && <span className="text-[9px] text-[var(--taomni-code-muted)]">unavailable</span>}
-                      </button>
-                    ))}
-                    <div data-testid="structural-search-filter-reason" className="px-2 py-0.5 text-[9px] text-[var(--taomni-code-muted)]">
-                      {UNSUPPORTED_FILTER_REASON}
-                    </div>
-                  </div>
+                  <AnchoredMenu anchor={filterButtonRef} testId="structural-search-filter-menu"
+                    ariaLabel="Add filter" onClose={() => setAddFilterOpen(false)} items={[
+                      ...STRUCTURAL_FILTER_KINDS.map((kind) => ({
+                        label: kind.label,
+                        testId: `structural-search-filter-option-${kind.id}`,
+                        disabled: !kind.supported,
+                        disabledReason: kind.supported ? undefined : UNSUPPORTED_FILTER_REASON,
+                        onClick: () => textFilterRef.current?.focus(),
+                      })),
+                      { label: UNSUPPORTED_FILTER_REASON, testId: "structural-search-filter-reason", sectionHeader: true },
+                    ]} />
                 )}
                 <label className="flex items-center gap-1.5">
                   <span className="w-9 shrink-0">Text</span>
@@ -292,7 +264,7 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
                     ref={textFilterRef}
                     data-testid="structural-search-variable-text"
                     aria-label={`Text modifier for $${selectedVariable}$`}
-                    className="taomni-input h-6 min-w-0 flex-1 px-1 font-mono text-[11px]"
+                    className="taomni-input h-6 min-w-0 flex-1 px-1 font-mono text-ui-small"
                     placeholder="regular expression"
                     value={selected.text}
                     onChange={(event) => updateVariable(selectedVariable, { text: event.target.value })}
@@ -313,15 +285,15 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
         </div>
         {unavailable ? (
           <div
-            data-testid="structural-search-unavailable"
+            id="structural-search-status" data-testid="structural-search-unavailable"
             role="status"
-            className="mx-3 mb-1 flex items-center gap-1.5 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300"
+            className="mx-3 mb-1 flex items-center gap-1.5 rounded border border-ui-warning-border bg-ui-warning-surface px-2 py-1 text-ui-warning"
           >
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 truncate">{message ?? "Structural Search backend is not available"}</span>
           </div>
         ) : phase === "error" && message ? (
-          <div data-testid="structural-search-error" role="alert" className="mx-3 mb-1 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-400">
+          <div data-testid="structural-search-error" role="alert" className="mx-3 mb-1 rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1 text-ui-danger">
             {message}
           </div>
         ) : null}
@@ -352,8 +324,8 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
           <button
             type="button"
             data-testid="structural-search-find"
-            className="h-7 rounded px-3 text-[11px] disabled:opacity-50"
-            style={{ background: "var(--taomni-accent)", color: "#fff" }}
+            className="h-7 rounded px-3 text-ui-small disabled:opacity-50"
+            style={{ background: "var(--taomni-primary-bg)", color: "var(--taomni-primary-text)" }}
             disabled={findDisabled}
             onClick={runFind}
           >
@@ -362,13 +334,12 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
           <button
             type="button"
             data-testid="structural-search-cancel"
-            className="h-7 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+            className="h-7 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={cancel}
           >
             Cancel
           </button>
         </div>
-      </div>
-    </div>
+    </ModalSurface>
   );
 }

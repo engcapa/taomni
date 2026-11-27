@@ -1,3 +1,4 @@
+import { alertAppDialog } from "../../lib/appDialogs";
 import { Copy, Edit3, Folder, FolderOpen, Play, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { openBinaryFile, openTextFile } from "../../lib/fileHelpers";
@@ -96,11 +97,11 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     if (warnings.length === 0) return;
     const shown = warnings.slice(0, 8);
     const more = warnings.length > shown.length ? t("sessionTree.warningsMore", { count: warnings.length - shown.length, plural: warnings.length - shown.length === 1 ? "" : "s" }) : "";
-    window.alert(`${shown.join("\n")}${more}`);
+    void alertAppDialog({ message: `${shown.join("\n")}${more}` });
   };
 
   const reportFileError = (error: unknown) => {
-    window.alert(error instanceof Error ? error.message : String(error));
+    void alertAppDialog({ message: error instanceof Error ? error.message : String(error) });
   };
 
   const handleDrop = (groupPath: string | null, sessionIds: string[]) => {
@@ -137,7 +138,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       const result = parseTaomniSessions(text, { targetFolder: folderPath, existingSessions: sessions });
       importPreview.queueImportPreview(result, folderPath, "Taomni");
     }).catch((error) => {
-      window.alert(error instanceof Error ? error.message : String(error));
+      void alertAppDialog({ message: error instanceof Error ? error.message : String(error) });
     });
   };
 
@@ -148,7 +149,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       const result = parseMobaXtermSessions(bytes, { targetFolder: folderPath, existingSessions: sessions, homeDir });
       importPreview.queueImportPreview(result, folderPath, "MobaXterm");
     }).catch((error) => {
-      window.alert(error instanceof Error ? error.message : String(error));
+      void alertAppDialog({ message: error instanceof Error ? error.message : String(error) });
     });
   };
 
@@ -158,7 +159,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       const result = parseCsvSessions(text, { targetFolder: folderPath, existingSessions: sessions });
       importPreview.queueImportPreview(result, folderPath, "CSV");
     }).catch((error) => {
-      window.alert(error instanceof Error ? error.message : String(error));
+      void alertAppDialog({ message: error instanceof Error ? error.message : String(error) });
     });
   };
   const { enrichTabbyResult, enrichSecureCrtResult, externalVaultPrompt } = useExternalSessionSecrets({

@@ -54,7 +54,7 @@ export function ModuleReleaseNotice({ openSettings }: { openSettings(): void }) 
   const [restartError, setRestartError] = useState<string | null>(null);
   if (!showMfaNotice && !newModules.length && !legacyPending && !waitingForRestart && !importFailed && !plan?.legacyWaiting) return null;
 
-  return <aside data-testid="module-release-notice" className="max-h-40 space-y-1.5 overflow-y-auto border-t border-[var(--taomni-divider)] px-3 py-2 text-[12px]">
+  return <aside data-testid="module-release-notice" className="max-h-40 space-y-1.5 overflow-y-auto border-t border-[var(--taomni-divider)] px-3 py-2 text-ui-body">
     {showMfaNotice && <p data-testid="module-release-mfa" role={mfaNotice instanceof Error ? "alert" : "status"}>
       {mfaNotice instanceof Error ? mfaNotice.message : t("plugins.marketMfaMigrationRequired")}
     </p>}
@@ -71,7 +71,7 @@ export function ModuleReleaseNotice({ openSettings }: { openSettings(): void }) 
       </ul>
     </div>}
     {dismissError && <p role="alert">{dismissError}</p>}
-    {restartError && <p role="alert" data-testid="module-release-restart-error" className="text-red-500">{restartError}</p>}
+    {restartError && <p role="alert" data-testid="module-release-restart-error" className="text-ui-danger">{restartError}</p>}
     <div className="mt-2 flex gap-2">
       <button type="button" data-testid="module-release-open-store" className="taomni-btn" onClick={() => {
         openSettingsSection("module-store");

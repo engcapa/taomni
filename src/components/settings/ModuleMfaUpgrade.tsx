@@ -68,19 +68,19 @@ export function ModuleMfaUpgrade({ eligible, installed = false }: { eligible: bo
   if (!eligible && !result) return null;
 
   const cardTone = eligible
-    ? "border-amber-500/35 bg-amber-500/10"
+    ? "border-ui-warning-border bg-ui-warning-surface"
     : result === "complete"
-      ? "border-emerald-500/30 bg-emerald-500/10"
-      : "border-red-500/30 bg-red-500/10";
+      ? "border-ui-success-border bg-ui-success-surface"
+      : "border-ui-danger-border bg-ui-danger-surface";
 
   return <div data-testid="module-upgrade-mfa-card" className={`mb-3 space-y-2 rounded border p-3 ${cardTone}`}>
     {eligible && <div className="flex items-start gap-2">
-      <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+      <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-ui-warning" />
       <div className="min-w-0 flex-1">
-        <div data-testid="module-upgrade-mfa-title" className="text-[13px] font-semibold">
+        <div data-testid="module-upgrade-mfa-title" className="text-ui-title font-semibold">
           {t("settings.moduleUpgradeMfaTitle")}
         </div>
-        <div data-testid="module-upgrade-mfa-subtitle" className="mt-1 text-[12px] text-[var(--taomni-text-muted)]">
+        <div data-testid="module-upgrade-mfa-subtitle" className="mt-1 text-ui-body text-[var(--taomni-text-muted)]">
           {t("settings.moduleUpgradeMfaSubtitle")}
         </div>
       </div>
@@ -125,7 +125,7 @@ export function ModuleMfaUpgrade({ eligible, installed = false }: { eligible: bo
         </div>
       </fieldset>
       {busy && <p role="status">{t("settings.moduleUpgradeWorking")}</p>}
-      {error && <p role="alert" data-testid="module-upgrade-mfa-error" className="break-words text-[var(--taomni-error)]">{error}</p>}
+      {error && <p role="alert" data-testid="module-upgrade-mfa-error" className="break-words text-[var(--taomni-danger-text)]">{error}</p>}
     </form>}
   </div>;
 }

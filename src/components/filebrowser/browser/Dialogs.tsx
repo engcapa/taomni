@@ -1,6 +1,7 @@
 import { Columns, Rows } from "lucide-react";
 import { useT, type TranslateFn } from "../../../lib/i18n";
 import { joinPath, type FileEntry } from "../../../lib/sftp";
+import { Modal } from "../../ui/Modal";
 import { type Orientation } from "./types";
 
 export function OrientationToggle({
@@ -31,7 +32,7 @@ export function OrientationToggle({
       ) : (
         <Rows className="w-3 h-3" />
       )}
-      <span className="text-[10px]">
+      <span className="text-ui-caption">
         {orientation === "horizontal" ? t("fileBrowser.orientationSide") : t("fileBrowser.orientationStack")}
       </span>
     </button>
@@ -51,49 +52,48 @@ export function DownloadPrompt({
 }) {
   const t = useT();
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)" }}
-      onClick={onCancel}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="w-[420px] rounded shadow-lg p-4"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="text-sm font-semibold mb-2">{t("fileBrowser.downloadPromptTitle")}</div>
-        <div className="text-[12px] mb-3 break-all" style={{ color: "var(--taomni-text-muted)" }}>
-          {t("fileBrowser.downloadPromptDescription", { name: entry.name })}
-          <div className="mt-1 font-mono text-[11px]">{joinPath(localDir, entry.name)}</div>
-        </div>
-        <div className="flex gap-2 justify-end">
+    <Modal
+      title={t("fileBrowser.downloadPromptTitle")}
+      testId="sftp-download-prompt"
+      closeLabel={t("common.close")}
+      initialFocus='[data-testid="sftp-download-prompt-open"]'
+      dismissOnBackdrop={true}
+      onCancel={onCancel}
+      footer={
+        <>
           <button
             type="button"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+            data-testid="sftp-download-prompt-cancel"
+            className="taomni-btn"
             onClick={onCancel}
           >
             {t("fileBrowser.chmodCancel")}
           </button>
           <button
             type="button"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+            data-testid="sftp-download-prompt-download"
+            className="taomni-btn"
             onClick={() => onDownload(false)}
           >
             {t("fileBrowser.downloadPromptDownloadOnly")}
           </button>
           <button
             type="button"
-            className="px-3 py-1 text-[12px] rounded text-white"
-            style={{ background: "var(--taomni-accent)" }}
+            data-testid="sftp-download-prompt-open"
+            className="taomni-btn"
+            data-primary="true"
             onClick={() => onDownload(true)}
           >
             {t("fileBrowser.downloadPromptDownloadAndOpen")}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="text-ui-body break-all" style={{ color: "var(--taomni-text-muted)" }}>
+        {t("fileBrowser.downloadPromptDescription", { name: entry.name })}
+        <div className="mt-1 font-mono text-ui-small">{joinPath(localDir, entry.name)}</div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -110,32 +110,38 @@ export function PreviewModal({
 }) {
   const t = useT();
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.5)" }}
-      onClick={onClose}
+    <Modal
+      size="complex"
+      title={name}
+      testId="sftp-preview-modal"
+      initialFocus='[data-testid="sftp-preview-close"]'
+      dismissOnBackdrop={true}
+      onCancel={onClose}
+      footer={
+        <button
+          type="button"
+          data-testid="sftp-preview-close"
+          className="taomni-btn"
+          data-primary="true"
+          onClick={onClose}
+        >
+          {t("fileBrowser.previewClose")}
+        </button>
+      }
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="w-[80vw] h-[70vh] rounded shadow-lg flex flex-col"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-3 py-1.5 text-[12px] flex items-center border-b"
-          style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
-          <span className="font-semibold">{name}</span>
-          <span className="ml-2 text-[var(--taomni-text-muted)]">{path}</span>
-          <div className="flex-1" />
-          <button type="button" data-testid="sftp-preview-close" className="px-2 py-0.5 hover:bg-[var(--taomni-hover)] rounded" onClick={onClose}>
-            {t("fileBrowser.previewClose")}
-          </button>
-        </div>
-        <pre className="flex-1 overflow-auto px-3 py-2 text-[12px] font-mono whitespace-pre-wrap break-all"
-          style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
-          {text}
-        </pre>
+      <div className="mb-2 font-mono text-ui-small break-all text-[var(--taomni-text-muted)]">
+        {path}
       </div>
-    </div>
+      <pre
+        className="h-[60vh] overflow-auto rounded border p-3 text-ui-body font-mono whitespace-pre-wrap break-all"
+        style={{
+          background: "var(--taomni-bg)",
+          color: "var(--taomni-text)",
+          borderColor: "var(--taomni-divider)",
+        }}
+      >
+        {text}
+      </pre>
+    </Modal>
   );
 }

@@ -1,0 +1,73 @@
+id: TC-UIC-006-detached-appearance
+title: A detached local terminal reads the current appearance and updates while Settings stays open
+covers: [F5.5, F6.3]
+fixtures: [reset_db]
+tags: [ui-contract, window, theme]
+modes: [native]
+timeout_sec: 240
+ui_standard: [UI-FND-03a, UI-FND-13, UI-FND-14]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-window-appearance
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- press: {selector: '#ui-font-size-slider', key: Home}
+- click: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-dark"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: ui-detached-appearance}
+- fill: {selector: 'input[aria-label="Keyboard shortcut"]', value: Ctrl+Alt+9}
+- set_check: {selector: '[data-testid="session-auto-connect"]', checked: false}
+- set_check: {selector: '[data-testid="session-open-new-window"]', checked: true}
+- click: '[data-testid="session-save"]'
+- click: '[data-testid="session-tree-item"][data-session-name="ui-detached-appearance"]'
+- press: Control+Alt+9
+- switch_window: {selector: '[data-testid="detached-reattach"]', timeout_sec: 90}
+- wait_for: 'html[data-app-theme="dark"] [data-testid="detached-reattach"]'
+- assert_computed_style: {selector: '[data-testid="detached-reattach"] span', property: font-size, equals: 9px}
+- switch_window: {selector: '[data-testid="ribbon-settings"]', timeout_sec: 45}
+- click: '[data-testid="ribbon-settings"]'
+- press: {selector: '#ui-font-size-slider', key: End}
+- click: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-light"]'
+- switch_window: {selector: '[data-testid="detached-reattach"]', timeout_sec: 45}
+- wait_for: 'html[data-app-theme="light"] [data-testid="detached-reattach"]'
+- assert_computed_style: {selector: '[data-testid="detached-reattach"] span', property: font-size, equals: 17px}
+- reload_window: {ready_selector: '[data-testid="detached-handoff"] [role="status"]'}
+- wait_for: '[data-testid="detached-handoff-close"]'
+- assert_text: {selector: '[data-testid="detached-handoff"] [role="status"] h1', contains: open session}
+- assert_computed_style: {selector: '[data-testid="detached-handoff"] h1', property: font-size, equals: 20px}
+- assert_solid_text_contrast: {selector: '[data-testid="detached-handoff"] [role="status"] p:first-of-type', minimum: 4.5, composite_ancestors: true}
+- switch_window: {selector: '[data-testid="ribbon-settings"]', close_with: '[data-testid="detached-handoff-close"]', timeout_sec: 45}
+- assert_visible: '[data-testid="ribbon-settings"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-FND-13, UI-FND-14]
+    requirement: A new standalone window opens at the saved appearance and its visible toolbar text tracks live changes from main.
+    actions: [5, 7, 18, 24, 26, 27]
+    checkpoints:
+    - {step: 20, expectation: The new terminal window opens in Dark.}
+    - {step: 21, expectation: The compact toolbar uses the 10px base minus its 1px text token.}
+    - {step: 28, expectation: The same terminal window resolves the newly selected Light theme.}
+    - {step: 29, expectation: Its visible toolbar now uses the 18px base minus 1px.}
+    results: [20, 21, 28, 29]
+  - id: expired-connection
+    ui_standard: [UI-FND-03a, UI-FND-13, UI-FND-14]
+    requirement: Reloading the detached terminal after its single-use connection was consumed shows readable recovery instructions and can close the child window.
+    actions: [24, 26, 30, 35]
+    checkpoints:
+    - {step: 32, expectation: The reloaded session explains the missing connection.}
+    - {step: 33, expectation: The error title uses the 18px setting with its 2px heading increment.}
+    - {step: 34, expectation: The rendered instructions clear 4.5 to 1 in Light.}
+    - {step: 36, expectation: The main window remains available after closing the detached window.}
+    results: [32, 33, 34, 36]
+  visual:
+  - {check: Rendered toolbar typography, method: automated, reason: Reads the displayed label in two font settings.}
+  native:
+  - {check: Cross-window settings delivery, method: automated, reason: Switches between real main and detached WebViews with a local PTY.}

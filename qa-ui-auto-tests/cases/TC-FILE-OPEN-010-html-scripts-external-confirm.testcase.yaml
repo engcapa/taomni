@@ -8,6 +8,7 @@ description: >-
   Browser uses explicit blob/VFS stubs and cannot prove native protocol/proxy boundaries;
   TC-FILE-OPEN-009 owns those. Native observes forwarded IPC without replacing its result.
 modes: [browser, native]
+ui_standard: [UI-DLG-06, UI-DST-04]
 covers: [F-FILEOPEN-1, F-EXPLORER-1]
 tags: [p0, file-open, html, sandbox, security, crash-regression]
 fixtures: [reset_db, html_network_test]
@@ -48,9 +49,7 @@ steps:
 - assert_text_equals:
     selector: '[data-testid="html-external-url"]'
     equals: https://qa-author-spoof.invalid/${fixture.html_network_nonce}
-- eval_readonly:
-    expression: document.activeElement === document.querySelector('.fv-modal button')
-    expect_truthy: true
+- assert_focus_on: '[data-testid="html-external-cancel"]'
 - click: '[data-testid="html-external-cancel"]'
 - assert_html_network: {state: external-cancelled}
 - html_preview_click: {target: external}
@@ -101,6 +100,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
+    ui_standard: [UI-DLG-06, UI-DST-04]
     requirement: An invalid-token request is ignored and even an author-forged valid-token external request requires parent consent.
     actions: [13, 16, 22]
     checkpoints:

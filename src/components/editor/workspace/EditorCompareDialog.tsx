@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { ModalSurface } from "../../ui/ModalSurface";
+import { useState } from "react";
 import { ArrowLeftRight, Check, Copy, X } from "lucide-react";
 import { writeText } from "../../../lib/clipboard";
 import type { CompareDocumentDescriptor, EditorCompareSession } from "./editorCompareModel";
@@ -44,12 +45,6 @@ function lineRows(leftText: string, rightText: string): Array<{
   });
 }
 
-function focusableElements(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(
-    "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
-  ));
-}
-
 function CompareSide({
   side,
   sideKind,
@@ -73,7 +68,7 @@ function CompareSide({
       <div className="flex min-w-0 items-center justify-between gap-2 border-b border-[var(--taomni-code-border)] px-3 py-1.5">
         <div className="min-w-0">
           <div className="truncate text-xs font-medium">{side.title}</div>
-          <div className="truncate text-[10px] text-[var(--taomni-code-muted)]">
+          <div className="truncate text-ui-caption text-[var(--taomni-code-muted)]">
             {side.path ?? side.source ?? "buffer"} · {metadataLabel(side)}
           </div>
         </div>
@@ -90,7 +85,7 @@ function CompareSide({
         </button>
       </div>
       {copyStatus && (
-        <div role="status" className="border-b border-[var(--taomni-code-border)] px-3 py-1 text-[10px] text-amber-400">
+        <div role="status" className="border-b border-[var(--taomni-code-border)] px-3 py-1 text-ui-caption text-ui-warning">
           {copyStatus}
         </div>
       )}
@@ -98,7 +93,7 @@ function CompareSide({
         <div
           role="alert"
           data-testid={`${isLeft ? "compare-left" : "compare-right"}-unavailable`}
-          className="m-3 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-300"
+          className="m-3 rounded border border-ui-warning-border bg-ui-warning-surface p-3 text-xs text-ui-warning"
         >
           <div className="font-medium">Unavailable: {side.unavailable.reason}</div>
           <div className="mt-1 break-words">{side.unavailable.message}</div>
@@ -108,7 +103,7 @@ function CompareSide({
           {rows.map((row, index) => {
             const value = isLeft ? row.left : row.right;
             const changed = row.kind !== "same";
-            const color = isLeft ? "bg-red-500/10 text-red-300" : "bg-emerald-500/10 text-emerald-300";
+            const color = isLeft ? "bg-ui-danger-surface text-ui-danger" : "bg-ui-success-surface text-ui-success";
             return (
               <div
                 key={`${index}:${row.kind}`}
@@ -134,7 +129,6 @@ export function EditorCompareDialog({
   onClose,
   onApplyRight,
 }: EditorCompareDialogProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const [copyStatus, setCopyStatus] = useState<Record<"left" | "right", string | null>>({
     left: null,
     right: null,
@@ -146,41 +140,6 @@ export function EditorCompareDialog({
     && !session.left.unavailable
     && !session.right.unavailable
     && !session.right.readOnly;
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const initial = dialog.querySelector<HTMLElement>("[data-compare-autofocus='true']")
-      ?? focusableElements(dialog)[0];
-    initial?.focus();
-  }, [session.id]);
-
-  useEffect(() => {
-    const handleEscape = (event: WindowEventMap["keydown"]) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      onClose();
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
-
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Tab") return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusable = focusableElements(dialog);
-    if (focusable.length === 0) {
-      event.preventDefault();
-      return;
-    }
-    const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
-    const nextIndex = event.shiftKey
-      ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1)
-      : (currentIndex + 1) % focusable.length;
-    event.preventDefault();
-    focusable[nextIndex]?.focus();
-  };
 
   const copySide = async (side: "left" | "right") => {
     const document = side === "left" ? session.left : session.right;
@@ -209,15 +168,14 @@ export function EditorCompareDialog({
   };
 
   return (
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
+    <ModalSurface
+      key={session.id}
+      initialFocus={canApply ? '[data-testid="compare-apply-left-to-right"]' : '[data-testid="compare-dialog-close"]'}
+      onCancel={() => { if (!applying) onClose(); }}
       aria-label={session.title}
-      tabIndex={-1}
       data-testid="code-workspace-compare-dialog"
-      onKeyDown={handleKeyDown}
-      className="fixed inset-0 z-50 flex min-h-0 flex-col bg-[var(--taomni-code-bg)]/95 p-4 text-[var(--taomni-code-text)] backdrop-blur-sm"
+      className="taomni-modal taomni-workspace-modal min-h-0"
+      style={{ width: "calc(100vw - 32px)", height: "calc(100vh - 32px)" }}
     >
       <div className="flex min-w-0 shrink-0 items-start justify-between gap-3 border-b border-[var(--taomni-code-border)] pb-3">
         <div className="min-w-0">
@@ -225,7 +183,7 @@ export function EditorCompareDialog({
             <ArrowLeftRight className="h-4 w-4 shrink-0 text-[var(--taomni-accent)]" />
             <h2 className="truncate text-sm font-semibold">{session.title}</h2>
           </div>
-          <div data-testid="compare-session-metadata" className="mt-1 truncate text-[10px] text-[var(--taomni-code-muted)]">
+          <div data-testid="compare-session-metadata" className="mt-1 truncate text-ui-caption text-[var(--taomni-code-muted)]">
             {session.source ?? "file"} · {session.target ? `target revision ${session.target.documentRevision}` : "read-only comparison"}
           </div>
         </div>
@@ -256,7 +214,7 @@ export function EditorCompareDialog({
         </div>
       </div>
       {applyError && (
-        <div role="alert" data-testid="compare-apply-error" className="mt-3 shrink-0 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+        <div role="alert" data-testid="compare-apply-error" className="mt-3 shrink-0 rounded border border-ui-danger-border bg-ui-danger-surface px-3 py-2 text-xs text-ui-danger">
           Apply failed: {applyError}
         </div>
       )}
@@ -276,6 +234,6 @@ export function EditorCompareDialog({
           copyStatus={copyStatus.right}
         />
       </div>
-    </div>
+    </ModalSurface>
   );
 }

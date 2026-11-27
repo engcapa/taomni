@@ -1,4 +1,12 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
+@import "../../../../src/styles/ui-foundations.css";
 
 @source "./";
+@source "../../../crates/taomni-plugin-api/frontend/ui";
+
+.taomni-modal.mfa-add-dialog {
+  width: min(520px, calc(100vw - 24px));
+  padding: 0;
+  gap: 0;
+}

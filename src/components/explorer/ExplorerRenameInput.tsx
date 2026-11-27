@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { useT } from "../../lib/i18n";
 import type { FileEntry } from "../../lib/sftp";
 import { useExplorerContext } from "./ExplorerContext";
 
 export function ExplorerRenameInput({ entry }: { entry: FileEntry }) {
+  const t = useT();
   const { operations } = useExplorerContext();
   const [value, setValue] = useState(entry.name);
   const input = useRef<HTMLInputElement>(null);
@@ -20,7 +22,8 @@ export function ExplorerRenameInput({ entry }: { entry: FileEntry }) {
     committing.current = false;
     if (!success) input.current?.focus();
   };
-  return <input ref={input} data-testid="explorer-rename-input" aria-label="Rename" value={value}
+  return <input ref={input} data-testid="explorer-rename-input" aria-label={t("common.rename")} value={value}
+    aria-invalid={!!operations.renameError} aria-describedby={operations.renameError ? operations.renameErrorId : undefined}
     onChange={(event) => setValue(event.target.value)} spellCheck={false}
     onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}
     onKeyDown={(event) => {

@@ -70,7 +70,7 @@ export function AcpProxyFields({
     <div className="space-y-2">
       <div className="flex flex-wrap gap-x-3 gap-y-1.5">
         {modes.map(({ value, label }) => (
-          <label key={value} className="flex items-center gap-1.5 cursor-pointer text-[11px]">
+          <label key={value} className="flex items-center gap-1.5 cursor-pointer text-ui-small">
             <input
               type="radio"
               className="accent-[var(--taomni-accent)]"
@@ -86,7 +86,7 @@ export function AcpProxyFields({
       {selectedMode === "session" &&
         (proxySessions.length > 0 ? (
           <select
-            className="taomni-input h-7 w-full text-[12px]"
+            className="taomni-input h-7 w-full text-ui-body"
             value={sessionId ?? ""}
             onChange={(event) => onChange({ proxy_session_id: event.target.value || null })}
             data-testid={`${testIdPrefix}-session-select`}
@@ -99,7 +99,7 @@ export function AcpProxyFields({
             ))}
           </select>
         ) : (
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">
             {t("settings.appProxySessionNone")}
           </div>
         ))}
@@ -107,7 +107,7 @@ export function AcpProxyFields({
       {selectedMode === "manual" && (
         <input
           type="text"
-          className="taomni-input h-7 w-full text-[12px] font-mono"
+          className="taomni-input h-7 w-full text-ui-body font-mono"
           placeholder="http://127.0.0.1:31028"
           defaultValue={proxyUrl ?? ""}
           onBlur={(event) => onChange({ proxy_url: event.target.value.trim() || null })}

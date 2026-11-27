@@ -45,7 +45,7 @@ export function CommonCommandsEditor({ value, onChange, t }: CommonCommandsEdito
   return (
     <div className="flex flex-col gap-1.5">
       {value.length === 0 ? (
-        <div className="text-[11px] text-[var(--taomni-text-muted)] italic px-1 py-2">
+        <div className="text-ui-small text-[var(--taomni-text-muted)] italic px-1 py-2">
           {t("terminalAppearance.commonCommandsEmpty")}
         </div>
       ) : (
@@ -53,14 +53,14 @@ export function CommonCommandsEditor({ value, onChange, t }: CommonCommandsEdito
           {value.map((item, idx) => (
             <div key={idx} className="flex items-center gap-2">
               <input
-                className="taomni-input flex-1 min-w-0 font-mono text-[12px]"
+                className="taomni-input flex-1 min-w-0 font-mono text-ui-body"
                 placeholder={t("terminalAppearance.commonCommandPlaceholder")}
                 value={item.command}
                 onChange={(e) => updateRow(idx, { command: e.target.value })}
                 aria-label={t("terminalAppearance.commonCommandAriaCommand", { index: idx + 1 })}
               />
               <input
-                className="taomni-input flex-1 min-w-0 text-[12px]"
+                className="taomni-input flex-1 min-w-0 text-ui-body"
                 placeholder={t("terminalAppearance.commonCommandDescriptionPlaceholder")}
                 value={item.description ?? ""}
                 onChange={(e) => updateRow(idx, { description: e.target.value })}
@@ -81,7 +81,7 @@ export function CommonCommandsEditor({ value, onChange, t }: CommonCommandsEdito
       )}
       <button
         type="button"
-        className="taomni-btn h-8 px-2 text-[11px] self-start inline-flex items-center gap-1"
+        className="taomni-btn h-8 px-2 text-ui-small self-start inline-flex items-center gap-1"
         onClick={addRow}
       >
         <Plus size={12} /> {t("terminalAppearance.commonCommandAddEntry")}

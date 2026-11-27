@@ -13,13 +13,13 @@
     justify-content: center;
     white-space: nowrap;
     height: auto;
-    min-height: max(26px, calc(1em + 8px));
+    min-height: var(--taomni-control-h-md);
     line-height: 1.25;
     padding: 0 14px;
     font-size: var(--taomni-ui-font-size);
     background: linear-gradient(to bottom, var(--taomni-button-from), var(--taomni-button-to));
     border: 1px solid var(--taomni-input-border);
-    border-radius: 3px;
+    border-radius: var(--taomni-radius-md);
     cursor: pointer;
     color: var(--taomni-text);
     transition: var(--taomni-transition);
@@ -31,11 +31,27 @@
     background: var(--taomni-button-disabled);
   }
   .taomni-btn:disabled:hover { background: var(--taomni-button-disabled); }
-  .taomni-btn[data-primary="true"] {
-    background: linear-gradient(to bottom, var(--taomni-accent-soft), var(--taomni-accent));
-    border-color: var(--taomni-accent); color: #fff; font-weight: 600;
+  .taomni-btn[data-primary="true"]:enabled {
+    background: var(--taomni-primary-bg);
+    border-color: var(--taomni-primary-bg);
+    color: var(--taomni-primary-text);
+    font-weight: 600;
   }
-  .taomni-btn[data-primary="true"]:hover { background: linear-gradient(to bottom, color-mix(in srgb, var(--taomni-accent-soft) 85%, #fff), color-mix(in srgb, var(--taomni-accent) 85%, #fff)); }
+  .taomni-btn[data-primary="true"]:enabled:hover { background: var(--taomni-primary-hover); }
+  .taomni-btn[data-primary="true"]:enabled:active { background: var(--taomni-primary-active); }
+  .taomni-btn[data-danger="true"]:enabled {
+    background: var(--taomni-danger-bg);
+    border-color: var(--taomni-danger-border);
+    color: var(--taomni-danger-text);
+  }
+  .taomni-btn[aria-busy="true"] { gap: 6px; cursor: progress; }
+  .taomni-btn:is([data-variant="ghost"], [data-variant="link"]) {
+    border-color: transparent;
+    background: transparent;
+  }
+  .taomni-btn[data-variant="ghost"]:enabled:hover { background: var(--taomni-control-hover); }
+  .taomni-btn[data-variant="link"] { color: var(--taomni-accent); text-decoration: underline; }
+  .taomni-btn:focus-visible { outline: 2px solid var(--taomni-focus-ring); outline-offset: 1px; }
 }
 
 /* Card Hover Environment Shadow Depth Effect */
@@ -46,4 +62,19 @@
   transform: translateY(-2px);
   box-shadow: var(--taomni-shadow-md);
   border-color: var(--taomni-accent-soft);
+}
+
+.taomni-control-tooltip {
+  position: fixed;
+  z-index: var(--taomni-z-tooltip);
+  pointer-events: none;
+  box-sizing: border-box;
+  max-width: min(320px, calc(100vw - 12px));
+  padding: 4px 8px;
+  border: 1px solid var(--taomni-divider);
+  border-radius: var(--taomni-radius-md);
+  background: var(--taomni-panel-bg);
+  color: var(--taomni-text);
+  font: inherit;
+  overflow-wrap: anywhere;
 }

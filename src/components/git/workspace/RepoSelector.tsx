@@ -111,7 +111,7 @@ export function RepoSelector({
         {open&&(
           <div
             data-testid="workspace-repo-selector-menu"
-            className="absolute left-0 top-[calc(100%+4px)] z-[70] w-[360px] max-w-[min(360px,calc(100vw-24px))] rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg"
+            className="absolute left-0 top-[calc(100%+4px)] z-[var(--taomni-z-popover)] w-[360px] max-w-[min(360px,calc(100vw-24px))] rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg"
           >
             {roots.length>=5&&(
               <div className="p-2 border-b border-[var(--taomni-divider)]">
@@ -137,19 +137,19 @@ export function RepoSelector({
               >
                 <GitBranch className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[12px] font-medium">All Repositories</div>
-                  <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">{roots.length} repositories</div>
+                  <div className="truncate text-ui-body font-medium">All Repositories</div>
+                  <div className="truncate text-ui-small text-[var(--taomni-text-muted)]">{roots.length} repositories</div>
                 </div>
-                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${totalChanges? "bg-[var(--taomni-accent)] text-white":"bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"}`}>
+                <span className={`shrink-0 rounded px-1.5 py-0.5 text-ui-small ${totalChanges? "bg-[var(--taomni-accent)] text-white":"bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"}`}>
                   {totalChanges}
                 </span>
               </button>
               {groups.length===0? (
-                <div className="px-3 py-3 text-[12px] text-[var(--taomni-text-muted)]">No repositories match</div>
+                <div className="px-3 py-3 text-ui-body text-[var(--taomni-text-muted)]">No repositories match</div>
               ):groups.map((group) => (
                 <div key={group.key}>
                   {groups.length>1&&(
-                    <div className="px-2 pt-2 pb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase text-[var(--taomni-text-muted)]">
+                    <div className="px-2 pt-2 pb-1 flex items-center gap-1.5 text-ui-caption font-semibold uppercase text-[var(--taomni-text-muted)]">
                       <FolderGit2 className="w-3 h-3" />
                       <span className="truncate">{group.name}</span>
                     </div>
@@ -188,16 +188,16 @@ export function RepoSelector({
                         <RepoStatusIcon loading={!!state?.loading} error={state?.error??null} changes={changes} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="min-w-0 truncate text-[12px] font-medium">{root.name||gitRepoName(root.repoRoot)}</span>
+                            <span className="min-w-0 truncate text-ui-body font-medium">{root.name||gitRepoName(root.repoRoot)}</span>
                             {root.isSubmodule&&(
-                              <span className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-[9px] uppercase text-[var(--taomni-text-muted)]">
+                              <span className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-ui-caption uppercase text-[var(--taomni-text-muted)]">
                                 sub
                               </span>
                             )}
                           </div>
-                          <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">{branch}</div>
+                          <div className="truncate text-ui-small text-[var(--taomni-text-muted)]">{branch}</div>
                         </div>
-                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${changes? "bg-[var(--taomni-accent)] text-white":"bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"}`}>
+                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-ui-small ${changes? "bg-[var(--taomni-accent)] text-white":"bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"}`}>
                           {changes}
                         </span>
                       </div>
@@ -207,15 +207,15 @@ export function RepoSelector({
               ))}
             </div>
             <div className="h-9 flex items-center gap-2 px-2 border-t border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
-              <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--taomni-text-muted)]">
+              <span className="min-w-0 flex-1 truncate text-ui-small text-[var(--taomni-text-muted)]">
                 {draftRoots.size} selected
               </span>
-              <button type="button" className="taomni-btn h-7 px-2 text-[12px]" onClick={closeMenu}>
+              <button type="button" className="taomni-btn h-7 px-2 text-ui-body" onClick={closeMenu}>
                 Cancel
               </button>
               <button
                 type="button"
-                className="taomni-btn h-7 px-2 text-[12px]"
+                className="taomni-btn h-7 px-2 text-ui-body"
                 disabled={draftRoots.size===0}
                 onClick={applyDraft}
               >
@@ -232,7 +232,7 @@ export function RepoSelector({
 
 export function RepoStatusIcon({ loading,error,changes }: { loading: boolean; error: string|null; changes: number; }) {
   if(loading) return <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-[var(--taomni-accent)]" />;
-  if(error) return <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" />;
+  if(error) return <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-ui-danger" />;
   if(changes) return <Circle className="w-2.5 h-2.5 shrink-0 fill-current text-[var(--taomni-accent)]" />;
   return <Check className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />;
 }

@@ -59,6 +59,17 @@ describe("remote chmod", () => {
 });
 
 
+it("preserves a known zero-byte total in the queue when an empty file completes", async () => {
+  const { result } = renderHook(() => useSftpController("sftp-session"));
+  const file = { name: "empty", path: "/remote/empty", size: 0, fileType: "file" } as FileEntry;
+  await act(async () => result.current.download(file, "/local"));
+  act(() => {
+    vi.mocked(listenSftpProgress).mock.calls[0][1]({ bytes: 0, total: 0, rate: 0, eta: 0 });
+    vi.mocked(listenSftpComplete).mock.calls[0][1]({ success: true });
+  });
+  expect(useTransferStore.getState().items[0]).toMatchObject({ bytes: 0, size: 0, state: "done" });
+});
+
 describe("transfer retry ownership", () => {
   it("ignores an old worker's completion after a cancelled download is retried", async () => {
     const { result } = renderHook(() => useSftpController("sftp-session"));

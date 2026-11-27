@@ -1,239 +1,97 @@
-import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { Button } from "../../ui/Button";
+import { Modal } from "../../ui/Modal";
+import { getLocale } from "../../../lib/i18n";
 import type { BackupSettingsViewProps } from "./BackupSettingsTypes";
-export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | "restoreModalOpen" | "setRestoreModalOpen" | "inspecting" | "manifest" | "vaultState" | "restoreVaultPassword" | "setRestoreVaultPassword" | "setInspectError" | "inspectError" | "restorePassword" | "setRestorePassword" | "handleRetryInspectWithPassword" | "restoreStaged" | "restoring" | "handleConfirmRestore">) {
-  const { t, restoreModalOpen, setRestoreModalOpen, inspecting, manifest, vaultState, restoreVaultPassword, setRestoreVaultPassword, setInspectError, inspectError, restorePassword, setRestorePassword, handleRetryInspectWithPassword, restoreStaged, restoring, handleConfirmRestore } = inputs;
-  const displayError = inspectError?.startsWith("backupSettings.") ? t(inspectError) : inspectError;
-  return <>
-      {restoreModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="backup-restore-dialog-title"
-            data-testid="backup-restore-dialog"
-            className="w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border p-5 shadow-2xl space-y-4"
-            style={{
-              background: "var(--taomni-bg)",
-              borderColor: "var(--taomni-card-border)",
-              color: "var(--taomni-text)",
-            }}
-          >
-            <div
-              className="flex items-center justify-between border-b pb-3"
-              style={{ borderColor: "var(--taomni-divider)" }}
-            >
-              <h3 id="backup-restore-dialog-title" className="font-semibold text-base flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-[var(--taomni-accent)]" />
-                {t("backupSettings.restoreModalTitle")}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setRestoreModalOpen(false)}
-                className="text-sm text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
-              >
-                ✕
-              </button>
-            </div>
 
-            <div
-              className="rounded border p-3 text-xs"
-              style={{
-                background: "var(--taomni-warning-bg)",
-                borderColor: "var(--taomni-warning-border)",
-                color: "var(--taomni-warning-text)",
-              }}
-            >
-              {t("backupSettings.restoreModalWarning")}
-            </div>
+type RestoreProps = Pick<BackupSettingsViewProps,
+  "t" | "archiveName" | "dismissRestore" | "inspecting" | "manifest" | "vaultState" |
+  "restoreVaultPassword" | "setRestoreVaultPassword" | "setInspectError" | "inspectError" |
+  "restorePassword" | "setRestorePassword" | "handleRetryInspectWithPassword" |
+  "restoreStaged" | "relaunchError" | "restartAfterRestore" | "restoring" | "handleConfirmRestore">;
 
-            {inspecting ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-8 text-xs text-[var(--taomni-text-muted)]">
-                <Loader2 className="h-5 w-5 animate-spin text-[var(--taomni-accent)]" />
-                {t("backupSettings.inspecting")}
-              </div>
-            ) : manifest ? (
-              <div className="space-y-3 text-xs">
-                <p className="text-[var(--taomni-text-muted)]">
-                  {t("backupSettings.provenance", { source: manifest.provenance ? `${manifest.provenance.deviceName} · ${manifest.provenance.deviceId}` : t("backupSettings.unknownSource") })}
-                  {t("backupSettings.restoreIdentityHint")}
-                </p>
-                <div
-                  className="grid grid-cols-2 gap-2 rounded border p-3"
-                  style={{
-                    background: "var(--taomni-card-bg)",
-                    borderColor: "var(--taomni-card-border)",
-                  }}
-                >
-                  <div>
-                    <span className="text-[var(--taomni-text-muted)]">{t("backupSettings.archiveVersion")}:</span>
-                    <div className="font-medium font-mono">{manifest.appVersion}</div>
-                  </div>
-                  <div>
-                    <span className="text-[var(--taomni-text-muted)]">{t("backupSettings.scopeLabel")}:</span>
-                    <div className="font-medium capitalize">{manifest.backupScope}</div>
-                  </div>
-                  <div>
-                    <span className="text-[var(--taomni-text-muted)]">{t("backupSettings.archiveDate")}:</span>
-                    <div className="font-mono">{new Date(manifest.createdAt).toLocaleString()}</div>
-                  </div>
-                  <div>
-                    <span className="text-[var(--taomni-text-muted)]">{t("backupSettings.archiveFilesCount")}:</span>
-                    <div className="font-mono">{t("backupSettings.filesCount", { count: manifest.files.length })}</div>
-                  </div>
-                </div>
+export function BackupRestoreDialog({
+  t, archiveName, dismissRestore, inspecting, manifest, vaultState, restoreVaultPassword,
+  setRestoreVaultPassword, inspectError, setInspectError, restorePassword, setRestorePassword,
+  handleRetryInspectWithPassword, restoreStaged, relaunchError, restartAfterRestore, restoring, handleConfirmRestore,
+}: RestoreProps) {
+  const [confirmation, setConfirmation] = useState("");
+  const password = useRef<HTMLInputElement>(null);
+  const errorId = useId();
+  const hintId = useId();
+  const locked = restoring || restoreStaged;
+  const vaultPasswordError = inspectError === "backupSettings.vaultBadPassword" || inspectError === "backupSettings.vaultPasswordRequired";
+  const archivePasswordError = inspectError === "backupSettings.badArchivePassword";
+  useEffect(() => {
+    if (vaultPasswordError || archivePasswordError) password.current?.focus();
+  }, [vaultPasswordError, archivePasswordError]);
 
-                <div
-                  data-testid="backup-restore-files"
-                  className="max-h-36 overflow-y-auto space-y-1 rounded border p-2 font-mono text-[11px] text-[var(--taomni-text-muted)]"
-                  style={{
-                    background: "var(--taomni-panel-bg)",
-                    borderColor: "var(--taomni-divider)",
-                  }}
-                >
-                  {manifest.files.map((f) => (
-                    <div key={f.path} className="flex justify-between">
-                      <span className="truncate pr-2">{f.path}</span>
-                      <span>{(f.sizeBytes / 1024).toFixed(1)} KB</span>
-                    </div>
-                  ))}
-                </div>
-
-                {vaultState !== "empty" ? (
-                  <div
-                    className="space-y-1.5 border-t pt-2"
-                    style={{ borderColor: "var(--taomni-divider)" }}
-                  >
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-[var(--taomni-text-muted)]">
-                      <ShieldCheck className="h-3.5 w-3.5 text-[var(--taomni-accent)]" />
-                      <span>{t("backupSettings.restoreVaultPasswordLabel")}</span>
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="password"
-                      data-testid="backup-restore-vault-password"
-                      value={restoreVaultPassword}
-                      onChange={(e) => {
-                        setRestoreVaultPassword(e.target.value);
-                        setInspectError(null);
-                      }}
-                      placeholder={t("backupSettings.restoreVaultPasswordPh")}
-                      className="w-full rounded border px-3 py-1.5 text-xs text-[var(--taomni-text)] outline-none focus:border-[var(--taomni-accent)] placeholder:text-[var(--taomni-text-muted)]"
-                      style={{
-                        background: "var(--taomni-input-bg)",
-                        borderColor: "var(--taomni-input-border)",
-                      }}
-                    />
-                    <p className="text-[11px] text-[var(--taomni-text-muted)]">
-                      {t("backupSettings.restoreVaultPasswordHint")}
-                    </p>
-                  </div>
-                ) : (
-                  <div
-                    className="border-t pt-2 text-[11px] italic text-[var(--taomni-text-muted)]"
-                    style={{ borderColor: "var(--taomni-divider)" }}
-                  >
-                    {t("backupSettings.vaultEmptyNotice")}
-                  </div>
-                )}
-
-                {inspectError && (
-                  <div role="alert" data-testid="backup-restore-error" className="text-xs text-red-500 bg-red-500/10 p-2.5 rounded border border-red-500/20 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                    <span>{displayError}</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {inspectError && (
-                  <div className="text-xs text-red-500 bg-red-500/10 p-2.5 rounded border border-red-500/20">
-                    {displayError}
-                  </div>
-                )}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-[var(--taomni-text-muted)]">
-                    {t("backupSettings.inputPasswordForDecrypt")}
-                  </label>
-                  <input
-                    type="password"
-                    value={restorePassword}
-                    onChange={(e) => setRestorePassword(e.target.value)}
-                    data-testid="backup-restore-password" placeholder={t("backupSettings.archivePasswordPh")}
-                    className="w-full rounded border px-3 py-2 text-xs text-[var(--taomni-text)] outline-none focus:border-[var(--taomni-accent)] placeholder:text-[var(--taomni-text-muted)]"
-                    style={{
-                      background: "var(--taomni-input-bg)",
-                      borderColor: "var(--taomni-input-border)",
-                    }}
-                  />
-                  <button
-                    type="button"
-                    data-testid="backup-restore-unlock" onClick={handleRetryInspectWithPassword}
-                    className="mt-2 w-full rounded border py-1.5 text-xs font-medium text-[var(--taomni-text)] hover:border-[var(--taomni-accent)]"
-                    style={{
-                      background: "var(--taomni-card-bg)",
-                      borderColor: "var(--taomni-input-border)",
-                    }}
-                  >
-                    {t("backupSettings.unlockAndVerify")}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {restoreStaged && (
-              <div
-                role="status"
-                data-testid="backup-restore-staged"
-                className="flex items-center gap-2 rounded border p-3 text-xs"
-                style={{
-                  background: "var(--taomni-success-bg)",
-                  borderColor: "var(--taomni-success-border)",
-                  color: "var(--taomni-success-text)",
-                }}
-              >
-                <CheckCircle2 className="h-4 w-4 flex-shrink-0" style={{ color: "var(--taomni-success-icon)" }} />
-                <span>{t("backupSettings.restoreStagedSuccess")}</span>
-              </div>
-            )}
-
-            <div
-              className="flex justify-end gap-2 border-t pt-2"
-              style={{ borderColor: "var(--taomni-divider)" }}
-            >
-              <button
-                type="button"
-                data-testid="backup-restore-cancel"
-                disabled={restoring}
-                onClick={() => setRestoreModalOpen(false)}
-                className="rounded border px-3 py-1.5 text-xs text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)]"
-                style={{
-                  background: "var(--taomni-card-bg)",
-                  borderColor: "var(--taomni-input-border)",
-                }}
-              >
-                {t("common.cancel")}
-              </button>
-              {manifest && (
-                <button
-                  type="button"
-                  data-testid="backup-restore-confirm"
-                  disabled={restoring || restoreStaged}
-                  onClick={handleConfirmRestore}
-                  className="flex items-center gap-1.5 rounded bg-red-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                >
-                  {restoring ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      {t("backupSettings.restoring")}
-                    </>
-                  ) : (
-                    t("backupSettings.confirmRestoreAndRestart")
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-  </>;
+  return <Modal title={t("backupSettings.restoreModalTitle")} testId="backup-restore-dialog"
+    initialFocus='[data-testid="backup-restore-cancel"]' onCancel={dismissRestore}
+    footer={<>
+      <Button data-testid="backup-restore-cancel" disabled={locked && relaunchError === null} onClick={dismissRestore}>{t("common.cancel")}</Button>
+      {relaunchError !== null && <Button onClick={() => void restartAfterRestore()}>{t("update.restartNow")}</Button>}
+      {manifest && <Button variant="danger" data-testid="backup-restore-confirm" busy={restoring}
+        disabled={restoreStaged || !archiveName || confirmation !== archiveName}
+        aria-describedby={hintId} onClick={() => void handleConfirmRestore(confirmation)}>
+        {t(restoring ? "backupSettings.restoring" : "backupSettings.confirmRestoreAndRestart")}
+      </Button>}
+    </>}>
+    <div className="space-y-3">
+      <p className="rounded border border-ui-warning-border bg-ui-warning-surface p-3 text-ui-warning">
+        {t("backupSettings.restoreModalWarning")}
+      </p>
+      {inspectError && inspectError !== "backupSettings.inputPasswordForDecrypt" &&
+        <p id={errorId} role="alert" data-testid="backup-restore-error" className="rounded border border-ui-danger-border bg-ui-danger-surface p-2 text-ui-danger">
+          {inspectError.startsWith("backupSettings.") ? t(inspectError) : inspectError}
+        </p>}
+      {inspecting ? <p role="status">{t("backupSettings.inspecting")}</p> : manifest ? <>
+        <p className="text-theme-muted">{t("backupSettings.provenance", {
+          source: manifest.provenance ? `${manifest.provenance.deviceName} · ${manifest.provenance.deviceId}` : t("backupSettings.unknownSource"),
+        })}{t("backupSettings.restoreIdentityHint")}</p>
+        <dl className="grid grid-cols-2 gap-2 rounded border border-theme-border bg-theme-surface p-3">
+          <div><dt className="text-theme-muted">{t("backupSettings.archiveVersion")}</dt><dd>{manifest.appVersion}</dd></div>
+          <div><dt className="text-theme-muted">{t("backupSettings.scopeLabel")}</dt><dd>{manifest.backupScope}</dd></div>
+          <div><dt className="text-theme-muted">{t("backupSettings.archiveDate")}</dt><dd>{new Date(manifest.createdAt).toLocaleString(getLocale())}</dd></div>
+          <div><dt className="text-theme-muted">{t("backupSettings.archiveFilesCount")}</dt><dd>{t("backupSettings.filesCount", { count: manifest.files.length })}</dd></div>
+        </dl>
+        <ul data-testid="backup-restore-files" className="max-h-36 overflow-y-auto rounded border border-theme-border p-2 font-mono text-ui-small">
+          {manifest.files.map((file) => <li key={file.path} className="flex justify-between gap-2">
+            <span className="break-all">{file.path}</span><span className="shrink-0">{(file.sizeBytes / 1024).toFixed(1)} KB</span>
+          </li>)}
+        </ul>
+        <label className="block"><span id={hintId}>{t("backupSettings.typeArchiveName", { name: archiveName })}</span>
+          <input className="taomni-input mt-1 w-full" value={confirmation} disabled={locked}
+            data-testid="backup-restore-name" autoComplete="off" spellCheck={false}
+            onChange={(event) => setConfirmation(event.target.value)} />
+        </label>
+        {vaultState !== "empty" ? <>
+          <label className="block">{t("backupSettings.restoreVaultPasswordLabel")}
+            <input ref={password} type="password" className="taomni-input mt-1 w-full" disabled={locked}
+              autoComplete="current-password" required aria-invalid={vaultPasswordError || undefined}
+              aria-describedby={vaultPasswordError ? errorId : undefined}
+              data-testid="backup-restore-vault-password" value={restoreVaultPassword}
+              onChange={(event) => { setRestoreVaultPassword(event.target.value); setInspectError(null); }}
+              placeholder={t("backupSettings.restoreVaultPasswordPh")} />
+          </label>
+          <p className="text-ui-small text-theme-muted">{t("backupSettings.restoreVaultPasswordHint")}</p>
+        </> : <p className="text-ui-small text-theme-muted">{t("backupSettings.vaultEmptyNotice")}</p>}
+      </> : <form className="space-y-2" onSubmit={(event) => {
+        event.preventDefault();
+        if (restorePassword) void handleRetryInspectWithPassword();
+      }}>
+        <label className="block">{t("backupSettings.inputPasswordForDecrypt")}
+          <input ref={password} type="password" data-testid="backup-restore-password" value={restorePassword}
+            required aria-invalid={archivePasswordError || undefined} aria-describedby={archivePasswordError ? errorId : undefined}
+            className="taomni-input mt-1 w-full" onChange={(event) => { setRestorePassword(event.target.value); setInspectError(null); }}
+            placeholder={t("backupSettings.archivePasswordPh")} />
+        </label>
+        <Button type="submit" data-testid="backup-restore-unlock" disabled={!restorePassword}>{t("backupSettings.unlockAndVerify")}</Button>
+      </form>}
+      {relaunchError !== null && <p role="alert" className="text-ui-danger">{t("backupSettings.restartError", { reason: relaunchError })}</p>}
+      {restoreStaged && relaunchError === null && <p role="status" data-testid="backup-restore-staged" className="rounded border border-ui-success-border bg-ui-success-surface p-2 text-ui-success">
+        {t("backupSettings.restoreStagedSuccess")}
+      </p>}
+    </div>
+  </Modal>;
 }

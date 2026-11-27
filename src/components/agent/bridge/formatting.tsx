@@ -1,3 +1,4 @@
+import { t } from "../../../lib/i18n";
 import { type SqlEcho } from "./types";
 import { uploadLocalPaths } from "./uploadPlanning";
 
@@ -46,35 +47,35 @@ export function describe(tool: string, rawArgs: Record<string, unknown> | null |
   switch (tool) {
     case "run_in_terminal":
     case "Bash":
-      return `在终端执行命令: ${String(args.command ?? "")}`;
+      return t("agent.toolRequest.terminal", { command: String(args.command ?? "") });
     case "Write":
     case "Edit":
     case "MultiEdit":
     case "NotebookEdit":
-      return `修改文件: ${String(args.file_path ?? args.notebook_path ?? "")}`;
+      return t("agent.toolRequest.edit", { path: String(args.file_path ?? args.notebook_path ?? "") });
     case "sftp_upload": {
       const localPaths = uploadLocalPaths(args);
       const remote = String(args.remote_path ?? args.remote_dir ?? "");
-      if (localPaths.length > 1) return `上传 ${localPaths.length} 个本地文件到 ${remote}`;
-      return `上传 ${localPaths[0] ?? String(args.local_path ?? "")} 到 ${remote}`;
+      if (localPaths.length > 1) return t("agent.toolRequest.uploadMany", { count: localPaths.length, remote });
+      return t("agent.toolRequest.upload", { path: localPaths[0] ?? String(args.local_path ?? ""), remote });
     }
     case "sftp_download":
-      return `下载远端文件到 ${String(args.local_dir ?? "")}`;
+      return t("agent.toolRequest.download", { path: String(args.local_dir ?? "") });
     case "save_as_runbook":
-      return `保存 Runbook: ${String(args.name ?? "")}`;
+      return t("agent.toolRequest.runbook", { name: String(args.name ?? "") });
     case "run_sql":
     case "run_sql_captured":
-      return `执行 SQL: ${String(args.sql ?? "")}`;
+      return t("agent.toolRequest.sql", { sql: String(args.sql ?? "") });
     case "export_result":
-      return `导出查询结果 (${String(args.format ?? "csv")})`;
+      return t("agent.toolRequest.exportResult", { format: String(args.format ?? "csv") });
     case "redis_set_key":
-      return `写入 Redis 键: ${String(args.key ?? "")}`;
+      return t("agent.toolRequest.redisSet", { key: String(args.key ?? "") });
     case "redis_del_key":
-      return `删除 Redis 键: ${String(args.key ?? "")}`;
+      return t("agent.toolRequest.redisDelete", { key: String(args.key ?? "") });
     case "redis_exec":
-      return `执行 Redis 命令: ${String(args.command ?? "")}`;
+      return t("agent.toolRequest.redisExec", { command: String(args.command ?? "") });
     default:
-      return `Claude Code 请求执行工具 "${tool}"`;
+      return t("agent.toolRequest.other", { tool });
   }
 }
 

@@ -151,7 +151,7 @@ export function SegmentPopup({
       id={popupId}
       data-testid="code-workspace-breadcrumb-popup"
       data-taomni-context-menu="true"
-      className="fixed z-[500] flex max-h-[min(360px,50vh)] w-[min(320px,calc(100vw-12px))] flex-col overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] text-[11px] text-[var(--taomni-code-text)] shadow-xl"
+      className="fixed z-[var(--taomni-z-popover)] flex max-h-[min(360px,50vh)] w-[min(320px,calc(100vw-12px))] flex-col overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] text-ui-small text-[var(--taomni-code-text)] shadow-xl"
       style={{ left: coords.left, top: coords.top }}
       onKeyDown={onKeyDown}
     >
@@ -166,7 +166,7 @@ export function SegmentPopup({
           aria-expanded="true"
           aria-autocomplete="list"
           aria-activedescendant={activeOptionId}
-          className="taomni-input h-6 w-full text-[11px]"
+          className="taomni-input h-6 w-full text-ui-small"
           placeholder={open.kind === "path" && open.loading ? "Loading…" : "Type to filter"}
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
@@ -177,7 +177,7 @@ export function SegmentPopup({
           <div className="px-2 py-1.5 text-[var(--taomni-code-muted)]">Loading…</div>
         )}
         {open.kind === "path" && open.error && (
-          <div className="px-2 py-1.5 text-red-400">{open.error}</div>
+          <div className="px-2 py-1.5 text-ui-danger">{open.error}</div>
         )}
         {open.kind === "path" && !open.loading && !open.error && filteredPath.length === 0 && (
           <div className="px-2 py-1.5 text-[var(--taomni-code-muted)]">
@@ -235,7 +235,7 @@ export function SegmentPopup({
               <Hash className="h-3 w-3 shrink-0 text-[var(--taomni-accent)]" />
               <span className="min-w-0 truncate">{symbol.name}</span>
               {symbol.detail && (
-                <span className="ml-auto min-w-0 max-w-[40%] truncate text-[10px] text-[var(--taomni-code-muted)]">
+                <span className="ml-auto min-w-0 max-w-[40%] truncate text-ui-caption text-[var(--taomni-code-muted)]">
                   {symbol.detail}
                 </span>
               )}
@@ -280,7 +280,7 @@ export function SegmentPopup({
                 data-testid={`code-workspace-breadcrumb-action-${action.id}`}
                 disabled={action.disabled}
                 className={`flex w-full items-center px-2 py-1 text-left hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40 ${index === safeIndex ? "bg-[var(--taomni-code-active-line-bg)]" : ""
-                  } ${action.danger ? "text-red-400" : "text-[var(--taomni-code-text)]"}`}
+                  } ${action.danger ? "text-ui-danger" : "text-[var(--taomni-code-text)]"}`}
                 onMouseEnter={() => onSelectedIndexChange(index)}
                 onClick={() => activate(index)}
               >

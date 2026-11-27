@@ -87,7 +87,7 @@ export function registerworkspaceEditsHistory2Cases(caseContext: registerworkspa
     await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "Extract generated helper" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Extract generated helper" }));
     await waitFor(() => expect(confirmAppDialog).toHaveBeenCalled());
 
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");

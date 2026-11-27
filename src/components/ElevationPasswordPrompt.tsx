@@ -34,8 +34,7 @@ export function ElevationPasswordPrompt({
   return (
     <div
       data-testid="sockscap-root-prompt-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(20,30,45,0.4)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
     >
       <form
         data-testid="sockscap-root-prompt-dialog"
@@ -50,12 +49,12 @@ export function ElevationPasswordPrompt({
         <div
           className="h-8 flex shrink-0 items-center px-3"
           style={{
-            background: "linear-gradient(to bottom, #5895c8, #2b5d8b)",
-            color: "white",
+            background: "var(--taomni-chrome-bg)",
+            color: "var(--taomni-text)",
           }}
         >
           <ShieldAlert className="w-3.5 h-3.5 mr-1.5" />
-          <span className="text-[12px] font-semibold">
+          <span className="text-ui-body font-semibold">
             {t("sockscap.rootPromptTitle")}
           </span>
           <div className="flex-1" />
@@ -64,18 +63,18 @@ export function ElevationPasswordPrompt({
             type="button"
             onClick={onCancel}
             aria-label={t("common.close")}
-            className="hover:bg-white/20 rounded p-0.5"
+            className="hover:bg-[var(--taomni-control-hover)] rounded p-0.5"
           >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
         <div className="min-h-0 overflow-y-auto p-4">
-          <div className="text-[12px] mb-3 text-[var(--taomni-text-muted)]">
+          <div className="text-ui-body mb-3 text-[var(--taomni-text-muted)]">
             {subtitle}
           </div>
 
-          <label className="block text-[12px] mb-1 font-medium text-[var(--taomni-text)]">
+          <label className="block text-ui-body mb-1 font-medium text-[var(--taomni-text)]">
             {t("sockscap.rootPasswordLabel")}
           </label>
           <input
@@ -85,7 +84,7 @@ export function ElevationPasswordPrompt({
             autoFocus
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="taomni-input w-full h-8 text-[13px]"
+            className="taomni-input w-full h-8 text-ui-body"
             placeholder={t("sockscap.rootPasswordPlaceholder")}
             disabled={busy}
           />
@@ -93,8 +92,8 @@ export function ElevationPasswordPrompt({
           {error && (
             <div
               data-testid="sockscap-root-prompt-error"
-              className="mt-2 text-[12px]"
-              style={{ color: "var(--taomni-error, #c33)" }}
+              className="mt-2 text-ui-body"
+              style={{ color: "var(--taomni-danger-text, #c33)" }}
             >
               {error}
             </div>

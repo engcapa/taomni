@@ -124,7 +124,7 @@ export function StructuralSearchPanel({ session, onOpenMatch }: StructuralSearch
       data-testid="structural-search-panel"
       data-phase={phase}
       data-active-requests={capabilities ? String(capabilities.activeRequests) : undefined}
-      className="flex h-full min-h-0 flex-col text-[12px]"
+      className="flex h-full min-h-0 flex-col text-ui-body"
     >
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-2">
         <span className="shrink-0 font-medium">Find</span>
@@ -138,7 +138,7 @@ export function StructuralSearchPanel({ session, onOpenMatch }: StructuralSearch
         <button
           type="button"
           data-testid="structural-search-edit-query"
-          className="h-6 rounded px-2 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)]"
+          className="h-6 rounded px-2 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
           onClick={session.open}
         >
           Edit Query…
@@ -154,7 +154,7 @@ export function StructuralSearchPanel({ session, onOpenMatch }: StructuralSearch
         onKeyDown={onKeyDown}
       >
         {phase === "cancelled" ? (
-          <div data-testid="structural-search-cancelled" role="status" className="px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]">
+          <div data-testid="structural-search-cancelled" role="status" className="px-3 py-1 text-ui-small text-[var(--taomni-code-muted)]">
             Search cancelled{result ? " — showing the previous results" : ""}.
           </div>
         ) : null}
@@ -163,7 +163,7 @@ export function StructuralSearchPanel({ session, onOpenMatch }: StructuralSearch
             No occurrences found for the template in {result?.query.scope === "file" ? "the current file" : result?.query.scope === "module" ? "the module" : "the project"}.
           </div>
         ) : phase === "unavailable" ? (
-          <div data-testid="structural-search-unavailable" className="px-3 py-6 text-center text-amber-700 dark:text-amber-300">
+          <div data-testid="structural-search-unavailable" className="px-3 py-6 text-center text-ui-warning">
             {message ?? "Structural Search backend is not available"}
           </div>
         ) : !result ? (
@@ -208,7 +208,7 @@ export function StructuralSearchPanel({ session, onOpenMatch }: StructuralSearch
               ) : (
                 <>
                   <span className={`min-w-0 truncate ${row.kind === "file" ? "" : "font-mono"}`}>{row.label}</span>
-                  <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">
+                  <span className="shrink-0 text-ui-caption text-[var(--taomni-code-muted)]">
                     {row.count} result{row.count === 1 ? "" : "s"}
                   </span>
                 </>
@@ -219,7 +219,7 @@ export function StructuralSearchPanel({ session, onOpenMatch }: StructuralSearch
       </div>
       <div
         data-testid="structural-search-backend"
-        className="flex h-6 shrink-0 items-center gap-2 border-t border-[var(--taomni-code-border)] px-2 text-[10px] text-[var(--taomni-code-muted)]"
+        className="flex h-6 shrink-0 items-center gap-2 border-t border-[var(--taomni-code-border)] px-2 text-ui-caption text-[var(--taomni-code-muted)]"
       >
         <span className="min-w-0 truncate">{backendLabel ? `Parser: ${backendLabel}` : "Parser: unavailable"}</span>
         {result ? <span>· {result.filesScanned} file{result.filesScanned === 1 ? "" : "s"} · {result.elapsedMs} ms</span> : null}

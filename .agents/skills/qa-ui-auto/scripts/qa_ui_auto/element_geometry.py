@@ -22,6 +22,10 @@ def assert_geometry(args: dict, measurements: list[dict]) -> None:
                 raise StepError(f"{prefix}: {label} {dimension} {value} < {minimum}")
         if args.get("same_width") and abs(item["width"] - measurements[0]["width"]) > tolerance:
             raise StepError(f"{prefix}: {label} width {item['width']} differs from {measurements[0]['width']}")
+        if "hit_height" in args:
+            actual = item["hit_height"]
+            if abs(actual - args["hit_height"]) > tolerance:
+                raise StepError(f"{prefix}: {label} hit height {actual} differs from {args['hit_height']}px")
         if "viewport_margin" in args:
             margin = args["viewport_margin"]
             for edge, bound, minimum in (("left", margin, True), ("top", margin, True),
@@ -39,11 +43,23 @@ def assert_geometry(args: dict, measurements: list[dict]) -> None:
 
 def run_geometry(args: dict, evaluate, case_dir: Path) -> str:
     selector = json.dumps(args["selector"])
+    # Older WKWebView versions expose pre-zoom DOM rectangles. Hit test in
+    # viewport CSS pixels to independently measure the visible, actionable row.
+    hit_height = "undefined"
+    if "hit_height" in args:
+        hit_height = """(() => {
+          const x = Math.floor(Math.min(innerWidth - 1, Math.max(0, rect.left + rect.width / 2)));
+          let count = 0;
+          for (let y = 0; y < innerHeight; y++) {
+            if (element.contains(document.elementFromPoint(x + 0.5, y + 0.5))) count++;
+          }
+          return count;
+        })()"""
     expression = f"""Array.from(document.querySelectorAll({selector}), element => {{
       const rect = element.getBoundingClientRect();
       const icon = element.querySelector('svg')?.getBoundingClientRect();
       return {{id: element.getAttribute('data-testid') || element.id || element.tagName,
-        width: rect.width, height: rect.height,
+        width: rect.width, height: rect.height, hit_height: {hit_height},
         left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
         viewport_width: window.innerWidth, viewport_height: window.innerHeight,
         icon: icon ? {{width: icon.width, height: icon.height}} : null}};

@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Trash2, X, Eraser, Pause, Play, RotateCw, ChevronDown, ChevronUp, ArrowLeftRight } from "lucide-react";
 import { useTransferStore } from "../../stores/transferStore";
@@ -179,19 +180,19 @@ export function FileTransferQueue({
     return (
       <div
         data-testid="sftp-transfer-queue-collapsed"
-        className="h-6 border-t px-2 flex items-center gap-2 text-[11px] cursor-pointer hover:bg-[var(--taomni-hover)] select-none shrink-0 transition-colors"
+        className="h-6 border-t px-2 flex items-center gap-2 text-ui-small cursor-pointer hover:bg-[var(--taomni-hover)] select-none shrink-0 transition-colors"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
         onClick={toggleOpen}
         title={t("fileBrowser.transferExpand")}
       >
         <ChevronUp className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
         <span className="font-semibold">{t("fileBrowser.transferTitle")}</span>
-        <span className="text-[var(--taomni-text-muted)] text-[10px] px-1.5 py-0.5 rounded bg-[var(--taomni-hover)]">
+        <span className="text-[var(--taomni-text-muted)] text-ui-caption px-1.5 py-0.5 rounded bg-[var(--taomni-hover)]">
           {filtered.length}
         </span>
         {hasActive && (
-          <span className="text-emerald-500 text-[10px] flex items-center gap-1 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-ui-success text-ui-caption flex items-center gap-1 font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--taomni-success-icon)] animate-pulse" />
             {t("fileBrowser.transferActive", { count: activeCount })}
           </span>
         )}
@@ -199,7 +200,7 @@ export function FileTransferQueue({
         <button
           type="button"
           data-testid="sftp-transfer-queue-expand-btn"
-          className="px-1.5 py-0.5 text-[10px] text-[var(--taomni-accent)] hover:underline rounded"
+          className="px-1.5 py-0.5 text-ui-caption text-[var(--taomni-accent)] hover:underline rounded"
           title={t("fileBrowser.transferExpand")}
           onClick={(e) => {
             e.stopPropagation();
@@ -220,7 +221,7 @@ export function FileTransferQueue({
     >
       <div
         data-testid="sftp-transfer-queue-resize-handle"
-        className="h-1.5 -mt-0.5 cursor-row-resize bg-[var(--taomni-divider)]/40 hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors relative z-10 flex items-center justify-center group select-none"
+        className="h-1.5 -mt-0.5 cursor-row-resize bg-[var(--taomni-divider)]/40 hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors relative z-[var(--taomni-z-sticky)] flex items-center justify-center group select-none"
         onPointerDown={startResize}
       >
         <div className="w-8 h-0.5 rounded-full bg-transparent group-hover:bg-white/50 transition-colors" />
@@ -228,7 +229,7 @@ export function FileTransferQueue({
 
       {showCrossHostBanner && (
         <div
-          className="text-[11px] px-2 py-1 border-b shrink-0 flex items-center gap-2"
+          className="text-ui-small px-2 py-1 border-b shrink-0 flex items-center gap-2"
           style={{
             borderColor: "var(--taomni-divider)",
             background: "var(--taomni-quick-bg)",
@@ -242,7 +243,7 @@ export function FileTransferQueue({
           <button
             type="button"
             disabled
-            className="ml-auto px-1.5 py-0.5 rounded text-[10px] opacity-50 cursor-not-allowed"
+            className="ml-auto px-1.5 py-0.5 rounded text-ui-caption opacity-50 cursor-not-allowed"
             style={{ border: "1px solid var(--taomni-divider)" }}
             title={t("fileBrowser.crossHostPickPeerTitle")}
           >
@@ -252,40 +253,40 @@ export function FileTransferQueue({
       )}
 
       <div
-        className="h-6 px-2 flex items-center text-[11px] font-semibold gap-2 shrink-0 select-none"
+        className="h-6 px-2 flex items-center text-ui-small font-semibold gap-2 shrink-0 select-none"
         style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
         <span>{t("fileBrowser.transferTitle")}</span>
-        <span className="text-[var(--taomni-text-muted)] text-[10px] px-1.5 py-0.5 rounded bg-[var(--taomni-hover)]">
+        <span className="text-[var(--taomni-text-muted)] text-ui-caption px-1.5 py-0.5 rounded bg-[var(--taomni-hover)]">
           {filtered.length}
         </span>
         {hasActive && (
-          <span className="text-emerald-500 text-[10px] flex items-center gap-1 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-ui-success text-ui-caption flex items-center gap-1 font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--taomni-success-icon)] animate-pulse" />
             {t("fileBrowser.transferActive", { count: activeCount })}
           </span>
         )}
         <div className="flex-1" />
         <button
           type="button"
-          className="px-1.5 py-0.5 hover:bg-[var(--taomni-hover)] rounded inline-flex items-center gap-1 text-[10px]"
+          className="px-1.5 py-0.5 hover:bg-[var(--taomni-hover)] rounded inline-flex items-center gap-1 text-ui-caption"
           title={t("fileBrowser.transferClearTitle")}
           onClick={clearCompleted}
         >
           <Eraser className="w-3 h-3" /> {t("fileBrowser.transferClear")}
         </button>
-        <button
+        <IconButton
           type="button"
           data-testid="sftp-transfer-queue-close"
           className="px-1 py-0.5 hover:bg-[var(--taomni-hover)] rounded inline-flex items-center text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
-          title={t("fileBrowser.transferClose")}
+          label={t("fileBrowser.transferClose")}
           onClick={toggleOpen}
         >
           <ChevronDown className="w-3.5 h-3.5" />
-        </button>
+        </IconButton>
       </div>
 
-      <div className="overflow-auto text-[11px] flex-1 min-h-0">
+      <div className="overflow-auto text-ui-small flex-1 min-h-0">
         {filtered.length === 0 && (
           <div className="px-2 py-2 text-[var(--taomni-text-muted)]">
             {t("fileBrowser.transferEmptyText")}
@@ -316,7 +317,7 @@ export function FileTransferQueue({
               style={{ borderColor: "var(--taomni-divider)" }}
             >
               <div className="flex items-center gap-2 truncate">
-                <span style={{ color: it.direction === "upload" ? "#3a7ac0" : "#3da064" }}>
+                <span style={{ color: it.direction === "upload" ? "var(--taomni-info-icon)" : "var(--taomni-success-icon)" }}>
                   {it.direction === "upload" ? "↑" : "↓"}
                 </span>
                 <span className="truncate flex-1">
@@ -339,53 +340,53 @@ export function FileTransferQueue({
                   </span>
                 )}
                 {canPause && (
-                  <button
+                  <IconButton
                     type="button"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
-                    title={t("fileBrowser.transferPause")}
+                    label={t("fileBrowser.transferPause")}
                     onClick={() => onPause!(it.id)}
                   >
                     <Pause className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 )}
                 {canResume && (
-                  <button
+                  <IconButton
                     type="button"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
-                    title={t("fileBrowser.transferResume")}
+                    label={t("fileBrowser.transferResume")}
                     onClick={() => onResume!(it.id)}
                   >
                     <Play className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 )}
                 {canRetry && (
-                  <button
+                  <IconButton
                     type="button"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
-                    title={t("fileBrowser.transferRetryTitle")}
+                    label={t("fileBrowser.transferRetryTitle")}
                     onClick={() => onRetry!(it.id)}
                   >
                     <RotateCw className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 )}
                 {isInFlight || it.state === "paused" ? (
-                  <button
+                  <IconButton
                     type="button"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
-                    title={t("fileBrowser.transferCancelTitle")}
+                    label={t("fileBrowser.transferCancelTitle")}
                     onClick={() => onCancel(it.id)}
                   >
                     <X className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 ) : (
-                  <button
+                  <IconButton
                     type="button"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
-                    title={t("fileBrowser.transferRemoveTitle")}
+                    label={t("fileBrowser.transferRemoveTitle")}
                     onClick={() => remove(it.id)}
                   >
                     <Trash2 className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 )}
               </div>
               <div
@@ -398,17 +399,17 @@ export function FileTransferQueue({
                     width: `${pct}%`,
                     background:
                       it.state === "error"
-                        ? "#c0432a"
+                        ? "var(--taomni-danger-icon)"
                         : it.state === "done"
-                          ? "#3da064"
+                          ? "var(--taomni-success-icon)"
                           : it.state === "paused"
-                            ? "#d99a2b"
+                            ? "var(--taomni-warning-icon)"
                             : "var(--taomni-accent)",
                   }}
                 />
               </div>
               {it.error && (
-                <div className="text-[10px] mt-0.5 text-red-500 truncate">{it.error}</div>
+                <div className="text-ui-caption mt-0.5 text-ui-danger truncate">{it.error}</div>
               )}
             </div>
           );
@@ -420,15 +421,15 @@ export function FileTransferQueue({
 
 function StateBadge({ state }: { state: TransferState }) {
   const colors: Record<TransferState, string> = {
-    queued: "bg-slate-500",
-    running: "bg-[var(--taomni-accent)]",
-    paused: "bg-amber-500",
-    done: "bg-emerald-600",
-    error: "bg-red-600",
-    cancelled: "bg-slate-400",
+    queued: "bg-[var(--taomni-panel-bg)] text-[var(--taomni-text)]",
+    running: "bg-ui-info-surface text-ui-info",
+    paused: "bg-ui-warning-surface text-ui-warning",
+    done: "bg-ui-success-surface text-ui-success",
+    error: "bg-ui-danger-surface text-ui-danger",
+    cancelled: "bg-[var(--taomni-panel-bg)] text-[var(--taomni-text-muted)]",
   };
   return (
-    <span className={`text-white text-[10px] px-1 rounded ${colors[state]}`}>
+    <span className={`text-ui-caption px-1 rounded ${colors[state]}`}>
       {state}
     </span>
   );

@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecoveryWorkspace } from "./RecoveryWorkspace";
 import type { RecoveryBootstrap } from "../../lib/runtimeRecovery";
 
+import { setLocale } from "../../lib/i18n";
+
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), channels: [] as Array<{ id: number; onmessage: (data: number[]) => void }> }));
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: mocks.invoke,
@@ -23,8 +25,19 @@ const bootstrap = (): RecoveryBootstrap => ({
   ] },
 });
 describe("limited recovery workspace", () => {
-  beforeEach(() => { mocks.invoke.mockReset(); mocks.invoke.mockResolvedValue(undefined); mocks.channels.length = 0; });
-  afterEach(cleanup);
+  beforeEach(() => { setLocale("zh-CN"); mocks.invoke.mockReset(); mocks.invoke.mockResolvedValue(undefined); mocks.channels.length = 0; });
+  afterEach(() => { cleanup(); setLocale("en"); });
+  it("switches the recovery explanation and active observation language without reattaching the terminal", async () => {
+    render(<RecoveryWorkspace bootstrap={bootstrap()} />);
+    await screen.findByText("有限恢复界面已就绪");
+    fireEvent.click(screen.getByTestId("recovery-observe"));
+    await screen.findByText("已订阅原终端；无输出不代表任务已结束");
+    act(() => setLocale("en"));
+    expect(screen.getByTestId("recovery-handshake")).toHaveTextContent("The recovery window is ready.");
+    expect(screen.getByTestId("recovery-output-status")).toHaveTextContent("Observing the original terminal");
+    expect(screen.getByTestId("recovery-policy")).toHaveTextContent("new output from the original terminal");
+    expect(mocks.invoke.mock.calls.map(([command]) => command)).toEqual(["recovery_ready", "attach_terminal_output"]);
+  });
   it("restores selection and metadata, no automatic connect/create/send even in StrictMode", async () => {
     render(<StrictMode><RecoveryWorkspace bootstrap={bootstrap()} /></StrictMode>);
     await screen.findByText("有限恢复界面已就绪");

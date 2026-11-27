@@ -52,16 +52,16 @@ export const ProjectFactsStatusBadge: React.FC<ProjectFactsStatusBadgeProps> = (
       data-testid="project-facts-status-badge"
       className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs border ${
         discoveryLabel && status === "idle"
-          ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
+          ? "bg-ui-info-surface text-ui-info border-ui-info-border"
           : status === "ready" && !isStale
-          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+          ? "bg-ui-success-surface text-ui-success border-ui-success-border"
           : status === "loading"
-          ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+          ? "bg-ui-info-surface text-ui-info border-ui-info-border"
           : status === "untrusted"
-          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+          ? "bg-ui-warning-surface text-ui-warning border-ui-warning-border"
           : status === "degraded" || isStale
-          ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20"
-          : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+          ? "bg-ui-warning-surface text-ui-warning border-ui-warning-border"
+          : "bg-ui-danger-surface text-ui-danger border-ui-danger-border"
       } ${className}`}
       title={reason || discoveryReason || (isStale ? "Project structure is stale" : `Project facts (${status})`)}
     >

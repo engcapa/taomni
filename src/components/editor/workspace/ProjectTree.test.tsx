@@ -177,12 +177,15 @@ describe("ProjectTree navigation across views", () => {
 
     // Directory chevron arrow: click toggles and selects
     const dirArrow = screen.getByTestId("code-workspace-tree-dir-arrow");
+    expect(dirArrow).toHaveAttribute("aria-hidden", "true");
+    expect(dir.querySelector('[role="button"]')).toBeNull();
     onToggleDir.mockClear();
     fireEvent.click(dirArrow);
     expect(onToggleDir).toHaveBeenCalledWith("root", "src");
 
     // Root chevron arrow: click toggles and selects
     const rootArrow = screen.getByTestId("code-workspace-tree-root-arrow");
+    expect(rootArrow).toHaveAttribute("aria-hidden", "true");
     fireEvent.click(rootArrow);
     expect(onToggleRoot).toHaveBeenCalledWith("root");
   });

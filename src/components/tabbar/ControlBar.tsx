@@ -1,3 +1,4 @@
+import { pageZoomCommands, zoomBinding } from "../../lib/pageZoom";
 import {
   Download,
   FileText,
@@ -119,7 +120,8 @@ export function ControlBar({
     previewNode,
   } = useSessionImportExport();
 
-  const openMainMenu = (event: React.MouseEvent) => {
+  const openMainMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const menuButton = event.currentTarget;
     // Opening a menu samples current ownership without subscribing the entire
     // window to every editor selection, mount and command-state publication.
     const commands = getWorkspaceCommands ? getWorkspaceCommands()?.items ?? [] : workspaceCommands;
@@ -181,6 +183,8 @@ export function ControlBar({
         testId: "context-menu-item-view",
         icon: <PanelLeft className="w-3 h-3" />,
         children: [
+          ...pageZoomCommands.map(({ id, label, key }) => ({ label: t(label), shortcut: zoomBinding(key), onClick: () => onCommand(id) })),
+          { label: "", separator: true },
           { label: t("sidebar.headerTitle"), testId: "context-menu-item-toggle-sidebar", icon: <PanelLeft className="w-3 h-3" />, onClick: onToggleSidebar },
           { label: t("menu.quickConnectToolbar"), testId: "context-menu-item-toggle-quick-connect", icon: <Search className="w-3 h-3" />, checked: quickConnectVisible, onClick: () => onCommand("toggle-quick-connect") },
           { label: t("menu.splitTerminal"), testId: "context-menu-item-split-terminal", icon: <SplitSquareVertical className="w-3 h-3" />, onClick: () => onCommand("split") },
@@ -222,7 +226,11 @@ export function ControlBar({
       },
       { label: t("menu.xserver"), testId: "context-menu-item-xserver", icon: <Monitor className="w-3 h-3" />, checked: xServerEnabled, onClick: () => onCommand("toggle-xserver") },
       { label: t("menu.settings"), testId: "context-menu-item-settings", icon: <Settings className="w-3 h-3" />, onClick: () => onCommand("settings") },
-      { label: t("menu.help"), testId: "context-menu-item-help", icon: <HelpCircle className="w-3 h-3" />, onClick: () => onCommand("help") },
+      { label: t("menu.help"), testId: "context-menu-item-help", icon: <HelpCircle className="w-3 h-3" />, onClick: () => {
+        // The selected item unmounts as About opens. Retain its keyboard return target.
+        menuButton.focus();
+        onCommand("help");
+      } },
       { label: "", separator: true, onClick: () => {} },
       { label: t("ribbon.exit"), testId: "context-menu-item-exit", icon: <Power className="w-3 h-3" />, onClick: () => onCommand("exit"), danger: true },
     ]);
@@ -261,7 +269,7 @@ export function ControlBar({
         ) : activeSideTab === "explorer" ? (
           <ExplorerTabStrip />
         ) : activeSideTab === "home" || activeSideTab === "agents" || (activeSideTab === "tools" && !hasToolsSurfaceTabs) ? (
-          <div className="flex h-full items-center gap-2 px-2 text-[12px] font-semibold" data-testid="platform-mode-title">
+          <div className="flex h-full items-center gap-2 px-2 text-ui-body font-semibold" data-testid="platform-mode-title">
             {t(activeSideTab === "home" ? "platform.homeTitle" : activeSideTab === "tools" ? "platform.tools" : "platform.agentsTitle")}
           </div>
         ) : (
@@ -342,8 +350,8 @@ function UpdateHint() {
           <Download className="w-4 h-4" />
           <span
             aria-hidden="true"
-            className="absolute -top-0.5 -right-0.5 w-[7px] h-[7px] rounded-full"
-            style={{ background: "#e5534b", boxShadow: "0 0 0 1.5px var(--taomni-chrome-bg)" }}
+            className="absolute -top-0.5 -right-0.5 w-[7px] h-[7px] rounded-full ring-[1.5px] ring-[var(--taomni-chrome-bg)]"
+            style={{ background: "var(--taomni-danger)" }}
           />
         </span>
       }
@@ -361,7 +369,7 @@ function BarButton({
 }: {
   icon: React.ReactNode;
   title: string;
-  onClick?: (event: React.MouseEvent) => void;
+  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
   testId?: string;
   active?: boolean;
   expanded?: boolean;

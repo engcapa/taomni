@@ -1,0 +1,70 @@
+id: TC-UIC-024-tunnel-validation
+title: A tunnel draft leads the keyboard to the invalid field and preserves the corrected gateway
+covers: [F8.2]
+tags: [ui-contract, tunnel]
+modes: [browser, native]
+fixtures: [reset_db]
+ui_standard: [UI-INP-02, UI-DLG-12, UI-FND-03a]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tunnel-validation
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="light"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-tunneling"]'
+- click: '[data-testid="tunnel-new"]'
+- press: {selector: '[data-testid="tunnel-editor-save"]', key: Enter}
+- assert_focus_on: 'input[placeholder="e.g. postgres-replica"][aria-invalid="true"]'
+- assert_text: {selector: '[data-testid="tunnel-editor"] [role="alert"]', contains: Tunnel name is required}
+- assert_solid_text_contrast: {selector: '[data-testid="tunnel-editor"] [role="alert"]', minimum: 4.5}
+- fill: {selector: 'input[placeholder="e.g. postgres-replica"]', value: qa-tunnel-validation}
+- assert_not_visible: '[data-testid="tunnel-editor"] [role="alert"]'
+- press: {selector: '[data-testid="tunnel-editor-save"]', key: Enter}
+- assert_focus_on: 'input[placeholder="ssh.example.com"][aria-invalid="true"]'
+- assert_attribute: {selector: 'input[placeholder="e.g. postgres-replica"]', name: value, equals: qa-tunnel-validation}
+- fill: {selector: 'input[placeholder="ssh.example.com"]', value: gateway.invalid}
+- fill: {selector: 'input[placeholder="user"]', value: tester}
+- fill: {selector: 'input[placeholder="0"]', value: '65536'}
+- press: {selector: '[data-testid="tunnel-editor-save"]', key: Enter}
+- assert_focus_on: 'input[placeholder="0"][aria-invalid="true"]'
+- assert_text: {selector: '[data-testid="tunnel-editor"] [role="alert"]', contains: '65535'}
+- fill: {selector: 'input[placeholder="0"]', value: '1080'}
+- click: '[data-testid="tunnel-editor"] input[type="radio"][value="Dynamic"]'
+- click: '[data-testid="tunnel-editor-save"]'
+- assert_text: {selector: '[data-testid="tunnel-list"] tbody', contains: qa-tunnel-validation}
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="dark"]'
+- click: '[data-testid="tunnel-new"]'
+- click: '[data-testid="tunnel-editor-save"]'
+- assert_solid_text_contrast: {selector: '[data-testid="tunnel-editor"] [role="alert"]', minimum: 4.5}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: field-validation
+    ui_standard: [UI-INP-02, UI-DLG-12]
+    requirement: Saving a partial configuration focuses the invalid field and allows a corrected dynamic tunnel to be saved.
+    actions: [8, 12, 14, 17, 18, 19, 20, 23, 24, 25]
+    checkpoints:
+    - {step: 9, expectation: The name field owns focus and reports the validation error.}
+    - {step: 10, expectation: The alert explains the required name.}
+    - {step: 13, expectation: Correcting the name clears the stale alert.}
+    - {step: 15, expectation: The missing gateway is the next focused invalid field.}
+    - {step: 16, expectation: The entered name is retained.}
+    - {step: 21, expectation: The invalid listener port owns focus.}
+    - {step: 22, expectation: The diagnostic specifies the upper limit.}
+    - {step: 26, expectation: The corrected tunnel is listed after saving through the normal editor.}
+    results: [9, 10, 13, 15, 16, 21, 22, 26]
+  - id: diagnostic-contrast
+    ui_standard: [UI-FND-03a]
+    requirement: Validation feedback is legible in both selected appearances.
+    actions: [3, 8, 27, 30]
+    checkpoints:
+    - {step: 11, expectation: Light error feedback clears 4.5 to 1.}
+    - {step: 31, expectation: Dark error feedback clears 4.5 to 1.}
+    results: [11, 31]
+  native:
+  - {check: Persist the corrected tunnel using the packaged editor., method: automated, reason: The native tunnel store reloads the saved row.}
+  visual:
+  - {check: Error panel appearance., method: automated, reason: Measures the rendered diagnostic in light and dark themes.}

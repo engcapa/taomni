@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { setLocale } from "./i18n";
 import { RECOVERY_LIMITATIONS, recoveryLimitation } from "./recoveryPolicy";
 describe("fail-closed recovery policy", () => {
+  beforeEach(() => { setLocale("zh-CN"); });
+  afterEach(() => { setLocale("en"); });
   it("has an explicit explanation for every current tab kind, not an automatic connect default", () => {
     expect(Object.keys(RECOVERY_LIMITATIONS)).toHaveLength(23);
     for (const [kind, limitation] of Object.entries(RECOVERY_LIMITATIONS)) {

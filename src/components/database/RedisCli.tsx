@@ -173,7 +173,7 @@ export const RedisCli = forwardRef<RedisCliHandle, RedisCliProps>(function Redis
     return (
       <button
         type="button"
-        className="h-7 shrink-0 w-full flex items-center gap-2 px-2 text-[11px]"
+        className="h-7 shrink-0 w-full flex items-center gap-2 px-2 text-ui-small"
         style={{
           background: "var(--taomni-quick-bg)",
           borderTop: "1px solid var(--taomni-divider)",
@@ -190,7 +190,7 @@ export const RedisCli = forwardRef<RedisCliHandle, RedisCliProps>(function Redis
     <div className="h-full flex flex-col min-h-0" data-testid="redis-cli">
       {cliMenu.render}
       <div
-        className="h-7 shrink-0 flex items-center gap-2 px-2 text-[11px]"
+        className="h-7 shrink-0 flex items-center gap-2 px-2 text-ui-small"
         style={{
           background: "var(--taomni-quick-bg)",
           borderTop: "1px solid var(--taomni-divider)",
@@ -230,7 +230,7 @@ export const RedisCli = forwardRef<RedisCliHandle, RedisCliProps>(function Redis
           <div className="relative">
             <button
               type="button"
-              className="inline-flex items-center gap-1 px-1.5 rounded hover:bg-[var(--taomni-hover)] text-[11px]"
+              className="inline-flex items-center gap-1 px-1.5 rounded hover:bg-[var(--taomni-hover)] text-ui-small"
               data-testid="redis-ai-answer-language-toggle"
               title={t("codeWorkspaceAi.answerLanguageTooltip", { current: t(answerLanguageLabelKey(answerLanguage)) })}
               onClick={() => setLangMenuOpen((v) => !v)}
@@ -241,7 +241,7 @@ export const RedisCli = forwardRef<RedisCliHandle, RedisCliProps>(function Redis
             </button>
             {langMenuOpen && (
               <div
-                className="absolute left-0 top-full mt-1 z-50 py-1 rounded shadow-lg border text-[11px] min-w-[120px]"
+                className="absolute left-0 top-full mt-1 z-[var(--taomni-z-popover)] py-1 rounded shadow-lg border text-ui-small min-w-[120px]"
                 style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
               >
                 {AI_ANSWER_LANGUAGES.map((lang) => (
@@ -276,7 +276,7 @@ export const RedisCli = forwardRef<RedisCliHandle, RedisCliProps>(function Redis
         <button
           type="button"
           className="inline-flex items-center gap-1 px-1.5 rounded hover:bg-[var(--taomni-hover)]"
-          style={{ color: monitoring ? "#d9534f" : "var(--taomni-text-muted)" }}
+          style={{ color: monitoring ? "var(--taomni-danger-text)" : "var(--taomni-text-muted)" }}
           onClick={toggleMonitor}
           title="Toggle MONITOR"
         >
@@ -293,7 +293,7 @@ export const RedisCli = forwardRef<RedisCliHandle, RedisCliProps>(function Redis
       </div>
       <div
         ref={outputRef}
-        className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-2 font-mono text-[12px]"
+        className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-2 font-mono text-ui-body"
         onContextMenu={(event) => openCliContextMenu(event)}
         style={{
           background: "var(--taomni-term-bg)",
@@ -316,7 +316,7 @@ export const RedisCli = forwardRef<RedisCliHandle, RedisCliProps>(function Redis
                 {onExplain && (
                   <button
                     type="button"
-                    className="shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 inline-flex items-center gap-1 rounded px-1 text-[10px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)] transition-opacity"
+                    className="shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 inline-flex items-center gap-1 rounded px-1 text-ui-caption text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)] transition-opacity"
                     data-testid="redis-explain-line"
                     title={t("dbAi.explainReplyTooltip")}
                     onClick={() => onExplain(line.cmd!, line.reply)}
@@ -326,7 +326,7 @@ export const RedisCli = forwardRef<RedisCliHandle, RedisCliProps>(function Redis
                 )}
               </div>
             )}
-            <pre className="whitespace-pre-wrap" style={{ color: line.error ? "#ff6b6b" : undefined, margin: 0 }}>
+            <pre className="whitespace-pre-wrap" style={{ color: line.error ? "var(--taomni-danger-text)" : undefined, margin: 0 }}>
               {line.reply}
             </pre>
           </div>
@@ -338,7 +338,7 @@ export const RedisCli = forwardRef<RedisCliHandle, RedisCliProps>(function Redis
         onContextMenu={(event) => openCliContextMenu(event, { command: input })}
       >
         <span
-          className="text-[var(--taomni-accent)] font-mono text-[12px]"
+          className="text-[var(--taomni-accent)] font-mono text-ui-body"
           style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
         >
           &gt;

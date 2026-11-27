@@ -355,7 +355,7 @@ export function useTerminalInteraction(context: UseTerminalInteractionContext) {
     closeSearch,
     cancelPendingSearch,
     runSearch,
-    setSearchStatus,
+    setSearchComplete,
     setSearchMatches,
     setActiveSearchIndex,
     searchValue,
@@ -364,7 +364,7 @@ export function useTerminalInteraction(context: UseTerminalInteractionContext) {
     searchMatches,
     activeSearchIndex,
     setSearchValue,
-    searchStatus,
+    searchComplete,
   } = useTerminalSearchActions({ searchAddonRef: panel.searchAddonRef, termRef: panel.termRef, clearTerminalBlockSelection, focusTerminal, searchInputRef: panel.searchInputRef });
   return {
     focusTerminal,
@@ -410,7 +410,7 @@ export function useTerminalInteraction(context: UseTerminalInteractionContext) {
     fallbackSearchRef,
     setSearchMatches,
     setActiveSearchIndex,
-    setSearchStatus,
+    setSearchComplete,
     syncTerminalSize,
     flushRecordedOutput,
     setResolvedLocalShellId,
@@ -430,7 +430,7 @@ export function useTerminalInteraction(context: UseTerminalInteractionContext) {
     searchValue,
     setSearchValue,
     runSearch,
-    searchStatus,
+    searchComplete,
     historyHostKey,
   };
 }

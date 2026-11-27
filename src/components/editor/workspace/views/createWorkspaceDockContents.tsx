@@ -193,8 +193,8 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
       icon: WORKSPACE_TOOL_ICONS["problems"],
       badge: problems.activeProblemCounts.errors > 0 || problems.activeProblemCounts.warnings > 0 ? (
         <span className="inline-flex items-center gap-1">
-          {problems.activeProblemCounts.errors > 0 && <span className="text-red-500">{problems.activeProblemCounts.errors}</span>}
-          {problems.activeProblemCounts.warnings > 0 && <span className="text-amber-500">{problems.activeProblemCounts.warnings}</span>}
+          {problems.activeProblemCounts.errors > 0 && <span className="text-ui-danger">{problems.activeProblemCounts.errors}</span>}
+          {problems.activeProblemCounts.warnings > 0 && <span className="text-ui-warning">{problems.activeProblemCounts.warnings}</span>}
         </span>
       ) : undefined,
       renderContent: () => (
@@ -437,7 +437,7 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
       // Mounted on first open and kept, so the commit message and
       // selection survive hiding the tool window.
       renderContent: () => gitSnapshotOwner.gitRoots.length > 0 && (gitToolWindowMounted || (bottomDockOpen && bottomDockTab === "git")) ? (
-        <div data-testid="code-workspace-git-tool-window" tabIndex={-1} className="relative h-full min-h-0 outline-none">
+        <div data-testid="code-workspace-git-tool-window" tabIndex={-1} className="relative h-full min-h-0 focus-visible:keyboard-outline">
           <WorkspaceGitManager
             workspaceName={title}
             roots={gitSnapshotOwner.gitRoots}
@@ -446,7 +446,7 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
           />
         </div>
       ) : (
-        <div data-testid="code-workspace-git-tool-window-empty" role="status" className="px-3 py-3 text-[11px] text-[var(--taomni-code-muted)]">
+        <div data-testid="code-workspace-git-tool-window-empty" role="status" className="px-3 py-3 text-ui-small text-[var(--taomni-code-muted)]">
           {gitSnapshotOwner.gitRootsLoading ? "Detecting Git repositories…" : "No Git repository in this workspace"}
         </div>
       ),

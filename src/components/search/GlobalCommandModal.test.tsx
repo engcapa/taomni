@@ -89,3 +89,28 @@ it("includes Local servers tool command and dispatches taomni:command servers wh
     window.removeEventListener("taomni:command", listener);
   }
 });
+
+it("opens in top-layer dialog, guards IME composition, dismisses on backdrop, and restores opener focus", () => {
+  const opener = document.createElement("button");
+  document.body.append(opener);
+  opener.focus();
+
+  render(<GlobalCommandModal />);
+  act(() => useWorkspaceUiStore.getState().openGlobalSearch());
+
+  const dialog = screen.getByTestId("global-search-modal");
+  expect(dialog.tagName).toBe("DIALOG");
+  const input = screen.getByTestId("global-search-input");
+  expect(input).toHaveFocus();
+
+  fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+  fireEvent.keyDown(input, { key: "Escape", isComposing: true });
+  expect(useWorkspaceUiStore.getState().globalSearchOpen).toBe(true);
+
+  vi.spyOn(dialog, "getBoundingClientRect").mockReturnValue(new DOMRect(100, 80, 640, 400));
+  fireEvent.pointerDown(dialog, { pointerId: 1, button: 0, clientX: 10, clientY: 10 });
+  fireEvent.pointerUp(dialog, { pointerId: 1, button: 0, clientX: 10, clientY: 10 });
+  expect(useWorkspaceUiStore.getState().globalSearchOpen).toBe(false);
+  expect(opener).toHaveFocus();
+  opener.remove();
+});

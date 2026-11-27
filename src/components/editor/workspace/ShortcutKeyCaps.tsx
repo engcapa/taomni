@@ -26,8 +26,8 @@ export function ShortcutKeyCaps({
             <Fragment key={`${groupIndex}-${capIndex}`}>
               {/* Inline (not visually hidden) so innerText stays `Ctrl+Shift+N`
                   on every WebView; sr-only's absolute box splits innerText lines. */}
-              {capIndex > 0 && <span className="text-[9px] opacity-40">+</span>}
-              <kbd className="mx-px inline rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 font-sans text-[10px] leading-4">
+              {capIndex > 0 && <span className="text-ui-caption opacity-40">+</span>}
+              <kbd className="mx-px inline rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 font-sans text-ui-caption leading-4">
                 {cap}
               </kbd>
             </Fragment>

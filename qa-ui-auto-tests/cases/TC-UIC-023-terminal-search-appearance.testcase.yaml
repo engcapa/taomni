@@ -1,0 +1,51 @@
+id: TC-UIC-023-terminal-search-appearance
+title: Terminal search results remain readable over the active terminal across theme changes
+covers: [F4.1, F4.8]
+tags: [ui-contract, terminal]
+modes: [browser, native]
+fixtures: [reset_db]
+ui_standard: [UI-FND-03a, UI-FND-09, UI-FOC-01]
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="theme-cycle"]'
+- click: '[data-testid="tao-home-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="terminal-pane"]'
+- press: Control+Shift+F
+- assert_focus_on: 'input[aria-label="Find"]'
+- fill: {selector: 'input[aria-label="Find"]', value: taomni-missing-marker-9164}
+- press: Enter
+- assert_text: {selector: '[data-testid="terminal-find-status"]', contains: No matches}
+- assert_attribute: {selector: html, name: data-app-theme, equals: light}
+- assert_solid_text_contrast: {selector: '[data-testid="terminal-find-status"]', minimum: 4.5, composite_ancestors: true}
+- assert_computed_style: {selector: '[data-testid="terminal-search-bar"]', property: z-index, equals: '900'}
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: dark}
+- assert_solid_text_contrast: {selector: '[data-testid="terminal-find-status"]', minimum: 4.5, composite_ancestors: true}
+- press: {selector: 'input[aria-label="Find"]', key: Escape}
+- assert_not_visible: '[data-testid="terminal-search-bar"]'
+- assert_focus_within: '[data-testid="terminal-pane"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: readable-search
+    ui_standard: [UI-FND-03a, UI-FND-09, UI-FOC-01]
+    requirement: The search shortcut owns focus and reports a readable zero-result state when the application changes appearance.
+    actions: [2, 3, 5, 6, 8, 9, 14, 17]
+    checkpoints:
+    - {step: 7, expectation: Find owns keyboard input.}
+    - {step: 10, expectation: Submitting the absent marker announces no matches.}
+    - {step: 11, expectation: The light appearance is active.}
+    - {step: 12, expectation: The actual result foreground clears 4.5 to 1 in Light.}
+    - {step: 13, expectation: Search paints on the desktop popover layer above terminal decorations.}
+    - {step: 15, expectation: The dark appearance is active while search stays open.}
+    - {step: 16, expectation: The same result clears 4.5 to 1 in Dark.}
+    - {step: 18, expectation: Escape closes search.}
+    - {step: 19, expectation: The active terminal owns input again.}
+    - {step: 20, expectation: The interaction has no uncaught renderer errors.}
+    results: [7, 10, 11, 12, 13, 15, 16, 18, 19, 20]
+  visual:
+  - {check: Measure the rendered result text against its painted background in both appearances., method: automated, reason: Mounted terminal styles can override inherited app colors.}
+  native:
+  - {check: Change theme and search using the packaged WebView and local terminal., method: automated, reason: Terminal input and WebView focus belong to the native window.}

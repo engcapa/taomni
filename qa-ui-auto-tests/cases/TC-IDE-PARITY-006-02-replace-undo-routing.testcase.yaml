@@ -6,6 +6,7 @@ covers: [F25.5]
 tags: [code-workspace, ide-find, replace, undo, parity006, p1]
 modes: [browser]
 fixtures: [reset_db, parity006_replace]
+ui_standard: [UI-DLG-04, UI-DLG-06, UI-DLG-07]
 timeout_sec: 240
 steps:
   - open: ${cfg.app.base_url}
@@ -51,30 +52,20 @@ steps:
       equals: [alpha coin one, beta token two, '']
   - click: '[data-testid="code-workspace-find-match-row"]'
   - press: Mod+z
-  - wait_for: '[data-testid="code-workspace-undo-confirm"]'
+  - wait_for: '[data-testid="code-workspace-undo-confirm"]:modal'
   - assert_text:
       selector: '[data-testid="code-workspace-undo-confirm"]'
       contains: Undo Replace in files?
-  - eval_readonly:
-      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-undo-confirm-ok'
-      expect_truthy: true
+  - assert_focus_on: '[data-testid="code-workspace-undo-confirm-ok"]'
   - screenshot: tc-ide-parity-006-02-undo-dialog.png
   - press: Tab
-  - eval_readonly:
-      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-undo-confirm-cancel'
-      expect_truthy: true
+  - assert_focus_on: '[data-testid="code-workspace-undo-confirm-cancel"]'
   - press: Tab
-  - eval_readonly:
-      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-undo-confirm-ok'
-      expect_truthy: true
+  - assert_focus_on: '[data-testid="code-workspace-undo-confirm-ok"]'
   - press: Shift+Tab
-  - eval_readonly:
-      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-undo-confirm-cancel'
-      expect_truthy: true
+  - assert_focus_on: '[data-testid="code-workspace-undo-confirm-cancel"]'
   - press: Shift+Tab
-  - eval_readonly:
-      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-undo-confirm-ok'
-      expect_truthy: true
+  - assert_focus_on: '[data-testid="code-workspace-undo-confirm-ok"]'
   - press: Tab
   - press: Enter
   - assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
@@ -85,7 +76,7 @@ steps:
       selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
       equals: [alpha coin one, beta token two, '']
   - press: Mod+z
-  - wait_for: '[data-testid="code-workspace-undo-confirm"]'
+  - wait_for: '[data-testid="code-workspace-undo-confirm"]:modal'
   - press: Escape
   - assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
   - eval_readonly:
@@ -101,10 +92,8 @@ steps:
       selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
       value: Undo Replace in files
   - click: '[data-testid="code-workspace-search-everywhere"] >> text=Undo Replace in files'
-  - wait_for: '[data-testid="code-workspace-undo-confirm"]'
-  - eval_readonly:
-      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-undo-confirm-ok'
-      expect_truthy: true
+  - wait_for: '[data-testid="code-workspace-undo-confirm"]:modal'
+  - assert_focus_on: '[data-testid="code-workspace-undo-confirm-ok"]'
   - press: Enter
   - assert_text:
       selector: '[data-testid="status-bar-message"]'
@@ -134,6 +123,7 @@ verification:
   review: reviewed
   requirements:
   - id: ED-PARITY-006-V2
+    ui_standard: [UI-DLG-04, UI-DLG-06, UI-DLG-07]
     requirement: Input undo remains local; result and Actions undo trap keyboard focus, cancel preserves history, and one confirmed undo restores both files.
     actions: [1, 3, 6, 8, 10, 11, 12, 13, 14, 16, 17, 18, 19, 21, 23, 24, 25, 28, 29, 34, 36, 38, 40, 42, 43, 47, 49, 53, 55, 56, 57, 60, 65, 66, 67, 68, 71]
     checkpoints:

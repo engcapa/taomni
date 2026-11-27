@@ -1,0 +1,52 @@
+id: TC-UIC-017-workspace-keymap-reference
+title: The shortcut reference opens at search and displays the effective Rename shortcut once
+covers: [F25.5]
+tags: [ui-contract, code-workspace, keymap]
+modes: [browser, native]
+fixtures: [reset_db]
+ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-06, UI-PLAT-01]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-keymap-reference
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Alt+/
+- wait_for: '[data-testid="keymap-cheatsheet-dialog"][open]'
+- assert_labelledby_text: {selector: '[data-testid="keymap-cheatsheet-dialog"]', equals: Keyboard Shortcuts & Keymap}
+- assert_focus_on: '[data-testid="keymap-search-input"]'
+- fill: {selector: '[data-testid="keymap-search-input"]', value: Rename Symbol}
+- wait_for: '[data-testid="keymap-item-workspace.renameSymbol"]'
+- assert_count: {selector: '[data-testid="keymap-item-workspace.renameSymbol"] kbd', equal: 1}
+- assert_text_equals: {selector: '[data-testid="keymap-item-workspace.renameSymbol"] kbd', equals: Shift+F6}
+- press: Escape
+- assert_not_visible: '[data-testid="keymap-cheatsheet-dialog"]'
+- assert_visible: '[data-testid="code-workspace-tab"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: open-and-search
+    requirement: Opening the shortcut reference focuses its labelled search box and filters the action list.
+    ui_standard: [UI-DLG-03, UI-DLG-06]
+    actions: [7, 11]
+    checkpoints:
+    - {step: 9, expectation: The dialog references its visible title.}
+    - {step: 10, expectation: Search owns the keyboard.}
+    - {step: 12, expectation: The Rename Symbol action remains visible.}
+    results: [9, 10, 12]
+  - id: binding-and-escape
+    requirement: Rename Symbol displays its effective default shortcut once and Escape closes the reference.
+    ui_standard: [UI-PLAT-01, UI-DLG-04]
+    actions: [11, 15]
+    checkpoints:
+    - {step: 13, expectation: The row contains one binding.}
+    - {step: 14, expectation: The binding reads Shift+F6.}
+    - {step: 16, expectation: Escape closes the modal.}
+    - {step: 17, expectation: The workspace is still visible.}
+    results: [13, 14, 16, 17]
+  visual:
+  - {check: Binding text and focus, method: automated, reason: Reads the active element and the individual key label.}
+  native:
+  - {check: Packaged reference window, method: automated, reason: Checks modal activation and dismissal inside the active WebView.}

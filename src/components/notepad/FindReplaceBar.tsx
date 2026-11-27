@@ -1,3 +1,5 @@
+import { IconButton } from "../ui/IconButton";
+import { SectionTabs, sectionTab } from "../ui/SectionTabs";
 import {
   useEffect,
   useId,
@@ -312,15 +314,15 @@ export function FindReplaceBar({
           <option key={item} value={item} />
         ))}
       </datalist>
-      <button
+      <IconButton
         type="button"
         className="np-find-icon-btn"
         data-testid="np-find-swap"
-        title={label("互换", "Swap")}
+        label={label("互换", "Swap")}
         onClick={swapFindReplace}
       >
         <Replace size={13} />
-      </button>
+      </IconButton>
     </div>
   );
 
@@ -457,15 +459,15 @@ export function FindReplaceBar({
           <b className="np-find-title">{label(FIND_TABS.find((tab) => tab.id === find.tab)?.zh ?? "查找", FIND_TABS.find((tab) => tab.id === find.tab)?.en ?? "Find")}</b>
           <span className="np-find-context">{label("· 当前文档 / 打开文档 / 目录", "· Current document / Open documents / Directory")}</span>
           <span className="np-find-spacer" />
-          <button
+          <IconButton
             type="button"
             className="np-find-icon-btn"
             data-testid="np-find-compact"
-            title={label("紧凑模式", "Compact mode")}
+            label={label("紧凑模式", "Compact mode")}
             onClick={() => onPatch({ compact: !find.compact })}
           >
             <List size={13} />
-          </button>
+          </IconButton>
           <input
             type="range"
             className="np-find-opacity"
@@ -489,13 +491,12 @@ export function FindReplaceBar({
           </LegacyId>
         </div>
 
-        <div className="np-find-tabs" role="tablist">
+        <SectionTabs className="np-find-tabs">
           {FIND_TABS.map((tab) => (
             <LegacyId key={tab.id} id={`notepad-find-tab-${tab.id}`}>
               <button
                 type="button"
-                role="tab"
-                aria-selected={find.tab === tab.id}
+                {...sectionTab(find.tab === tab.id)}
                 className={`np-find-tab${find.tab === tab.id ? " on active" : ""}`}
                 data-testid={`np-find-tab-${tab.id}`}
                 onClick={() => onPatch({ tab: tab.id })}
@@ -504,7 +505,7 @@ export function FindReplaceBar({
               </button>
             </LegacyId>
           ))}
-        </div>
+        </SectionTabs>
 
         <div className="np-find-body">
           {findRow}

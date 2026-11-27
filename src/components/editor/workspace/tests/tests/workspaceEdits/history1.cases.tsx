@@ -170,7 +170,7 @@ export function registerworkspaceEditsHistory1Cases(caseContext: registerworkspa
 
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspCodeActions).toHaveBeenCalled());
-    fireEvent.click(await screen.findByRole("button", { name: "Insert space" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Insert space" }));
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspCodeActionResolve).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({ data: { fixId: "space" } }),
@@ -298,7 +298,7 @@ export function registerworkspaceEditsHistory1Cases(caseContext: registerworkspa
     await waitFor(() => expect(document.querySelector(".cm-content")?.textContent).toBe("x=1"));
 
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "Insert space" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Insert space" }));
     await waitFor(() => expect(selectCodeWorkspaceUi(
       useCodeWorkspaceStore.getState(),
       "instance-actions-undo",
@@ -416,7 +416,7 @@ export function registerworkspaceEditsHistory1Cases(caseContext: registerworkspa
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "Insert space then sync" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Insert space then sync" }));
 
     // The edit lands first...
     await waitFor(() => expect(selectCodeWorkspaceUi(

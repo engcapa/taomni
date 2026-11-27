@@ -51,7 +51,7 @@
 }
 .taomni-checkbox:checked::after {
   content: "✓";
-  font-size: 10px;
+  font-size: var(--taomni-fs-caption);
   line-height: 1;
   color: var(--taomni-accent);
 }

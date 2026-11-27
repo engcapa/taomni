@@ -41,11 +41,11 @@ export function DebugBreakpointsPane({
   return (
     <div
       data-testid="debug-breakpoints-pane"
-      className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)] text-[11px]"
+      className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)] text-ui-small"
     >
       {/* Breakpoints toolbar */}
       <div className="h-6 shrink-0 flex items-center justify-between border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]/40 px-2">
-        <span className="font-medium text-[10px] text-[var(--taomni-text-muted)]">
+        <span className="font-medium text-ui-caption text-[var(--taomni-text-muted)]">
           Manage Breakpoints
         </span>
         <div className="flex items-center gap-1">

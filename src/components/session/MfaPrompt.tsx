@@ -36,8 +36,7 @@ export function MfaPrompt({ host, username, request, onSubmit, onCancel }: MfaPr
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(20,30,45,0.4)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
     >
       <form
         data-testid="mfa-prompt"
@@ -51,10 +50,10 @@ export function MfaPrompt({ host, username, request, onSubmit, onCancel }: MfaPr
       >
         <div
           className="h-8 flex shrink-0 items-center px-3"
-          style={{ background: "linear-gradient(to bottom, #5895c8, #2b5d8b)", color: "white" }}
+          style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}
         >
           <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />
-          <span className="text-[12px] font-semibold">
+          <span className="text-ui-body font-semibold">
             {request.name?.trim() ? request.name : t("mfaPrompt.title")}
           </span>
           <div className="flex-1" />
@@ -63,20 +62,20 @@ export function MfaPrompt({ host, username, request, onSubmit, onCancel }: MfaPr
             type="button"
             onClick={onCancel}
             aria-label={t("mfaPrompt.closeAria")}
-            className="hover:bg-white/20 rounded p-0.5"
+            className="hover:bg-[var(--taomni-control-hover)] rounded p-0.5"
           >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
         <div className="min-h-0 overflow-y-auto p-4">
-          <div className="text-[12px] mb-2 text-[var(--taomni-text-muted)]">
+          <div className="text-ui-body mb-2 text-[var(--taomni-text-muted)]">
             {t("mfaPrompt.subtitle", { user: username, host })}
           </div>
           {request.instructions?.trim() && (
             <div
               data-testid="mfa-instructions"
-              className="text-[12px] mb-3 whitespace-pre-wrap"
+              className="text-ui-body mb-3 whitespace-pre-wrap"
               style={{ color: "var(--taomni-text)" }}
             >
               {request.instructions}
@@ -85,7 +84,7 @@ export function MfaPrompt({ host, username, request, onSubmit, onCancel }: MfaPr
 
           {request.prompts.map((p, idx) => (
             <div key={idx} className={idx > 0 ? "mt-3" : undefined}>
-              <label className="block text-[12px] mb-1" style={{ color: "var(--taomni-text)" }}>
+              <label className="block text-ui-body mb-1" style={{ color: "var(--taomni-text)" }}>
                 {p.prompt?.trim() ? p.prompt : t("mfaPrompt.defaultPrompt")}
               </label>
               <input
@@ -95,7 +94,7 @@ export function MfaPrompt({ host, username, request, onSubmit, onCancel }: MfaPr
                 autoFocus={idx === 0}
                 value={answers[idx] ?? ""}
                 onChange={(e) => setAnswer(idx, e.target.value)}
-                className="taomni-input w-full h-8 text-[13px]"
+                className="taomni-input w-full h-8 text-ui-body"
                 autoComplete="one-time-code"
               />
             </div>

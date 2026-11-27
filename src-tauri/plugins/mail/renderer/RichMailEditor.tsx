@@ -488,7 +488,7 @@ export function RichMailEditor({
         data-testid="mail-compose-format-toolbar"
       >
         <select
-          className="taomni-input h-7 w-[104px] text-[12px]"
+          className="taomni-input h-7 w-[104px] text-ui-body"
           aria-label="Paragraph style"
           data-testid="mail-compose-format-block"
           disabled={disabled}
@@ -499,7 +499,7 @@ export function RichMailEditor({
           ))}
         </select>
         <select
-          className="taomni-input h-7 w-[120px] text-[12px]"
+          className="taomni-input h-7 w-[120px] text-ui-body"
           aria-label="Font family"
           data-testid="mail-compose-font-family"
           disabled={disabled}
@@ -510,7 +510,7 @@ export function RichMailEditor({
           ))}
         </select>
         <select
-          className="taomni-input h-7 w-[64px] text-[12px]"
+          className="taomni-input h-7 w-[64px] text-ui-body"
           aria-label="Font size"
           data-testid="mail-compose-font-size"
           disabled={disabled}
@@ -554,7 +554,7 @@ export function RichMailEditor({
         {onAttach && (
           <button
             type="button"
-            className="taomni-btn h-7 px-2 text-[12px]"
+            className="taomni-btn h-7 px-2 text-ui-body"
             data-testid="mail-compose-attach"
             disabled={disabled}
             onClick={onAttach}
@@ -569,7 +569,7 @@ export function RichMailEditor({
       <div className="relative flex-1 min-h-[240px] flex flex-col">
         <div
           ref={editorRef}
-          className="flex-1 min-h-[240px] overflow-auto px-3 py-2 text-[13px] leading-6 outline-none bg-[var(--taomni-input-bg)] empty:before:content-['']"
+          className="flex-1 min-h-[240px] overflow-auto px-3 py-2 text-ui-body leading-6 focus-visible:keyboard-outline bg-[var(--taomni-input-bg)] empty:before:content-['']"
           contentEditable={!disabled}
           suppressContentEditableWarning
           role="textbox"
@@ -587,7 +587,7 @@ export function RichMailEditor({
         />
         {showDrag && (
           <div
-            className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[var(--taomni-accent)]/10 text-[12px] font-medium text-[var(--taomni-accent)]"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[var(--taomni-accent)]/10 text-ui-body font-medium text-[var(--taomni-accent)]"
             data-testid="mail-compose-drop-hint"
           >
             Drop files to attach · drop images to insert inline

@@ -1,0 +1,61 @@
+@import "./ui-typography.css";
+@import "./modal.css";
+
+/* Inline outlines remain visible inside scrollports and clipped list rows. */
+@utility keyboard-outline {
+  outline: 2px solid var(--taomni-focus-ring, var(--taomni-accent));
+  outline-offset: -2px;
+}
+
+/* Independently packaged renderers also run on cores that predate these roles. */
+@theme inline {
+  --color-ui-danger: var(--taomni-danger-text, var(--taomni-text));
+  --color-ui-danger-surface: var(--taomni-danger-bg, var(--taomni-card-bg));
+  --color-ui-danger-border: var(--taomni-danger-border, var(--taomni-divider));
+  --color-ui-warning: var(--taomni-warning-text);
+  --color-ui-warning-surface: var(--taomni-warning-bg);
+  --color-ui-warning-border: var(--taomni-warning-border);
+  --color-ui-success: var(--taomni-success-text);
+  --color-ui-success-surface: var(--taomni-success-bg);
+  --color-ui-success-border: var(--taomni-success-border);
+  --color-ui-info: var(--taomni-info-text, var(--taomni-accent));
+  --color-ui-info-surface: var(--taomni-info-bg, var(--taomni-selected));
+  --color-ui-info-border: var(--taomni-info-border, var(--taomni-accent));
+}
+
+.taomni-toast-stack {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: var(--taomni-z-toast, 1200);
+  display: grid;
+  gap: 8px;
+  max-width: min(460px, calc(100% - 24px));
+  pointer-events: none;
+}
+.taomni-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--taomni-card-border);
+  border-radius: var(--taomni-radius-lg, 4px);
+  box-shadow: var(--taomni-shadow-md);
+  background: var(--taomni-card-bg);
+  color: var(--taomni-text);
+  font-size: var(--taomni-fs-body);
+  pointer-events: auto;
+}
+.taomni-toast[data-tone="error"] {
+  border-color: var(--taomni-danger-border);
+  color: var(--taomni-danger-text);
+  background: var(--taomni-danger-bg);
+}
+.taomni-toast-message {
+  min-width: 0;
+  max-height: 8em;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}

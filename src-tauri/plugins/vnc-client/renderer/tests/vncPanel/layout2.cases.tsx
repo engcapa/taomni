@@ -270,5 +270,41 @@ export function registerVncPanelLayout2Cases() {
       // Four drops, four automatic reconnects (the old policy gave up after three).
       expect(connectCalls()).toHaveLength(5);
     });
+
+    it("cancels unencrypted and authentication modals on Escape while respecting IME composition", async () => {
+      let calls = 0;
+      mocks.invoke.mockImplementation((command: string) => {
+        if (command === "vnc_connect") {
+          calls += 1;
+          if (calls === 1) {
+            return Promise.reject(structured("unencrypted-confirmation-required", "security", false, "unencrypted connection requires confirmation"));
+          }
+          return Promise.reject(structured("credentials-required", "authentication", false, "credentials required"));
+        }
+        return Promise.resolve("");
+      });
+      render(<VncPanel tabId="vnc-tab" host="h.test" port={5900} visible />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByTestId("vnc-unencrypted-continue")).toHaveFocus();
+      fireEvent.keyDown(screen.getByTestId("vnc-unencrypted-continue"), { key: "Escape", isComposing: true });
+      expect(screen.getByTestId("vnc-overlay-unencrypted")).toBeInTheDocument();
+      fireEvent.keyDown(screen.getByTestId("vnc-unencrypted-continue"), { key: "Escape" });
+      expect(screen.queryByTestId("vnc-overlay-unencrypted")).toBeNull();
+      expect(screen.getByTestId("vnc-overlay-disconnected")).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("vnc-reconnect"));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      const password = screen.getByTestId("vnc-auth-password");
+      expect(password).toHaveFocus();
+      fireEvent.keyDown(password, { key: "Escape", isComposing: true });
+      expect(screen.getByTestId("vnc-overlay-auth")).toBeInTheDocument();
+      fireEvent.keyDown(password, { key: "Escape" });
+      expect(screen.queryByTestId("vnc-overlay-auth")).toBeNull();
+      expect(screen.getByTestId("vnc-overlay-disconnected")).toBeInTheDocument();
+    });
   });
 }

@@ -1,0 +1,46 @@
+:root {
+  /* Capture surfaces paint against an arbitrary desktop bitmap. */
+  --taomni-capture-image-bg: #000;
+  --taomni-capture-initial-dim: rgb(0 0 0 / 40%);
+  --taomni-capture-dim: rgb(0 0 0 / 45%);
+  --taomni-capture-selection-border: #1677ff;
+  --taomni-capture-selection-dashed: rgb(22 119 255 / 55%);
+  --taomni-capture-handle-outline: #fff;
+  --taomni-capture-ink-editor-bg: rgb(0 0 0 / 30%);
+  --taomni-capture-checker-base: #e2e2e2;
+  --taomni-capture-checker-square: #c4c4c4;
+  --taomni-capture-pin-border: rgb(22 119 255 / 60%);
+
+  /* The overlay is isolated from app chrome. Order the hit surfaces and
+     indicators independently so that preview actions remain reachable. */
+  --taomni-z-capture-dim: 10;
+  --taomni-z-capture-input: 20;
+  --taomni-z-capture-ink: 30;
+  --taomni-z-capture-selection: 35;
+  --taomni-z-capture-move: 36;
+  --taomni-z-capture-handle: 37;
+  --taomni-z-capture-pick: 40;
+  --taomni-z-capture-sample: 45;
+  --taomni-z-capture-toolbar: 50;
+  --taomni-z-capture-indicator: 60;
+  --taomni-z-capture-tool-options: 65;
+  --taomni-z-capture-result: 70;
+  --taomni-z-capture-preview-pick: 85;
+  --taomni-z-capture-preview-sample: 86;
+}
+
+.screenshot-pin-surface {
+  background-color: var(--taomni-capture-checker-base);
+  background-image: conic-gradient(
+    var(--taomni-capture-checker-square) 25%,
+    transparent 0 50%,
+    var(--taomni-capture-checker-square) 0 75%,
+    transparent 0
+  );
+  background-size: 16px 16px;
+}
+
+.screenshot-qa-capture-target {
+  background: #fff;
+  color: #000;
+}

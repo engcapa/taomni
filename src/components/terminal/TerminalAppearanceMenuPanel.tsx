@@ -140,7 +140,7 @@ export function TerminalAppearanceMenuPanel({
       />
       <div className="border-t border-[var(--taomni-divider)] p-2 space-y-2">
         <label className="block">
-          <span className="block mb-1 text-[11px] font-semibold text-[var(--taomni-text-muted)]">{labels.font}</span>
+          <span className="block mb-1 text-ui-small font-semibold text-[var(--taomni-text-muted)]">{labels.font}</span>
           <FontPickerSelect
             ariaLabel={labels.font}
             testId={fontSelectTestId}
@@ -159,7 +159,7 @@ export function TerminalAppearanceMenuPanel({
           />
         </label>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-semibold text-[var(--taomni-text-muted)]">{labels.textSize}</span>
+          <span className="text-ui-small font-semibold text-[var(--taomni-text-muted)]">{labels.textSize}</span>
           <div className="inline-flex items-center gap-1">
             <button
               type="button"

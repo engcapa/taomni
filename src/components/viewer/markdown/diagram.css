@@ -1,13 +1,14 @@
 .fv-md-mermaid:focus-visible,.fv-md-drawio:focus-visible{outline:2px solid var(--accent-s);outline-offset:2px}
-.fv.fv-md-diagram-tools{position:fixed;display:flex;flex-direction:row;width:max-content;height:auto;gap:3px;padding:4px;background:var(--card);border:1px solid var(--divider);border-radius:8px;box-shadow:var(--shadow);z-index:1120}
+.fv.fv-md-diagram-tools{position:fixed;display:flex;flex-direction:row;width:max-content;height:auto;gap:3px;padding:4px;background:var(--card);border:1px solid var(--divider);border-radius:8px;box-shadow:var(--shadow);z-index:var(--taomni-z-popover, 900)}
 .fv-md-diagram-tools .fv-icon-button{width:32px;height:30px}
-.fv.fv-md-diagram-menu{position:fixed;z-index:1140;width:270px;height:auto;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;padding:5px}
+.fv.fv-md-diagram-menu{position:fixed;z-index:var(--taomni-z-menu-over-modal, 1100);width:270px;height:auto;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;padding:5px}
 .fv-md-diagram-menu>button{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border-radius:5px;font-size:12px;white-space:nowrap;text-align:left}
 .fv-md-diagram-menu>button:hover,.fv-md-diagram-menu>button:focus-visible{background:var(--hover);outline:none}
 .fv-md-diagram-menu svg{width:15px;height:15px;flex:none}
-.fv-md-diagram-notice{position:absolute;right:12px;bottom:12px;padding:7px 12px;border-radius:7px;border:1px solid var(--divider);background:var(--panel);box-shadow:var(--shadow);z-index:10;font-size:12px}
-.fv-md-diagram-backdrop{position:fixed;inset:0;background:#0f172a99;display:flex;align-items:center;justify-content:center;padding:20px;z-index:1200}
-.fv-md-diagram-viewer{display:flex;flex-direction:column;width:min(1440px,100%);height:100%;max-height:100%;min-width:0;background:var(--panel);border:1px solid var(--divider);border-radius:10px;box-shadow:0 16px 60px #0005;overflow:hidden;color:var(--text)}
+.fv-md-diagram-notice{position:absolute;right:12px;bottom:12px;padding:7px 12px;border-radius:7px;border:1px solid var(--divider);background:var(--panel);box-shadow:var(--shadow);z-index:var(--taomni-z-sticky, 100);font-size:12px}
+.fv-md-diagram-backdrop{position:fixed;inset:0;background:var(--taomni-overlay, #0f172a99);display:flex;align-items:center;justify-content:center;padding:20px;z-index:var(--taomni-z-modal, 1000)}
+.fv-md-diagram-viewer{display:flex;flex-direction:column;margin:auto;padding:0;width:min(1440px,calc(100vw - 40px));height:calc(100vh - 40px);max-width:calc(100vw - 40px);max-height:calc(100vh - 40px);min-width:0;background:var(--panel);border:1px solid var(--divider);border-radius:10px;box-shadow:0 16px 60px #0005;overflow:hidden;color:var(--text)}
+.fv-md-diagram-viewer::backdrop{background:var(--taomni-overlay, #0f172a99)}
 .fv-md-diagram-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 12px;border-bottom:1px solid var(--divider);font-size:13px;flex:none;min-width:0}
 .fv-md-diagram-heading strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fv-md-diagram-controls{display:flex;align-items:center;flex-wrap:wrap;gap:3px;padding:6px 10px;border-bottom:1px solid var(--divider);flex:none}
@@ -23,4 +24,4 @@
 .fv-md-diagram-stage>img,.fv-md-diagram-stage>.fv-md-diagram-svg{position:absolute;left:50%;top:50%;max-width:none;max-height:none;object-fit:contain;pointer-events:none;transform-origin:center}
 .fv-md-diagram-stage>span,.fv-md-diagram-stage>[role=alert]{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--panel);color:var(--text);padding:8px 12px;border-radius:6px;font-size:12px}
 .fv-md-diagram-footer{padding:7px 12px;border-top:1px solid var(--divider);font-size:12px;color:var(--muted);flex:none}
-@media(max-width:600px){.fv-md-diagram-backdrop{padding:8px}.fv-md-diagram-controls{padding:5px;gap:2px}.fv-md-diagram-controls .fv-icon-button{width:28px}.fv-md-diagram-footer{font-size:11px}}
+@media(max-width:600px){.fv-md-diagram-backdrop{padding:8px}.fv-md-diagram-viewer{width:calc(100vw - 16px);height:calc(100vh - 16px);max-width:calc(100vw - 16px);max-height:calc(100vh - 16px)}.fv-md-diagram-controls{padding:5px;gap:2px}.fv-md-diagram-controls .fv-icon-button{width:28px}.fv-md-diagram-footer{font-size:11px}}

@@ -128,9 +128,9 @@ describe("HBaseShellTab workspace", () => {
     await waitFor(() => expect(ipcMock.hbaseConnect).toHaveBeenCalled());
     expect(screen.getByTestId("hbase-tab-limit")).toHaveValue(2);
 
-    fireEvent.click(screen.getByTitle("New query panel"));
+    fireEvent.click(screen.getByRole("button", { name: "New query panel" }));
     await waitFor(() => expect(screen.getByTitle("Query 2")).toBeInTheDocument());
-    expect(screen.queryByTitle("New query panel")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New query panel" })).not.toBeInTheDocument();
 
     for (let run = 0; run < 3; run += 1) {
       fireEvent.click(screen.getByTestId("mock-editor"));
@@ -168,12 +168,21 @@ describe("HBaseShellTab workspace", () => {
   it("opens a command-reference help dialog and gates admin commands on REST", async () => {
     render(<HBaseShellTab tabId="t1" info={info} visible />);
     await waitFor(() => expect(ipcMock.hbaseConnect).toHaveBeenCalled());
-    fireEvent.click(await screen.findByText("Help"));
+    const helpBtn = await screen.findByRole("button", { name: /Help/ });
+    helpBtn.focus();
+    fireEvent.click(helpBtn);
     const dialog = await screen.findByTestId("hbase-help-dialog");
+    expect(dialog.tagName).toBe("DIALOG");
+    expect(screen.getByTestId("hbase-help-close")).toHaveFocus();
     expect(dialog).toHaveTextContent("count");
     expect(dialog).toHaveTextContent("enable");
     // REST transport => admin verbs carry the unsupported note.
     expect(dialog).toHaveTextContent("Not available on the REST transport");
+    fireEvent.keyDown(dialog, { key: "Escape", isComposing: true });
+    expect(screen.getByTestId("hbase-help-dialog")).toBeInTheDocument();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByTestId("hbase-help-dialog")).not.toBeInTheDocument();
+    expect(helpBtn).toHaveFocus();
   });
 
   it("opens the shared query library with the stable HBase session scope", async () => {

@@ -1,5 +1,7 @@
 # Authoring And Maintaining Coverage
 
+For desktop controls, declare the applicable `ui_standard` IDs on the case and its requirements. Map each result to an observable step using the [UI verification guide](ui-standard-verification.md).
+
 Reuse audit results and source context. Inspect the owning feature in
 `qa-ui-auto-tests/feature-list.md` and its source files; run a helper only when
 information is missing. Apply requested changes directly and summarize the diff.

@@ -52,7 +52,11 @@ export function MfaImagePane({ onTexts }: { onTexts: (texts: string[]) => MfaTex
   };
 
   useEffect(() => {
-    zoneRef.current?.focus();
+    const control = zoneRef.current;
+    const dialog = control?.closest('[role="dialog"]');
+    const focus = document.activeElement;
+    if (focus?.getAttribute("role") === "tab" && dialog?.contains(focus)) return;
+    control?.focus();
   }, []);
 
   // Tauri delivers OS file drops as paths (see App.tsx dispatchNativeFileDrop).
@@ -81,7 +85,7 @@ export function MfaImagePane({ onTexts }: { onTexts: (texts: string[]) => MfaTex
         tabIndex={0}
         role="region"
         aria-label={t("mfa.imageHint")}
-        className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded border-2 border-dashed p-4 text-center text-[12px] outline-none focus-visible:border-[var(--taomni-accent)]"
+        className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded border-2 border-dashed p-4 text-center text-ui-body outline-none focus-visible:border-[var(--taomni-accent)]"
         style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}
         onPaste={(event) => {
           event.preventDefault();
@@ -105,7 +109,7 @@ export function MfaImagePane({ onTexts }: { onTexts: (texts: string[]) => MfaTex
         <button
           type="button"
           data-testid="mfa-image-paste"
-          className="inline-flex items-center gap-1 rounded border px-3 py-1 text-[12px] hover:bg-[var(--taomni-hover)]"
+          className="inline-flex items-center gap-1 rounded border px-3 py-1 text-ui-body hover:bg-[var(--taomni-hover)]"
           style={{ borderColor: "var(--taomni-input-border)" }}
           disabled={state.kind === "busy"}
           onClick={() => void run(readClipboardQrTexts, t("mfa.imageNoClipboard"))}
@@ -116,7 +120,7 @@ export function MfaImagePane({ onTexts }: { onTexts: (texts: string[]) => MfaTex
         <button
           type="button"
           data-testid="mfa-image-choose"
-          className="inline-flex items-center gap-1 rounded border px-3 py-1 text-[12px] hover:bg-[var(--taomni-hover)]"
+          className="inline-flex items-center gap-1 rounded border px-3 py-1 text-ui-body hover:bg-[var(--taomni-hover)]"
           style={{ borderColor: "var(--taomni-input-border)" }}
           disabled={state.kind === "busy"}
           onClick={() => fileRef.current?.click()}
@@ -142,8 +146,8 @@ export function MfaImagePane({ onTexts }: { onTexts: (texts: string[]) => MfaTex
         data-state={state.kind}
         role="status"
         aria-live="polite"
-        className="min-h-[18px] text-[12px]"
-        style={{ color: state.kind === "error" ? "var(--taomni-error, #c33)" : "var(--taomni-text-muted)" }}
+        className="min-h-[18px] text-ui-body"
+        style={{ color: state.kind === "error" ? "var(--taomni-danger-text, #c33)" : "var(--taomni-text-muted)" }}
       >
         {state.kind === "busy" ? t("mfa.imageDecoding") : state.kind === "error" ? state.message : ""}
       </div>

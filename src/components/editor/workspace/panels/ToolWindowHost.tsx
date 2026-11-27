@@ -154,7 +154,7 @@ export function ToolWindowPane({
         data-testid={`code-workspace-tool-window-header${suffix}`}
         className="flex h-8 shrink-0 items-center gap-1 border-b border-[var(--taomni-code-border)]/50 px-2"
       >
-        <span data-testid={`code-workspace-tool-window-title${suffix}`} className="shrink-0 text-[12px] font-medium text-[var(--taomni-code-text)]">
+        <span data-testid={`code-workspace-tool-window-title${suffix}`} className="shrink-0 text-ui-body font-medium text-[var(--taomni-code-text)]">
           {title}
         </span>
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">{headerExtra}</div>

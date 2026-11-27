@@ -45,7 +45,7 @@ describe("Explorer operation clipboard ownership", () => {
     vi.mocked(explorerWriteClipboardFiles).mockRejectedValueOnce(new Error("clipboard unavailable"));
     await act(async () => { await result.current.copy([beta], true); });
     expect(getExplorerClipboard()?.paths).toEqual([alpha.path, beta.path]);
-    expect(result.current.toast).toMatchObject({ error: true, message: "Error: clipboard unavailable" });
+    expect(result.current.toasts.at(-1)).toMatchObject({ error: true, message: "Error: clipboard unavailable" });
   });
   it("a Copy in another app surface cancels an earlier cut even for the same file list", async () => {
     const { result } = renderHook(() => useExplorerOperations("tab"));
@@ -70,7 +70,7 @@ describe("Explorer operation clipboard ownership", () => {
     const { result } = renderHook(() => useExplorerOperations("tab"));
     await act(async () => { await result.current.paste(); });
     expect(localCopyEntries).not.toHaveBeenCalled(); expect(localMoveEntries).not.toHaveBeenCalled();
-    expect(result.current.toast?.message).toContain("owner conversion failed");
+    expect(result.current.toasts.at(-1)?.message).toContain("owner conversion failed");
   });
   it("partial cut leaves failed sources retryable, reports every reason and never repeats successes", async () => {
     setExplorerClipboard({ paths: [alpha.path, beta.path], cut: true });
@@ -80,8 +80,8 @@ describe("Explorer operation clipboard ownership", () => {
     await act(async () => { await result.current.paste(); });
     expect(explorerUpdateCutClipboard).toHaveBeenCalledWith([alpha.path, beta.path], [beta.path]);
     expect(getExplorerClipboard()).toEqual({ paths: [beta.path], cut: true });
-    expect(result.current.toast).toMatchObject({ error: true });
-    expect(result.current.toast?.message).toContain("Permission denied");
+    expect(result.current.toasts.at(-1)).toMatchObject({ error: true });
+    expect(result.current.toasts.at(-1)?.message).toContain("Permission denied");
   });
   it("does not overwrite an external clipboard replacement during a cut", async () => {
     setExplorerClipboard({ paths: [alpha.path], cut: true });
@@ -101,14 +101,14 @@ describe("Explorer recoverable deletion and drop semantics", () => {
     expect(result.current.deletePrompt).toMatchObject({ entries: [alpha, beta], defaultIntent: "trash" });
     expect(localTrashEntries).not.toHaveBeenCalled();
     act(() => result.current.trash([alpha, beta]));
-    await waitFor(() => expect(result.current.toast?.undo).toBeTypeOf("function"));
+    await waitFor(() => expect(result.current.toasts.at(-1)?.action?.run).toBeTypeOf("function"));
     expect(localTrashEntries).toHaveBeenCalledWith([alpha.path, beta.path]);
     expect(result.current.deletePrompt).toMatchObject({
       entries: [beta], reason: expect.stringContaining("No trash on volume"), defaultIntent: "permanent",
     });
     expect(sftpRemove).not.toHaveBeenCalled();
     await idle(result);
-    act(() => result.current.toast?.undo?.());
+    act(() => result.current.toasts.at(-1)?.action?.run?.());
     await waitFor(() => expect(localTrashRestore).toHaveBeenCalledWith([{ id: "opaque", originalPath: alpha.path }]));
   });
   it("cancelling the choice prompt leaves files untouched and ShiftDelete defaults to permanent", () => {
@@ -129,7 +129,7 @@ describe("Explorer recoverable deletion and drop semantics", () => {
     vi.mocked(sftpRemove).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("deleted source"));
     await act(async () => { await result.current.permanentDelete([alpha, beta]); });
     expect(sftpRemove).toHaveBeenCalledTimes(2);
-    expect(result.current.toast?.message).toContain("deleted source");
+    expect(result.current.toasts.at(-1)?.message).toContain("deleted source");
   });
   it("cross-volume drops copy while same-volume drops move, and Ctrl/Option overrides force copy", async () => {
     const { result } = renderHook(() => useExplorerOperations("tab"));
@@ -152,7 +152,7 @@ describe("Explorer recoverable deletion and drop semantics", () => {
     await idle(result);
     expect(explorerCancelOperation).toHaveBeenCalled();
     expect(localMoveEntries).toHaveBeenCalledTimes(1);
-    expect(result.current.toast?.message).toContain("Cancelled");
+    expect(result.current.toasts.at(-1)?.message).toContain("Cancelled");
   });
   it("creates independent Markdown and HTML names with collision suffixes", async () => {
     vi.mocked(localCreateEntry).mockResolvedValue("/target/New Markdown document.md");

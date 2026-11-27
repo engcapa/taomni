@@ -4,6 +4,7 @@ import { MoreHorizontal } from "lucide-react";
 import { useElementResizeFrame } from "../../../hooks/useElementResizeFrame";
 import { writeImagePng, writeText } from "../../../lib/clipboard";
 import { markdownBasename } from "../../../lib/markdownAssets";
+import { ContextMenu } from "../../ContextMenu";
 import { useViewerLabels } from "../viewerLabels";
 import { diagramActions, type DiagramAction } from "./diagramActions";
 import { DEFAULT_DIAGRAM_VIEW, diagramKind, loadedMarkdownImage, MARKDOWN_DIAGRAM_SELECTOR, MARKDOWN_IMAGE_SELECTOR, snapshotDiagram, snapshotMarkdownImage, type MarkdownVisualSnapshot, type DiagramTransform } from "./diagramModel";
@@ -23,16 +24,18 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, ena
   const label = useViewerLabels();
   const [active, setActive] = useState<HTMLElement | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const [viewer, setViewer] = useState<{ snapshot: MarkdownVisualSnapshot; action: DiagramAction } | null>(null);
+  const [viewer, setViewer] = useState<{ snapshot: MarkdownVisualSnapshot; action: DiagramAction; returnFocus: HTMLElement | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [position, setPosition] = useState({ left: 0, top: 0, visible: false });
-  const menuElement = useRef<HTMLDivElement>(null), toolbar = useRef<HTMLDivElement>(null);
+  const toolbar = useRef<HTMLDivElement>(null);
   const activeElement = useRef(active); activeElement.current = active;
   const state = useRef({ active, menu, viewer }); state.current = { active, menu, viewer };
   const epoch = useRef(0), working = useRef(false);
-  const focus = () => (state.current.active?.isConnected ? state.current.active : root.current?.querySelector<HTMLElement>(".fv-md-main") || root.current)?.focus();
-  const closeViewer = () => { setViewer(null); focus(); };
+  const focus = useCallback(() => {
+    (state.current.active?.isConnected ? state.current.active : root.current?.querySelector<HTMLElement>(".fv-md-main") || root.current)?.focus();
+  }, [root]);
+  const closeViewer = () => { setViewer(null); };
   const snapshot = (element: HTMLElement) => {
     const stem = markdownBasename(docPath).replace(/\.(md|markdown)$/i, "");
     const index = (selector: string) => Array.from(root.current?.querySelectorAll(selector) ?? []).indexOf(element) + 1;
@@ -41,8 +44,11 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, ena
       : snapshotDiagram(element, `${stem}-diagram-${index(MARKDOWN_DIAGRAM_SELECTOR)}`);
   };
   const open = (element: HTMLElement, action: DiagramAction = "open") => {
-    try { setActive(element); setMenu(null); setNotice(""); setViewer({ snapshot: snapshot(element), action }); }
-    catch (error) { onError(String(error)); }
+    try {
+      const returnFocus = element.isConnected ? element : root.current?.querySelector<HTMLElement>(".fv-md-main") || root.current;
+      setActive(element); setMenu(null); setNotice("");
+      setViewer({ snapshot: snapshot(element), action, returnFocus });
+    } catch (error) { onError(String(error)); }
   };
   const openMenu = (element: HTMLElement, x: number, y: number) => { setActive(element); setMenu({ x, y }); };
   const callbacks = useRef({ open, openMenu, onError }); callbacks.current = { open, openMenu, onError };
@@ -121,28 +127,6 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, ena
     };
   }, [root, docPath, enabled, label, schedule]);
   useEffect(() => { setActive(null); setMenu(null); setViewer(null); setBusy(false); setNotice(""); }, [docPath, enabled]);
-  useEffect(() => {
-    if (!menu) return;
-    const dismiss = () => setMenu(null);
-    const outside = (event: Event) => {
-      if (event.target instanceof Node && !menuElement.current?.contains(event.target)) dismiss();
-    };
-    const escape = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.isComposing) { event.preventDefault(); dismiss(); focus(); } };
-    // Capture runs even when the clicked diagram owns and stops pointer input.
-    document.addEventListener("pointerdown", outside, true);
-    document.addEventListener("click", outside, true);
-    document.addEventListener("focusin", outside, true);
-    window.addEventListener("blur", dismiss);
-    window.addEventListener("keydown", escape);
-    menuElement.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    return () => {
-      document.removeEventListener("pointerdown", outside, true);
-      document.removeEventListener("click", outside, true);
-      document.removeEventListener("focusin", outside, true);
-      window.removeEventListener("blur", dismiss);
-      window.removeEventListener("keydown", escape);
-    };
-  }, [menu]);
   const run = async (action: DiagramAction, image: MarkdownVisualSnapshot, transform: DiagramTransform) => {
     if (working.current) return;
     const token = epoch.current; working.current = true; setBusy(true); setNotice("");
@@ -197,17 +181,29 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, ena
       {kind !== "image" && <button type="button" className="fv-icon-button" data-testid="markdown-diagram-more" aria-haspopup="menu" aria-expanded={!!menu} title={label("更多查看操作", "More viewing actions")} aria-label={label("更多查看操作", "More viewing actions")}
         onClick={(event) => { const box = event.currentTarget.getBoundingClientRect(); openMenu(active, box.left, box.bottom); }}><MoreHorizontal /></button>}
     </div>, document.body)}
-    {menu && active && createPortal(<div className="fv fv-menu fv-md-diagram-menu" ref={menuElement} role="menu" aria-label={label(`${name} 图片菜单`, `${name} image menu`)} data-testid="markdown-diagram-menu"
-      style={{ left: Math.max(8, Math.min(menu.x, window.innerWidth - 278)), top: Math.max(8, Math.min(menu.y, window.innerHeight - 510)) }} onKeyDown={(event) => {
-        if (event.key === "Tab") { setMenu(null); focus(); return; }
-        if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-        event.preventDefault(); const buttons = Array.from(menuElement.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") || []);
-        const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-        buttons[event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length]?.focus();
-      }}>
-      {entries.map(({ id, title, Icon }) => <button key={id} type="button" role="menuitem" data-testid={`markdown-diagram-menu-${id}`} disabled={busy} onClick={() => choose(id)}><Icon />{title}</button>)}
-    </div>, document.body)}
+    {menu && active && (
+      <ContextMenu
+        x={menu.x}
+        y={menu.y}
+        testId="markdown-diagram-menu"
+        ariaLabel={label(`${name} 图片菜单`, `${name} image menu`)}
+        className="fv fv-menu fv-md-diagram-menu"
+        closeOnTab
+        dismissOnFocusOut
+        items={entries.map(({ id, title, Icon }) => ({
+          label: title,
+          testId: `markdown-diagram-menu-${id}`,
+          icon: <Icon />,
+          disabled: busy,
+          onClick: () => choose(id),
+        }))}
+        onClose={(reason) => {
+          setMenu(null);
+          if (reason === "escape") focus();
+        }}
+      />
+    )}
     {notice && !viewer && <div className="fv-md-diagram-notice" role="status" data-testid="markdown-diagram-status">{notice}</div>}
-    {viewer && createPortal(<MarkdownDiagramViewer snapshot={viewer.snapshot} initialAction={viewer.action} busy={busy} notice={notice} label={label} onAction={(action, image, transform) => { void run(action, image, transform); }} onClose={closeViewer} />, document.body)}
+    {viewer && createPortal(<MarkdownDiagramViewer snapshot={viewer.snapshot} initialAction={viewer.action} busy={busy} notice={notice} label={label} returnFocus={viewer.returnFocus} onAction={(action, image, transform) => { void run(action, image, transform); }} onClose={closeViewer} />, document.body)}
   </>;
 }

@@ -53,7 +53,7 @@ export function TerminalSplitToolbar({
       </span>
       <button
         type="button"
-        className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40"
+        className="text-ui-small px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40"
         style={{ color: "var(--taomni-text-muted)" }}
         disabled={lockedCount === 0}
         onClick={onClearLocks}

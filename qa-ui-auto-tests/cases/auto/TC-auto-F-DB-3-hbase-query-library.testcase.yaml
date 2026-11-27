@@ -9,6 +9,7 @@ description: 'Creates and opens an HBase Shell session in browser mode. The brow
   default HBase command under the stable session and namespace scope.
 
   '
+ui_standard: [UI-FND-09]
 covers:
 - F-DB-3
 - F-DB-4
@@ -64,9 +65,23 @@ steps:
 - click: '[data-testid="query-library-save"]'
 - wait_for: '[data-testid^="saved-query-"]'
 - screenshot: db-3-hbase-query-library.png
+- click: '[data-testid="hbase-save-query"]'
+- assert_computed_style: {selector: '.taomni-dialog-backdrop:has(> [data-testid="query-library-dialog"])', property: z-index, equals: '1000'}
+- click: '[data-testid="query-library-dialog"] button[aria-label="Close"]'
+- assert_not_visible: '[data-testid="query-library-dialog"]'
+- assert_visible: '[data-testid^="saved-query-"]'
 verification:
   review: reviewed
   requirements:
+  - id: query-library-modal
+    ui_standard: [UI-FND-09]
+    requirement: The saved-query dialog uses the shared modal layer and closing it preserves the saved entry.
+    actions: [26, 28]
+    checkpoints:
+    - {step: 27, expectation: The real form's backdrop resolves to the modal layer.}
+    - {step: 29, expectation: Closing dismisses the form.}
+    - {step: 30, expectation: The saved query remains available.}
+    results: [27, 29, 30]
   - id: R1
     requirement: HBase Shell keeps its query library available offline：按步骤执行后，所有声明的可观察结果均满足。
     actions:

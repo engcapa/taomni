@@ -118,7 +118,7 @@ function CodeViewAppearanceSettingsContent({
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="grid grid-cols-12 gap-3 items-end">
           <label className="col-span-12 md:col-span-7">
-            <span className="block text-[12px] font-semibold mb-1">{t("codeViewAppearance.fontLabel")}</span>
+            <span className="block text-ui-body font-semibold mb-1">{t("codeViewAppearance.fontLabel")}</span>
             <FontPickerSelect
               ariaLabel={t("codeViewAppearance.fontAria")}
               options={fontPickerOptions}
@@ -130,14 +130,14 @@ function CodeViewAppearanceSettingsContent({
               onSelect={(font) => updateProfile({ fontFamily: makeTerminalFontFamily(font) })}
             />
             {showFontWarning && (
-              <p className="mt-1.5 text-[11px] text-[#ff6b6b] leading-snug">
+              <p className="mt-1.5 text-ui-small text-[#ff6b6b] leading-snug">
                 {t("terminalAppearance.nonMonospaceWarning")}
               </p>
             )}
           </label>
 
           <div className="col-span-8 md:col-span-3">
-            <span className="block text-[12px] font-semibold mb-1">{t("codeViewAppearance.textSizeLabel")}</span>
+            <span className="block text-ui-body font-semibold mb-1">{t("codeViewAppearance.textSizeLabel")}</span>
             <div className="inline-flex items-center gap-1">
               <button
                 className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
@@ -191,7 +191,7 @@ function CodeViewAppearanceSettingsContent({
               checked={profile.fontLigatures}
               onChange={(event) => updateProfile({ fontLigatures: event.target.checked })}
             />
-            <span className="text-[12px]">{t("terminalAppearance.ligaturesLabel")}</span>
+            <span className="text-ui-body">{t("terminalAppearance.ligaturesLabel")}</span>
           </label>
 
           <label className="col-span-12 md:col-span-4 inline-flex items-center gap-1.5 pb-1">
@@ -202,14 +202,14 @@ function CodeViewAppearanceSettingsContent({
               checked={profile.softWrap}
               onChange={(event) => updateProfile({ softWrap: event.target.checked })}
             />
-            <span className="text-[12px]">{t("codeViewAppearance.softWrapLabel")}</span>
+            <span className="text-ui-body">{t("codeViewAppearance.softWrapLabel")}</span>
           </label>
         </div>
       </section>
 
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="block">
-          <span className="block text-[12px] font-semibold mb-1">{t("codeViewAppearance.themeLabel")}</span>
+          <span className="block text-ui-body font-semibold mb-1">{t("codeViewAppearance.themeLabel")}</span>
           <ThemePreviewSelect
             ariaLabel={t("codeViewAppearance.themeAria")}
             value={themeSelectValue}

@@ -93,7 +93,7 @@ describe("Notepad editor context menu (U3)", () => {
     expect(fireEvent.contextMenu(host, { clientX: 120, clientY: 80, button: 2 })).toBe(false);
 
     const menu = screen.getByTestId("context-menu");
-    expect(within(menu).getAllByRole("button")).toHaveLength(EXPECTED_CONTEXT_ROWS.length);
+    expect(within(menu).getAllByRole("menuitem")).toHaveLength(EXPECTED_CONTEXT_ROWS.length);
     const rows = Array.from(menu.querySelectorAll<HTMLElement>('[data-testid^="notepad-context-"]'));
     expect(rows.map((row) => row.dataset.testid)).toEqual(EXPECTED_CONTEXT_ROWS);
     // Shortcuts come from the shared keymap catalog and stay visible.

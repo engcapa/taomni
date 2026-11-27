@@ -24,6 +24,10 @@ describe("ED-PARITY-012 DEC-012-06: Go to Line:Column", () => {
     render(<GoToLineDialog current={{ line: 4, column: 7 }} lineCount={10} onGo={onGo} onCancel={vi.fn()} />);
     const field = screen.getByTestId("code-workspace-goto-line-input") as HTMLInputElement;
     expect(field.value).toBe("4:7");
+    expect(screen.getByRole("dialog")).toHaveAccessibleName("Go to Line:Column");
+    fireEvent.keyDown(field, { key: "Enter", isComposing: true });
+    fireEvent.keyDown(field, { key: "Enter", keyCode: 229 });
+    expect(onGo).not.toHaveBeenCalled();
     await waitFor(() => expect(field).toHaveFocus());
     expect(field.selectionStart).toBe(0);
     expect(field.selectionEnd).toBe(3);
@@ -39,7 +43,14 @@ describe("ED-PARITY-012 DEC-012-06: Go to Line:Column", () => {
     const field = screen.getByTestId("code-workspace-goto-line-input");
     fireEvent.change(field, { target: { value: "9" } });
     expect(screen.getByTestId("code-workspace-goto-line-ok")).toBeDisabled();
+    expect(field).toHaveAccessibleDescription(screen.getByRole("alert").textContent!);
     expect(screen.getByRole("alert")).toHaveTextContent("between 1 and 3");
+    const cancel = screen.getByTestId("code-workspace-goto-line-cancel");
+    cancel.focus();
+    fireEvent.keyDown(cancel, { key: "Tab" });
+    expect(field).toHaveFocus();
+    fireEvent.keyDown(field, { key: "Escape", isComposing: true });
+    expect(onCancel).not.toHaveBeenCalled();
     fireEvent.keyDown(field, { key: "Enter" });
     expect(onGo).not.toHaveBeenCalled();
     fireEvent.keyDown(field, { key: "Escape" });

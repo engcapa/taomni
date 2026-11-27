@@ -15,11 +15,13 @@ export function MarkdownDrawioImport({ view, readOnly, onError }: { view: () => 
   const [pages, setPages] = useState<DrawioPage[] | null>(null);
   const [busy, setBusy] = useState(false);
   const restoreFocus = useRef(false);
+  const focusEditor = useRef(false);
   const range = useRef<{ from: number; to: number; content: string } | null>(null);
   const generation = useRef(0);
   useEffect(() => () => { generation.current++; }, []);
   useEffect(() => { if (!busy && restoreFocus.current) { restoreFocus.current = false; button.current?.focus(); } }, [busy]);
-  const close = () => { setPages(null); range.current = null; button.current?.focus(); };
+  useEffect(() => { if (!pages && focusEditor.current) { focusEditor.current = false; view()?.focus(); } }, [pages, view]);
+  const close = () => { setPages(null); range.current = null; };
   return <>
     <button ref={button} type="button" className="fv-icon-button" data-testid="markdown-import-drawio" aria-label={label("导入 draw.io", "Import draw.io")} title={label("导入 draw.io", "Import draw.io")} disabled={readOnly || busy} onMouseDown={(event) => event.preventDefault()} onClick={() => {
       const editor = view(); if (!editor || editor.state.readOnly) return;
@@ -45,13 +47,14 @@ export function MarkdownDrawioImport({ view, readOnly, onError }: { view: () => 
       void file.text().then((xml) => { const parsed = parseDrawio(xml); if (token === generation.current) setPages(parsed); })
         .catch((cause: unknown) => { if (token === generation.current) onError(String(cause)); });
     }} />
-    {pages && createPortal(<div className="fv" style={{ display: "contents" }}><DrawioImportDialog pages={pages} onCancel={close} onInsert={(markdown) => {
+    {pages && createPortal(<div className="fv" style={{ display: "contents" }}><DrawioImportDialog pages={pages} returnFocus={button.current} onCancel={close} onInsert={(markdown) => {
       const editor = view(), selection = range.current;
       if (!editor || editor.state.readOnly || !selection || editor.state.doc.toString() !== selection.content) {
         onError(label("文档已更改，请重新选择导入位置", "Document changed; choose an import position again")); close(); return;
       }
       editor.dispatch({ changes: { from: selection.from, to: selection.to, insert: `\n\n${markdown}\n` }, selection: { anchor: selection.from + markdown.length + 3 } });
-      setPages(null); range.current = null; editor.focus();
+      focusEditor.current = true;
+      setPages(null); range.current = null;
     }} /></div>, document.body)}
   </>;
 }

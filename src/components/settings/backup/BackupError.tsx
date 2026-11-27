@@ -22,7 +22,7 @@ export function BackupError({ error, t }: { error: string; t: TranslateFn }) {
   else if (/NATIVE_VERSION_UNSUPPORTED|native versioning is unavailable/i.test(error)) key = "version";
   else if (/registration may have completed|registration completed/i.test(error)) key = "registration";
   else if (/active.*tasks|Another Feishu connection|being authorized/i.test(error)) key = "busy";
-  return <div role="alert" className="break-all text-xs text-red-500">
+  return <div role="alert" className="break-all text-xs text-ui-danger">
     <p>{t(`remoteBackup.errors.${key}`)}</p>
     {(!error.startsWith("BACKUP_") || error.includes(":")) && <details><summary>{t("remoteBackup.errorDetails")}</summary><p>{error}</p></details>}
   </div>;

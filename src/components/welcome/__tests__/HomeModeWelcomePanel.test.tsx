@@ -65,7 +65,9 @@ describe("Home mode welcome panel (TASK-08)", () => {
     expect(screen.getByTestId("welcome-panel").textContent).toContain("Welcome to Taomni");
     expect(screen.getByTestId("welcome-panel").textContent).toContain("Start local terminal");
     expect(screen.getByTestId("welcome-panel").textContent).toContain("New session");
-    expect(screen.getByTestId("welcome-open-local-terminal")).toBeInTheDocument();
+    for (const id of ["welcome-open-local-terminal", "welcome-new-session", "home-open-workspace", "home-new-notepad"]) {
+      expect(screen.getByTestId(id)).toHaveAttribute("data-primary", "true");
+    }
     expect(screen.getByTestId("welcome-version")).toBeInTheDocument();
     expect(screen.getByTestId("welcome-version-footer")).toBeInTheDocument();
 

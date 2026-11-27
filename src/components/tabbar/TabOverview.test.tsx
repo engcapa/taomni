@@ -229,6 +229,8 @@ it("moves focus with arrows and enlarges a hovered card only after the dwell tim
   expect(screen.queryByTestId("tab-overview-enlarged")).toBeNull();
   act(() => vi.advanceTimersByTime(1));
   const enlarged = screen.getByTestId("tab-overview-enlarged");
+  expect(dialog.tagName).toBe("DIALOG");
+  expect(dialog).toContainElement(enlarged);
   expect(enlarged).toHaveAttribute("data-tab-id", "session-2");
   expect(useAppStore.getState().activeTabId).toBe("session-1");
   fireEvent.mouseLeave(second, { relatedTarget: enlarged });

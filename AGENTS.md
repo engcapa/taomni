@@ -112,6 +112,32 @@ Rust uses snake_case modules/functions and rustfmt's four-space indentation with
 - For each split, run the affected behavior tests and required boundary/contract checks. Verify native side effects in native tests; a successful build or a smaller line count does not establish behavioral equivalence.
 - Run `pnpm check:refactor` before committing. It checks compatibility, dependency boundaries, and the 800-line limit for product sources, tests, fixtures, and build scripts; `pnpm build` runs the same checks. Keep any generated/declarative exceptions explicit in `scripts/source-file-size.mjs` and explain them in the refactoring document.
 
+## UI & Interaction Standard
+
+All desktop UI changes in the shell, core and official modules follow
+[UI-STANDARD](docs-feature/ui-standard/UI-STANDARD.md) and its
+[enforcement and acceptance criteria](docs-feature/ui-standard/ENFORCEMENT.md).
+Apply the same rules to detached windows, overlays and standalone desktop entry points.
+
+- Identify affected control types, rule IDs and registered exceptions before implementation.
+  Document deviations in UI-STANDARD §9 and cite the applicable IDs in the design and PR.
+- Reuse shared controls, theme tokens, effective platform bindings and window-local
+  app dialogs. Preserve content-specific appearance and the original object of an async decision.
+- Shared controls for independently packaged renderers live in
+  `src-tauri/crates/taomni-plugin-api/frontend/ui/`. Pass translated labels and
+  use the renderer host's React instance. Build each affected module with its
+  production Vite config and include shared control and stylesheet inputs in
+  the signed frontend workflow's source check.
+- Verify the required interaction matrix for each affected entry, including keyboard
+  completion, IME, focus return, disabled/busy/error states, both themes, font-size
+  endpoints and the owning window where applicable.
+- Declare `ui_standard` on changed UI cases and map each ID to requirement steps
+  with observable results. Run affected unit, browser and native cases together
+  with `ui-contract` and `crash-regression`. Record platform, mode, source and receipt.
+- Keep the desktop UI lint baseline empty and run `pnpm check:refactor`. The
+  development case check fails desktop renderer changes without a changed
+  rule-mapped case.
+
 ## External Network Access & Downloads
 
 Apply these requirements when adding or changing features that access external networks, including downloads, API requests, and update checks.

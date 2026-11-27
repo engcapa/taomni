@@ -5,6 +5,7 @@ description: >-
   second account starts with a blank password prompt. Refusing its wrong
   password leaves the secret hidden. Cancelling and reopening clears both the
   password and error, and the correct password reveals only the second key.
+ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-06, UI-DLG-07]
 covers: [F-MFA-1]
 tags: [mfa, export, modular-retained, p1]
 modes: [browser, native]
@@ -69,6 +70,18 @@ steps:
 - click: '[data-testid="mfa-qr-close"]'
 - assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 2}
 - assert_no_runtime_errors: null
+- click: '[data-testid="mfa-account-menu"]:is([data-issuer="Second Export"] *)'
+- click: '[data-testid="mfa-menu-qr"]'
+- assert_labelledby_text: {selector: '[data-testid="mfa-qr-dialog"]', equals: QR code for Second Export}
+- assert_focus_on: '[data-testid="mfa-qr-password"]'
+- press: Shift+Tab
+- assert_focus_on: '[data-testid="mfa-qr-reveal"]'
+- press: Tab
+- assert_focus_on: '[data-testid="mfa-qr-password"]'
+- press: Escape
+- assert_not_visible: '[data-testid="mfa-qr-dialog"]'
+- assert_focus_on: '[data-testid="mfa-account-menu"]:is([data-issuer="Second Export"] *)'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -92,6 +105,18 @@ verification:
     - {step: 53, expectation: Both accounts are still stored.}
     - {step: 54, expectation: The export sequence raises no unhandled runtime error.}
     results: [45, 46, 51, 53, 54]
+  - id: keyboard-export
+    ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-06, UI-DLG-07]
+    requirement: The account export form has an accessible title, owns keyboard focus and returns it to the original account.
+    actions: [55, 56, 59, 61, 63]
+    checkpoints:
+    - {step: 57, expectation: The dialog is named after the chosen account.}
+    - {step: 58, expectation: Authorization starts in the password field.}
+    - {step: 60, expectation: Reverse traversal reaches the last form action.}
+    - {step: 62, expectation: Forward traversal wraps within the form.}
+    - {step: 64, expectation: Escape closes the active export.}
+    - {step: 65, expectation: The same account's action button regains focus.}
+    results: [57, 58, 60, 62, 64, 65]
   visual:
   - check: Each account starts with a locked export dialog and exposes its key only after verification.
     method: automated

@@ -29,14 +29,14 @@ export function ServerOutputLog({ serverType }: Props) {
   return (
     <div className="flex flex-col mt-3">
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-[11px] font-semibold" style={{ color: "var(--taomni-text)" }}>
+        <span className="text-ui-small font-semibold" style={{ color: "var(--taomni-text)" }}>
           {t("servers.output")}
         </span>
         <div className="flex-1" />
         <button
           type="button"
           data-testid="server-log-autoscroll"
-          className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)]"
+          className="flex items-center gap-1 text-ui-small px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)]"
           aria-pressed={autoScroll}
           title={t("servers.autoScroll")}
           onClick={() => setAutoScroll((v) => !v)}
@@ -48,7 +48,7 @@ export function ServerOutputLog({ serverType }: Props) {
         <button
           type="button"
           data-testid="server-log-clear"
-          className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)]"
+          className="flex items-center gap-1 text-ui-small px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)]"
           title={t("servers.clear")}
           disabled={logLines.length === 0}
           onClick={() => clearLog(serverType)}

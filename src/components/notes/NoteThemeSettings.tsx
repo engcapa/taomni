@@ -89,7 +89,7 @@ export function NoteThemeSettings() {
 
   return (
     <div
-      className="p-2 flex flex-col gap-2 border-b border-[var(--taomni-divider)] shrink-0 text-[11px]"
+      className="p-2 flex flex-col gap-2 border-b border-[var(--taomni-divider)] shrink-0 text-ui-small"
       data-testid="note-theme-settings"
     >
       {/* Theme */}

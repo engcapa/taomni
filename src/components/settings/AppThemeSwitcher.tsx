@@ -24,7 +24,7 @@ export function AppThemeSwitcher({ compact = false }: { compact?: boolean }) {
 
   if (compact) {
     return (
-      <div className="inline-flex items-center gap-1.5 text-[11px]">
+      <div className="inline-flex items-center gap-1.5 text-ui-small">
         <span className="text-[var(--taomni-text-muted)]">{t("settings.themeLabel")}</span>
         <ThemePreviewSelect
           value={mode}
@@ -62,7 +62,7 @@ export function AppThemeIconButton() {
   return (
     <button
       type="button"
-      className="h-6 px-2 inline-flex items-center gap-1.5 rounded border text-[11px] hover:bg-[var(--taomni-control-hover)]"
+      className="h-6 px-2 inline-flex items-center gap-1.5 rounded border text-ui-small hover:bg-[var(--taomni-control-hover)]"
       style={{
         borderColor: "var(--taomni-input-border)",
         background: "var(--taomni-input-bg)",

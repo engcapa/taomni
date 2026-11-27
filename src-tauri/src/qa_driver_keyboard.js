@@ -51,6 +51,18 @@ function dispatchQaKeyDefault(el, key, event, modifiers) {
   if (moveQaInputSelection(el, key, modifiers)) return;
   if (modifiers.Control || modifiers.Meta || modifiers.Alt ||
       ["Control", "Shift", "Alt", "Meta"].includes(key)) return;
+  if (el instanceof HTMLInputElement && el.type === "range") {
+    if (el.disabled || (key !== "Home" && key !== "End")) return;
+    const previous = el.value;
+    const boundary = key === "Home" ? (el.min || "0") : (el.max || "100");
+    // Use the host setter so React sees the same value change as a native edit.
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, boundary);
+    if (el.value !== previous) {
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    return;
+  }
   if (el.isContentEditable) {
     if (key === "Enter") document.execCommand("insertParagraph", false, null);
     else if (key === "Backspace") document.execCommand("delete", false, null);
@@ -78,6 +90,7 @@ function dispatchQaKeyDefault(el, key, event, modifiers) {
     return;
   }
   if (el.disabled || el.readOnly || (key.length !== 1 && key !== "Enter")) return;
+  if (el instanceof HTMLInputElement && el.selectionStart === null) return;
   const start = el.selectionStart ?? el.value.length;
   const end = el.selectionEnd ?? start;
   const insert = key === "Enter" ? "\n" : key;
@@ -85,21 +98,33 @@ function dispatchQaKeyDefault(el, key, event, modifiers) {
   el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: insert }));
 }
 
-// Default button activation for constructed WKWebView keyboard events.
-// These are WebView actions, not physical macOS keyboard input.
+// Default button and checkable-input activation for constructed WKWebView
+// keyboard events. These are WebView actions, not physical macOS keyboard input.
 function createQaButtonKeyboard() {
   let spaceTarget = null;
   return (el, type, key, event, modifiers) => {
     const unmodified = !modifiers.Control && !modifiers.Meta && !modifiers.Alt;
-    const enabled = el instanceof HTMLButtonElement && !el.disabled && document.activeElement === el;
+    const isButton = el instanceof HTMLButtonElement ||
+      (el instanceof HTMLInputElement && ["button", "submit", "reset"].includes(el.type));
+    const isCheckable = el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio");
+    const enabled = (isButton || isCheckable) && !el.disabled && document.activeElement === el;
     if (type === "keydown" && key === " ") {
       spaceTarget = enabled && unmodified && !event.defaultPrevented ? el : null;
     } else if (type === "keyup" && key === " ") {
       const target = spaceTarget;
       spaceTarget = null;
       if (target === el && enabled && unmodified && !event.defaultPrevented) el.click();
-    } else if (type === "keydown" && key === "Enter" && enabled && unmodified && !event.defaultPrevented) {
+    } else if (type === "keydown" && key === "Enter" && isButton && enabled && unmodified && !event.defaultPrevented) {
       el.click();
     }
   };
+}
+
+// A keydown may open a search field or close a dialog. Its keyup belongs to
+// the element that currently owns focus, including when modifier keys follow.
+function dispatchQaKeyToFocus(type, key, event, modifiers, buttonDefault) {
+  const target = document.activeElement || document.body;
+  target.dispatchEvent(event);
+  buttonDefault(target, type, key, event, modifiers);
+  if (type === "keydown") dispatchQaKeyDefault(target, key, event, modifiers);
 }

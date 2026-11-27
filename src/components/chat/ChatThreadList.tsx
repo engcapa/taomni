@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { Clock, Plus, Trash2 } from "lucide-react";
 import type { ChatThread } from "../../stores/chatStore";
 import { useT, type TranslateFn } from "../../lib/i18n";
@@ -29,20 +30,20 @@ export function ChatThreadList({ threads, activeThreadId, onSelect, onNew, onDel
         style={{ background: "var(--taomni-panel-bg)" }}
       >
         <Clock className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
-        <span className="text-[12px] font-semibold flex-1">{t("chat.threadListTitle")}</span>
-        <button
+        <span className="text-ui-body font-semibold flex-1">{t("chat.threadListTitle")}</span>
+        <IconButton
           type="button"
           className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
           onClick={onNew}
-          title={t("chat.threadNewTitle")}
+          label={t("chat.threadNewTitle")}
         >
           <Plus className="w-3.5 h-3.5" />
-        </button>
+        </IconButton>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {threads.length === 0 && (
-          <div className="text-[11px] text-[var(--taomni-text-muted)] text-center py-4">
+          <div className="text-ui-small text-[var(--taomni-text-muted)] text-center py-4">
             {t("chat.threadEmptyState")}
           </div>
         )}
@@ -57,19 +58,19 @@ export function ChatThreadList({ threads, activeThreadId, onSelect, onNew, onDel
             onClick={() => onSelect(th.id)}
           >
             <div className="flex-1 min-w-0">
-              <div className="text-[12px] truncate">{th.title}</div>
-              <div className="text-[10px] text-[var(--taomni-text-muted)]">
+              <div className="text-ui-body truncate">{th.title}</div>
+              <div className="text-ui-caption text-[var(--taomni-text-muted)]">
                 {th.provider_id} · {formatTime(th.updated_at, t)}
               </div>
             </div>
-            <button
+            <IconButton
               type="button"
-              className="opacity-0 group-hover:opacity-100 h-5 w-5 p-0 inline-flex items-center justify-center rounded hover:bg-red-500/20 hover:text-red-400 transition-all"
+              className="opacity-0 group-hover:opacity-100 h-5 w-5 p-0 inline-flex items-center justify-center rounded hover:bg-ui-danger-surface hover:text-ui-danger transition-all"
               onClick={(e) => { e.stopPropagation(); onDelete(th.id); }}
-              title={t("chat.threadDeleteTitle")}
+              label={t("chat.threadDeleteTitle")}
             >
               <Trash2 className="w-3 h-3" />
-            </button>
+            </IconButton>
           </div>
         ))}
       </div>

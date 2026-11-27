@@ -402,12 +402,13 @@ export function registerTerminalPanelClipboard7Cases() {
     expect(screen.queryByText("More fonts...")).not.toBeInTheDocument();
     expect(screen.queryByText("Display font ligatures")).not.toBeInTheDocument();
 
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
     fireEvent.click(screen.getByText("Zoom in"));
-
-    expect(onProfileChange).toHaveBeenLastCalledWith(expect.objectContaining({
-      fontSize: 15,
-      theme: DEFAULT_TERMINAL_PROFILE.theme,
-    }));
+    await waitFor(() => expect(term.options.fontSize).toBe(15));
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(await screen.findByText("Reset zoom"));
+    await waitFor(() => expect(term.options.fontSize).toBe(14));
+    expect(onProfileChange).not.toHaveBeenCalled();
   });
 
   it("emits a complete terminal profile when a context menu theme is selected", async () => {

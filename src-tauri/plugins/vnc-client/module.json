@@ -3,7 +3,7 @@
   "slug": "vnc-client",
   "name": "VNC Client",
   "description": "Connect to VNC desktops through direct, proxy or SSH jump routes. The module relays frames, clipboard and input, including the Windows special-key helper. Disabling the module stops live connections and keeps saved sessions.",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "coreApiVersion": "1",
   "kind": "remote-client",
   "status": "stable",

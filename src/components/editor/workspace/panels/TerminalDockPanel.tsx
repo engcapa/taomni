@@ -243,7 +243,7 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
             >
               <button
                 type="button"
-                className="inline-flex h-full max-w-44 items-center gap-1 px-2 text-[11px]"
+                className="inline-flex h-full max-w-44 items-center gap-1 px-2 text-ui-small"
                 onClick={() => setActiveId(instance.id)}
                 title={instance.cwd || instance.initialCwd}
               >
@@ -264,7 +264,7 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
           {roots.length > 1 && (
             <select
               aria-label="Terminal root directory"
-              className="h-6 max-w-40 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[11px]"
+              className="h-6 max-w-40 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-ui-small"
               value={selectedRootId}
               onChange={(event) => setSelectedRootId(event.target.value)}
             >
@@ -285,7 +285,7 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
         </div>
         <div className="relative min-h-0 flex-1">
           {instances.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
+            <div className="flex h-full items-center justify-center text-ui-body text-[var(--taomni-code-muted)]">
               Open the Terminal tab to start a workspace shell
             </div>
           ) : instances.map((instance) => (

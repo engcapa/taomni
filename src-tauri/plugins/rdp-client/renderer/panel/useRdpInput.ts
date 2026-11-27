@@ -12,11 +12,12 @@ export interface UseRdpInputContext {
   detachedWindowControls: { onReattach: () => void; onToggleOsFullscreen: () => void; osFullscreen: boolean; } | undefined;
   osFullscreen: boolean;
   setBarReveal: import("react").Dispatch<import("react").SetStateAction<number>>;
+  imeInputRef: import("react").RefObject<HTMLTextAreaElement | null>;
   canvasRef: import("react").RefObject<HTMLCanvasElement | null>;
 }
 
 export function useRdpInput(context: UseRdpInputContext) {
-  const { connection, visible, conn, toggleOsFullscreen, detachedWindowControls, osFullscreen, setBarReveal, canvasRef } = context;
+  const { connection, visible, conn, toggleOsFullscreen, detachedWindowControls, osFullscreen, setBarReveal, canvasRef, imeInputRef } = context;
 
   /* ── Input handlers ──────────────────────────────────────────────── */
 
@@ -55,9 +56,10 @@ export function useRdpInput(context: UseRdpInputContext) {
     (down: boolean) => (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!visible || conn?.status !== "connected") return;
       const code = e.nativeEvent.code;
+      const remoteTarget = e.target === e.currentTarget || e.target === canvasRef.current || e.target === imeInputRef.current;
 
       if (connection.composingRef.current || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) {
-        e.preventDefault();
+        if (remoteTarget) e.preventDefault();
         return;
       }
 
@@ -76,6 +78,9 @@ export function useRdpInput(context: UseRdpInputContext) {
         return;
       }
 
+      // React also bubbles events from the host toolbar and its portals.
+      if (!remoteTarget) return;
+
       if (!down && connection.suppressNextPasteKeyUpRef.current && code === "KeyV") {
         connection.suppressNextPasteKeyUpRef.current = false;
         e.preventDefault();
@@ -89,13 +94,16 @@ export function useRdpInput(context: UseRdpInputContext) {
       }
       const sc = keyEventToScancode(e.nativeEvent);
       if (!sc) return;
-      e.preventDefault();
       const wireScancode = applyExtended(sc.scancode, sc.extended);
+      if (!down && !connection.pressedScancodesRef.current.has(wireScancode)) return;
+      e.preventDefault();
       if (down) connection.pressedScancodesRef.current.add(wireScancode);
       else connection.pressedScancodesRef.current.delete(wireScancode);
       connection.sendBinary(encodeKey(down, wireScancode));
     },
     [
+      canvasRef,
+      imeInputRef,
       conn?.status,
       detachedWindowControls?.osFullscreen,
       osFullscreen,

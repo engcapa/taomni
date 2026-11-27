@@ -52,6 +52,7 @@ from .linux_ime import current_fcitx_engine
 from . import wayland
 from .runtime_errors import native_assert as assert_no_runtime_errors
 from .native_drag import native_drag
+from .native_hover import native_hover
 from .host_file_observation import assert_file_sha256 as _assert_file_sha256
 from .save_lock_probe import run as save_reader_lock
 from .terminal_burst_probe import run as terminal_burst
@@ -310,35 +311,6 @@ def _eval_readonly(ctx: NativeStepContext, args: Any) -> str:
     from .steps.assertions import assert_readonly_result
     assert_readonly_result(args, lambda: ctx.session.execute(f"return ({expr});"))
     return f"eval ok"
-
-
-def _hover(ctx: NativeStepContext, args: Any) -> str:
-    ctx.session.activate_linux_window()
-    selector, _ = _selector_args(args)
-    element = ctx.session.find(selector, interactive=True)
-    # Use the WebDriver element origin instead of converting the element's
-    # CSS rect to viewport coordinates. WKWebView can report CSS pixels while
-    # its input endpoint consumes backing-screen coordinates (notably on
-    # Retina macOS), which can move the pointer beside a portal submenu.
-    origin = {"element-6066-11e4-a52e-4f735466cecf": element}
-    ctx.session.request(
-        "POST",
-        ctx.session.endpoint("/actions"),
-        {
-            "actions": [
-                {
-                    "type": "pointer",
-                    "id": "mouse",
-                    "parameters": {"pointerType": "mouse"},
-                    "actions": [{"type": "pointerMove", "duration": 150, "x": 0, "y": 0,
-                                 "origin": origin}],
-                }
-            ]
-        },
-    )
-    # Allow React submenu state to mount before the next native step queries it.
-    time.sleep(0.35)
-    return f"hovered {selector}"
 
 
 def _mouse_path(ctx: NativeStepContext, args: Any) -> str:
@@ -1737,7 +1709,8 @@ def _do_blur(ctx: NativeStepContext, args: Any) -> str:
 
 @_verb("hover")
 def _do_hover(ctx: NativeStepContext, args: Any) -> str:
-    return _hover(ctx, args)
+    selector, _ = _selector_args(args)
+    return native_hover(ctx, selector, isinstance(args, dict) and args.get("macos_system_pointer") is True)
 
 
 @_verb("mouse_path")
@@ -1790,6 +1763,13 @@ def _do_select_option(ctx: NativeStepContext, args: Any) -> str:
 @_verb("assert_attribute")
 def _do_assert_attribute(ctx: NativeStepContext, args: Any) -> str:
     return _assert_attribute(ctx, args)
+
+
+@_verb("assert_solid_text_contrast")
+def _do_assert_solid_text_contrast(ctx: NativeStepContext, args: Any) -> str:
+    from .ui_contrast import run_contrast
+
+    return run_contrast(args, lambda expression: ctx.session.execute(f"return ({expression});"), ctx.case_dir)
 
 
 @_verb("assert_element_geometry")
@@ -2718,9 +2698,8 @@ def _do_seed_storage(ctx: NativeStepContext, args: Any) -> str:
 @_verb("reload_window")
 def _do_reload_window(ctx: NativeStepContext, args: Any) -> str:
     """Reload the webview document; wait for the app shell to return."""
-    _ = args
     from .native_reload import reload_window
-    return reload_window(ctx)
+    return reload_window(ctx, ready_selector=(args or {}).get("ready_selector", '[data-testid="welcome-panel"]'))
 
 
 @_verb("parity005_native_fault")

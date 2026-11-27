@@ -105,6 +105,11 @@ pub(crate) async fn stop_thread_runtime_inner(
     // The owning turn publishes its terminal state after cancellation has unwound.
     // Clear a visible native-tool gate immediately even when its subprocess
     // has just been stopped and cannot deliver its own runtime event.
+    state
+        .core
+        .agent
+        .pending_approvals
+        .dismiss_acp(thread_id, None, None);
     if let Some(app) = app {
         let _ = app.emit(
             "agent-acp-permission-dismissed",

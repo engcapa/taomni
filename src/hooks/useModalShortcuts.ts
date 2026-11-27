@@ -10,10 +10,10 @@ interface ModalShortcutsOptions {
 export function useModalShortcuts({ onCancel, onSave, onTest }: ModalShortcutsOptions) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
+      if (document.querySelector("dialog[open]")) return;
       // 1. Esc -> Cancel
       if (e.key === "Escape") {
-        if (e.defaultPrevented) return;
-
         if (onCancel) {
           e.preventDefault();
           e.stopPropagation();

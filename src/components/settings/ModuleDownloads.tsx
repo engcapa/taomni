@@ -25,12 +25,12 @@ export function ModuleDownloads() {
   }, [refresh]);
 
   return <section data-testid="module-downloads" className="mb-5 rounded-md border border-[var(--taomni-divider)] p-3">
-    <h3 className="text-[13px] font-semibold">{t("plugins.downloadsTitle")}</h3>
-    <p className="my-2 text-[12px] text-[var(--taomni-text-muted)]">{t("plugins.downloadsHint")}</p>
-    {error && <p data-testid="module-downloads-error" role="alert" className="text-[12px] text-red-500">{error}</p>}
-    {recoveryErrors.map((reason, index) => <p key={index} data-testid="module-download-recovery-error" role="alert" className="text-[12px] text-red-500">{reason}</p>)}
+    <h3 className="text-ui-body font-semibold">{t("plugins.downloadsTitle")}</h3>
+    <p className="my-2 text-ui-body text-[var(--taomni-text-muted)]">{t("plugins.downloadsHint")}</p>
+    {error && <p data-testid="module-downloads-error" role="alert" className="text-ui-body text-ui-danger">{error}</p>}
+    {recoveryErrors.map((reason, index) => <p key={index} data-testid="module-download-recovery-error" role="alert" className="text-ui-body text-ui-danger">{reason}</p>)}
     {!loaded && !error && <p>{t("plugins.downloadsLoading")}</p>}
-    {loaded && tasks.length === 0 && <p data-testid="module-downloads-empty" className="text-[12px] text-[var(--taomni-text-muted)]">{t("plugins.downloadsEmpty")}</p>}
+    {loaded && tasks.length === 0 && <p data-testid="module-downloads-empty" className="text-ui-body text-[var(--taomni-text-muted)]">{t("plugins.downloadsEmpty")}</p>}
     <ul className="space-y-3">
       {tasks.map((task) => {
         const { progress } = task;
@@ -40,7 +40,7 @@ export function ModuleDownloads() {
         const title = task.completedPath.split(/[/\\]/).pop() ?? task.id;
         return <li key={task.id} data-testid="module-download-task" data-download-id={task.id} data-phase={progress.phase}
           data-downloaded={progress.downloaded} data-total={total ?? "unknown"} data-busy={busy[task.id] === true}
-          className="rounded border border-[var(--taomni-divider)] p-2 text-[12px]">
+          className="rounded border border-[var(--taomni-divider)] p-2 text-ui-body">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="min-w-0 break-all font-medium">{title}</span>
             <span data-testid="module-download-phase">{t(`plugins.downloadPhase${progress.phase}`)}</span>
@@ -49,7 +49,7 @@ export function ModuleDownloads() {
           <p data-testid="module-download-bytes" className="text-[var(--taomni-text-muted)]">
             {bytes(progress.downloaded)}{total != null ? ` / ${bytes(total)}` : ""}{percent !== null ? ` · ${percent.toFixed(1)}%` : ""}
           </p>
-          {(progress.error || errors[task.id]) && <p data-testid="module-download-error" role="alert" className="my-2 break-words text-red-500">{errors[task.id] || progress.error}</p>}
+          {(progress.error || errors[task.id]) && <p data-testid="module-download-error" role="alert" className="my-2 break-words text-ui-danger">{errors[task.id] || progress.error}</p>}
           <div className="mt-2 flex gap-2">
             {active ? <button type="button" data-testid="module-download-cancel" className="taomni-btn" disabled={busy[task.id]}
               onClick={() => { void cancel(task.id); }}>{t("plugins.downloadCancel")}</button>

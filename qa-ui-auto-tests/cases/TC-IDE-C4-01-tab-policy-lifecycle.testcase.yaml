@@ -21,6 +21,7 @@ description: 'ED-TABS-004 browser lifecycle case. Builds a deterministic pinned 
   negative recovery-surface observation.
 
   '
+ui_standard: [UI-DLG-03]
 covers:
 - F25.5
 tags:
@@ -121,9 +122,8 @@ steps:
     selector: '[data-testid="confirm-dialog"]'
     name: role
     equals: dialog
-- assert_attribute:
-    selector: '[data-testid="confirm-dialog"]'
-    name: aria-label
+- assert_text_equals:
+    selector: '[data-testid="confirm-dialog"][aria-labelledby] h2'
     equals: Apply editor tab policy
 - assert_text:
     selector: '[data-testid="confirm-dialog-message"]'
@@ -208,6 +208,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
+    ui_standard: [UI-DLG-03]
     requirement: Editor tab policy eviction, dirty confirmation, and lifecycle receipt：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
@@ -288,7 +289,7 @@ verification:
     - step: 51
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"confirm-dialog\"]", "name": "role", "equals": "dialog"}}'
     - step: 52
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"confirm-dialog\"]", "name": "aria-label", "equals": "Apply editor tab policy"}}'
+      expectation: The title referenced by aria-labelledby identifies the pending tab policy.
     - step: 53
       expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "beta.txt"}}'
     - step: 55

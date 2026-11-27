@@ -13,15 +13,15 @@ steps:
   - wait_for: '[data-testid="recovery-observe"]'
   - assert_attribute: {selector: '[data-testid="recovery-observe"]', name: aria-pressed, equals: 'false'}
   - click: '[data-testid="recovery-observe"]'
-  - assert_text: {selector: '[data-testid="recovery-output-status"]', contains: 已订阅原终端}
+  - assert_text: {selector: '[data-testid="recovery-output-status"]', contains: Observing the original terminal}
   - assert_text: {selector: '[data-testid="recovery-output"]', contains: QA-ORIGINAL-OUTPUT}
   - assert_count: {selector: 'textarea', equal: 0}
   - click: '[data-testid="recovery-observe"]'
   - assert_attribute: {selector: '[data-testid="recovery-observe"]', name: aria-pressed, equals: 'false'}
-  - assert_text_equals: {selector: '[data-testid="recovery-output-status"]', equals: 未订阅输出}
+  - assert_text_equals: {selector: '[data-testid="recovery-output-status"]', equals: Output observation is off.}
   - assert_text: {selector: '[data-testid="recovery-output"]', contains: QA-ORIGINAL-OUTPUT}
   - click: '[data-testid="recovery-observe"]'
-  - assert_text: {selector: '[data-testid="recovery-output-status"]', contains: 已订阅原终端}
+  - assert_text: {selector: '[data-testid="recovery-output-status"]', contains: Observing the original terminal}
   - screenshot: readonly-original-output.png
 verification:
   review: reviewed

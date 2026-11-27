@@ -66,23 +66,23 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
         )}
 
         <div className="flex-1 min-w-0">
-          {provider.custom ? <button type="button" className="text-left text-[13px] font-medium" data-testid="llm-custom-toggle"
+          {provider.custom ? <button type="button" className="text-left text-ui-body font-medium" data-testid="llm-custom-toggle"
             aria-expanded={expanded} onClick={(event) => { event.stopPropagation(); setExpanded(!expanded); }}>{provider.custom.label || "Custom provider"}</button>
-            : <div className="text-[13px] font-medium">{PROVIDER_LABELS[id] ?? id}</div>}
-          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+            : <div className="text-ui-body font-medium">{PROVIDER_LABELS[id] ?? id}</div>}
+          <div className="text-ui-small text-[var(--taomni-text-muted)] truncate">
             {id === "opencode-go" ? t("opencodeGo.subscription") : PROVIDER_NOTES[id] ?? provider.base_url}
           </div>
         </div>
 
         {testResult && (
-          <span className={`text-[11px] ${testResult.ok ? "text-green-400" : "text-red-400"}`}>
+          <span className={`text-ui-small ${testResult.ok ? "text-ui-success" : "text-ui-danger"}`}>
             {testResult.ok ? `✓ ${testResult.latency_ms}ms` : t("aiSettings.llmFailed")}
           </span>
         )}
 
         <button
           type="button"
-          className={`taomni-btn h-6 px-2 text-[11px] shrink-0 ${isActive ? "opacity-50 cursor-default" : ""}`}
+          className={`taomni-btn h-6 px-2 text-ui-small shrink-0 ${isActive ? "opacity-50 cursor-default" : ""}`}
           onClick={(e) => { e.stopPropagation(); if (!isActive) onActivate(); }}
           disabled={isActive}
         >
@@ -94,14 +94,14 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
         <div className="px-3 pb-3 border-t border-[var(--taomni-divider)] pt-2 space-y-2">
           {id !== "local" && (
             <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmApiKey")}</label>
+              <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmApiKey")}</label>
               <div className="space-y-1.5">
                 {apiKeys.map((key, index) => (
                   <div key={index} className="flex items-center gap-1.5">
                     <input
                       type="password"
                       data-testid="llm-provider-key"
-                      className="taomni-input h-7 flex-1 min-w-0 text-[12px]"
+                      className="taomni-input h-7 flex-1 min-w-0 text-ui-body"
                       placeholder={`${t("aiSettings.llmApiKeyPlaceholder")} #${index + 1}`}
                       value={key}
                       onChange={(e) => {
@@ -127,7 +127,7 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
                 ))}
                 <button
                   type="button"
-                  className="taomni-btn h-7 px-2 text-[12px] inline-flex items-center gap-1.5"
+                  className="taomni-btn h-7 px-2 text-ui-body inline-flex items-center gap-1.5"
                   onClick={() => onChange(withProviderApiKeys(provider, [...apiKeys, ""]))}
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -137,22 +137,22 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
             </div>
           )}
           {provider.custom ? <CustomLlmProviderFields provider={provider} onChange={onChange} focusName={startExpanded} /> : <div>
-            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmModel")}</label>
+            <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmModel")}</label>
             {id === "opencode-go" ? <>
-              <a href="https://opencode.ai/console" data-testid="go-console" className="text-[11px] underline"
+              <a href="https://opencode.ai/console" data-testid="go-console" className="text-ui-small underline"
                 onClick={(e) => { e.preventDefault(); void openExternalUrl("https://opencode.ai/console"); }}>{t("opencodeGo.console")}</a>
               <GoProviderFields provider={provider} onChange={onChange} blocked={blocked} />
             </> : <input
               type="text"
               data-testid="llm-provider-model"
-              className="taomni-input h-7 w-full text-[12px]"
+              className="taomni-input h-7 w-full text-ui-body"
               value={provider.model}
               onChange={(e) => onChange({ ...provider, model: e.target.value })}
             />}
           </div>}
           {!provider.custom && <div>
-            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmCapabilities")}</label>
-            <div className="flex flex-wrap gap-3 text-[11px] text-[var(--taomni-text-muted)]">
+            <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmCapabilities")}</label>
+            <div className="flex flex-wrap gap-3 text-ui-small text-[var(--taomni-text-muted)]">
               <label className="inline-flex items-center gap-1.5">
                 <input
                   type="checkbox"
@@ -184,10 +184,10 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
           </div>}
           {capabilities.image_generation && (
             <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmImageModel")}</label>
+              <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmImageModel")}</label>
               <input
                 type="text"
-                className="taomni-input h-7 w-full text-[12px]"
+                className="taomni-input h-7 w-full text-ui-body"
                 value={provider.image_model ?? ""}
                 onChange={(e) => onChange({ ...provider, image_model: e.target.value })}
               />
@@ -195,36 +195,36 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
           )}
           {capabilities.video_generation && (
             <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmVideoModel")}</label>
+              <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmVideoModel")}</label>
               <input
                 type="text"
-                className="taomni-input h-7 w-full text-[12px]"
+                className="taomni-input h-7 w-full text-ui-body"
                 value={provider.video_model ?? ""}
                 onChange={(e) => onChange({ ...provider, video_model: e.target.value })}
               />
             </div>
           )}
           <div>
-            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmBaseUrl")}</label>
+            <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmBaseUrl")}</label>
             <input
               type="text"
-              className="taomni-input h-7 w-full text-[12px]"
+              className="taomni-input h-7 w-full text-ui-body"
               data-testid="llm-provider-base-url"
               value={provider.base_url}
               onChange={(e) => onChange({ ...provider, base_url: e.target.value })}
             />
           </div>
           <div>
-            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
+            <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
             <GoProxyFields provider={provider} onChange={onChange} />
           </div>
           <div className="flex items-center gap-2 pt-1">
             {!provider.custom && <button ref={inspectorButton} type="button" data-testid="model-inspector-open" data-provider={id}
-              className="taomni-btn h-7 px-3 text-[12px]" aria-expanded={inspecting}
+              className="taomni-btn h-7 px-3 text-ui-body" aria-expanded={inspecting}
               onClick={() => setInspecting((open) => !open)}>{t("modelInspector.title")}</button>}
             <button
               type="button"
-              className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+              className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5"
               onClick={onTest}
               data-testid="llm-provider-test"
               disabled={testing || (id === "opencode-go" && blocked)}
@@ -238,7 +238,7 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
             {onRemove && <button type="button" className="taomni-btn h-7 w-7 inline-flex items-center justify-center"
               data-testid="llm-custom-remove" title={t("common.delete")} aria-label={t("common.delete")} onClick={onRemove}><Trash2 size={14} /></button>}
             {testResult && (
-              <span className={`text-[12px] flex items-center gap-1 ${testResult.ok ? "text-green-400" : "text-red-400"}`}>
+              <span className={`text-ui-body flex items-center gap-1 ${testResult.ok ? "text-ui-success" : "text-ui-danger"}`}>
                 {testResult.ok ? (
                   <><CheckCircle className="w-3.5 h-3.5" /> {t("aiSettings.llmConnected", { ms: testResult.latency_ms })}</>
                 ) : (

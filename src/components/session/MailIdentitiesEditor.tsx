@@ -67,7 +67,7 @@ export function MailIdentitiesEditor({
       ))}
       <button
         type="button"
-        className="taomni-btn h-7 px-2 self-start inline-flex items-center gap-1.5 text-[12px]"
+        className="taomni-btn h-7 px-2 self-start inline-flex items-center gap-1.5 text-ui-body"
         data-testid="mail-identity-add"
         onClick={() => onChange([
           ...identities,

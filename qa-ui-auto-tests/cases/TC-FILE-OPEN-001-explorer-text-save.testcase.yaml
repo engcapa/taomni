@@ -3,6 +3,7 @@ title: Explorer opens a shared text viewer, saves exact bytes and protects dirty
 description: AC04/05/08/18/21. Real Explorer double-click and preview/edit entries share one canonical viewer. Edits, Save, Ctrl/Cmd+S,
   dirty close/cancel/discard and reopen assert actual content, not only runtime-error absence. Browser byte oracle reads IndexedDB VFS
   only; native disk effects are asserted independently in 002/003.
+ui_standard: [UI-DLG-04, UI-DLG-06]
 modes:
 - browser
 covers:
@@ -87,8 +88,8 @@ steps:
 
       '
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
-- wait_for: '[data-testid="viewer-close-dialog"]'
-- click: '[data-testid="viewer-close-cancel"]'
+- assert_focus_on: '[data-testid="viewer-close-cancel"]'
+- press: Escape
 - assert_visible: '[data-testid="file-viewer"]'
 - assert_items:
     selector: '[data-testid="viewer-editor"] .cm-line'
@@ -171,6 +172,7 @@ verification:
     - 25
     - 26
   - id: R2
+    ui_standard: [UI-DLG-04, UI-DLG-06]
     requirement: Cancel preserves dirty edits; discard does not write them; focused Ctrl/Cmd+S saves.
     actions:
     - 27
@@ -182,6 +184,8 @@ verification:
     - 40
     - 41
     checkpoints:
+    - step: 29
+      expectation: The safe Cancel action has keyboard focus before Escape.
     - step: 32
       expectation: Cancel retains exact unsaved editor content.
     - step: 33
@@ -197,6 +201,7 @@ verification:
     - step: 42
       expectation: After editing the line-terminated shortcut-save text, actual status cursor reports line2 column1.
     results:
+    - 29
     - 32
     - 33
     - 36

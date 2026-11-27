@@ -1,0 +1,48 @@
+id: TC-UIC-004-notepad-split-zoom
+title: Notepad zoom applies to one focused pane and survives a document switch
+covers: [F-NOTEPAD-3]
+modes: [browser, native]
+tags: [ui-contract, notepad, zoom]
+ui_standard: [UI-ZOOM-01, UI-ZOOM-02]
+fixtures: [reset_db]
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-uic-editor
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- click: '[data-testid="viewer-editor"] .cm-content'
+- type: original pane text
+- click: '[data-testid="notepad-tool-split"]'
+- click: '[data-testid="notepad-editor-secondary"] .cm-content'
+- press: {key: 'Control+=', macos_key: 'Meta+='}
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.np-pane.active-pane .cm-editor')).fontSize === '14px' && getComputedStyle(document.querySelector('.np-pane:not(.active-pane) .cm-editor')).fontSize === '13px'
+    expect_truthy: true
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- assert_text_equals: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="notepad-status-zoom"]', equals: '100%'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="false"]'
+- click: '[data-testid="notepad-editor-secondary"] .cm-content'
+- assert_text_equals: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="notepad-status-zoom"]', equals: '108%'}
+- press: {key: 'Control+0', macos_key: 'Meta+0'}
+- assert_text_equals: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="notepad-status-zoom"]', equals: '100%'}
+- assert_text: {selector: '[data-testid="notepad-editor-secondary"] .cm-content', contains: original pane text}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-ZOOM-01, UI-ZOOM-02]
+    requirement: The platform zoom shortcut changes only the focused editor pane, a second document starts at its base and returning preserves the first document and its zoom.
+    actions: [6, 7, 8, 9, 11, 13, 14, 16]
+    checkpoints:
+    - {step: 10, expectation: Secondary pane text enlarges one point and primary text stays at its base.}
+    - {step: 12, expectation: The new document uses its unchanged font preference.}
+    - {step: 15, expectation: The first document retains the enlarged secondary pane.}
+    - {step: 17, expectation: Reset restores the base font in the addressed pane.}
+    - {step: 18, expectation: The unsaved original text remains present after the switch.}
+    results: [10, 12, 15, 17, 18]
+  visual:
+  - {check: Pane font, method: automated, reason: Reads actual CodeMirror text sizes and the rendered percentage.}
+  native:
+  - {check: Packaged editor focus, method: automated, reason: Sends platform-specific keys to the active WebView editor.}

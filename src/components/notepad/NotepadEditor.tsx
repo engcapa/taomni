@@ -1,3 +1,4 @@
+import { useZoomTarget } from "../../hooks/useZoomTarget";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { ChevronLeft, ChevronRight, Lock } from "lucide-react";
@@ -31,6 +32,7 @@ import { NotepadStatusBar } from "./NotepadStatusBar";
 import { NotepadToolbar } from "./NotepadToolbar";
 import { FloatingPanels, PanelDockView } from "./panels/PanelHost";
 import { useNotepadActions } from "./useNotepadActions";
+import { useNotepadZoom } from "./useNotepadZoom";
 import "./notepad.css";
 
 export function NotepadEditor({
@@ -170,7 +172,11 @@ export function NotepadEditor({
       .catch(() => useNotepadStore.getState().patchMacro({ loaded: true }));
   }, [store.macro.loaded]);
 
+  const zoom = useNotepadZoom(prefs.fontSize, docState.split ? docState.activePane : 0);
+  const zoomRoot = useRef<HTMLDivElement>(null);
+  useZoomTarget(zoomRoot, true, zoom.change);
   const actions = useNotepadActions({
+    zoom: zoom.change,
     docKey,
     document,
     docState,
@@ -281,8 +287,6 @@ export function NotepadEditor({
     }),
     [store.symbols, eolLabel, prefs.showRuler, prefs.rulerCol],
   );
-  const zoomPct = Math.round(((13 + store.zoomDelta) / 13) * 100);
-  const effectiveFontSize = Math.max(8, Math.min(32, prefs.fontSize + store.zoomDelta));
   const allSymbolsOn = Object.values(store.symbols).every(Boolean);
 
   const activeHostDoc = viewerTabHost.getActiveDoc(hostCtx);
@@ -376,7 +380,7 @@ export function NotepadEditor({
   return (
     <div
       className={`np-workbench ${store.viewMode ? `np-mode-${store.viewMode}` : ""}`}
-      data-testid="notepad-workbench"
+      ref={zoomRoot} data-testid="notepad-workbench"
       onKeyDown={(e) => {
         if (e.defaultPrevented || isImeComposing(e.nativeEvent)) return;
         // Design §4.2: every Notepad dialog closes on Esc and returns to the editor.
@@ -598,7 +602,7 @@ export function NotepadEditor({
             readOnly={effectiveReadOnly}
             wrap={prefs.wrap}
             showLineNumbers={prefs.showLineNumbers}
-            fontSizePx={effectiveFontSize}
+            fontSizes={zoom.sizes}
             insertMode={store.insertMode}
             virtualSpace={store.virtualSpace}
             showChangeHistory={prefs.showChangeHistory}
@@ -699,13 +703,13 @@ export function NotepadEditor({
           recording={store.macro.recording}
           backupIntervalSec={prefs.backupSec}
           lastBackupAt={docState.lastBackupAt}
-          zoomPct={zoomPct}
+          zoomPct={zoom.percent}
           backupState={docState.backupState ?? "idle"}
           onCycleEol={() => void actions.sessionAndMacroHelpers.cycleEol()}
           onOpenEncoding={() => setEncodingOpen(true)}
           onToggleInsertMode={() => store.setInsertMode(!store.insertMode)}
           onToggleReadonly={() => void actions.registry.execute("file.toggleReadonly")}
-          onResetZoom={() => store.setZoomDelta(0)}
+          onResetZoom={() => zoom.change("reset")}
         />
       )}
 

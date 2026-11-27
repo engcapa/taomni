@@ -23,7 +23,7 @@ const modules: Record<string, { object: string; names: string[] }> = {
   ] },
   "react/jsx-runtime": { object: "__taomniHost.jsxRuntime", names: ["Fragment", "jsx", "jsxs"] },
   "react-dom": { object: "__taomniHost.ReactDOM", names: ["createPortal", "flushSync"] },
-  "lib/i18n": { object: "__taomniHost.i18n", names: ["getLocale", "useT"] },
+  "lib/i18n": { object: "__taomniHost.i18n", names: ["getLocale", "t", "useT"] },
   "components/ContextMenu": platformModule("contextMenu", ["useContextMenu"]),
   "components/sidebar/ConfirmDialog": platformModule("dialogs", ["useConfirmDialog", "useTextInputDialog"]),
   "components/terminal/FontPickerPanel": platformModule("fonts", ["FontPickerSelect"]),

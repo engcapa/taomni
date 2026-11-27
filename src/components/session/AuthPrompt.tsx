@@ -32,7 +32,7 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(20,30,45,0.4)" }}>
+    <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center">
       <form
         data-testid="auth-prompt"
         onSubmit={handleSubmit}
@@ -40,17 +40,17 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
         style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-chrome-border)", color: "var(--taomni-text)" }}
       >
         <div className="h-8 flex shrink-0 items-center px-3"
-             style={{ background: "linear-gradient(to bottom, #5895c8, #2b5d8b)", color: "white" }}>
+             style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}>
           <KeyRound className="w-3.5 h-3.5 mr-1.5" />
-          <span className="text-[12px] font-semibold">{t("authPrompt.titleRequired")}</span>
+          <span className="text-ui-body font-semibold">{t("authPrompt.titleRequired")}</span>
           <div className="flex-1" />
-          <button data-testid="auth-close" type="button" onClick={onCancel} aria-label={t("authPrompt.closeAria")} className="hover:bg-white/20 rounded p-0.5">
+          <button data-testid="auth-close" type="button" onClick={onCancel} aria-label={t("authPrompt.closeAria")} className="hover:bg-[var(--taomni-control-hover)] rounded p-0.5">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
         <div className="min-h-0 overflow-y-auto p-4">
-          <div className="text-[12px] mb-3 text-[var(--taomni-text-muted)]">
+          <div className="text-ui-body mb-3 text-[var(--taomni-text-muted)]">
             {t("authPrompt.subtitle", { user: username, host })}
           </div>
           <input
@@ -60,11 +60,11 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
             autoFocus
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="taomni-input w-full h-8 text-[13px]"
+            className="taomni-input w-full h-8 text-ui-body"
             placeholder={t("authPrompt.password")}
           />
           <label
-            className="flex items-center gap-1.5 mt-3 text-[11px] cursor-pointer"
+            className="flex items-center gap-1.5 mt-3 text-ui-small cursor-pointer"
             title={
               vaultState === "empty"
                 ? t("authPrompt.saveTooltipSetup")

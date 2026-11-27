@@ -135,7 +135,7 @@ export function NotesDetachedWindow() {
         <div className="flex-1 h-full min-w-0" aria-hidden="true" data-window-drag />
         <button
           type="button"
-          className="taomni-btn relative z-30 h-5 w-5 p-0 inline-flex items-center justify-center rounded hover:bg-black/10"
+          className="taomni-btn relative z-[var(--taomni-z-docked-overlay)] h-5 w-5 p-0 inline-flex items-center justify-center rounded hover:bg-black/10"
           onClick={dockToHub}
           onMouseDown={(event) => event.stopPropagation()}
           title={t("notes.dock")}
@@ -149,7 +149,7 @@ export function NotesDetachedWindow() {
       <div className="flex-1 min-h-0 flex flex-col">
         <NotesPanel showPanelModeToggle={false} />
       </div>
-      <WindowResizeHandles className="absolute inset-0 z-20" edgeSize={5} cornerSize={10} />
+      <WindowResizeHandles className="absolute inset-0 z-[var(--taomni-z-sticky)]" edgeSize={5} cornerSize={10} />
       <div className="notes-sticky-fold" aria-hidden="true" />
     </div>
   );

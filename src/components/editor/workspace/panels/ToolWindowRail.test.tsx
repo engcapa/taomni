@@ -31,7 +31,7 @@ describe("ED-PARITY-010 tool window rail", () => {
     expect(button).toHaveAttribute("aria-pressed", "true");
     expect(button).toBeDisabled();
     expect(button).toHaveTextContent("4");
-    expect(button).toHaveAttribute("title", "Run — Busy");
+    expect(button).toHaveAttribute("data-taomni-tooltip", "Run — Busy");
   });
 
   it("renders stripe buttons with pressed state, shortcut titles and disabled reasons", () => {
@@ -47,11 +47,11 @@ describe("ED-PARITY-010 tool window rail", () => {
     );
     const project = screen.getByTestId("code-workspace-tool-rail-project");
     expect(project).toHaveAttribute("aria-pressed", "true");
-    expect(project).toHaveAttribute("title", "Project Alt+1");
+    expect(project).toHaveAttribute("data-taomni-tooltip", "Project Alt+1");
     fireEvent.click(project);
     expect(onProject).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("code-workspace-tool-rail-commit")).toBeDisabled();
-    expect(screen.getByTestId("code-workspace-tool-rail-commit").getAttribute("title")).toContain("No Git repository");
+    expect(screen.getByTestId("code-workspace-tool-rail-commit").getAttribute("data-taomni-tooltip")).toContain("No Git repository");
   });
 
   it("renders an embedded stripe for the sidebar rail without its own chrome (ED-PARITY-027)", () => {

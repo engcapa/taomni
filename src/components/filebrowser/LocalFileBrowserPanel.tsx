@@ -211,7 +211,7 @@ function LegacyLocalFileBrowserPanel({ tabId, initialPath }: Props) {
   if (!session?.attached) {
     return (
       <div
-        className="w-full h-full flex items-center justify-center text-[12px]"
+        className="w-full h-full flex items-center justify-center text-ui-body"
         style={{ background: "var(--taomni-bg)", color: "var(--taomni-text-muted)" }}
       >
         {t("fileBrowser.localBrowserLoading")}

@@ -11274,7 +11274,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-mail"
-version = "0.1.59"
+version = "0.1.60"
 dependencies = [
  "libc",
  "rusqlite",
@@ -11292,7 +11292,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-mfa"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "png 0.18.1",
  "quircs",
@@ -11308,7 +11308,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-rdp-client"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "rusqlite",
  "serde",
@@ -11324,7 +11324,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-rdp-server"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "libc",
  "serde",
@@ -11341,7 +11341,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-screenshot"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "image",
@@ -11408,7 +11408,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-sockscap"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "serde",
  "serde_json",
@@ -11445,7 +11445,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-vnc-client"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "futures",
  "serde",

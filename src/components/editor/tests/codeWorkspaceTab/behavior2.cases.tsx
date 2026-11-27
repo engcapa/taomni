@@ -475,7 +475,7 @@ export function registerCodeWorkspaceTabBehavior2Cases() {
       content.focus();
       fireEvent.keyDown(content, { key, code: "Enter", altKey: true });
 
-      expect(await screen.findByRole("button", { name: "Insert space" })).toBeInTheDocument();
+      expect(await screen.findByRole("menuitem", { name: "Insert space" })).toBeInTheDocument();
       expect(lspMocks.lspCodeActions).toHaveBeenCalled();
       // Focus and buffer stay untouched: no newline was inserted.
       expect(selectCodeWorkspaceUi(

@@ -90,7 +90,7 @@ export function useObjectStorageController(sessionId: string) {
         listenStorageProgress(transferId, (payload) => {
           patchTransfer(transferId, {
             bytes: payload.bytes,
-            size: payload.total || undefined,
+            size: payload.total,
             rate: payload.rate,
             eta: payload.eta,
             state: "running",

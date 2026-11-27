@@ -3,6 +3,7 @@ title: Markdown zoom shortcuts and shared actions on a draw.io swimlane
 covers: [F-FILEOPEN-1, F-EXPLORER-1]
 modes: [browser, native]
 tags: [p1, markdown, drawio, regression]
+ui_standard: [UI-ZOOM-01]
 fixtures: [reset_db, markdown_drawio_roundtrip]
 timeout_sec: 180
 steps:
@@ -32,6 +33,7 @@ steps:
 - press:
     selector: '[data-testid="markdown-live"]'
     key: Control+=
+    macos_key: Meta+=
 - assert_attribute:
     selector: '[data-testid="markdown-live"]'
     name: data-zoom
@@ -47,6 +49,7 @@ steps:
 - press:
     selector: '[data-testid="markdown-source"]'
     key: Control+-
+    macos_key: Meta+-
 - assert_attribute:
     selector: '[data-testid="markdown-source"]'
     name: data-zoom
@@ -76,6 +79,7 @@ verification:
   review: reviewed
   requirements:
   - id: MARKDOWN-VIEW-ACTIONS
+    ui_standard: [UI-ZOOM-01]
     requirement: Markdown zoom shortcuts and shared actions on a draw.io swimlane.
     actions: [14, 17, 19, 21, 23, 27, 29, 31]
     checkpoints:
@@ -84,13 +88,13 @@ verification:
     - step: 13
       expectation: The swimlane preview paints outline and connector paths.
     - step: 15
-      expectation: Control+Equal increases Live zoom.
+      expectation: The platform zoom-in shortcut increases Live zoom.
     - step: 16
       expectation: The visible document pane uses the updated CSS zoom.
     - step: 18
       expectation: Source keeps the current zoom.
     - step: 20
-      expectation: Control+Minus reduces Source zoom.
+      expectation: The platform zoom-out shortcut reduces Source zoom.
     - step: 24
       expectation: The context menu identifies the draw.io source.
     - step: 25

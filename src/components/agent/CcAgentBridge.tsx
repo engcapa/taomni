@@ -12,10 +12,6 @@ import { useSessionStore } from "../../stores/sessionStore";
 import {
   type QueuedPermission,
   type CaptureProgress,
-  type PermissionPrompt,
-  type AcpPermissionPrompt,
-  type AcpPermissionDismissed,
-  type CcPermissionResolved,
   type ToolDispatch,
   type SqlEcho,
 } from "./bridge/types";
@@ -25,8 +21,12 @@ import { buildEchoNote, fmtBytes, describe, preview } from "./bridge/formatting"
 import { addressesThisWindow } from "../../lib/windowLabel";
 import { QA_APPROVAL_PROBE_ENABLED, installApprovalProbe } from "./approvalProbe";
 
+import { sameApproval, usePendingApprovals } from "./bridge/usePendingApprovals";
+import { getLocale, useT } from "../../lib/i18n";
+
 export function CcAgentBridge() {
-  const [queue, setQueue] = useState<QueuedPermission[]>([]);
+  const t = useT();
+  const { queue, setQueue } = usePendingApprovals();
   const [deciding, setDeciding] = useState(false);
   const [captures, setCaptures] = useState<CaptureProgress[]>([]);
   const activeThreadId = useChatStore((state) => state.activeThreadId);
@@ -37,128 +37,6 @@ export function CcAgentBridge() {
     () => (QA_APPROVAL_PROBE_ENABLED ? installApprovalProbe() : undefined),
     [],
   );
-
-  // --- permission prompts (HITL) ---------------------------------------
-  useEffect(() => {
-    let unlistenCc: UnlistenFn | null = null;
-    let unlistenAcp: UnlistenFn | null = null;
-    let unlistenAcpDismissed: UnlistenFn | null = null;
-    let unlistenCcResolved: UnlistenFn | null = null;
-    let disposed = false;
-    void listen<PermissionPrompt>("agent-cc-permission", (event) => {
-      // The backend addresses the window that started the turn, so a detached
-      // session window cannot render a second copy of the same card (issue
-      // #869). Unlabelled events are the broadcast fallback and stay accepted.
-      if (!addressesThisWindow(event.payload.windowLabel)) return;
-      // Dedupe by callId: a stray double-emit must not stack two cards.
-      const prompt: QueuedPermission = { source: "cc", ...event.payload };
-      setQueue((q) =>
-        q.some((p) => p.source === prompt.source && p.callId === prompt.callId)
-          ? q
-          : [...q, prompt],
-      );
-    }).then((fn) => {
-      // `listen` resolves async. If the effect was already torn down (React
-      // StrictMode double-mount in dev), unregister immediately instead of
-      // leaking this listener — a leak would fire every handler twice.
-      if (disposed) void fn();
-      else unlistenCc = fn;
-    }).catch(() => {
-      // `listen` can reject outside Tauri (e.g. jsdom tests); ignore — the
-      // bridge is simply inert there.
-    });
-    void listen<AcpPermissionPrompt>("agent-acp-permission", (event) => {
-      if (!addressesThisWindow(event.payload.windowLabel)) return;
-      const prompt: QueuedPermission = { source: "acp", ...event.payload };
-      setQueue((q) =>
-        q.some(
-          (p) =>
-            p.source === prompt.source &&
-            p.threadId === prompt.threadId &&
-            p.callId === prompt.callId,
-        )
-          ? q
-          : [...q, prompt],
-      );
-    }).then((fn) => {
-      if (disposed) void fn();
-      else unlistenAcp = fn;
-    }).catch(() => {
-      // ACP gates are only emitted by the desktop backend; ignore a missing
-      // event bridge in browser-only tests just like the CC listener above.
-    });
-    void listen<CcPermissionResolved>("agent-cc-permission-resolved", (event) => {
-      // Decided here or in another window, timed out, or its thread stopped:
-      // a card that is no longer answerable must not linger (issue #869).
-      const { callId, threadId } = event.payload ?? {};
-      if (callId == null && threadId == null) return;
-      setQueue((q) =>
-        q.filter((p) => {
-          if (p.source !== "cc") return true;
-          if (callId != null) return p.callId !== callId;
-          return p.threadId !== threadId;
-        }),
-      );
-    }).then((fn) => {
-      if (disposed) void fn();
-      else unlistenCcResolved = fn;
-    }).catch(() => {
-      // Resolved notifications only exist on the desktop backend.
-    });
-    void listen<AcpPermissionDismissed>("agent-acp-permission-dismissed", (event) => {
-      const { threadId, permissionOwnerId, callId } = event.payload;
-      setQueue((q) =>
-        q.filter((p) => {
-          if (p.source !== "acp" || p.threadId !== threadId) return true;
-          if (callId != null && p.callId !== callId) return true;
-          return permissionOwnerId != null && p.permissionOwnerId !== permissionOwnerId;
-        }),
-      );
-    }).then((fn) => {
-      if (disposed) void fn();
-      else unlistenAcpDismissed = fn;
-    }).catch(() => {
-      // The backend can dismiss a gate after an ACP timeout, stop, or close.
-    });
-    return () => {
-      disposed = true;
-      unlistenCc?.();
-      unlistenCcResolved?.();
-      unlistenAcp?.();
-      unlistenAcpDismissed?.();
-    };
-  }, []);
-
-  // Tauri events are not queued: after a renderer reload or crash the bridge has
-  // no card for a prompt that is still pending. Re-read the prompts addressed to
-  // this window on mount; dedupe by callId keeps an already-received prompt from
-  // being shown twice.
-  useEffect(() => {
-    let disposed = false;
-    void invoke<PermissionPrompt[]>("cc_pending_permission_prompts")
-      .then((prompts) => {
-        if (disposed || !Array.isArray(prompts)) return;
-        const restored = prompts.filter(
-          (prompt) => prompt && prompt.callId && addressesThisWindow(prompt.windowLabel),
-        );
-        if (restored.length === 0) return;
-        setQueue((q) => {
-          const next = [...q];
-          for (const prompt of restored) {
-            if (!next.some((p) => p.source === "cc" && p.callId === prompt.callId)) {
-              next.push({ source: "cc", ...prompt });
-            }
-          }
-          return next;
-        });
-      })
-      .catch(() => {
-        // Browser preview and older backends have no replay command.
-      });
-    return () => {
-      disposed = true;
-    };
-  }, []);
 
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
@@ -189,7 +67,7 @@ export function CcAgentBridge() {
         console.error("cc_resolve_permission failed:", e);
       } finally {
         setQueue((q) =>
-          q.filter((p) => p.source !== prompt.source || p.callId !== prompt.callId),
+          q.filter((p) => !sameApproval(p, prompt)),
         );
         setDeciding(false);
       }
@@ -203,6 +81,7 @@ export function CcAgentBridge() {
       try {
         await invoke("acp_resolve_permission", {
           threadId: prompt.threadId,
+          permissionOwnerId: prompt.permissionOwnerId,
           callId: prompt.callId,
           optionId,
         });
@@ -210,7 +89,7 @@ export function CcAgentBridge() {
         console.error("acp_resolve_permission failed:", e);
       } finally {
         setQueue((q) =>
-          q.filter((p) => p.source !== prompt.source || p.callId !== prompt.callId),
+          q.filter((p) => !sameApproval(p, prompt)),
         );
         setDeciding(false);
       }
@@ -224,13 +103,14 @@ export function CcAgentBridge() {
       try {
         await invoke("acp_cancel_permission", {
           threadId: prompt.threadId,
+          permissionOwnerId: prompt.permissionOwnerId,
           callId: prompt.callId,
         });
       } catch (e) {
         console.error("acp_cancel_permission failed:", e);
       } finally {
         setQueue((q) =>
-          q.filter((p) => p.source !== prompt.source || p.callId !== prompt.callId),
+          q.filter((p) => !sameApproval(p, prompt)),
         );
         setDeciding(false);
       }
@@ -366,21 +246,21 @@ export function CcAgentBridge() {
   return (
     <>
       {captures.length > 0 && (
-        <div className="fixed bottom-4 left-4 z-[1000] flex max-w-[360px] flex-col gap-2">
+        <div className="fixed bottom-4 left-4 z-[var(--taomni-z-toast)] flex max-w-[360px] flex-col gap-2">
           {captures.map((c) => (
             <div
               key={c.captureId}
-              className="flex items-center justify-between gap-3 rounded bg-[var(--taomni-bg-elevated,#222)] px-3 py-2 text-xs shadow-lg"
+              className="flex items-center justify-between gap-3 rounded bg-[var(--taomni-panel-bg)] px-3 py-2 text-ui-body shadow-[var(--taomni-shadow-md)]"
             >
               <span className="truncate text-[var(--taomni-text-muted)]">
-                捕获中 {c.lines.toLocaleString()} 行 · {fmtBytes(c.bytes)}
+                {t("agent.captureProgress", { lines: c.lines.toLocaleString(getLocale()), size: fmtBytes(c.bytes) })}
               </span>
               <button
                 type="button"
-                className="shrink-0 rounded border border-[var(--taomni-border,#444)] px-2 py-0.5 hover:bg-[var(--taomni-bg-hover,#333)]"
+                className="shrink-0 rounded border border-[var(--taomni-divider)] px-2 py-0.5 hover:bg-[var(--taomni-hover)]"
                 onClick={() => void cancelCapture(c.captureId)}
               >
-                取消
+                {t("common.cancel")}
               </button>
             </div>
           ))}
@@ -388,14 +268,21 @@ export function CcAgentBridge() {
       )}
       {head && (
         <div
-          className="fixed z-[1000] shadow-lg"
+          className="fixed z-[var(--taomni-z-blocking-gate)]"
           style={safetyGatePlacement.style}
           data-testid="ai-chat-safety-gate"
+          data-call-id={head.callId}
+          data-source-window={head.sourceWindow}
           data-anchor={safetyGatePlacement.anchored ? "chat-drawer" : "viewport"}
           // Observable queue depth: only the head renders, so a stacked
           // duplicate is invisible in the DOM without this.
           data-queue-length={String(queue.length)}
         >
+          {head.sourceWindow && (
+            <div className="rounded-t border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] px-3 py-1 text-ui-body">
+              {t("agent.approvalWindow", { name: head.sourceWindowTitle || head.sourceWindow })}
+            </div>
+          )}
           {head.source === "cc" ? (
             <ActionCard
               tool={head.tool}

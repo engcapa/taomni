@@ -5,6 +5,7 @@ description: AC-010/016 retained MFA behavior during engine extraction. From an 
   reload, search the saved note, cancel deletion, then confirm and reload again. Native verifies production Rust
   engine, real Vault and mfa.db; browser verifies renderer workflow with preview stubs. This case does not establish
   an independent MFA host or normal process restart.
+ui_standard: [UI-DLG-06, UI-DLG-07, UI-DLG-10]
 covers:
 - F-MFA-1
 - F-MFA-2
@@ -77,6 +78,8 @@ steps:
     selector: '[data-testid="mfa-add-error"]'
     contains: already exists
 - click: '[data-testid="mfa-add-cancel"]'
+- assert_focus_on: '[data-testid="confirm-dialog-cancel"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
 - assert_count:
     selector: '[data-testid="mfa-account-row"]'
@@ -87,6 +90,11 @@ steps:
 - click: '[data-testid="mfa-account-menu"]'
 - click: '[data-testid="mfa-menu-edit"]'
 - wait_for: '[data-testid="mfa-edit-dialog"]'
+- assert_focus_on: '[data-testid="mfa-edit-issuer"]'
+- press: Shift+Tab
+- assert_focus_on: '[data-testid="mfa-edit-save"]'
+- press: Tab
+- assert_focus_on: '[data-testid="mfa-edit-issuer"]'
 - fill:
     selector: '[data-testid="mfa-edit-issuer"]'
     value: QA Renamed Lifecycle
@@ -101,6 +109,7 @@ steps:
     value: rotation-lifecycle-015
 - click: '[data-testid="mfa-edit-save"]'
 - assert_not_visible: '[data-testid="mfa-edit-dialog"]'
+- assert_focus_on: '[data-testid="mfa-account-menu"]'
 - assert_attribute:
     selector: '[data-testid="mfa-account-row"]'
     name: data-account
@@ -208,6 +217,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
+    ui_standard: [UI-DLG-10]
     requirement: The RFC HOTP account advances once; duplicate rejection preserves the account and counter (AC-03,
       AC-09).
     actions:
@@ -231,6 +241,7 @@ verification:
     - 30
     - 31
     - 33
+    - 35
     checkpoints:
     - step: 10
       expectation: Vault setup opens an empty MFA store
@@ -241,110 +252,124 @@ verification:
     - step: 32
       expectation: Equivalent HOTP secret is refused
     - step: 34
-      expectation: Cancel closes the duplicate form
-    - step: 35
-      expectation: No duplicate account was added
+      expectation: Keeping the unsaved duplicate draft has initial focus.
     - step: 36
+      expectation: Explicit discard closes the duplicate form.
+    - step: 37
+      expectation: No duplicate account was added
+    - step: 38
       expectation: Duplicate refusal did not advance or reset the original counter
     results:
-    - 35
+    - 34
     - 36
+    - 37
+    - 38
   - id: R2
     requirement: Metadata, pin, sort/filter preferences and the same HOTP counter survive a WebView reload; the
       saved note remains searchable (AC-12, AC-13, AC-14).
     actions:
-    - 37
-    - 38
+    - 39
     - 40
-    - 41
-    - 42
-    - 43
-    - 44
+    - 47
+    - 48
     - 49
-    - 52
-    - 54
+    - 50
+    - 51
     - 57
-    - 58
     - 60
-    - 67
-    checkpoints:
-    - step: 46
-      expectation: Edited account name is visible
-    - step: 47
-      expectation: Edited group is Ops
-    - step: 48
-      expectation: Editing metadata keeps counter one
-    - step: 51
-      expectation: Pin is saved
-    - step: 53
-      expectation: Issuer sort is selected
-    - step: 55
-      expectation: Ops filter is selected
-    - step: 56
-      expectation: No runtime error in the document before reloading
-    - step: 61
-      expectation: Renamed account is loaded after reload
-    - step: 62
-      expectation: Renamed account name persists
-    - step: 63
-      expectation: Pin persists
-    - step: 64
-      expectation: Issuer sort persists
-    - step: 65
-      expectation: Ops filter persists
-    - step: 66
-      expectation: Counter one still produces 287 082
-    - step: 68
-      expectation: Saved note finds the same account
-    results:
-    - 56
     - 62
-    - 63
-    - 64
     - 65
     - 66
     - 68
+    - 75
+    checkpoints:
+    - step: 54
+      expectation: Edited account name is visible
+    - step: 55
+      expectation: Edited group is Ops
+    - step: 56
+      expectation: Editing metadata keeps counter one
+    - step: 59
+      expectation: Pin is saved
+    - step: 61
+      expectation: Issuer sort is selected
+    - step: 63
+      expectation: Ops filter is selected
+    - step: 64
+      expectation: No runtime error in the document before reloading
+    - step: 69
+      expectation: Renamed account is loaded after reload
+    - step: 70
+      expectation: Renamed account name persists
+    - step: 71
+      expectation: Pin persists
+    - step: 72
+      expectation: Issuer sort persists
+    - step: 73
+      expectation: Ops filter persists
+    - step: 74
+      expectation: Counter one still produces 287 082
+    - step: 76
+      expectation: Saved note finds the same account
+    results:
+    - 64
+    - 70
+    - 71
+    - 72
+    - 73
+    - 74
+    - 76
   - id: R3
     requirement: Cancelling deletion preserves the account and counter; confirming deletion persists an empty store
       after reload without runtime errors (AC-13, AC-14).
     actions:
-    - 69
-    - 70
-    - 71
-    - 74
+    - 77
     - 78
     - 79
-    - 81
-    - 85
+    - 82
     - 86
-    - 88
+    - 87
+    - 89
+    - 93
+    - 94
+    - 96
     checkpoints:
-    - step: 73
+    - step: 81
       expectation: Confirmation names the renamed account
-    - step: 75
-      expectation: Cancel closes confirmation
-    - step: 76
-      expectation: Account remains after cancellation
-    - step: 77
-      expectation: Counter remains one
-    - step: 82
-      expectation: Confirmed deletion shows empty state
     - step: 83
-      expectation: Deletion is announced
+      expectation: Cancel closes confirmation
     - step: 84
-      expectation: No runtime error in the document before reloading
-    - step: 89
-      expectation: Empty state persists after reload
+      expectation: Account remains after cancellation
+    - step: 85
+      expectation: Counter remains one
     - step: 90
-      expectation: Deleted account is not reloaded
+      expectation: Confirmed deletion shows empty state
     - step: 91
+      expectation: Deletion is announced
+    - step: 92
+      expectation: No runtime error in the document before reloading
+    - step: 97
+      expectation: Empty state persists after reload
+    - step: 98
+      expectation: Deleted account is not reloaded
+    - step: 99
       expectation: No application runtime error
     results:
-    - 76
-    - 77
     - 84
-    - 90
-    - 91
+    - 85
+    - 92
+    - 98
+    - 99
+  - id: edit-focus
+    ui_standard: [UI-DLG-06, UI-DLG-07]
+    requirement: The editor starts in the issuer field, wraps keyboard focus at both ends, and restores the originating account action after saving.
+    actions: [39, 40, 43, 45, 51]
+    checkpoints:
+    - {step: 42, expectation: The issuer field owns focus.}
+    - {step: 44, expectation: Reverse traversal wraps to Save.}
+    - {step: 46, expectation: Forward traversal returns to the issuer field.}
+    - {step: 53, expectation: The original account action regains focus.}
+    results: [42, 44, 46, 53]
   visual:
   - check: Metadata and confirmation dialogs, group/filter and pin remain legible in supported WebViews.
     method: manual

@@ -1,3 +1,4 @@
+import { ModalSurface } from "../../../ui/ModalSurface";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   createReplaceInFilesPlan,
@@ -47,9 +48,7 @@ export function ReplacePreviewDialog({
   onCancel,
 }: ReplacePreviewDialogProps) {
   const [excluded, setExcluded] = useState<ReadonlySet<string>>(() => new Set(initialExcludedKeys));
-  const dialogRef = useRef<HTMLDivElement>(null);
   const commitRef = useRef<HTMLButtonElement>(null);
-  const cancelRef = useRef<HTMLButtonElement>(null);
 
   useLayoutEffect(() => {
     setExcluded(new Set(initialExcludedKeys));
@@ -58,7 +57,7 @@ export function ReplacePreviewDialog({
   useLayoutEffect(() => {
     // Disabled controls lose focus in WebKit. Keep pending keys in the modal
     // and restore its primary action when a blocked commit becomes retryable.
-    (committing ? dialogRef.current : commitRef.current)?.focus();
+    (committing ? commitRef.current?.closest("dialog") : commitRef.current)?.focus();
   }, [committing]);
   const allPlan = useMemo(() => createReplaceInFilesPlan(edit), [edit]);
   const excludedUsageIds = useMemo(() => {
@@ -123,80 +122,41 @@ export function ReplacePreviewDialog({
     [allPlan, excluded],
   );
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (committing) {
-      if (["Escape", "Enter", "Tab"].includes(event.key)) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      onCancel();
-      return;
-    }
-    if (event.key === "Tab") {
-      const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
-        "input:not(:disabled), button:not(:disabled), [tabindex='0']",
-      ));
-      const first = controls[0];
-      const last = controls.at(-1);
-      if ((event.shiftKey && document.activeElement === first)
-        || (!event.shiftKey && document.activeElement === last)) {
-        event.preventDefault();
-        (event.shiftKey ? last : first)?.focus();
-      }
-      return;
-    }
-    if (event.key === "Enter") {
-      if (event.target instanceof HTMLInputElement && event.target.type === "checkbox") return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.target === cancelRef.current) {
-        onCancel();
-        return;
-      }
-      if (live.includedMatches > 0) onCommit(excluded);
-    }
-  };
-
   return (
-    <div
-      ref={dialogRef}
+    <ModalSurface
       tabIndex={-1}
       data-testid="code-workspace-replace-preview"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Replace in files preview"
-      onKeyDown={handleKeyDown}
-      className="flex max-h-[70vh] min-h-0 w-[560px] max-w-[90vw] flex-col rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[12px] text-[var(--taomni-code-text)]"
+      aria-labelledby="code-workspace-replace-title"
+      initialFocus='[data-testid="code-workspace-replace-commit"]'
+      onCancel={() => { if (!committing) onCancel(); }}
+      className="taomni-modal taomni-workspace-modal"
+      data-bleed="true"
+      style={{ width: "min(560px, calc(100vw - 32px))" }}
     >
       <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2">
-        <div className="font-medium">Replace in files preview</div>
+        <h2 id="code-workspace-replace-title" className="font-medium">Replace in files preview</h2>
         <div
           data-testid="code-workspace-replace-summary"
-          className="mt-0.5 text-[11px] text-[var(--taomni-code-text)]"
+          className="mt-0.5 text-ui-small text-[var(--taomni-code-text)]"
         >
           Replace {live.includedMatches} occurrence{live.includedMatches === 1 ? "" : "s"} of '{query}' across {includedFiles} file{includedFiles === 1 ? "" : "s"} with '{replacement}'?
         </div>
         <div
           data-testid="code-workspace-replace-counts"
-          className="mt-0.5 text-[11px] text-[var(--taomni-code-muted)]"
+          className="mt-0.5 text-ui-small text-[var(--taomni-code-muted)]"
         >
           {live.includedMatches} of {live.totalMatches} occurrences · replace with “{replacement}”
         </div>
         {scopeLabel && (
           <div
             data-testid="code-workspace-replace-scope"
-            className="mt-0.5 text-[10px] text-[var(--taomni-code-muted)]"
+            className="mt-0.5 text-ui-caption text-[var(--taomni-code-muted)]"
           >
             {scopeLabel}
           </div>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto py-1">
+      <div className="min-h-0 flex-auto overflow-auto py-1">
         {byFile.map(([path, usages]) => {
           const excludedCount = usages.filter((usage) => excluded.has(keyOf(usage))).length;
           const allExcluded = excludedCount === usages.length;
@@ -212,7 +172,7 @@ export function ReplacePreviewDialog({
                   onChange={(event) => toggleFile(path, event.target.checked)}
                 />
                 <span className="min-w-0 flex-1 truncate text-left">{path}</span>
-                <span className="shrink-0 text-[10px] tabular-nums">
+                <span className="shrink-0 text-ui-caption tabular-nums">
                   {usages.length - excludedCount}/{usages.length}
                 </span>
               </label>
@@ -231,10 +191,10 @@ export function ReplacePreviewDialog({
                       data-usage-id={usage.id}
                       onChange={() => toggleUsageKey(key)}
                     />
-                    <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
+                    <span className="shrink-0 font-mono text-ui-caption text-[var(--taomni-code-muted)]">
                       {usage.range.start.line + 1}:{usage.range.start.character}
                     </span>
-                    <span className="min-w-0 flex-1 truncate font-mono text-[11px]">
+                    <span className="min-w-0 flex-1 truncate font-mono text-ui-small">
                       → {usage.newText}
                     </span>
                   </label>
@@ -253,7 +213,7 @@ export function ReplacePreviewDialog({
         <div
           data-testid="code-workspace-replace-commit-error"
           role="alert"
-          className="shrink-0 border-t border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[11px] text-red-500"
+          className="shrink-0 border-t border-ui-danger-border bg-ui-danger-surface px-3 py-1.5 text-ui-small text-ui-danger"
         >
           {commitError}
         </div>
@@ -261,7 +221,6 @@ export function ReplacePreviewDialog({
       <div className="shrink-0 flex items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-3 py-2">
         <button
           type="button"
-          ref={cancelRef}
           data-testid="code-workspace-replace-cancel"
           className="h-7 rounded px-3 hover:bg-[var(--taomni-code-active-line-bg)]"
           onClick={onCancel}
@@ -280,6 +239,6 @@ export function ReplacePreviewDialog({
           {committing ? "Replacing…" : `Replace ${live.includedMatches}`}
         </button>
       </div>
-    </div>
+    </ModalSurface>
   );
 }

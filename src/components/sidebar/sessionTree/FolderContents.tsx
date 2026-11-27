@@ -1,6 +1,7 @@
 import { readSessionBookmark } from "../../../lib/sessionBookmark";
 import { useRef } from "react";
-import { Terminal as TerminalIcon, Monitor, Folder, Wifi, ChevronRight, ChevronDown, FolderOpen, FileText, Database, Globe, Server, Mail } from "lucide-react";
+import { ChevronRight, ChevronDown, Folder, FolderOpen } from "lucide-react";
+import { SessionProtocolIcon } from "../../session/SessionProtocolIcon";
 import type { SessionConfig } from "../../../lib/ipc";
 import { useCustomDropTarget, type CustomDragData } from "../../../lib/customDnD";
 import { sessionTypeLabel } from "../../../lib/terminalProfile";
@@ -146,18 +147,18 @@ export function TreeFolder({
         onContextMenu={onContextMenu}
       >
         {open ? (
-          <ChevronDown className="w-3 h-3 text-slate-500" />
+          <ChevronDown className="w-3 h-3 text-[var(--taomni-text-muted)]" />
         ) : (
-          <ChevronRight className="w-3 h-3 text-slate-500" />
+          <ChevronRight className="w-3 h-3 text-[var(--taomni-text-muted)]" />
         )}
         {open || isRoot ? (
-          <FolderOpen className="w-3.5 h-3.5 text-amber-600" />
+          <FolderOpen className="w-3.5 h-3.5 text-ui-warning" />
         ) : (
-          <Folder className="w-3.5 h-3.5 text-amber-600" />
+          <Folder className="w-3.5 h-3.5 text-ui-warning" />
         )}
         <span className="flex-1 font-medium truncate">{node.name}</span>
         {count !== undefined && hasChildren && (
-          <span className="text-slate-500" style={{ fontSize: "calc(var(--taomni-ui-font-size) - 2px)" }}>({count})</span>
+          <span className="text-[var(--taomni-text-muted)]" style={{ fontSize: "calc(var(--taomni-ui-font-size) - 2px)" }}>({count})</span>
         )}
       </div>
       {open && <div className="pl-4">{children}</div>}
@@ -216,8 +217,8 @@ export function SessionItem({
         )}
       </span>
       <span
-        className="px-1 rounded"
-        style={{ fontSize: "calc(var(--taomni-ui-font-size) - 2px)", background: "#e1ecfa", color: "#1e3a5f" }}
+        className="rounded bg-[var(--taomni-info-bg)] px-1 text-ui-caption text-[var(--taomni-info-text)]"
+        data-testid="session-protocol-label"
       >
         {typeLabel}
       </span>
@@ -227,49 +228,5 @@ export function SessionItem({
 
 
 export function sessionIcon(type: string) {
-  switch (type) {
-    case "SSH":
-      return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#2b5d8b" }} />;
-    case "RDP":
-      return <Monitor className="w-3.5 h-3.5" style={{ color: "#a04b9c" }} />;
-    case "VNC":
-      return <Monitor className="w-3.5 h-3.5" style={{ color: "#c97a23" }} />;
-    case "SFTP":
-    case "FTP":
-      return <Folder className="w-3.5 h-3.5" style={{ color: "#3b7ac2" }} />;
-    case "Rlogin":
-      return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#5b8a4a" }} />;
-    case "Mosh":
-      return <Server className="w-3.5 h-3.5" style={{ color: "#7a3d9d" }} />;
-    case "Browser":
-      return <Globe className="w-3.5 h-3.5" style={{ color: "#1e5fa8" }} />;
-    case "Serial":
-      return <Wifi className="w-3.5 h-3.5" style={{ color: "#236a98" }} />;
-    case "WSL":
-      return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#0078d4" }} />;
-    case "LocalShell":
-      return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#62d36f" }} />;
-    case "MySQL":
-      return <Database className="w-3.5 h-3.5" style={{ color: "#00758f" }} />;
-    case "PostgreSQL":
-      return <Database className="w-3.5 h-3.5" style={{ color: "#336791" }} />;
-    case "PanWeiDB":
-      return <Database className="w-3.5 h-3.5" style={{ color: "#0b8f6a" }} />;
-    case "Oracle":
-      return <Database className="w-3.5 h-3.5" style={{ color: "#c74634" }} />;
-    case "SQLServer":
-      return <Database className="w-3.5 h-3.5" style={{ color: "#cc2927" }} />;
-    case "StarRocks":
-      return <Database className="w-3.5 h-3.5" style={{ color: "#0f8f8c" }} />;
-    case "ClickHouse":
-      return <Database className="w-3.5 h-3.5" style={{ color: "#e6a817" }} />;
-    case "Redis":
-      return <Database className="w-3.5 h-3.5" style={{ color: "#d82c20" }} />;
-    case "Mail":
-      return <Mail className="w-3.5 h-3.5" style={{ color: "#256f6a" }} />;
-    case "File":
-      return <FileText className="w-3.5 h-3.5" style={{ color: "var(--taomni-text-muted)" }} />;
-    default:
-      return <TerminalIcon className="w-3.5 h-3.5" style={{ color: "#2b5d8b" }} />;
-  }
+  return <SessionProtocolIcon protocol={type} className="size-3.5" />;
 }

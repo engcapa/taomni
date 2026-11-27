@@ -1,0 +1,43 @@
+id: TC-UIC-019-session-file-validation
+title: File analysis reports an inline error and preserves the HBase connection draft
+covers: [F-DB-3, F5.5]
+tags: [ui-contract, session, hbase]
+modes: [browser, native]
+fixtures: [reset_db]
+ui_standard: [UI-DLG-12, UI-INP-02]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-session-file
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- click: '[data-testid="session-proto-hbaseshell"]'
+- fill: {selector: 'input[aria-label="HBase ZooKeeper quorum"]', value: qa-zk.invalid}
+- fill: {selector: 'input[aria-label="HBase site config file path"]', value: taomni-qa-missing-hbase-site.xml}
+- click: '[data-testid="hbase-settings"] button[title="Read hbase-site.xml and populate the connection fields"]'
+- assert_text: {selector: '[data-testid="hbase-settings"] [role="alert"]', contains: Check the path and permissions}
+- assert_attribute: {selector: 'input[aria-label="HBase site config file path"]', name: aria-invalid, equals: 'true'}
+- assert_attribute: {selector: 'input[aria-label="HBase site config file path"]', name: value, equals: taomni-qa-missing-hbase-site.xml}
+- assert_attribute: {selector: 'input[aria-label="HBase ZooKeeper quorum"]', name: value, equals: qa-zk.invalid}
+- fill: {selector: 'input[aria-label="HBase site config file path"]', value: corrected.xml}
+- assert_not_visible: '[data-testid="hbase-settings"] [role="alert"]'
+- assert_count: {selector: 'input[aria-label="HBase site config file path"][aria-invalid="true"]', equal: 0}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: preserve-file-draft
+    ui_standard: [UI-DLG-12, UI-INP-02]
+    requirement: A failed file read explains recovery inside the editor and permits correcting the path without losing connection fields.
+    actions: [6, 7, 8, 13]
+    checkpoints:
+    - {step: 9, expectation: An inline alert explains the retry.}
+    - {step: 10, expectation: The path field exposes the validation state.}
+    - {step: 11, expectation: The failed path is still editable.}
+    - {step: 12, expectation: The existing quorum is retained.}
+    - {step: 14, expectation: Editing removes the stale diagnostic.}
+    - {step: 15, expectation: The corrected field clears its invalid state.}
+    results: [9, 10, 11, 12, 14, 15]
+  visual:
+  - {check: Inline diagnostic, method: automated, reason: Confirms that the visible error is inside the session settings and clears on edit.}
+  native:
+  - {check: Missing configuration on disk, method: automated, reason: Exercises the native file parser and its returned error through the packaged session editor.}
