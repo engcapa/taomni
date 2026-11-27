@@ -3,7 +3,7 @@
   "slug": "vnc-server",
   "name": "VNC Server",
   "description": "Share the desktop through an installed system VNC server.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "coreApiVersion": "1",
   "kind": "local-server",
   "status": "stable",
