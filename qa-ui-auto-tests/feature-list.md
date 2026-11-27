@@ -16778,6 +16778,7 @@ files:
   - src-tauri/plugins/taoffice-pdf/renderer/PdfViewer.jsx
   - src-tauri/plugins/taoffice-pdf/renderer/PdfPage.jsx
   - src-tauri/plugins/taoffice-pdf/renderer/PdfNavigation.jsx
+  - src-tauri/plugins/taoffice-pdf/renderer/PdfPassword.jsx
   - src/lib/openFile/documentProvider.ts
   - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts
@@ -16989,6 +16990,21 @@ controls:
     kind: display
   - id: taoffice-pdf-retry
     selector: '[data-testid="taoffice-pdf-retry"]'
+    kind: interactive
+  - id: taoffice-pdf-password
+    selector: '[data-testid="taoffice-pdf-password"]'
+    kind: interactive
+  - id: taoffice-pdf-password-status
+    selector: '[data-testid="taoffice-pdf-password-status"]'
+    kind: display
+  - id: taoffice-pdf-unlock
+    selector: '[data-testid="taoffice-pdf-unlock"]'
+    kind: interactive
+  - id: taoffice-pdf-password-cancel
+    selector: '[data-testid="taoffice-pdf-password-cancel"]'
+    kind: interactive
+  - id: taoffice-pdf-password-open
+    selector: '[data-testid="taoffice-pdf-password-open"]'
     kind: interactive
   - id: viewer-editor
     selector: '[data-testid="viewer-editor"]'

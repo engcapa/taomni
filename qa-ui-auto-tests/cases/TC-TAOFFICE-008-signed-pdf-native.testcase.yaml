@@ -39,6 +39,7 @@ steps:
 - press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: ArrowDown}
 - wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-ready="true"] [data-search-hit]'
 - press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Escape}
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Escape}
 - eval_readonly:
     expression: document.activeElement.dataset.testid === "taoffice-pdf-viewport"
     expect_truthy: true
@@ -47,4 +48,18 @@ steps:
 - press: {selector: '[data-testid="taoffice-pdf-viewport"]', key: Control+0, macos_key: Meta+0}
 - assert_attribute: {selector: '[data-testid="taoffice-pdf-fit"]', name: aria-pressed, equals: 'true'}
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/report.pdf', sha256: '${fixture.taoffice_pdf_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="locked.pdf"]'
+- wait_for: '[data-testid="taoffice-pdf-password"]'
+- click: '[data-testid="taoffice-pdf-password-cancel"]'
+- wait_for: '[data-testid="taoffice-pdf-password-open"]'
+- click: '[data-testid="taoffice-pdf-password-open"]'
+- fill: {selector: '[data-testid="taoffice-pdf-password"]', value: wrong-password}
+- press: {selector: '[data-testid="taoffice-pdf-password"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-pdf-password-status"]', contains: Incorrect password}
+- fill: {selector: '[data-testid="taoffice-pdf-password"]', value: open-report}
+- press: {selector: '[data-testid="taoffice-pdf-unlock"]', key: Enter}
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"]'
+- assert_text: {selector: '[data-testid="taoffice-pdf-text"]', contains: Quarterly report}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/locked.pdf', sha256: '${fixture.taoffice_locked_pdf_sha}'}
 - assert_no_runtime_errors: null

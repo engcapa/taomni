@@ -24,6 +24,8 @@ TaOffice PDF 与 TaOffice Media 声明了独立版本和四个包平台，两者
 
 PDF 工具栏使用应用按钮和字号。文档区域聚焦时，Windows/Linux 使用 Ctrl+F、Ctrl+=、Ctrl+-、Ctrl+0，macOS 使用 ⌘F、⌘=、⌘-、⌘0。查找输入接受 Enter 和 ↑/↓，在匹配页之间移动时保留输入焦点。Esc 回到原按钮或文档区域。按钮提示显示对应平台键位。TC-TAOFFICE-007 覆盖 UI-FND-13、UI-PAT-05/15 和 UI-ZOOM-02/03，TC-TAOFFICE-008 在原生 WebView 中验证查找、大纲跳转及缩放。媒体模块播放地址被 WebView 拒绝时，通过同一文档授权读取上限为 32 MiB 的本地 Blob，再尝试播放一次。
 
+加密 PDF 在当前文档内显示密码输入。Enter 提交，Esc 结束当前解码任务，用户可在同一标签重开提示。密码交给当前 PDF.js 任务后清空。TC-TAOFFICE-007/008 使用实际 AES-128 PDF 覆盖 UI-INP-02/04/06/07、错误反馈、重新打开和原始文件摘要。
+
 核心在求值 ESM 前安装只读的 `globalThis.__taomniHost`。模块不能打包第二份 React；共享 hooks 必须使用该对象里的 React 实例。
 
 | SDK 字段 | 当前公开内容 |

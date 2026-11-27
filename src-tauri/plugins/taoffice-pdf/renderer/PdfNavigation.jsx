@@ -33,6 +33,14 @@ export function PdfSearch({ pdf, label, input, onMatch, onClose }) {
     onMatch(pages[next], search);
   }
 
+  function updateQuery(value) {
+    setQuery(value);
+    setSearch(null);
+    setResult(null);
+    setNotice("");
+    onMatch(null, "");
+  }
+
   return <form className="taoffice-pdf-navigation" role="search" aria-label={label("查找 PDF", "Find in PDF")}
     onSubmit={(event) => {
       event.preventDefault();
@@ -41,16 +49,19 @@ export function PdfSearch({ pdf, label, input, onMatch, onClose }) {
       else if (value) setSearch(value);
     }}
     onKeyDown={(event) => {
-      if (event.key === "Escape" && !event.nativeEvent.isComposing) {
+      const composing = event.nativeEvent.isComposing || event.keyCode === 229;
+      if (composing && event.key === "Enter") event.preventDefault();
+      if (event.key === "Escape" && !composing) {
+        event.preventDefault();
         event.stopPropagation();
-        onClose();
+        if (query && event.target === input.current) updateQuery("");
+        else onClose();
       }
     }}>
     <input ref={input} className="taomni-input" type="search" data-testid="taoffice-pdf-search-input"
-      aria-label={label("查找文字", "Find text")} value={query} onChange={(event) => {
-        setQuery(event.target.value); setSearch(null); setResult(null); setNotice(""); onMatch(null, "");
-      }} onKeyDown={(event) => {
-        if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+      aria-label={label("查找文字", "Find text")} value={query} onChange={(event) => updateQuery(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing || event.keyCode === 229 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
           || (result?.pages.length ?? 0) < 2 || !["ArrowDown", "ArrowUp"].includes(event.key)) return;
         event.preventDefault();
         event.stopPropagation();

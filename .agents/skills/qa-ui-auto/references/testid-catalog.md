@@ -1511,6 +1511,11 @@
 - `[data-testid="taoffice-pdf-page-error"]` — display — F-FILEOPEN-1.taoffice-pdf-page-error
 - `[data-testid="taoffice-pdf-error"]` — display — F-FILEOPEN-1.taoffice-pdf-error
 - `[data-testid="taoffice-pdf-retry"]` — interactive — F-FILEOPEN-1.taoffice-pdf-retry
+- `[data-testid="taoffice-pdf-password"]` — interactive — F-FILEOPEN-1.taoffice-pdf-password
+- `[data-testid="taoffice-pdf-password-status"]` — display — F-FILEOPEN-1.taoffice-pdf-password-status
+- `[data-testid="taoffice-pdf-unlock"]` — interactive — F-FILEOPEN-1.taoffice-pdf-unlock
+- `[data-testid="taoffice-pdf-password-cancel"]` — interactive — F-FILEOPEN-1.taoffice-pdf-password-cancel
+- `[data-testid="taoffice-pdf-password-open"]` — interactive — F-FILEOPEN-1.taoffice-pdf-password-open
 - `[data-testid="viewer-editor"]` — interactive — F-FILEOPEN-1.viewer-editor
 - `[data-testid="viewer-save"]` — interactive — F-FILEOPEN-1.viewer-save
 - `[data-testid="viewer-readonly"]` — display — F-FILEOPEN-1.viewer-readonly

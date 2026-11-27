@@ -1,7 +1,8 @@
-import { openPdf } from "./pdfDocument.js";
+import { openPdf, PasswordResponses } from "./pdfDocument.js";
 import { MAX_PAGE_SCALE, MIN_PAGE_SCALE, pageNumber, stepPageScale } from "./pdfGeometry.js";
 import { PdfPage } from "./PdfPage.jsx";
 import { PdfOutline, PdfSearch } from "./PdfNavigation.jsx";
+import { PdfPassword } from "./PdfPassword.jsx";
 import styles from "./pdfViewer.css?inline";
 
 const { React, i18n } = globalThis.__taomniHost;
@@ -13,6 +14,8 @@ export default function PdfViewer({ document: source, active }) {
   const [pdf, setPdf] = useState(null);
   const [revision, retry] = useState(0);
   const [failure, setFailure] = useState("");
+  const [challenge, setChallenge] = useState(null);
+  const [cancelled, setCancelled] = useState(false);
   const [page, setPage] = useState(1);
   const [pageInput, setPageInput] = useState("1");
   const [pageError, setPageError] = useState(false);
@@ -34,19 +37,29 @@ export default function PdfViewer({ document: source, active }) {
     let task;
     setPdf(null);
     setFailure("");
+    setChallenge(null);
+    if (cancelled) return;
     async function load() {
       const bytes = await (await source.read()).arrayBuffer();
       if (!alive) return;
       task = openPdf(new Uint8Array(bytes));
+      task.onPassword = (submit, reason) => {
+        if (alive) setChallenge({ submit, incorrect: reason === PasswordResponses.INCORRECT_PASSWORD });
+      };
       const opened = await task.promise;
-      if (alive) setPdf(opened);
+      if (alive) {
+        setChallenge(null);
+        setPdf(opened);
+      }
     }
-    void load().catch((error) => { if (alive) setFailure(String(error)); });
+    void load().catch((error) => {
+      if (alive) { setChallenge(null); setFailure(String(error)); }
+    });
     return () => {
       alive = false;
       void task?.destroy().catch(() => {});
     };
-  }, [source, revision]);
+  }, [source, revision, cancelled]);
 
   useEffect(() => {
     const node = viewport.current;
@@ -155,7 +168,21 @@ export default function PdfViewer({ document: source, active }) {
         <button type="button" className="taomni-btn" data-testid="taoffice-pdf-retry"
           onClick={() => { go(1); retry((value) => value + 1); }}>{label("重试", "Retry")}</button>
       </div>}
-      {!pdf && !failure && <p role="status">{label("正在读取 PDF…", "Reading PDF…")}</p>}
+      {!pdf && !failure && !challenge && !cancelled && <p role="status">{label("正在读取 PDF…", "Reading PDF…")}</p>}
+      {challenge && <PdfPassword active={active} challenge={challenge} label={label}
+        onSubmit={(password) => {
+          setChallenge({ submit: null, incorrect: false });
+          challenge.submit(password);
+        }} onCancel={() => {
+          setCancelled(true);
+          viewport.current?.focus();
+        }} />}
+      {cancelled && <div className="taoffice-pdf-locked">
+        <p role="status">{label("PDF 已锁定", "PDF is locked")}</p>
+        <button type="button" className="taomni-btn" data-testid="taoffice-pdf-password-open" onClick={() => setCancelled(false)}>
+          {label("输入密码", "Enter password")}
+        </button>
+      </div>}
       {pdf && viewportWidth > 0 && <PdfPage
         key={currentPage + "/" + (zoom ?? viewportWidth + "fit") + "/" + rotation}
         pdf={pdf} number={currentPage} zoom={zoom} rotation={rotation} highlight={highlight} onScale={setScale}

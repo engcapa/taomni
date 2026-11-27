@@ -1,4 +1,5 @@
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs";
+export { PasswordResponses } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 export function openPdf(data) {
   const assets = new URL(/* @vite-ignore */ "./pdfjs/", import.meta.url);

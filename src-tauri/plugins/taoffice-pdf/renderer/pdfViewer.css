@@ -35,6 +35,11 @@
 .taoffice-pdf-page { position: relative; margin-inline: auto; }
 .taoffice-pdf-page canvas { display: block; width: 100%; height: 100%; }
 .taoffice-pdf-error { padding: 8px; overflow-wrap: anywhere; user-select: text; }
+.taoffice-pdf-password, .taoffice-pdf-locked { max-width: 24rem; margin: 1em auto; }
+.taoffice-pdf-password > label { display: grid; gap: .4em; }
+.taoffice-pdf-password .taomni-input { width: 100%; text-align: start; }
+.taoffice-pdf-password > p, .taoffice-pdf-locked > p { margin-block: .5em; }
+.taoffice-pdf-password > div { display: flex; flex-wrap: wrap; gap: .5em; }
 .taoffice-pdf-page .textLayer {
   position: absolute;
   inset: 0;
