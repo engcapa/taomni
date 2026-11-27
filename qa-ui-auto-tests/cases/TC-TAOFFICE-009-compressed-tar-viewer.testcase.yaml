@@ -15,6 +15,7 @@ steps:
 - press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
 - fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
 - press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="quarterly.TAR.GZ"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="quarterly.TAR.GZ"]'
 - wait_for: '[data-testid="archive-entry"][data-name="images/pixel.png"]'
 - assert_count: {selector: '[data-testid="archive-entry"]', equal: 2}
