@@ -1,6 +1,7 @@
 id: TC-TAOFFICE-017
 title: Fill PDF fields and save a copy from the shared close dialog
 description: Edit real AcroForm text and a checkbox, restore focus when closing the form, and export a new PDF through the viewer's dirty-close dialog.
+ui_standard: [UI-DLG-04, UI-DLG-06]
 modes: [browser]
 covers: [F-FILEOPEN-1]
 tags: [p0, file-open, taoffice, taoffice-pdf]
@@ -48,7 +49,8 @@ steps:
 - wait_for: '[data-testid="taoffice-pdf-form-toggle"]:focus'
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - wait_for: '[data-testid="viewer-close-dialog"]'
-- click: '[data-testid="viewer-close-cancel"]'
+- assert_focus_on: '[data-testid="viewer-close-cancel"]'
+- press: Escape
 - wait_for: {selector: '[data-testid="viewer-close-dialog"]', state: detached}
 - click: '[data-testid="taoffice-pdf-form-toggle"]'
 - assert_attribute: {selector: '[data-testid="taoffice-pdf-form-field"][data-field="Contact"]', name: value, equals: Avery}
@@ -60,3 +62,25 @@ steps:
 - wait_for: {selector: '[data-testid="taoffice-pdf-page"]', state: detached}
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/order-form.pdf', sha256: '${fixture.taoffice_pdf_form_sha}'}
 - assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-DLG-06]
+    requirement: The dirty-close dialog initially focuses Cancel.
+    actions: [25]
+    checkpoints:
+    - {step: 27, expectation: Cancel owns focus.}
+    results: [27]
+  - id: R2
+    ui_standard: [UI-DLG-04]
+    requirement: Escape dismisses the close dialog and preserves the edited PDF fields.
+    actions: [28, 30]
+    checkpoints:
+    - {step: 29, expectation: The close dialog is removed.}
+    - {step: 31, expectation: The reopened form still shows Avery.}
+    results: [29, 31]
+  visual:
+  - {check: Visible focus indicator on Cancel, method: manual, reason: The automated focus assertion reads the active element.}
+  native:
+  - {check: System save dialog and files on disk, method: external, reason: TC-TAOFFICE-018 verifies the signed module's native Save a Copy path.}
