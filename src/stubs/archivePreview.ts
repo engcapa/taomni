@@ -1,8 +1,9 @@
 import { inflateZipEntry, parseZipCentralDirectory } from "../lib/sessionImportExport/archive";
 import type { ArchiveEntry } from "../lib/openFile/archive";
-import { archiveFolderName, tarSuffix } from "../lib/openFile/archiveFormats";
+import { archiveFolderName, compressionSuffix, tarSuffix } from "../lib/openFile/archiveFormats";
+import { getLocale } from "../lib/i18n";
 import { basenameOf, vfsMkdir, vfsReadBytes, vfsRemove, vfsRename, vfsStat, vfsWriteBytes } from "./localVfs";
-import { tarDirectory } from "./tarPreview";
+import { compressedDirectory, tarDirectory } from "./tarPreview";
 
 async function zipDirectory(bytes: Uint8Array) {
   const records = parseZipCentralDirectory(bytes);
@@ -33,11 +34,18 @@ export async function invokeArchive(command: string, path: string, args: Record<
   const stat = await vfsStat(path);
   if (stat.size > 64 * 1024 * 1024) throw new Error("Archive input exceeds 64 MiB");
   const bytes = await vfsReadBytes(path);
-  const suffix = tarSuffix(basenameOf(path));
-  const { entries, content } = suffix ? await tarDirectory(bytes, suffix) : await zipDirectory(new Uint8Array(bytes));
+  const name = basenameOf(path);
+  if (/\.7z$/i.test(name)) {
+    throw new Error(getLocale() === "zh-CN" ? "请在桌面应用中打开此 7z 压缩包。" : "Open this 7z archive in the desktop app.");
+  }
+  const suffix = tarSuffix(name);
+  const compressed = suffix ? undefined : compressionSuffix(name);
+  const { entries, content } = suffix ? await tarDirectory(bytes, suffix)
+    : compressed ? await compressedDirectory(bytes, compressed, archiveFolderName(name))
+    : await zipDirectory(new Uint8Array(bytes));
   if (command === "viewer_archive_list") return entries;
   const selected = args.entry as ArchiveEntry | undefined;
-  const entry = selected && entries[selected.index];
+  const entry = selected ? entries[selected.index] : compressed ? entries[0] : undefined;
   if (selected && (!entry || entry.directory || entry.name !== selected.name || entry.size !== selected.size || entry.crc !== selected.crc)) {
     throw new Error("Archive changed. Reload before opening the entry");
   }

@@ -7,11 +7,15 @@ const maxBrowserBytes = 64 * 1024 * 1024;
 const utf8 = new TextDecoder("utf-8", { fatal: true });
 
 const desktopMessage = () => getLocale() === "zh-CN"
-  ? "请在桌面应用中打开此 TAR 压缩包。" : "Open this TAR archive in the desktop app.";
+  ? "请在桌面应用中打开此压缩文件。" : "Open this compressed file in the desktop app.";
 
 async function unpack(input: ArrayBuffer, suffix: string): Promise<Uint8Array<ArrayBuffer>> {
   if (suffix === ".tar") return new Uint8Array(input);
-  if (suffix !== ".tar.gz" && suffix !== ".tgz") throw new Error(desktopMessage());
+  if (suffix !== ".tar.gz" && suffix !== ".tgz" && suffix !== ".gz") throw new Error(desktopMessage());
+  return unpackGzip(input, maxBrowserBytes);
+}
+
+async function unpackGzip(input: ArrayBuffer, limit: number): Promise<Uint8Array<ArrayBuffer>> {
   const reader = new Blob([input]).stream().pipeThrough(new DecompressionStream("gzip")).getReader();
   const parts: Uint8Array[] = [];
   let size = 0;
@@ -20,7 +24,7 @@ async function unpack(input: ArrayBuffer, suffix: string): Promise<Uint8Array<Ar
       const { value, done } = await reader.read();
       if (done) break;
       size += value.length;
-      if (size > maxBrowserBytes) {
+      if (size > limit) {
         await reader.cancel();
         throw new Error(desktopMessage());
       }
@@ -38,6 +42,15 @@ async function unpack(input: ArrayBuffer, suffix: string): Promise<Uint8Array<Ar
   return archive;
 }
 
+export async function compressedDirectory(input: ArrayBuffer, suffix: string, name: string) {
+  if (suffix !== ".gz") throw new Error(desktopMessage());
+  if (!name || !safePath(name)) throw new Error("Invalid compressed output name");
+  const bytes = await unpackGzip(input, maxMember);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const entries: ArchiveEntry[] = [{ index: 0, name, directory: false, size: bytes.length, crc: new DataView(digest).getUint32(0) }];
+  return { entries, content: async () => bytes.buffer };
+}
+
 function textField(bytes: Uint8Array, start: number, end: number): string {
   const field = bytes.subarray(start, end);
   const nul = field.indexOf(0);
@@ -48,6 +61,11 @@ function octal(bytes: Uint8Array, start: number, end: number): number {
   const field = textField(bytes, start, end).trim();
   if (!/^[0-7]+$/.test(field)) throw new Error("Invalid TAR header number");
   return Number.parseInt(field, 8);
+}
+
+function safePath(name: string): boolean {
+  return name.split("/").every((part) => part && part.length <= 255 &&
+    !/[. ]$|[\\:<>"|?*\p{Cc}]|^(con|prn|aux|nul|conin\$|conout\$|(?:com|lpt)[1-9¹²³])(?:\.|$)/iu.test(part));
 }
 
 /** Browser VFS support for ordinary USTAR; the desktop owns the full decoder. */
@@ -80,8 +98,7 @@ export async function tarDirectory(input: ArrayBuffer, suffix: string) {
     const relative = raw.replace(/^(\.\/)+/, "");
     const name = directory ? relative.replace(/\/+$/, "") : relative;
     if (directory && (name === "." || raw === "./")) continue;
-    if (name.split("/").some((part) => !part || part.length > 255 ||
-      /[. ]$|[\\:<>"|?*\p{Cc}]|^(con|prn|aux|nul|conin\$|conout\$|(?:com|lpt)[1-9¹²³])(?:\.|$)/iu.test(part))) {
+    if (!safePath(name)) {
       throw new Error("Archive contains an unsafe path or non-regular entry");
     }
     const bytes = archive.subarray(start, start + size);

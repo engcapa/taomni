@@ -11,8 +11,10 @@ describe("file opening classification and identity", () => {
     ["/README", "text"], ["/LICENSE", "text"], ["/a.rs", "source"], ["/Dockerfile", "source"],
     ["/a.pdf", "pdf"], ["/a.xlsx", "document"], ["/unknown", "binary"],
     ["/a.CBZ", "archive"], ["/a.tar", "archive"], ["/a.TAR.GZ", "archive"],
+    ["/a.7Z", "archive"],
     ["/a.tgz", "archive"], ["/a.tar.bz2", "archive"], ["/a.tar.xz", "archive"], ["/a.tar.zst", "archive"],
-    ["/a.txt.gz", "binary"], ["/a.tar.gz.txt", "text"],
+    ["/a.txt.gz", "archive"], ["/a.txt.bz2", "archive"], ["/a.txt.xz", "archive"],
+    ["/a.txt.zst", "archive"], ["/a.tar.gz.txt", "text"],
   ])("classifies %s as %s", (path, kind) => expect(classifyFile(path)).toBe(kind));
   it.each(["quarter.2026.TAR.GZ", "quarter.2026.tar.xz", "quarter.2026.tgz", "quarter.2026.zip"])(
     "uses the archive's base name for the extraction directory (%s)",

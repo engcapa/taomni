@@ -12,8 +12,9 @@ from typing import Any
 from uuid import uuid4
 
 from . import platform_workspace_root, mail_server
+from .taoffice_7z import archive as seven_zip_fixture
 from .taoffice_pdf import document as pdf_fixture
-from .taoffice_tar import archives as tar_fixtures
+from .taoffice_tar import archives as tar_fixtures, compressed_text
 from .explorer_files import PNG
 
 TEXT = "File open original\nSecond line\n中文\n"
@@ -84,6 +85,12 @@ def setup(ctx: Any) -> None:
         files.update(tar_fixtures(TEXT.encode(), PNG))
         ctx.values["taoffice_tar_sha"] = hashlib.sha256(files["quarterly.TAR.GZ"]).hexdigest()
     if ctx.case_id in {"TC-TAOFFICE-003", "TC-TAOFFICE-005"}:
+    if ctx.case_id == "TC-TAOFFICE-010":
+        files["notes-backup.txt.GZ"] = compressed_text(TEXT.encode())
+        ctx.values["taoffice_gzip_sha"] = hashlib.sha256(files["notes-backup.txt.GZ"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-011", "TC-TAOFFICE-012"}:
+        files["records.7Z"] = seven_zip_fixture()
+        ctx.values["taoffice_7z_sha"] = hashlib.sha256(files["records.7Z"]).hexdigest()
         wav = io.BytesIO()
         with wave.open(wav, "wb") as audio:
             audio.setparams((1, 2, 8000, 0, "NONE", "not compressed"))

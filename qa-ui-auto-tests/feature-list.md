@@ -16756,6 +16756,8 @@ File Explorer 是 Sessions 下方的独立工作区，Tools 面板不再提供�
 TC-FILE-OPEN-006 检查工作区入口去重和全局文件设置。TC-FILE-OPEN-049
 检查 Mail 附件的只读副本、去重和最终关闭清理，并在完整模块回归中使用已启用的 Mail。
 TC-TAOFFICE-009 验证核心查看器打开 gzip TAR、清除筛选与恢复焦点、只读预览、原始文件摘要和解压后的实际内容。
+TC-TAOFFICE-010 验证单文件 gzip 预览、直接解压成文件，以及重复解压时保留原有内容。
+TC-TAOFFICE-011 验证原生 7z 固实压缩包的预览和解压，TC-TAOFFICE-012 验证浏览器预览显示桌面打开提示。
 
 <!-- feature
 id: F-FILEOPEN-1
@@ -16770,6 +16772,8 @@ files:
   - src/components/viewer/ArchiveViewer.tsx
   - src-tauri/src/viewer/archive.rs
   - src-tauri/src/viewer/archive/tar_archive.rs
+  - src-tauri/src/viewer/archive/compressed_file.rs
+  - src-tauri/src/viewer/archive/seven_zip.rs
   - src-tauri/plugins/taoffice-video/frontend/index.js
   - src-tauri/plugins/taoffice-pdf/renderer/PdfViewer.jsx
   - src-tauri/plugins/taoffice-pdf/renderer/PdfPage.jsx

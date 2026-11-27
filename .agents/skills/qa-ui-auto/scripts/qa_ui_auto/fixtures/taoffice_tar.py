@@ -1,4 +1,4 @@
-"""Deterministic gzip TAR inputs for the shared archive viewer scenario."""
+"""Deterministic gzip and TAR inputs for the shared archive viewer."""
 import gzip
 import io
 import tarfile
@@ -20,3 +20,7 @@ def archives(text: bytes, image: bytes) -> dict[str, bytes]:
         return gzip.compress(buffer.getvalue(), mtime=0)
 
     return {"quarterly.TAR.GZ": create(False), "unsafe.tgz": create(True)}
+
+
+def compressed_text(text: bytes) -> bytes:
+    return gzip.compress(text, mtime=0)

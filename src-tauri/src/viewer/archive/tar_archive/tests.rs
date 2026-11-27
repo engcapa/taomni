@@ -88,6 +88,33 @@ fn changed_tars_invalidate_a_member_even_if_size_and_name_match() {
 }
 
 #[test]
+fn standalone_compression_preserves_extensions_and_never_replaces_output() {
+    let content = "Single compressed file\n中文\n".as_bytes();
+    for suffix in ["gz", "bz2", "xz", "zst"] {
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join(format!("notes.txt.{suffix}"));
+        write_encoded(content, &file);
+        let source = file.to_str().unwrap();
+        let destination = root.path().to_str().unwrap();
+        let original = fs::read(&file).unwrap();
+        let entries = list(source).unwrap();
+        assert_eq!(entries.len(), 1);
+        let entry = entries[0].clone();
+        assert_eq!(entry.name, "notes.txt");
+        let temp = preview(source, entry).unwrap();
+        assert_eq!(fs::read(&temp.path).unwrap(), content);
+        super::super::super::release_temp(&temp.path).unwrap();
+        extract(source, destination, None).unwrap();
+        let output = root.path().join("notes.txt");
+        assert_eq!(fs::read(&output).unwrap(), content);
+        fs::write(&output, b"edited").unwrap();
+        assert!(extract(source, destination, None).is_err());
+        assert_eq!(fs::read(&output).unwrap(), b"edited");
+        assert_eq!(fs::read(&file).unwrap(), original);
+    }
+}
+
+#[test]
 fn invalid_tar_members_never_publish_staged_output() {
     let root = tempfile::tempdir().unwrap();
     let file = root.path().join("bundle.tar");

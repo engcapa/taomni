@@ -6,6 +6,9 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use zip::ZipArchive;
 
+mod codec;
+mod compressed_file;
+mod seven_zip;
 mod tar_archive;
 
 const MAX_ARCHIVE: u64 = 64 << 20;
@@ -116,8 +119,24 @@ fn visit(
     if meta.len() > MAX_ARCHIVE {
         return Err(invalid("Archive input exceeds 64 MiB"));
     }
-    if let Some(format) = tar_archive::Format::from_path(path) {
+    if let Some((format, _)) = tar_archive::suffix(path) {
         return tar_archive::visit(format, file.take(meta.len()), selection, member);
+    }
+    if Path::new(path)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("7z"))
+    {
+        return seven_zip::visit(file, selection, member);
+    }
+    if let Some(codec) = compressed_file::codec(path) {
+        return compressed_file::visit(
+            file,
+            meta.len(),
+            archive_stem(path)?,
+            codec,
+            selection,
+            member,
+        );
     }
 
     let (mut zip, entries) = zip_catalog(file)?;
@@ -189,8 +208,15 @@ pub(crate) fn extract(
         Ok(())
     })?;
     drop(root);
-    let (source, output) = if let Some(entry) = selection {
-        if entry.directory || entries.get(entry.index) != Some(&entry) {
+    let entry = selection.as_ref().or_else(|| {
+        if is_single_compressed_file(path) {
+            entries.first()
+        } else {
+            None
+        }
+    });
+    let (source, output) = if let Some(entry) = entry {
+        if entry.directory || entries.get(entry.index) != Some(entry) {
             return Err(invalid(
                 "Archive changed. Reload before extracting the entry",
             ));
@@ -213,7 +239,7 @@ fn archive_stem(path: &str) -> Result<&str, String> {
         .file_name()
         .and_then(|value| value.to_str())
         .ok_or_else(|| invalid("Missing archive name"))?;
-    let suffix_length = tar_archive::Format::suffix(name).map_or_else(
+    let suffix_length = tar_archive::suffix(name).map_or_else(
         || name.rfind('.').map_or(0, |dot| name.len() - dot),
         |(_, suffix)| suffix.len(),
     );
@@ -222,6 +248,10 @@ fn archive_stem(path: &str) -> Result<&str, String> {
         return Err(invalid("Invalid output directory name"));
     }
     Ok(stem)
+}
+
+fn is_single_compressed_file(path: &str) -> bool {
+    tar_archive::suffix(path).is_none() && compressed_file::codec(path).is_some()
 }
 
 #[cfg(test)]
