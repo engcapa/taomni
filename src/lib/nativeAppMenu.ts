@@ -1,3 +1,4 @@
+import { pageZoomCommands, zoomBinding } from "./pageZoom";
 import { t as translate } from "./i18n";
 import type { AppMenuSpec, BuildAppMenuParams, MenuNodeSpec } from "./nativeAppMenuSpec";
 
@@ -91,6 +92,11 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
   ];
 
   const viewMenu: MenuNodeSpec[] = [
+    // The focused content owns the physical key (including the IDEA bookmark exception).
+    ...pageZoomCommands.map(({ id, label, key }): MenuNodeSpec => ({
+      type: "item", id, label: `${t(label)}    ${zoomBinding(key, true)}`, action: id,
+    })),
+    { type: "separator" },
     { type: "check", id: "toggle-quick-connect", label: t("menu.quickConnectToolbar"), action: "toggle-quick-connect", checked: quickConnectVisible },
     { type: "separator" },
     { type: "item", id: "toggle-sidebar", label: t("menu.toggleSidebar"), action: "view" },

@@ -115,7 +115,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
           data-testid="main-window-top-drag-region"
           data-window-drag
           aria-hidden="true"
-          className="fixed inset-x-[14px] top-[2px] h-[4px] z-[9999] cursor-grab active:cursor-grabbing"
+          className="fixed inset-x-[14px] top-[2px] h-[4px] z-[var(--taomni-z-drag-ghost)] cursor-grab active:cursor-grabbing"
           onMouseDown={startWindowDrag}
         />
         {/* Overlay traffic lights belong to the window, outside both the rail

@@ -43,11 +43,11 @@ function ProviderGroupRow({ id, group, providers, onChange, onRemove }: Provider
         />
         <input
           type="text"
-          className="taomni-input h-7 flex-1 min-w-0 text-[12px]"
+          className="taomni-input h-7 flex-1 min-w-0 text-ui-body"
           value={group.label}
           onChange={(e) => onChange({ ...group, label: e.target.value })}
         />
-        <span className="text-[11px] text-[var(--taomni-text-muted)] shrink-0">group:{id}</span>
+        <span className="text-ui-small text-[var(--taomni-text-muted)] shrink-0">group:{id}</span>
         <button
           type="button"
           className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
@@ -58,7 +58,7 @@ function ProviderGroupRow({ id, group, providers, onChange, onRemove }: Provider
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-1.5 text-[11px] text-[var(--taomni-text-muted)]">
+      <div className="grid grid-cols-2 gap-1.5 text-ui-small text-[var(--taomni-text-muted)]">
         {providerEntries.map(([providerId]) => (
           <label key={providerId} className="inline-flex min-w-0 items-center gap-1.5">
             <input
@@ -156,7 +156,7 @@ export function LlmProvidersPanel() {
   }, [vaultState]);
 
   if (loading || !config) {
-    return <div className="text-[12px] text-[var(--taomni-text-muted)] p-3">{t("aiSettings.loading")}</div>;
+    return <div className="text-ui-body text-[var(--taomni-text-muted)] p-3">{t("aiSettings.loading")}</div>;
   }
 
   const handleSave = async () => {
@@ -212,8 +212,8 @@ export function LlmProvidersPanel() {
     <fieldset className="space-y-2 min-w-0" disabled={saving} data-testid="ai-llm-settings">
       <div className="flex items-center justify-between mb-1">
         <div>
-          <div className="text-[13px] font-semibold">{t("aiSettings.llmTitle")}</div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-body font-semibold">{t("aiSettings.llmTitle")}</div>
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">
             {t("aiSettings.llmActiveLine", {
               active: config.llm.active,
               fallback: config.llm.fallback.enabled
@@ -224,7 +224,7 @@ export function LlmProvidersPanel() {
         </div>
         <button
           type="button"
-          className="taomni-btn h-7 px-3 text-[12px]"
+          className="taomni-btn h-7 px-3 text-ui-body"
           onClick={() => void handleSave()}
           data-testid="llm-providers-save"
           disabled={saving}
@@ -236,7 +236,7 @@ export function LlmProvidersPanel() {
       {saveError && (
         <div
           role="alert"
-          className="flex items-start gap-2 text-[12px] rounded px-2.5 py-2"
+          className="flex items-start gap-2 text-ui-body rounded px-2.5 py-2"
           style={{
             background: "var(--taomni-warning-bg)",
             border: "1px solid var(--taomni-warning-border)",
@@ -255,7 +255,7 @@ export function LlmProvidersPanel() {
         <div
           role="status"
           data-testid="llm-providers-status"
-          className="flex items-center gap-2 text-[12px] rounded px-2.5 py-2"
+          className="flex items-center gap-2 text-ui-body rounded px-2.5 py-2"
           style={{
             background: "var(--taomni-success-bg)",
             border: "1px solid var(--taomni-success-border)",
@@ -298,10 +298,10 @@ export function LlmProvidersPanel() {
 
       {!fullyDisabled && <div className="pt-2 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="text-[13px] font-semibold">Provider groups</div>
+          <div className="text-ui-body font-semibold">Provider groups</div>
           <button
             type="button"
-            className="taomni-btn h-7 px-2 text-[12px] inline-flex items-center gap-1.5"
+            className="taomni-btn h-7 px-2 text-ui-body inline-flex items-center gap-1.5"
             onClick={handleAddGroup}
           >
             <Plus className="w-3.5 h-3.5" />
@@ -309,7 +309,7 @@ export function LlmProvidersPanel() {
           </button>
         </div>
         {Object.entries(providerGroups).length === 0 ? (
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">
             No provider groups configured.
           </div>
         ) : (

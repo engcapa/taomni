@@ -97,13 +97,13 @@ export function WorkspaceToolbar(viewProps: WorkspaceToolbarProps) {
         <Braces className="w-4 h-4 text-[var(--taomni-accent)]" />
         <div className="min-w-0">
           <div className="font-semibold leading-4 truncate">Code · {title}</div>
-          <div className="text-[11px] text-[var(--taomni-code-muted)] truncate max-w-[620px]">
+          <div className="text-ui-small text-[var(--taomni-code-muted)] truncate max-w-[620px]">
             {roots.length ? `${roots.length} root${roots.length === 1 ? "" : "s"}` : "No project roots"}
             {looseFiles.length > 0 ? ` · ${looseFiles.length} loose file${looseFiles.length === 1 ? "" : "s"}` : ""}
           </div>
         </div>
         {dirtyCount > 0 && (
-          <span className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[11px] bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-accent)]">
+          <span className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-ui-small bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-accent)]">
             {dirtyCount} unsaved
           </span>
         )}
@@ -183,7 +183,7 @@ export function WorkspaceToolbar(viewProps: WorkspaceToolbarProps) {
                 sourceFile,
                 event.target.value || null,
               )}
-              className="h-6 max-w-44 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[10px]"
+              className="h-6 max-w-44 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-ui-caption"
             >
               {activeRunConfigurations.map((configuration) => (
                 <option key={configuration.id} value={configuration.id}>{configuration.label}</option>
@@ -231,7 +231,7 @@ export function WorkspaceToolbar(viewProps: WorkspaceToolbarProps) {
                 aria-label="More editor actions"
                 data-testid="code-workspace-toolbar-more-menu"
                 onClick={() => setToolbarMoreOpen(false)}
-                className="absolute right-0 top-8 z-50 flex w-max max-w-[420px] flex-wrap items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] p-1.5 shadow-lg"
+                className="absolute right-0 top-8 z-[var(--taomni-z-popover)] flex w-max max-w-[420px] flex-wrap items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] p-1.5 shadow-lg"
                 onKeyDown={(event) => {
                   if (event.key === "Escape") {
                     event.stopPropagation();
@@ -266,7 +266,7 @@ export function WorkspaceToolbar(viewProps: WorkspaceToolbarProps) {
                     data-testid="code-workspace-zoom-reset"
                     title="Reset editor zoom"
                     aria-label="Reset editor zoom"
-                    className="h-6 min-w-10 rounded px-1.5 text-[11px] tabular-nums text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                    className="h-6 min-w-10 rounded px-1.5 text-ui-small tabular-nums text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
                     onClick={() => setCodeViewFontSize(DEFAULT_EDITOR_APPEARANCE_PROFILE.fontSizePx)}
                   >
                     {currentEditorFontSize}px

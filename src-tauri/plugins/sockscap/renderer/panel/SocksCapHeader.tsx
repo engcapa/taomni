@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../crates/taomni-plugin-api/frontend/ui/IconButton";
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, HelpCircle, Info, Layers, Loader2, Lock, Play, RefreshCw, Shield, Square, X } from "lucide-react";
 import { type HelperStatus, type SocksCapCapabilities, type SocksCapConfig, type SocksCapProfile, type SocksCapStatus, type StatsSnapshot } from "../../../../../src/lib/sockscap";
 import { type MacosSetupGuideMode, phaseTone } from "./configuration";
@@ -39,11 +40,11 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
     <Shield className="w-4.5 h-4.5 shrink-0 text-[var(--taomni-accent)]" />
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 min-w-0">
-        <div className="text-[14px] font-semibold shrink-0">{viewProps.t("sockscap.title")}</div>
+        <div className="text-ui-title font-semibold shrink-0">{viewProps.t("sockscap.title")}</div>
         {viewProps.caps && (
           <span
             data-testid="sockscap-capability-notes"
-            className="inline-flex items-center gap-1 min-w-0 text-[10px] text-[var(--taomni-text-muted)]"
+            className="inline-flex items-center gap-1 min-w-0 text-ui-caption text-[var(--taomni-text-muted)]"
             title={viewProps.caps.notes.join("\n") || viewProps.t("sockscap.captureBackendLabel", { backend: viewProps.caps.captureBackend })}
           >
             {viewProps.caps.notes.length > 0 && <Info className="w-3 h-3 shrink-0 text-[var(--taomni-accent)]" />}
@@ -55,7 +56,7 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
       </div>
       <div
         data-testid="sockscap-header-summary"
-        className="mt-0.5 flex items-center gap-2 min-w-0 text-[10px] text-[var(--taomni-text-muted)] whitespace-nowrap"
+        className="mt-0.5 flex items-center gap-2 min-w-0 text-ui-caption text-[var(--taomni-text-muted)] whitespace-nowrap"
       >
         <span
           className="inline-flex items-center gap-1 min-w-0"
@@ -91,17 +92,17 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
           </span>
         )}
         {viewProps.helper?.running && (
-          <span className="hidden 2xl:inline shrink-0 font-mono text-emerald-600 dark:text-emerald-400">
+          <span className="hidden 2xl:inline shrink-0 font-mono text-ui-success">
             Helper {viewProps.helper.pid}
           </span>
         )}
         {viewProps.running && (
           <span className="hidden 2xl:inline-flex items-center gap-2 shrink-0 font-mono">
-            <span className="inline-flex items-center gap-0.5 text-emerald-500">
+            <span className="inline-flex items-center gap-0.5 text-ui-success">
               <ArrowUpRight className="w-3 h-3" />
               {formatSpeed(viewProps.upSpeed)}
             </span>
-            <span className="inline-flex items-center gap-0.5 text-sky-500">
+            <span className="inline-flex items-center gap-0.5 text-ui-info">
               <ArrowDownLeft className="w-3 h-3" />
               {formatSpeed(viewProps.downSpeed)}
             </span>
@@ -112,7 +113,7 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
     {viewProps.locked && (
       <div
         data-testid="sockscap-locked-banner"
-        className="min-w-0 max-w-[400px] flex items-center gap-1.5 text-[11px] text-sky-700 dark:text-sky-400"
+        className="min-w-0 max-w-[400px] flex items-center gap-1.5 text-ui-small text-ui-info"
         title={viewProps.t(
           viewProps.linuxLaunchOnly ? "sockscap.rootlessLockedHint" : "sockscap.lockedHint",
         )}
@@ -127,7 +128,7 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
       <button
         type="button"
         data-testid="sockscap-tun-warning"
-        className="p-1.5 rounded text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
+        className="p-1.5 rounded text-ui-warning bg-ui-warning-surface hover:bg-ui-warning-surface"
         title={viewProps.t("sockscap.tunConflictWarning", { adapters: viewProps.tunConflicts.join(", ") })}
         aria-label={viewProps.t("sockscap.tunConflictTitle")}
         onClick={() => viewProps.setTunWarningOpen(true)}
@@ -135,7 +136,7 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
         <AlertTriangle className="w-4 h-4" />
       </button>
     )}
-    <div className={`text-[11px] font-medium ${phaseTone(viewProps.status?.phase ?? "idle")}`}>
+    <div className={`text-ui-small font-medium ${phaseTone(viewProps.status?.phase ?? "idle")}`}>
       {viewProps.status ? viewProps.t(`sockscap.phase.${viewProps.status.phase}`) : viewProps.t("sockscap.phase.idle")}
     </div>
     {viewProps.busy && <Loader2 className="w-4 h-4 animate-spin text-[var(--taomni-text-muted)]" />}
@@ -143,7 +144,8 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
       <button
         type="button"
         data-testid="sockscap-stop"
-        className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-[12px] bg-red-600/90 text-white hover:bg-red-600"
+        data-danger="true"
+        className="taomni-btn inline-flex items-center gap-1 px-3 py-1.5 rounded text-ui-body"
         onClick={() => void viewProps.onStop()}
         disabled={viewProps.busy}
       >
@@ -155,7 +157,7 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
         type="button"
         ref={viewProps.startButtonRef}
         data-testid="sockscap-start"
-        className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+        className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-ui-body bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
         onClick={() => void viewProps.preflightAndStart()}
         disabled={viewProps.busy || viewProps.probing || viewProps.redirectorApprovalWaiting}
         title={
@@ -176,7 +178,7 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
       <button
         type="button"
         data-testid="sockscap-macos-setup-help"
-        className="inline-flex items-center gap-1 px-2 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+        className="inline-flex items-center gap-1 px-2 py-1.5 rounded text-ui-body border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
         onClick={() => {
           viewProps.setMacosSetupError(null);
           viewProps.setMacosSetupGuideMode("help");
@@ -188,20 +190,20 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
         <span>{viewProps.t("sockscap.macosSetupHelp")}</span>
       </button>
     )}
-    <button
+    <IconButton
       type="button"
       data-testid="sockscap-refresh-status"
-      className="inline-flex items-center gap-1 px-2 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+      className="inline-flex items-center gap-1 px-2 py-1.5 rounded text-ui-body border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
       onClick={() => void viewProps.onRefreshStatus()}
       disabled={viewProps.busy}
-      title={viewProps.t("sockscap.refreshStatus")}
+      label={viewProps.t("sockscap.refreshStatus")}
     >
       <RefreshCw className={`w-3.5 h-3.5 ${viewProps.busy ? "animate-spin" : ""}`} />
-    </button>
+    </IconButton>
     <button
       type="button"
       data-testid="sockscap-recover"
-      className="inline-flex items-center gap-1 px-2 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
+      className="inline-flex items-center gap-1 px-2 py-1.5 rounded text-ui-body border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
       onClick={() => void viewProps.onRecover()}
       disabled={viewProps.busy}
       title={viewProps.t("sockscap.recoverHint")}

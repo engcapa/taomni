@@ -72,6 +72,16 @@ describe("notepad keymap & command registry (V-07, V-08)", () => {
     expect(matched).toBe("file.save");
   });
 
+  it("keeps AppKit Hide free and follows the user's binding for zoom", () => {
+    const map = useNotepadKeymap.getState();
+    expect(map.resolveShortcut("search.replace", true)).toBe("Meta+Alt+F");
+    expect(map.resolveShortcut("search.replace", false)).toBe("Control+H");
+    const plus = new KeyboardEvent("keydown", { key: "+", metaKey: true, shiftKey: true });
+    expect(map.findCommandByEvent(plus, true)).toBe("view.zoomIn");
+    map.clearBinding("view.zoomIn");
+    expect(map.findCommandByEvent(plus, true)).toBeNull();
+  });
+
   it("enforces DEC-07 recordable whitelist during macro recording (V-08)", async () => {
     const registry = new NotepadCommandRegistry();
     const steps: RecordedMacroStep[] = [];

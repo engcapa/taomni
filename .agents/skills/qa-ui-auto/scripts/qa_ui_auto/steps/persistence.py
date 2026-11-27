@@ -38,7 +38,6 @@ def step_seed_storage(ctx: StepContext, args: Any) -> None:
 @verb("reload_window")
 def step_reload_window(ctx: StepContext, args: Any) -> None:
     """Reload the webview document so store bootstraps re-read storage."""
-    _ = args
     if ctx.dry_run:
         return
     # Wait for the new document. Looking for the old welcome panel immediately
@@ -47,6 +46,6 @@ def step_reload_window(ctx: StepContext, args: Any) -> None:
     # wait for the application root rather than one normal-workspace route.
     ctx.page.reload(wait_until="domcontentloaded")  # type: ignore[attr-defined]
     try:
-        ctx.page.wait_for_selector("#root > *", state="attached", timeout=30_000)  # type: ignore[attr-defined]
+        ctx.page.wait_for_selector((args or {}).get("ready_selector", "#root > *"), state="attached", timeout=30_000)  # type: ignore[attr-defined]
     except Exception as e:  # noqa: BLE001
         raise StepError(f"reload_window: page did not come back up ({e})") from e

@@ -153,10 +153,10 @@ export function ChatDrawerRibbon() {
   }
   const badgeBg =
     colorBucket === "red"
-      ? "bg-red-500 text-white"
+      ? "bg-ui-danger-surface text-ui-danger"
       : colorBucket === "amber"
-        ? "bg-amber-400 text-black"
-        : "bg-[var(--taomni-accent)] text-white";
+        ? "bg-ui-warning-surface text-ui-warning"
+        : "bg-ui-info-surface text-ui-info";
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
@@ -246,7 +246,7 @@ export function ChatDrawerRibbon() {
         data-position={drawerPosition}
         data-dragging={dragging || undefined}
         data-alert-count={alertBadgeCount || undefined}
-        className={`${ribbonClass} z-40 flex items-center justify-center text-[9px] font-semibold tracking-normal shadow-lg transition-transform duration-150 hover:scale-105 cursor-grab active:cursor-grabbing ${bumping ? "animate-bounce" : ""}`}
+        className={`${ribbonClass} z-[var(--taomni-z-docked-overlay)] flex items-center justify-center text-ui-caption font-semibold tracking-normal shadow-lg transition-transform duration-150 hover:scale-105 cursor-grab active:cursor-grabbing ${bumping ? "animate-bounce" : ""}`}
         style={ribbonStyle}
         title={ribbonTitle}
         aria-label={ribbonAria}
@@ -277,7 +277,7 @@ export function ChatDrawerRibbon() {
         )}
         {hasAlerts && (
           <span
-            className={`absolute -top-1 -right-1 min-w-[13px] h-[13px] px-1 rounded-full text-[8px] font-bold flex items-center justify-center ${badgeBg}`}
+            className={`absolute -top-1 -right-1 min-w-[13px] h-[13px] px-1 rounded-full text-ui-caption font-bold flex items-center justify-center ${badgeBg}`}
             data-testid="tao-ribbon-badge"
           >
             {badgeText}

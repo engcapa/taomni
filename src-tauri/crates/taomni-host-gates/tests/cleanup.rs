@@ -89,6 +89,23 @@ fn killing_the_core_cleans_the_real_host_child_and_grandchild() {
     );
     wait_for_tree(&mut core, &ready, &pids);
     let descendants = support::receipt(&pids);
+    #[cfg(target_os = "linux")]
+    let watchdog_pid = {
+        let host_pid = descendants
+            .iter()
+            .find(|(role, _)| role == "host")
+            .map(|(_, pid)| *pid as libc::pid_t)
+            .expect("host PID receipt");
+        let mut found = None;
+        support::wait_for(
+            || {
+                found = find_watchdog_in_group(host_pid);
+                found.is_some()
+            },
+            "re-execed plugin watchdog in host process group",
+        );
+        found.unwrap()
+    };
     for (role, pid) in &descendants {
         assert!(
             support::process_alive(*pid),
@@ -99,15 +116,54 @@ fn killing_the_core_cleans_the_real_host_child_and_grandchild() {
     core.0.wait().unwrap();
     support::wait_for(
         || {
-            descendants
+            let descendants_gone = descendants
                 .iter()
-                .all(|(_, pid)| !support::process_alive(*pid))
+                .all(|(_, pid)| !support::process_alive(*pid));
+            #[cfg(target_os = "linux")]
+            {
+                descendants_gone && !support::process_alive(watchdog_pid)
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                descendants_gone
+            }
         },
         "all descendants cleaned after core death",
     );
     for (role, pid) in descendants {
         assert!(!support::process_alive(pid), "orphan {role} PID {pid}");
     }
+}
+
+#[cfg(target_os = "linux")]
+fn find_watchdog_in_group(group: libc::pid_t) -> Option<u32> {
+    let prefix = b"taomni-plugin-watchdog\0--plugin-watchdog\0";
+    for entry in std::fs::read_dir("/proc").ok()? {
+        let entry = entry.ok()?;
+        let Some(pid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|name| name.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        if unsafe { libc::getpgid(pid as libc::pid_t) } != group {
+            continue;
+        }
+        let Ok(cmdline) = std::fs::read(entry.path().join("cmdline")) else {
+            continue;
+        };
+        if !cmdline.starts_with(prefix) {
+            continue;
+        }
+        let Ok(comm) = std::fs::read_to_string(entry.path().join("comm")) else {
+            continue;
+        };
+        if comm.trim() == "taomni-watchdog" && support::process_alive(pid) {
+            return Some(pid);
+        }
+    }
+    None
 }
 
 #[test]

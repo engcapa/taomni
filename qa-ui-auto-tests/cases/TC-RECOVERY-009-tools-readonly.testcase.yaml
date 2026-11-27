@@ -21,7 +21,7 @@ steps:
 - wait_for: '[data-testid="recovery-workspace"]'
 - assert_text_equals:
     selector: '[data-testid="recovery-background-status"]'
-    equals: 尚未查询后台工具状态。
+    equals: Background status has not been checked yet.
 - click: '[data-testid="recovery-background-refresh"]'
 - assert_text:
     selector: '[data-testid="recovery-background-status"]'
@@ -31,7 +31,7 @@ steps:
     contains: 'SocksCap: idle — browser preview'
 - assert_text:
     selector: '[data-testid="recovery-background-status"]'
-    contains: 隧道：
+    contains: 'Tunnels:'
 - click: '[data-testid="recovery-background-refresh"]'
 - assert_text:
     selector: '[data-testid="recovery-background-status"]'

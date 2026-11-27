@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { RefreshCw, Lock, Unlock } from "lucide-react";
 import { getLocale } from "../../../lib/i18n";
 import type { BackupSettingsViewProps } from "./BackupSettingsTypes";
@@ -12,15 +13,15 @@ export function BackupLocalHistory(inputs: Pick<BackupSettingsViewProps, "t" | "
               <h4 className="text-sm font-medium text-theme-text">
                 {t("backupSettings.historyTitle")} ({safeHistory.length})
               </h4>
-              <button
+              <IconButton
                 type="button"
                 data-testid="backup-history-refresh"
                 onClick={() => void refreshHistory()}
                 className="p-1 rounded text-theme-muted hover:text-theme-text"
-                title={t("common.refresh")}
+                label={t("common.refresh")}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-              </button>
+              </IconButton>
             </div>
 
             {safeHistory.length === 0 ? (
@@ -53,12 +54,12 @@ export function BackupLocalHistory(inputs: Pick<BackupSettingsViewProps, "t" | "
                         </td>
                         <td className="py-2 px-2">
                           {item.isEncrypted ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-amber-500">
+                            <span className="inline-flex items-center gap-1 text-ui-small text-ui-warning">
                               <Lock className="w-3 h-3" />
                               {t("backupSettings.encrypted")}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-theme-muted">
+                            <span className="inline-flex items-center gap-1 text-ui-small text-theme-muted">
                               <Unlock className="w-3 h-3" />
                               {t("backupSettings.unencrypted")}
                             </span>
@@ -76,7 +77,7 @@ export function BackupLocalHistory(inputs: Pick<BackupSettingsViewProps, "t" | "
                           <button
                             type="button"
                             onClick={() => void handleDeleteItem(item.fileName)}
-                            className="text-xs text-red-500 hover:underline"
+                            className="text-xs text-ui-danger hover:underline"
                           >
                             {t("backupSettings.deleteAction")}
                           </button>

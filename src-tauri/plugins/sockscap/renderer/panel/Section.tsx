@@ -25,7 +25,7 @@ export function Section({
         aria-controls={contentId}
         onClick={() => setExpanded((current) => !current)}
       >
-        <h3 className="sockscap-section-title text-[12px] font-semibold truncate">
+        <h3 className="sockscap-section-title text-ui-body font-semibold truncate">
           {title}
         </h3>
         {expanded ? (

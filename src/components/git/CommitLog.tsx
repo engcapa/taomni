@@ -190,7 +190,7 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
     <div className="h-full min-h-0 flex flex-col">
       {pathFilter && (
         <div className="h-9 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)]">
-          <span className="font-semibold text-[12px] truncate">History: {pathFilter}</span>
+          <span className="font-semibold text-ui-body truncate">History: {pathFilter}</span>
           <div className="flex-1" />
           {onClose && (
             <button className="taomni-btn h-7 px-2 inline-flex items-center gap-1" type="button" onClick={onClose}>
@@ -214,7 +214,7 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          <label className="flex items-center gap-1 text-[12px] select-none whitespace-nowrap">
+          <label className="flex items-center gap-1 text-ui-body select-none whitespace-nowrap">
             Branch
             <BranchFilterSelect
               value={branchFilter}
@@ -227,7 +227,7 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
         </div>
         <div className="flex-1 min-h-0 overflow-auto">
           {entries.length === 0 ? (
-            <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+            <div className="h-full min-h-24 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
               {loading ? "Loading…" : "No commits"}
             </div>
           ) : (
@@ -265,19 +265,19 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
                       {entry.refs.map((ref) => (
                         <span
                           key={ref}
-                          className="shrink-0 mt-0.5 text-[10px] px-1 rounded bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
+                          className="shrink-0 mt-0.5 text-ui-caption px-1 rounded bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
                         >
                           {ref}
                         </span>
                       ))}
-                      <span className="min-w-0 text-[12px] leading-4 font-medium line-clamp-2">{entry.subject}</span>
+                      <span className="min-w-0 text-ui-body leading-4 font-medium line-clamp-2">{entry.subject}</span>
                     </div>
                     {commitBodyPreview(entry) && (
-                      <div className="mt-0.5 text-[11px] leading-4 text-[var(--taomni-text-muted)] line-clamp-1">
+                      <div className="mt-0.5 text-ui-small leading-4 text-[var(--taomni-text-muted)] line-clamp-1">
                         {commitBodyPreview(entry)}
                       </div>
                     )}
-                    <div className="mt-1 text-[11px] text-[var(--taomni-text-muted)] truncate">
+                    <div className="mt-1 text-ui-small text-[var(--taomni-text-muted)] truncate">
                       <span className="taomni-mono text-[var(--taomni-accent)]">{entry.shortOid}</span> · {entry.authorName} · {formatDate(entry.date)}
                     </div>
                   </div>
@@ -287,7 +287,7 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
           )}
           {entries.length >= limit && (
             <button
-              className="w-full py-2 text-[12px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)] inline-flex items-center justify-center gap-1"
+              className="w-full py-2 text-ui-body text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)] inline-flex items-center justify-center gap-1"
               type="button"
               disabled={loading || busy}
               onClick={() => setLimit((l) => l + 200)}
@@ -305,12 +305,12 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
       <Panel id="log-details" defaultSize="58%" minSize="35%" className="min-w-0 min-h-0">
         <PanelGroup orientation="vertical" id="git-log-detail-layout">
           <Panel id="log-files" defaultSize="30%" minSize="15%" className="min-h-0 flex flex-col border-b border-[var(--taomni-divider)]">
-            <div className="h-8 shrink-0 flex items-center px-3 border-b border-[var(--taomni-divider)] text-[12px] font-semibold">
+            <div className="h-8 shrink-0 flex items-center px-3 border-b border-[var(--taomni-divider)] text-ui-body font-semibold">
               {selected ? `${selected.shortOid} · ${files.length} file(s)` : "Commit"}
             </div>
             <div className="flex-1 min-h-0 overflow-auto">
               {files.length === 0 ? (
-                <div className="h-full min-h-16 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+                <div className="h-full min-h-16 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
                   {selected ? "No file changes" : "Select a commit"}
                 </div>
               ) : (
@@ -333,11 +333,11 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
                     <span
                       data-testid="git-log-file-status"
                       data-change-status={file.status}
-                      className={`shrink-0 w-[58px] text-center rounded px-1 py-0.5 text-[10px] uppercase ${gitChangeStatusColor(file.status)}`}
+                      className={`shrink-0 w-[58px] text-center rounded px-1 py-0.5 text-ui-caption uppercase ${gitChangeStatusColor(file.status)}`}
                     >
                       {file.status}
                     </span>
-                    <span className="truncate text-[12px]">{file.path}</span>
+                    <span className="truncate text-ui-body">{file.path}</span>
                   </button>
                 ))
               )}

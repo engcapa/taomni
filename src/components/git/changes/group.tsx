@@ -82,17 +82,17 @@ export function RepoChangeGroup({
           onChange={(value) => onToggleChecked(root.repoRoot, changes.map((change) => change.path), value)}
         />
         <GitBranch className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
-        <span className="min-w-0 truncate text-[12px] font-medium">{root.name}</span>
-        <span className="min-w-0 truncate text-[11px] text-[var(--taomni-text-muted)]">{branch}</span>
+        <span className="min-w-0 truncate text-ui-body font-medium">{root.name}</span>
+        <span className="min-w-0 truncate text-ui-small text-[var(--taomni-text-muted)]">{branch}</span>
         <div className="flex-1" />
         {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-accent)]" />}
-        {error && <AlertTriangle className="w-3.5 h-3.5 text-red-500" />}
-        <span className="shrink-0 rounded bg-[var(--taomni-hover)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)]">
+        {error && <AlertTriangle className="w-3.5 h-3.5 text-ui-danger" />}
+        <span className="shrink-0 rounded bg-[var(--taomni-hover)] px-1.5 py-0.5 text-ui-small text-[var(--taomni-text-muted)]">
           {checkedCount}/{changes.length}
         </span>
       </div>
       {collapsed ? null : error ? (
-        <div className="px-8 py-2 text-[11px] text-red-500" title={error}>
+        <div className="px-8 py-2 text-ui-small text-ui-danger" title={error}>
           {error}
         </div>
       ) : changes.length > 0 ? (
@@ -113,7 +113,7 @@ export function RepoChangeGroup({
           />
         </>
       ) : loading ? (
-        <div className="px-8 py-2 text-[11px] text-[var(--taomni-text-muted)]">
+        <div className="px-8 py-2 text-ui-small text-[var(--taomni-text-muted)]">
           {t("git.workspaceChanges.loadingChanges")}
         </div>
       ) : null}

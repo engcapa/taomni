@@ -91,6 +91,7 @@ steps:
 - assert_text: {selector: '[data-testid="backup-restore-files"]', contains: plugins/mfa/data/mfa.db}
 - assert_text: {selector: '[data-testid="backup-restore-files"]', contains: databases/vault.db}
 - fill: {selector: '[data-testid="backup-restore-vault-password"]', value: qa-signed-mfa-restore-original}
+- fill: {selector: '[data-testid="backup-restore-name"]', value: '${fixture.restore_archive_name}'}
 - click: '[data-testid="backup-restore-confirm"]'
 - assert_text_equals: {selector: '[data-testid="backup-restore-error"]', equals: Incorrect vault master password. Verification failed.}
 - assert_not_visible: '[data-testid="backup-restore-staged"]'
@@ -144,31 +145,31 @@ verification:
     results: [29, 30, 44]
   - id: R2
     requirement: Re-enabling to advance HOTP, rekeying Vault, and disabling again precede restore confirmation, rejecting the old password.
-    actions: [47, 54, 65, 69, 73, 78]
+    actions: [47, 54, 65, 69, 73, 79]
     checkpoints:
     - {step: 55, expectation: "HOTP advances to 287 082."}
     - {step: 66, expectation: "Vault master password updates."}
     - {step: 75, expectation: "Restore dialog lists plugins/mfa/data/mfa.db."}
     - {step: 76, expectation: "Restore dialog lists databases/vault.db."}
-    - {step: 79, expectation: "Incorrect old master password fails verification."}
-    - {step: 80, expectation: "Failed verification does not stage pending restore state."}
-    - {step: 82, expectation: "Archive, mutated counter 1, released lease and unchanged generation are ready before confirmation."}
-    - {step: 83, expectation: "Original renderer emits no runtime errors."}
-    results: [55, 66, 75, 76, 79, 80, 82, 83]
+    - {step: 80, expectation: "Incorrect old master password fails verification."}
+    - {step: 81, expectation: "Failed verification does not stage pending restore state."}
+    - {step: 83, expectation: "Archive, mutated counter 1, released lease and unchanged generation are ready before confirmation."}
+    - {step: 84, expectation: "Original renderer emits no runtime errors."}
+    results: [55, 66, 75, 76, 80, 81, 83, 84]
   - id: R3
     requirement: Automatic relaunch preserves the disabled lifecycle, rolls back Vault/MFA, and decrypts the original account once re-enabled.
-    actions: [84, 89, 93, 104, 113]
+    actions: [85, 90, 94, 105, 114]
     checkpoints:
-    - {step: 84, expectation: "Single confirmation exits original desktop at 0 and reattaches to new QA desktop PID."}
-    - {step: 86, expectation: "Generation advances, active pointer stays intact, host remains stopped without lease, and module SQLite returns to counter 0."}
-    - {step: 90, expectation: "Changed password is rejected after restore."}
-    - {step: 98, expectation: "Manager tab shows the disabled unavailable notice."}
-    - {step: 99, expectation: "No MFA account codes render while disabled."}
-    - {step: 112, expectation: "Re-enabling decrypts restored HOTP 755 224."}
-    - {step: 114, expectation: "Re-enabled signed host advances restored account to 287 082."}
-    - {step: 115, expectation: "Re-enabled signed MFA host holds the writer lease on the relaunched desktop."}
-    - {step: 116, expectation: "Complete automatic restore produces no runtime errors."}
-    results: [84, 86, 90, 98, 99, 112, 114, 115, 116]
+    - {step: 85, expectation: "Single confirmation exits original desktop at 0 and reattaches to new QA desktop PID."}
+    - {step: 87, expectation: "Generation advances, active pointer stays intact, host remains stopped without lease, and module SQLite returns to counter 0."}
+    - {step: 91, expectation: "Changed password is rejected after restore."}
+    - {step: 99, expectation: "Manager tab shows the disabled unavailable notice."}
+    - {step: 100, expectation: "No MFA account codes render while disabled."}
+    - {step: 113, expectation: "Re-enabling decrypts restored HOTP 755 224."}
+    - {step: 115, expectation: "Re-enabled signed host advances restored account to 287 082."}
+    - {step: 116, expectation: "Re-enabled signed MFA host holds the writer lease on the relaunched desktop."}
+    - {step: 117, expectation: "Complete automatic restore produces no runtime errors."}
+    results: [85, 87, 91, 99, 100, 113, 115, 116, 117]
   visual:
   - check: Re-enabled signed MFA pane showing restored HOTP 287 082 after advancing from 755 224.
     method: manual

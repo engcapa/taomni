@@ -1,5 +1,5 @@
 id: TC-031
-title: SFTP transfer queue exposes pause, resume, and cancel controls
+title: SFTP queue records a zero-byte upload and removes its completed row
 covers:
 - F7.3
 tags:
@@ -51,10 +51,10 @@ steps:
 - click: '[data-testid="sftp-local-pane"] >> text="qa-ui-auto-queue.txt"'
 - click: '[data-testid="sftp-local-upload-selected"]'
 - wait_for: '[data-testid="sftp-transfer-queue"]'
-- assert_count:
-    selector: '[data-testid="sftp-transfer-queue"] button[title]'
-    min: 1
-- click: '[data-testid="sftp-transfer-queue"] button[title="Remove from list"]'
+- assert_text:
+    selector: '[data-testid="sftp-transfer-queue"] [data-transfer-state="done"]'
+    contains: '0 B / 0 B'
+- click: '[data-testid="sftp-transfer-queue"] button[aria-label="Remove from list"]'
 - wait: 1
 - click: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-queue.txt"'
 - click: '[data-testid="sftp-remote-delete"]'
@@ -74,7 +74,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SFTP transfer queue exposes pause, resume, and cancel controls：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: SFTP queue records a zero-byte upload and removes its completed row：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 2
@@ -117,7 +117,7 @@ verification:
     - step: 28
       expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"]"}'
     - step: 29
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-transfer-queue\"] button[title]", "min": 1}}'
+      expectation: The uploaded empty file reports zero transferred bytes out of zero.
     - step: 34
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
     - step: 36
@@ -129,6 +129,7 @@ verification:
     - step: 44
       expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"] tr[title$=\"/qa-ui-auto-queue.txt\"]"}'
     results:
+    - 29
     - 42
     - 44
   visual:

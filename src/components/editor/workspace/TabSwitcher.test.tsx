@@ -70,7 +70,10 @@ describe("§8.18.5 TabSwitcher rendering", () => {
     );
     fireEvent.mouseDown(screen.getByTestId(`workspace-tab-switcher-item-k1`));
     expect(handlers.onCommit).toHaveBeenCalledWith(0);
-    fireEvent.mouseDown(screen.getByTestId("workspace-tab-switcher"));
+    const switcher = screen.getByTestId("workspace-tab-switcher");
+    fireEvent.pointerDown(switcher, { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+    expect(handlers.onCancel).not.toHaveBeenCalled();
+    fireEvent.pointerUp(switcher, { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
     expect(handlers.onCancel).toHaveBeenCalled();
   });
 });

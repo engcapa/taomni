@@ -34,13 +34,16 @@ function readString(source: Record<string, unknown>, key: string): string | unde
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+export function isWslExecutable(path: unknown): boolean {
+  return typeof path === "string" && path.split(/[\\/]/).pop()?.toLowerCase() === "wsl.exe";
+}
+
 function deriveDistroFromLocalShellArgs(
   source: Record<string, unknown>,
 ): string | undefined {
   const path = source.localShellPath;
   const args = source.localShellArgs;
-  if (typeof path !== "string") return undefined;
-  if (path.split(/[\\/]/).pop()?.toLowerCase() !== "wsl.exe") return undefined;
+  if (!isWslExecutable(path)) return undefined;
   if (!Array.isArray(args)) return undefined;
   const idx = args.indexOf("-d");
   if (idx >= 0 && idx + 1 < args.length && typeof args[idx + 1] === "string") {

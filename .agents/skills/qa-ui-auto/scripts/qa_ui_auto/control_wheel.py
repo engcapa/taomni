@@ -30,12 +30,7 @@ def native(ctx, args):
     if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
         raise StepError("control_wheel requires an isolated X11 display for native input")
     ctx.session.activate_linux_window()
-    element = ctx.session.find(args["selector"], interactive=True)
-    ctx.session.request("POST", ctx.session.endpoint("/actions"), {"actions": [{
-        "type": "pointer", "id": "mouse", "parameters": {"pointerType": "mouse"},
-        "actions": [{"type": "pointerMove", "duration": 150, "x": 0, "y": 0,
-                     "origin": {"element-6066-11e4-a52e-4f735466cecf": element}}],
-    }]})
+    ctx.session.hover_x11_target(args["selector"])
     try:
         subprocess.run(["xdotool", "keydown", "Control_L", "click", "4" if args["direction"] == "up" else "5"],
                        check=True, timeout=5)

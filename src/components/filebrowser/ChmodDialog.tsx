@@ -113,8 +113,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
       onClick={onCancel}
       onKeyDown={handleKeyDown}
     >
@@ -127,14 +126,14 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
       >
         <div className="text-sm font-semibold mb-1">{t("fileBrowser.chmodHeading")}</div>
         <div
-          className="text-[12px] mb-3 break-all"
+          className="text-ui-body mb-3 break-all"
           style={{ color: "var(--taomni-text-muted)" }}
           title={summary}
         >
           {summary}
         </div>
 
-        <table className="w-full text-[12px] mb-3 border-collapse">
+        <table className="w-full text-ui-body mb-3 border-collapse">
           <thead>
             <tr style={{ color: "var(--taomni-text-muted)" }}>
               <th className="text-left font-normal pb-1"></th>
@@ -169,7 +168,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
           </tbody>
         </table>
 
-        <div className="flex items-center gap-2 mb-2 text-[12px]">
+        <div className="flex items-center gap-2 mb-2 text-ui-body">
           <label htmlFor="chmod-octal" className="shrink-0" style={{ color: "var(--taomni-text-muted)" }}>
             {t("fileBrowser.chmodOctalLabel")}
           </label>
@@ -180,7 +179,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
             maxLength={4}
             value={octalText}
             onChange={(e) => handleOctalChange(e.target.value)}
-            className="w-16 px-1.5 py-0.5 font-mono text-[12px] rounded"
+            className="w-16 px-1.5 py-0.5 font-mono text-ui-body rounded"
             style={{
               background: "var(--taomni-input-bg)",
               border: `1px solid ${octalValid ? "var(--taomni-input-border)" : "#c0392b"}`,
@@ -194,7 +193,7 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
         </div>
 
         {hasDir && (
-          <label className="flex items-center gap-2 mb-3 text-[12px] cursor-pointer select-none">
+          <label className="flex items-center gap-2 mb-3 text-ui-body cursor-pointer select-none">
             <input
               type="checkbox"
               checked={recursive}
@@ -207,14 +206,14 @@ export function ChmodDialog({ entries, onCancel, onApply }: ChmodDialogProps) {
         <div className="flex gap-2 justify-end">
           <button
             type="button"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+            className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]"
             onClick={onCancel}
           >
             {t("fileBrowser.chmodCancel")}
           </button>
           <button
             type="button"
-            className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
+            className="px-3 py-1 text-ui-body rounded text-white disabled:opacity-50"
             style={{ background: "var(--taomni-accent)" }}
             onClick={handleApply}
             disabled={!octalValid}

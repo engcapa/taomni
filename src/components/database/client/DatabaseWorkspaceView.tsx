@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { type CSSProperties } from "react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle, type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
 import { Plus, X, AlertTriangle, Loader2, Bot, ExternalLink, Maximize2, Minimize2, ChevronRight, Files, Database } from "lucide-react";
@@ -187,8 +188,8 @@ export function DatabaseWorkspaceView(props: DatabaseWorkspaceViewProps) {
       {panelActions.queryTabMenu.render}
       {connError && (
         <div
-          className="h-7 shrink-0 px-2 flex items-center gap-2 text-[11px] border-b"
-          style={{ color: "#d9534f", borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
+          className="h-7 shrink-0 px-2 flex items-center gap-2 text-ui-small border-b"
+          style={{ color: "var(--taomni-danger-text)", borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           title={connError}
           data-testid="db-connection-error-banner"
         >
@@ -256,7 +257,7 @@ export function DatabaseWorkspaceView(props: DatabaseWorkspaceViewProps) {
         <button
           type="button"
           data-testid="db-schema-drawer-handle"
-          className="absolute left-0 top-12 z-30 h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--taomni-hover)]"
+          className="absolute left-0 top-12 z-[var(--taomni-z-sticky)] h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--taomni-hover)]"
           style={{
             background: "var(--taomni-panel-bg)",
             borderColor: "var(--taomni-divider)",
@@ -267,7 +268,7 @@ export function DatabaseWorkspaceView(props: DatabaseWorkspaceViewProps) {
           onClick={expandSchemaPanel}
         >
           <ChevronRight className="w-3.5 h-3.5" />
-          <span className="text-[10px] leading-none" style={{ writingMode: "vertical-rl" }}>
+          <span className="text-ui-caption leading-none" style={{ writingMode: "vertical-rl" }}>
             Objects
           </span>
         </button>
@@ -288,7 +289,7 @@ export function DatabaseWorkspaceView(props: DatabaseWorkspaceViewProps) {
             <div className="h-7 shrink-0 flex border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
               <button
                 type="button"
-                className="flex-1 text-[11px] font-semibold flex items-center justify-center gap-1.5 h-full transition-colors"
+                className="flex-1 text-ui-small font-semibold flex items-center justify-center gap-1.5 h-full transition-colors"
                 style={{
                   color: leftPanelTab === "schema" ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
                   background: leftPanelTab === "schema" ? "var(--taomni-bg)" : "transparent",
@@ -301,7 +302,7 @@ export function DatabaseWorkspaceView(props: DatabaseWorkspaceViewProps) {
               </button>
               <button
                 type="button"
-                className="flex-1 text-[11px] font-semibold flex items-center justify-center gap-1.5 h-full transition-colors"
+                className="flex-1 text-ui-small font-semibold flex items-center justify-center gap-1.5 h-full transition-colors"
                 style={{
                   color: leftPanelTab === "queries" ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
                   background: leftPanelTab === "queries" ? "var(--taomni-bg)" : "transparent",
@@ -358,7 +359,7 @@ export function DatabaseWorkspaceView(props: DatabaseWorkspaceViewProps) {
           {/* Panel tab strip */}
           <div className="h-full flex flex-col min-w-0">
             <div
-              className="h-7 shrink-0 flex items-center gap-1 px-1 text-[11px]"
+              className="h-7 shrink-0 flex items-center gap-1 px-1 text-ui-small"
               style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
             >
               {workspace.panels.map((p, i) => {
@@ -374,7 +375,7 @@ export function DatabaseWorkspaceView(props: DatabaseWorkspaceViewProps) {
                       value={workspace.panelDraftTitle}
                       maxLength={MAX_PANEL_NAME_LENGTH}
                       aria-label={t("tabs.rename")}
-                      className="px-2 h-5 w-[160px] rounded text-[11px] outline-none"
+                      className="px-2 h-5 w-[160px] rounded text-ui-small focus-visible:keyboard-outline"
                       style={{
                         background: "var(--taomni-selected)",
                         color: "var(--taomni-accent)",
@@ -435,14 +436,14 @@ export function DatabaseWorkspaceView(props: DatabaseWorkspaceViewProps) {
                 );
               })}
               {workspace.panels.length < workspace.tabLimit && (
-                <button
+                <IconButton
                   type="button"
-                  title="New query panel"
+                  labelKey="newQueryPanel"
                   className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
                   onClick={panelActions.addPanel}
                 >
                   <Plus className="w-3 h-3" />
-                </button>
+                </IconButton>
               )}
             </div>
 

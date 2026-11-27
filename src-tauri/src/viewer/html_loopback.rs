@@ -1,4 +1,5 @@
-//! Ephemeral loopback HTTP listener for macOS HTML previews.
+//! Ephemeral loopback HTTP listener for macOS HTML previews and the bundled
+//! draw.io renderer on Windows and macOS.
 //!
 //! WKWebView refuses to commit opaque `sandbox` iframes from custom URL
 //! schemes or unrouted `*.localhost` hostnames. Serving preview tokens over
@@ -132,7 +133,7 @@ async fn handle_request(req: Request<Body>) -> Response<Body> {
     if req.method() != Method::GET {
         return plain_error(StatusCode::METHOD_NOT_ALLOWED, "permission: GET only");
     }
-    #[cfg(any(target_os = "macos", test))]
+    #[cfg(any(target_os = "macos", target_os = "windows", test))]
     if let Some(response) = super::drawio_frame::serve(&srv.origin, req.uri().path()) {
         return response;
     }

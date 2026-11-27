@@ -73,7 +73,7 @@ export function registerinteractionEditing3Cases(caseContext: registerinteractio
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "Vanishing fix" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Vanishing fix" }));
 
     await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Code action resolve failed:"));
     expect(useAppStore.getState().statusMessage).toContain("Provider returned null on resolve");
@@ -144,9 +144,9 @@ export function registerinteractionEditing3Cases(caseContext: registerinteractio
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "Insert retry space" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Insert retry space" }));
 
-    const retry = await screen.findByRole("button", {
+    const retry = await screen.findByRole("menuitem", {
       name: /Retry Insert retry space.*resolve transport unavailable/i,
     });
     expect(selectCodeWorkspaceUi(
@@ -211,16 +211,16 @@ export function registerinteractionEditing3Cases(caseContext: registerinteractio
     expect(content).toBeTruthy();
     fireEvent.keyDown(content!, { key: "Enter", altKey: true });
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspCodeActions).toHaveBeenCalledTimes(1));
-    const keyboardCandidate = await screen.findByRole("button", { name: "Use shared candidate" });
+    const keyboardCandidate = await screen.findByRole("menuitem", { name: "Use shared candidate" });
     const keyboardCandidateId = keyboardCandidate.getAttribute("data-testid");
     expect(keyboardCandidateId).toMatch(/^code-workspace-intention-intention\.provider\./);
-    fireEvent.keyDown(window, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Use shared candidate" })).not.toBeInTheDocument());
+    fireEvent.keyDown(keyboardCandidate, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menuitem", { name: "Use shared candidate" })).not.toBeInTheDocument());
 
     const bulb = rendered.container.querySelector('[data-testid="code-workspace-lightbulb"]');
     expect(bulb).toBeTruthy();
     fireEvent.mouseDown(bulb!);
-    const gutterCandidate = await screen.findByRole("button", { name: "Use shared candidate" });
+    const gutterCandidate = await screen.findByRole("menuitem", { name: "Use shared candidate" });
     expect(gutterCandidate.getAttribute("data-testid")).toBe(keyboardCandidateId);
     expect(caseContext.workspaceTestHarness.lspMocks.lspCodeActions).toHaveBeenCalledTimes(2);
   });
@@ -314,12 +314,12 @@ export function registerinteractionEditing3Cases(caseContext: registerinteractio
     fireEvent.click(screen.getByTestId("code-workspace-bottom-tab-problems"));
     const problem = await screen.findByRole("button", { name: /Target file diagnostic/ });
     fireEvent.contextMenu(problem, { clientX: 12, clientY: 18 });
-    fireEvent.click(screen.getByRole("button", { name: "Quick Fix" }));
-    const problemCandidate = await screen.findByRole("button", { name: "Use target-file candidate" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Quick Fix" }));
+    const problemCandidate = await screen.findByRole("menuitem", { name: "Use target-file candidate" });
     const problemCandidateId = problemCandidate.getAttribute("data-testid");
     expect(problemCandidateId).toMatch(/^code-workspace-intention-intention\.provider\./);
-    fireEvent.keyDown(window, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Use target-file candidate" })).not.toBeInTheDocument());
+    fireEvent.keyDown(problemCandidate, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menuitem", { name: "Use target-file candidate" })).not.toBeInTheDocument());
 
     const secondaryContent = secondaryPane?.querySelector<HTMLElement>(".cm-content");
     expect(secondaryContent).not.toBeNull();
@@ -331,7 +331,7 @@ export function registerinteractionEditing3Cases(caseContext: registerinteractio
     vi.spyOn(secondaryView!, "posAtCoords").mockReturnValue(null);
     fireEvent.contextMenu(secondaryContent!, { clientX: 24, clientY: 36, button: 2 });
     fireEvent.click(await screen.findByTestId("editor-context-code-actions"));
-    const contextCandidate = await screen.findByRole("button", { name: "Use target-file candidate" });
+    const contextCandidate = await screen.findByRole("menuitem", { name: "Use target-file candidate" });
 
     expect(contextCandidate.getAttribute("data-testid")).toBe(problemCandidateId);
     expect(caseContext.workspaceTestHarness.lspMocks.lspCodeActions).toHaveBeenCalledTimes(2);
@@ -434,7 +434,7 @@ export function registerinteractionEditing3Cases(caseContext: registerinteractio
 
     // Trigger Alt+Enter
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
-    const importOption = await screen.findByRole("button", { name: "Import 'List' (java.util.List)" });
+    const importOption = await screen.findByRole("menuitem", { name: "Import 'List' (java.util.List)" });
     expect(importOption).toBeInTheDocument();
 
     fireEvent.click(importOption);

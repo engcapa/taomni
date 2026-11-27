@@ -2,10 +2,36 @@
 // Local entries only: CardDAV sync reports that it needs the desktop app.
 // Proves renderer orchestration; the Rust tests cover vCard and CardDAV.
 
+import { isValidEmailAddress, parseRecipientText } from "../lib/mailRecipients";
+import type { MailContactSuggestion } from "../lib/mail";
 import type { MailAddressBookEntry } from "../lib/mailContacts";
 
 const books = new Map<string, MailAddressBookEntry[]>();
 let counter = 0;
+const sentContacts = new Map<string, Map<string, MailContactSuggestion>>();
+
+export function stubRememberSentRecipients(accountId: string, recipients: string[]) {
+  const contacts = sentContacts.get(accountId) ?? new Map<string, MailContactSuggestion>();
+  const now = Math.floor(Date.now() / 1000);
+  for (const raw of recipients) {
+    const recipient = parseRecipientText(raw);
+    if (!recipient || !isValidEmailAddress(recipient.email)) continue;
+    const email = recipient.email.toLowerCase();
+    contacts.set(email, {
+      name: recipient.name || contacts.get(email)?.name || null,
+      email, source: "sent", score: 400, lastSeenAt: now,
+    });
+  }
+  sentContacts.set(accountId, contacts);
+}
+
+export function stubSentRecipientSuggestions(accountId: string, query: string) {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+  return [...(sentContacts.get(accountId)?.values() ?? [])]
+    .filter((contact) => contact.email.includes(needle) || contact.name?.toLowerCase().includes(needle))
+    .sort((a, b) => (b.lastSeenAt ?? 0) - (a.lastSeenAt ?? 0) || a.email.localeCompare(b.email));
+}
 
 export function stubListAddressBook(accountId: string): MailAddressBookEntry[] {
   return (books.get(accountId) ?? [])

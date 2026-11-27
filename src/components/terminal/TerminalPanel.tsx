@@ -122,7 +122,7 @@ export function TerminalPanel({
 
   const panelClasses = [
     "relative w-full h-full",
-    panel.fullscreen ? "fixed inset-0 z-[9000]" : "",
+    panel.fullscreen ? "fixed inset-0 z-[var(--taomni-z-docked-overlay)]" : "",
     panel.showScrollbar ? "" : "terminal-hide-scrollbar",
     panel.fontLigatures ? "terminal-font-ligatures" : "terminal-no-font-ligatures",
   ].filter(Boolean).join(" ");

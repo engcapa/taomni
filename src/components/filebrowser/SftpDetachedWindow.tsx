@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PanelRightOpen } from "lucide-react";
 import { FileBrowser } from "./FileBrowser";
-import { useAppTheme } from "../../lib/appTheme";
 import { subscribeCwdHint, getLatestCwdHint } from "../../lib/sftpSync";
-import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
+import { isTauriRuntime } from "../../lib/runtime";
+import { DetachedHandoffStatus } from "../detached/DetachedHandoffStatus";
 import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import { sftpWindowPaths, type DetachedSftpParams } from "../../lib/sftpWindowState";
 import { useSftpStore } from "../../stores/sftpStore";
@@ -84,27 +84,6 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   const t = useT();
   const reattachingRef = useRef(false);
   const [reattachError, setReattachError] = useState<string | null>(null);
-  const { mode, resolvedTheme } = useAppTheme();
-  const [uiFontFamily, setUiFontFamily] = useState(() => {
-    try {
-      return localStorage.getItem("taomni.uiFontFamily") || "Inter";
-    } catch {
-      return "Inter";
-    }
-  });
-  const [uiFontSize, setUiFontSize] = useState<number>(() => {
-    try {
-      const val = localStorage.getItem("taomni.uiFontSize");
-      if (val) {
-        const parsed = parseInt(val, 10);
-        if (!isNaN(parsed) && parsed >= 10 && parsed <= 18) return parsed;
-      }
-      return 12;
-    } catch {
-      return 12;
-    }
-  });
-
   const [params, setParams] = useState<DetachedSftpParams | null>(() =>
     consumeDetachedHandoff(sessionId),
   );
@@ -136,35 +115,6 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   const [cwdHint, setCwdHint] = useState<string | null>(() =>
     getLatestCwdHint(cwdSubscriptionId),
   );
-
-  useEffect(() => {
-    const handler = (event: StorageEvent) => {
-      if (event.key === "taomni.uiFontFamily" && event.newValue) {
-        setUiFontFamily(event.newValue);
-      } else if (event.key === "taomni.uiFontSize" && event.newValue) {
-        const parsed = parseInt(event.newValue, 10);
-        if (!isNaN(parsed) && parsed >= 10 && parsed <= 18) {
-          setUiFontSize(parsed);
-        }
-      }
-    };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
-  }, []);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.appTheme = resolvedTheme;
-    root.dataset.appThemeMode = mode;
-    root.style.colorScheme = resolvedTheme;
-    root.dataset.appPlatform = getAppPlatform();
-  }, [mode, resolvedTheme]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.style.setProperty("--taomni-ui-font-family", uiFontFamily);
-    root.style.setProperty("--taomni-ui-font-size", `${uiFontSize}px`);
-  }, [uiFontFamily, uiFontSize]);
 
   useEffect(() => {
     if (params) return;
@@ -229,48 +179,7 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   }, [title, t]);
 
   if (!params) {
-    // Use literal colours here (not CSS vars) so that even if the theme
-    // stylesheet hasn't loaded the popup is visibly populated rather than
-    // appearing as a blank white page.
-    return (
-      <div
-        className="w-screen h-screen flex items-center justify-center p-6"
-        style={{ background: "#1e2128", color: "#e6e6e6" }}
-      >
-        <div className="max-w-md text-center text-sm leading-relaxed">
-          {handoffTimedOut ? (
-            <>
-              <div className="text-base font-semibold mb-2">
-                {t("fileBrowser.detachedTimedOutTitle")}
-              </div>
-              <p style={{ color: "#a0a0a0" }}>
-                {t("fileBrowser.detachedTimedOutBody", { sessionId })}
-              </p>
-              <p className="mt-3" style={{ color: "#a0a0a0" }}>
-                {t("fileBrowser.detachedTimedOutHint")}
-              </p>
-              <button
-                type="button"
-                className="mt-4 px-3 py-1.5 text-xs rounded"
-                style={{ background: "#3a3f4a", color: "#e6e6e6" }}
-                onClick={() => window.close()}
-              >
-                {t("fileBrowser.detachedCloseWindow")}
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="text-base font-semibold mb-2">
-                {t("fileBrowser.detachedLoadingTitle")}
-              </div>
-              <p style={{ color: "#a0a0a0" }}>
-                {t("fileBrowser.detachedLoadingBody")}
-              </p>
-            </>
-          )}
-        </div>
-      </div>
-    );
+    return <DetachedHandoffStatus key={sessionId} sessionId={sessionId} failed={handoffTimedOut} />;
   }
 
   return (
@@ -280,7 +189,7 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
       style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}
     >
       <div
-        className="h-6 px-2 flex items-center text-[11px] font-semibold border-b shrink-0"
+        className="h-6 px-2 flex items-center text-ui-small font-semibold border-b shrink-0"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
         <span className="truncate flex-1">{title}</span>

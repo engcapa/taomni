@@ -113,21 +113,37 @@ describe("MarkdownEditor real host lifecycle", () => {
     expect(screen.getByTestId("markdown-export-menu")).toBeInTheDocument();
   });
   it("keeps the export menu above diagram actions when the shared viewer styles load last", () => {
+    const resolveZIndex = (element: Element) => {
+      const computed = getComputedStyle(element);
+      let current = computed.zIndex.trim();
+      for (let depth = 0; depth < 6; depth++) {
+        const match = /^var\(\s*(--[^,\s)]+)(?:\s*,\s*(.+))?\)$/.exec(current);
+        if (!match) return Number(current);
+        const resolved = computed.getPropertyValue(match[1]).trim();
+        current = resolved || (match[2] ?? "").trim();
+      }
+      return Number(current);
+    };
     const viewerStyles = document.createElement("style");
-    viewerStyles.textContent = readFileSync("src/components/viewer/viewer.css", "utf8")
+    viewerStyles.textContent = readFileSync("src/styles/theme.css", "utf8")
+      + readFileSync("src/components/viewer/viewer.css", "utf8")
       + readFileSync("src/components/viewer/markdown/diagram.css", "utf8");
     const diagramTools = document.createElement("div");
     diagramTools.className = "fv fv-md-diagram-tools";
+    const exportNotice = document.createElement("div");
+    exportNotice.className = "fv-md-export-notice";
     document.head.append(viewerStyles);
-    document.body.append(diagramTools);
+    document.body.append(diagramTools, exportNotice);
     try {
       render(<Harness />);
       fireEvent.click(screen.getByTestId("markdown-export"));
       const menu = screen.getByTestId("markdown-export-menu");
-      expect(Number(getComputedStyle(menu).zIndex)).toBeGreaterThan(Number(getComputedStyle(diagramTools).zIndex));
+      expect(resolveZIndex(menu)).toBeGreaterThan(resolveZIndex(diagramTools));
+      expect(resolveZIndex(menu)).toBeGreaterThan(resolveZIndex(exportNotice));
     } finally {
       viewerStyles.remove();
       diagramTools.remove();
+      exportNotice.remove();
     }
   });
   it("keeps one source/history across live/source/split/focus switches, with outline navigation", async () => {

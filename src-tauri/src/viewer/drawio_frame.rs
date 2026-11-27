@@ -1,4 +1,4 @@
-//! Fixed, bundled draw.io renderer assets for the WKWebView loopback host.
+//! Fixed, bundled draw.io renderer assets for the native loopback host.
 
 use axum::body::Body;
 use axum::http::{Response, StatusCode};

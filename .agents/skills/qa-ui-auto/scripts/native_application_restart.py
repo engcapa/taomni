@@ -28,6 +28,11 @@ class ExitConfirmation(TypedDict):
 
 CONFIRM_SELECTOR = '[data-testid="confirm-dialog"] [data-testid="confirm-dialog-confirm"]'
 KEEP_DRAFT_SELECTOR = '[data-testid="viewer-close-dialog"] [data-testid="viewer-close-keep-draft"]'
+DIALOG_NAME = r"""
+const title = (dialog.getAttribute('aria-labelledby') || '').trim().split(/\s+/)
+  .filter(Boolean).map(id => document.getElementById(id)?.textContent.trim() || '').filter(Boolean).join(' ')
+  || dialog.getAttribute('aria-label') || '';
+"""
 EXIT_DIALOG_OBSERVATION = """
 const visible = el => {
   if (!el) return false;
@@ -38,11 +43,12 @@ const visible = el => {
 const dialogs = [...document.querySelectorAll('[data-testid="confirm-dialog"]')].filter(visible);
 if (!dialogs.length) return null;
 const dialog = dialogs[0];
+""" + DIALOG_NAME + """
 const buttons = dialog.querySelectorAll('[data-testid="confirm-dialog-confirm"]');
 const button = buttons[0];
 return {
   count: dialogs.length,
-  title: dialog.getAttribute('aria-label') ?? '',
+  title,
   message: dialog.querySelector('[data-testid="confirm-dialog-message"]')?.textContent?.trim() ?? '',
   confirm_label: button?.textContent?.trim() ?? '',
   confirm_count: buttons.length,
@@ -60,11 +66,12 @@ const visible = el => {
 const dialogs = [...document.querySelectorAll('[data-testid="viewer-close-dialog"]')].filter(visible);
 if (!dialogs.length) return null;
 const dialog = dialogs[0];
+""" + DIALOG_NAME + """
 const buttons = dialog.querySelectorAll('[data-testid="viewer-close-keep-draft"]');
 const button = buttons[0];
 return {
   count: dialogs.length,
-  title: dialog.getAttribute('aria-label') ?? '',
+  title,
   paths: [...dialog.querySelectorAll('p span')].map((node) => node.textContent?.trim() ?? ''),
   keep_count: buttons.length,
   keep_label: button?.textContent?.trim() ?? '',

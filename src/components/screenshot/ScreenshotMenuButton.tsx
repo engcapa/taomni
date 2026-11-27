@@ -4,6 +4,8 @@ import { useT } from "../../lib/i18n";
 import { useAppDialogs, formatUnknownError } from "../../lib/appDialogs";
 import { openScreenshotOverlay } from "../../lib/screenshot";
 import { CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL, screenshotShortcutLabel, useScreenshotShortcutStore } from "../../lib/screenshotShortcut";
+import { ContextMenu } from "../ContextMenu";
+import { IconButton } from "../ui/IconButton";
 import { ScreenshotFavorites } from "./ScreenshotFavorites";
 
 /** Unified screen capture entry shared by the main and detached windows. */
@@ -11,11 +13,11 @@ export function ScreenshotMenuButton({ variant = "titlebar" }: { variant?: "titl
   const t = useT();
   const dialogs = useAppDialogs();
   const [screenshotBusy, setScreenshotBusy] = useState(false);
-  const [screenshotDelayMenu, setScreenshotDelayMenu] = useState(false);
+  const [screenshotDelayMenu, setScreenshotDelayMenu] = useState<{ x: number; y: number } | null>(null);
   const [screenshotCountdown, setScreenshotCountdown] = useState<number | null>(null);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const countdownTimer = useRef<number | null>(null);
-  const delayMenuRef = useRef<HTMLDivElement | null>(null);
+  const delayButton = useRef<HTMLButtonElement>(null);
   const shortcutLabel = screenshotShortcutLabel(useScreenshotShortcutStore((s) => s.status));
 
   const clearScreenshotCountdown = () => {
@@ -32,26 +34,9 @@ export function ScreenshotMenuButton({ variant = "titlebar" }: { variant?: "titl
     };
   }, []);
 
-  // Close the delay menu on outside click / Escape.
-  useEffect(() => {
-    if (!screenshotDelayMenu) return;
-    const onDown = (e: MouseEvent) => {
-      if (!delayMenuRef.current?.contains(e.target as Node)) setScreenshotDelayMenu(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setScreenshotDelayMenu(false);
-    };
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [screenshotDelayMenu]);
-
   const handleScreenshot = async (includeCurrentWindow = false) => {
     if (screenshotBusy) return;
-    setScreenshotDelayMenu(false);
+    setScreenshotDelayMenu(null);
     setScreenshotBusy(true);
     try {
       await openScreenshotOverlay(undefined, includeCurrentWindow);
@@ -68,7 +53,7 @@ export function ScreenshotMenuButton({ variant = "titlebar" }: { variant?: "titl
 
   /** Timed screenshot: count down, then open the overlay for capture. */
   const handleDelayedScreenshot = (seconds: number) => {
-    setScreenshotDelayMenu(false);
+    setScreenshotDelayMenu(null);
     if (screenshotBusy || screenshotCountdown !== null) return;
     clearScreenshotCountdown();
     let remaining = seconds;
@@ -84,7 +69,7 @@ export function ScreenshotMenuButton({ variant = "titlebar" }: { variant?: "titl
     }, 1000);
   };
   return (
-      <div ref={delayMenuRef} className={variant === "rail"
+      <div className={variant === "rail"
         ? "relative w-full shrink-0 flex flex-col items-center"
         : "relative shrink-0 self-center flex items-center"}>
         <button
@@ -108,56 +93,60 @@ export function ScreenshotMenuButton({ variant = "titlebar" }: { variant?: "titl
             : "h-6 w-7 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50 self-center"}
         >
           {screenshotCountdown !== null ? (
-            <span className="text-[12px] font-semibold tabular-nums" data-testid="system-screenshot-countdown">
+            <span className="text-ui-body font-semibold tabular-nums" data-testid="system-screenshot-countdown">
               {screenshotCountdown}
             </span>
           ) : (
             <Camera className="w-4 h-4" />
           )}
         </button>
-        <button
+        <IconButton
           type="button"
           data-testid="system-screenshot-delay-toggle"
-          aria-label={t("screenshot.captureOptions")}
-          title={t("screenshot.captureOptions")}
+          label={t("screenshot.captureOptions")}
+          ref={delayButton}
           disabled={screenshotBusy || screenshotCountdown !== null}
-          aria-expanded={screenshotDelayMenu}
+          aria-expanded={!!screenshotDelayMenu}
           aria-haspopup="menu"
-          onClick={() => setScreenshotDelayMenu((v) => !v)}
+          onClick={(event) => {
+            const button = event.currentTarget;
+            const bounds = button.getBoundingClientRect();
+            button.focus({ preventScroll: true });
+            setScreenshotDelayMenu(screenshotDelayMenu ? null : {
+              x: variant === "rail" ? bounds.right + 4 : bounds.left,
+              y: variant === "rail" ? bounds.top : bounds.bottom + 4,
+            });
+          }}
           className={variant === "rail"
             ? "absolute bottom-0 right-0.5 h-3 w-3 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50"
             : "h-6 w-4 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50"}
         >
           <ChevronDown className="w-3 h-3" />
-        </button>
+        </IconButton>
         {screenshotDelayMenu && (
-          <div
-            data-testid="system-screenshot-delay-menu"
-            role="menu"
-            className={variant === "rail"
-            ? "absolute left-full bottom-0 z-50 ml-1 min-w-48 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] py-1 shadow-xl"
-            : "absolute right-0 top-7 z-50 min-w-48 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] py-1 shadow-xl"}
-          >
-            <button type="button" data-testid="system-screenshot-current-window" role="menuitem" onClick={() => void handleScreenshot(true)}
-              className="block w-full px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]">{t("screenshot.currentWindow")} ({CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL})</button>
-            <p data-testid="system-screenshot-default-hint" className="px-3 pb-1 text-[11px] text-[var(--taomni-text-muted)]">{t("screenshot.defaultHide")}</p>
-            {[3, 5, 10].map((s) => (
-              <button
-                key={s}
-                type="button"
-                data-testid={`system-screenshot-delay-${s}`}
-                role="menuitem"
-                onClick={() => handleDelayedScreenshot(s)}
-                className="block w-full px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]"
-              >
-                {t("screenshot.delaySeconds", { count: s })}
-              </button>
-            ))}
-            <button type="button" data-testid="system-screenshot-favorites" role="menuitem" onClick={() => { setScreenshotDelayMenu(false); setFavoritesOpen(true); }}
-              className="block w-full border-t border-[var(--taomni-divider)] px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]">{t("screenshot.favorites")}</button>
-          </div>
+          <ContextMenu
+            {...screenshotDelayMenu}
+            testId="system-screenshot-delay-menu"
+            ariaLabel={t("screenshot.captureOptions")}
+            anchorRef={delayButton}
+            closeOnTab
+            dismissOnFocusOut
+            onClose={() => setScreenshotDelayMenu(null)}
+            items={[
+              { testId: "system-screenshot-current-window", label: t("screenshot.currentWindow"),
+                shortcut: `(${CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL})`, onClick: () => void handleScreenshot(true) },
+              { testId: "system-screenshot-default-hint", label: t("screenshot.defaultHide"), sectionHeader: true },
+              ...[3, 5, 10].map((seconds) => ({
+                testId: `system-screenshot-delay-${seconds}`,
+                label: t("screenshot.delaySeconds", { count: seconds }),
+                onClick: () => handleDelayedScreenshot(seconds),
+              })),
+              { label: "", separator: true },
+              { testId: "system-screenshot-favorites", label: t("screenshot.favorites"), onClick: () => setFavoritesOpen(true) },
+            ]}
+          />
         )}
-        {favoritesOpen && <ScreenshotFavorites onClose={() => setFavoritesOpen(false)} />}
+        {favoritesOpen && <ScreenshotFavorites returnFocus={delayButton.current} onClose={() => setFavoritesOpen(false)} />}
       </div>
   );
 }

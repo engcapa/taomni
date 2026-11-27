@@ -24,7 +24,7 @@ export function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
   const { icon, label } = describe(attachment, t);
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[10px] text-[var(--taomni-text-muted)]"
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-ui-caption text-[var(--taomni-text-muted)]"
       title={label}
       data-testid="attachment-chip"
     >
@@ -34,7 +34,7 @@ export function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
         <button
           type="button"
           aria-label={t("attachment.remove")}
-          className="hover:text-red-400 transition-colors"
+          className="hover:text-ui-danger transition-colors"
           onClick={onRemove}
         >
           <X className="w-2.5 h-2.5" />

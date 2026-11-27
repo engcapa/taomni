@@ -1,0 +1,57 @@
+id: TC-UIC-008-rail-tooltip
+title: Rail descriptions follow the pointed control and dismiss without activating the command
+covers: [F5.5]
+fixtures: [reset_db]
+modes: [browser, native]
+tags: [ui-contract, keyboard]
+ui_standard: [UI-KEY-01, UI-TIP-01, UI-TIP-03]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-rail-tooltip
+- hover: {selector: '[data-testid="side-tab-explorer"]', macos_system_pointer: true}
+- wait_for: '[data-testid="side-tab-explorer"][aria-describedby~="taomni-control-tooltip"]'
+- eval_readonly: {expression: "document.getElementById('taomni-control-tooltip').textContent === 'File Explorer'", expect_truthy: true}
+- hover: {selector: '[data-testid="side-tab-tools"]', macos_system_pointer: true}
+- wait_for: '[data-testid="side-tab-tools"][aria-describedby~="taomni-control-tooltip"]'
+- assert_count: {selector: '[role="tooltip"]', equal: 1}
+- press: {selector: '[data-testid="side-tab-tools"]', key: Escape}
+- assert_not_visible: '[role="tooltip"]'
+- assert_count: {selector: '[data-testid="side-tab-tools"][aria-describedby~="taomni-control-tooltip"]', equal: 0}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- hover: {selector: '[data-testid="session-close"]', macos_system_pointer: true}
+- wait_for: '[data-testid="session-close"][aria-describedby~="taomni-control-tooltip"]'
+- press: Escape
+- assert_not_visible: '[role="tooltip"]'
+- assert_visible: '[data-testid="session-editor"]'
+- press: Escape
+- assert_not_visible: '[data-testid="session-editor"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-TIP-01, UI-TIP-03]
+    requirement: Exactly one description belongs to the current rail control and Escape releases its accessible description.
+    actions: [3, 6, 9]
+    checkpoints:
+    - {step: 5, expectation: The tooltip displays the translated Explorer control name.}
+    - {step: 7, expectation: The next control describes itself with the live tooltip.}
+    - {step: 8, expectation: Only one tooltip is mounted.}
+    - {step: 10, expectation: Escape closes the tooltip.}
+    - {step: 11, expectation: The control no longer references the dismissed tooltip.}
+    results: [5, 7, 8, 10, 11]
+  - id: modal-tooltip-escape
+    ui_standard: [UI-KEY-01]
+    requirement: The first Escape dismisses the visible hint inside the form. The second closes the form.
+    actions: [13, 14, 16, 19]
+    checkpoints:
+    - {step: 15, expectation: The Close button owns the displayed hint.}
+    - {step: 17, expectation: The first Escape removes the tooltip.}
+    - {step: 18, expectation: The session editor remains visible and usable.}
+    - {step: 20, expectation: A second Escape closes the session editor.}
+    results: [15, 17, 18, 20]
+  visual:
+  - {check: Tooltip ownership, method: automated, reason: Reads visible text and the accessible relationship on the pointed control.}
+  native:
+  - {check: Desktop WebView hover and dismissal, method: automated, reason: Sends native-runner hover and keyboard actions to the rail.}

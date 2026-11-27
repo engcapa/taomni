@@ -38,7 +38,7 @@ export function NotesWorkspaceSidebar() {
     <NotesWorkspaceSearch value={view.search} onSearch={view.setSearch} />
     <NoteTagFilters tags={view.tags} tagFilterId={view.tagFilterId} onSelectTag={view.setTagFilter}
       prefix="notes-workspace" className="flex max-h-24 shrink-0 flex-wrap gap-1 overflow-auto py-1" />
-    {view.error && <p role="alert" className="break-words text-xs text-red-400">{view.error}</p>}
+    {view.error && <p role="alert" className="break-words text-xs text-ui-danger">{view.error}</p>}
     {Object.keys(errors).filter((id) => errors[id]).map((id) => <NoteTaskStatus key={id} noteId={id} />)}
     {view.loading && !view.notes.length && <p className="p-2 text-xs">{t("notes.loading")}</p>}
     {!view.loading && !view.notes.length && <p className="p-2 text-xs text-[var(--taomni-text-muted)]">{t("notes.emptyFiltered")}</p>}

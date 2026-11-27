@@ -18,8 +18,8 @@ export function NotepadSettingsPanel() {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-[16px] font-semibold">{t("notepad.settings.title")}</h3>
-          <p className="text-[12px] text-[var(--taomni-text-muted)]">
+          <h3 className="text-ui-heading font-semibold">{t("notepad.settings.title")}</h3>
+          <p className="text-ui-body text-[var(--taomni-text-muted)]">
             {t("notepad.settings.subtitle")}
           </p>
         </div>
@@ -34,7 +34,7 @@ export function NotepadSettingsPanel() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[12px]">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-ui-body">
         <label className="flex flex-col gap-1">
           <span>{t("notepad.settings.defaultEol")}</span>
           <select
@@ -141,7 +141,7 @@ export function NotepadSettingsPanel() {
         </label>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[12px]">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-ui-body">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"

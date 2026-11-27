@@ -20,7 +20,7 @@ export function ToolButton({
   return (
     <button
       type="button"
-      className={`h-6 ${suffix ? "px-1.5" : "w-6"} inline-flex items-center justify-center gap-0.5 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40`}
+      className={`h-6 ${suffix ? "px-1.5" : "w-6"} inline-flex items-center justify-center gap-0.5 rounded text-ui-small hover:bg-[var(--taomni-hover)] disabled:opacity-40`}
       style={active ? { background: "var(--taomni-selected)", color: "var(--taomni-accent)" } : undefined}
       title={title}
       aria-label={title}

@@ -16,7 +16,7 @@ export function UpstreamPortInput({ port, disabled, title, onPortChange }: Props
       type="number"
       min={1}
       max={65535}
-      className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
+      className="w-full text-ui-body px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
       value={incomplete ?? port ?? ""}
       disabled={disabled}
       title={title}

@@ -1,3 +1,4 @@
+import { confirmAppDialog } from "../../lib/appDialogs";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { html } from "@codemirror/lang-html";
 import {
@@ -160,8 +161,8 @@ function HtmlPreviewContent({ document, onError, visible = true, workspaceId }: 
     else if (event.key === "-") { event.preventDefault(); changeZoom(-1); }
     else if (event.key === "0") { event.preventDefault(); setZoom(100); }
   };
-  const allowOnce = () => {
-    if (preferences.htmlNetwork === "ask" && !window.confirm(label("仅在此标签中允许页面访问外部网络？关闭标签后将恢复阻止。", "Allow this page to access external networks in this tab only? Blocking resumes when the tab closes."))) return;
+  const allowOnce = async () => {
+    if (preferences.htmlNetwork === "ask" && !await confirmAppDialog({ danger: true, message: label("仅在此标签中允许页面访问外部网络？关闭标签后将恢复阻止。", "Allow this page to access external networks in this tab only? Blocking resumes when the tab closes.") })) return;
     setConsoleEntries([]); setAllowNetwork(true);
   };
 

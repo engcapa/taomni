@@ -1,3 +1,4 @@
+import { SectionTabs, sectionTab } from "../../../crates/taomni-plugin-api/frontend/ui/SectionTabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ExternalLink, Inbox, Loader2, MailOpen, Mail as MailIcon, RefreshCw, Star, Trash2 } from "lucide-react";
 import type { MailTabInfo } from "../../../../src/types";
@@ -215,16 +216,15 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
 
   return (
     <div className="h-full min-h-0 flex flex-col bg-[var(--taomni-bg)] text-[var(--taomni-text)]" data-testid="mail-unified-tab">
-      <div className="h-10 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[12px]">
+      <div className="h-10 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-ui-body">
         <Inbox className="w-4 h-4 text-[var(--taomni-text-muted)]" />
         <span className="font-semibold">Unified mail</span>
-        <div className="ml-2 inline-flex rounded border border-[var(--taomni-divider)] overflow-hidden" role="tablist" aria-label="Unified folder">
+        <SectionTabs className="ml-2 inline-flex rounded border border-[var(--taomni-divider)] overflow-hidden" aria-label="Unified folder">
           {MAIL_UNIFIED_VIEWS.map((entry) => (
             <button
               key={entry.value}
               type="button"
-              role="tab"
-              aria-selected={view === entry.value}
+              {...sectionTab(view === entry.value)}
               data-testid={`mail-unified-view-${entry.value}`}
               className={`h-7 px-3 ${view === entry.value ? "bg-[var(--taomni-selected)] font-semibold" : "hover:bg-[var(--taomni-hover)]"}`}
               onClick={() => {
@@ -236,7 +236,7 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
               {entry.label}
             </button>
           ))}
-        </div>
+        </SectionTabs>
         <span className="text-[var(--taomni-text-muted)]" data-testid="mail-unified-count" data-count={entries.length} data-unread={unreadCount}>
           {entries.length} message{entries.length === 1 ? "" : "s"}{unreadCount ? `, ${unreadCount} unread` : ""} · {accounts.length} account{accounts.length === 1 ? "" : "s"}
         </span>
@@ -253,25 +253,25 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
         </button>
       </div>
       {(error || status || failed.length > 0) && (
-        <div className="shrink-0 px-3 py-1 border-b border-[var(--taomni-divider)] text-[11px]">
-          {error && <div className="text-red-500">{error}</div>}
+        <div className="shrink-0 px-3 py-1 border-b border-[var(--taomni-divider)] text-ui-small">
+          {error && <div className="text-ui-danger">{error}</div>}
           {!error && status && <div className="text-[var(--taomni-text-muted)]" data-testid="mail-unified-status">{status}</div>}
           {failed.map(([id, message]) => (
-            <div key={id} className="flex items-center gap-1 text-amber-600" data-testid="mail-unified-account-error">
+            <div key={id} className="flex items-center gap-1 text-ui-warning" data-testid="mail-unified-account-error">
               <AlertTriangle className="w-3 h-3" /> {accountLabel(byId.get(id) ?? { sessionId: id, emailAddress: id })}: {message}
             </div>
           ))}
         </div>
       )}
       {accounts.length === 0 ? (
-        <div className="p-6 text-[12px] text-[var(--taomni-text-muted)]" data-testid="mail-unified-empty">
+        <div className="p-6 text-ui-body text-[var(--taomni-text-muted)]" data-testid="mail-unified-empty">
           No mail accounts yet. Create a Mail session to see its mail here.
         </div>
       ) : (
         <div className="flex-1 min-h-0 flex">
           <div className="w-[42%] min-w-[280px] border-r border-[var(--taomni-divider)] overflow-auto" data-testid="mail-unified-list">
             {entries.length === 0 && !loading && (
-              <div className="p-4 text-[12px] text-[var(--taomni-text-muted)]">Nothing here. Use Get mail to check every account.</div>
+              <div className="p-4 text-ui-body text-[var(--taomni-text-muted)]">Nothing here. Use Get mail to check every account.</div>
             )}
             {entries.map((entry) => {
               const key = unifiedKey(entry);
@@ -281,7 +281,7 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
                 <button
                   key={key}
                   type="button"
-                  className={`w-full px-3 py-2 text-left border-b border-[var(--taomni-divider)] text-[12px] hover:bg-[var(--taomni-hover)] ${selectedKey === key ? "bg-[var(--taomni-selected)]" : ""}`}
+                  className={`w-full px-3 py-2 text-left border-b border-[var(--taomni-divider)] text-ui-body hover:bg-[var(--taomni-hover)] ${selectedKey === key ? "bg-[var(--taomni-selected)]" : ""}`}
                   style={{ contentVisibility: "auto", containIntrinsicSize: "auto 58px" }}
                   data-testid="mail-unified-row"
                   data-account-id={entry.accountId}
@@ -290,11 +290,11 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
                 >
                   <div className="flex items-center gap-2">
                     <span className={`min-w-0 flex-1 truncate ${unread ? "font-semibold" : ""}`}>{sender(entry.message)}</span>
-                    {isStarred(entry.message) && <Star className="w-3 h-3 text-amber-500 fill-amber-500" />}
-                    <span className="shrink-0 text-[11px] text-[var(--taomni-text-muted)]">{formatDate(entry.message.dateTs)}</span>
+                    {isStarred(entry.message) && <Star className="w-3 h-3 text-ui-warning fill-[var(--taomni-warning-icon)]" />}
+                    <span className="shrink-0 text-ui-small text-[var(--taomni-text-muted)]">{formatDate(entry.message.dateTs)}</span>
                   </div>
                   <div className={`truncate ${unread ? "font-semibold" : ""}`}>{entry.message.subject || "(no subject)"}</div>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--taomni-text-muted)]">
+                  <div className="mt-0.5 flex items-center gap-1.5 text-ui-small text-[var(--taomni-text-muted)]">
                     <span className="max-w-[45%] truncate rounded px-1 border border-[var(--taomni-divider)]" data-testid="mail-unified-account">
                       {info ? accountLabel(info) : entry.accountId}
                     </span>
@@ -307,15 +307,15 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
 
           <div className="flex-1 min-w-0 flex flex-col" data-testid="mail-unified-reader">
             {!selected || !selectedInfo ? (
-              <div className="p-6 text-[12px] text-[var(--taomni-text-muted)]">Select a message to read it.</div>
+              <div className="p-6 text-ui-body text-[var(--taomni-text-muted)]">Select a message to read it.</div>
             ) : (
               <>
                 <div className="shrink-0 px-4 py-3 border-b border-[var(--taomni-divider)]">
-                  <h2 className="text-[16px] font-semibold break-words">{selected.message.subject || "(no subject)"}</h2>
-                  <div className="mt-1 text-[12px] text-[var(--taomni-text-muted)]">
+                  <h2 className="text-ui-heading font-semibold break-words">{selected.message.subject || "(no subject)"}</h2>
+                  <div className="mt-1 text-ui-body text-[var(--taomni-text-muted)]">
                     {sender(selected.message)} · {accountLabel(selectedInfo)} / {selected.message.folder}
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-ui-small">
                     <button
                       type="button"
                       className="taomni-btn h-6 px-2 inline-flex items-center gap-1"
@@ -338,7 +338,7 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
                       <Star className="w-3 h-3" /> {isStarred(selected.message) ? "Unstar" : "Star"}
                     </button>
                     <select
-                      className="h-6 px-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[11px]"
+                      className="h-6 px-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-ui-small"
                       aria-label="Move to folder"
                       data-testid="mail-unified-move"
                       value=""
@@ -372,7 +372,7 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
                 </div>
                 <div className="flex-1 min-h-0 overflow-auto p-3">
                   {body?.error ? (
-                    <div className="text-[12px] text-red-500">{body.error}</div>
+                    <div className="text-ui-body text-ui-danger">{body.error}</div>
                   ) : (
                     <MailMessageBodyView
                       html={body?.key === selectedKey ? body.body?.html : null}

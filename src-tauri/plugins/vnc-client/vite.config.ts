@@ -7,8 +7,9 @@ const shared = {
   react: {
     object: "__taomniHost.React",
     names: ["createContext", "createElement", "forwardRef", "useCallback", "useContext", "useDebugValue", "useEffect", "useInsertionEffect",
-      "useMemo", "useRef", "useState", "useSyncExternalStore"],
+      "useId", "useLayoutEffect", "useMemo", "useRef", "useState", "useSyncExternalStore"],
   },
+  "react-dom": { object: "__taomniHost.ReactDOM", names: ["createPortal"] },
   "react/jsx-runtime": { object: "__taomniHost.jsxRuntime", names: ["Fragment", "jsx", "jsxs"] },
   zustand: { object: "__taomniHost.zustand", names: ["create", "createStore", "useStore"] },
   viewerHost: {

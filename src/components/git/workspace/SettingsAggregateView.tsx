@@ -62,7 +62,7 @@ export function WorkspaceSettingsAggregateView({
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
-        <span className="text-[11px] text-[var(--taomni-text-muted)]">
+        <span className="text-ui-small text-[var(--taomni-text-muted)]">
           {rows.length}/{roots.length} repositories
         </span>
       </div>
@@ -70,8 +70,8 @@ export function WorkspaceSettingsAggregateView({
         {rows.length===0? (
           <EmptyState title="No repositories match" />
         ):(
-          <table className="min-w-[1120px] w-full border-collapse text-[12px]">
-            <thead className="sticky top-0 z-10 bg-[var(--taomni-quick-bg)]">
+          <table className="min-w-[1120px] w-full border-collapse text-ui-body">
+            <thead className="sticky top-0 z-[var(--taomni-z-sticky)] bg-[var(--taomni-quick-bg)]">
               <tr className="border-b border-[var(--taomni-divider)] text-left">
                 <th className="w-52 px-3 py-2 font-medium">Repository</th>
                 {WORKSPACE_SETTING_FIELDS.map((field) => (
@@ -89,7 +89,7 @@ export function WorkspaceSettingsAggregateView({
                   <tr key={root.repoRoot} className="border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]">
                     <td className="px-3 py-2 align-top">
                       <div className="font-medium truncate" title={root.repoRoot}>{root.name}</div>
-                      <div className="text-[11px] text-[var(--taomni-text-muted)] truncate" title={root.repoRoot}>
+                      <div className="text-ui-small text-[var(--taomni-text-muted)] truncate" title={root.repoRoot}>
                         {root.repoRoot}
                       </div>
                     </td>
@@ -108,7 +108,7 @@ export function WorkspaceSettingsAggregateView({
                     <td className="px-2 py-2 align-top text-right">
                       <button
                         type="button"
-                        className="taomni-btn h-7 px-2 text-[12px]"
+                        className="taomni-btn h-7 px-2 text-ui-body"
                         onClick={() => onSelectRepo(root.repoRoot)}
                       >
                         Select

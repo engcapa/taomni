@@ -43,9 +43,9 @@ export function EditorAiLanguagePanel() {
     <div className="space-y-2" data-testid="editor-ai-language-panel">
       <div className="flex items-center gap-2">
         <Languages className="w-4 h-4 text-[var(--taomni-accent)]" />
-        <div className="text-[13px] font-semibold flex-1">{t("aiSettings.answerLanguageTitle")}</div>
+        <div className="text-ui-body font-semibold flex-1">{t("aiSettings.answerLanguageTitle")}</div>
       </div>
-      <div className="text-[11px] text-[var(--taomni-text-muted)] -mt-1">
+      <div className="text-ui-small text-[var(--taomni-text-muted)] -mt-1">
         {t("aiSettings.answerLanguageDesc")}
       </div>
       <div className="space-y-1 pt-1">
@@ -60,8 +60,8 @@ export function EditorAiLanguagePanel() {
               className="mt-0.5 accent-[var(--taomni-accent)]"
             />
             <div>
-              <div className="text-[12px]">{LABELS[value]}</div>
-              <div className="text-[10px] text-[var(--taomni-text-muted)]">{DESCRIPTIONS[value]}</div>
+              <div className="text-ui-body">{LABELS[value]}</div>
+              <div className="text-ui-caption text-[var(--taomni-text-muted)]">{DESCRIPTIONS[value]}</div>
             </div>
           </label>
         ))}

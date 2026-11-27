@@ -93,11 +93,11 @@ export function ArchiveViewer({ viewer, active = true, workspaceId, host }: {
       {filter && <button type="button" className="taomni-btn" data-testid="archive-filter-clear" onClick={clearFilter}>
         {label("清除筛选", "Clear filter")}
       </button>}
-      <button className="taomni-btn" disabled={working} onClick={() => setRevision((n) => n + 1)}>{label("重新加载", "Reload")}</button>
+      <button type="button" className="taomni-btn" disabled={working} onClick={() => setRevision((n) => n + 1)}>{label("重新加载", "Reload")}</button>
       {!viewer.readOnlyReason && viewer.source !== "remote-temp" && viewer.source !== "mail-attachment" &&
-        <button className="taomni-btn" disabled={working || !entries?.length} data-testid="archive-extract-here"
+        <button type="button" className="taomni-btn" disabled={working || !entries?.length} data-testid="archive-extract-here"
           onClick={() => extract(true)}>{label("解压到同目录", "Extract beside archive")}</button>}
-      <button className="taomni-btn" disabled={working || !entries?.length} onClick={() => extract(false)}>{label("解压到…", "Extract to…")}</button>
+      <button type="button" className="taomni-btn" disabled={working || !entries?.length} onClick={() => extract(false)}>{label("解压到…", "Extract to…")}</button>
     </header>
     {viewer.readOnlyReason && <p role="status">{viewer.readOnlyReason}</p>}
     {error && <p role="alert" className="fv-banner warn" data-testid="archive-error">{error}</p>}
@@ -120,9 +120,9 @@ export function ArchiveViewer({ viewer, active = true, workspaceId, host }: {
       {!matching.length && <p role="status">{filter ? label("没有匹配条目", "No matching entries") : label("空压缩包", "Empty archive")}</p>}
     </div>}
     {matching.length > PAGE_SIZE && <footer>
-      <button className="taomni-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>{label("上一页", "Previous page")}</button>
+      <button type="button" className="taomni-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>{label("上一页", "Previous page")}</button>
       <span>{page + 1} / {Math.ceil(matching.length / PAGE_SIZE)}</span>
-      <button className="taomni-btn" disabled={(page + 1) * PAGE_SIZE >= matching.length} onClick={() => setPage(page + 1)}>{label("下一页", "Next page")}</button>
+      <button type="button" className="taomni-btn" disabled={(page + 1) * PAGE_SIZE >= matching.length} onClick={() => setPage(page + 1)}>{label("下一页", "Next page")}</button>
     </footer>}
   </section>;
 }

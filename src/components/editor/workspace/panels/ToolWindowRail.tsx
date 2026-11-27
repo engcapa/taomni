@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
-import { createPortal } from "react-dom";
+import { AnchoredMenu } from "../../../ui/AnchoredMenu";
 import { MoreHorizontal } from "../icons";
 import { ContextMenu, type MenuItem } from "../../../ContextMenu";
 import { useLatestHandlers } from "../useLatestHandlers";
@@ -226,7 +226,7 @@ export function ToolWindowRailResizeHandle({
       aria-valuemin={STRIPE_MIN_WIDTH}
       aria-valuemax={STRIPE_MAX_WIDTH}
       data-testid={testId}
-      className={`absolute inset-y-0 z-10 w-1.5 touch-none cursor-col-resize hover:bg-[var(--taomni-accent)]/60 focus:bg-[var(--taomni-accent)]/60 ${side === "left" ? "right-0" : "left-0"}`}
+      className={`absolute inset-y-0 z-[var(--taomni-z-sticky)] w-1.5 touch-none cursor-col-resize hover:bg-[var(--taomni-accent)]/60 focus:bg-[var(--taomni-accent)]/60 ${side === "left" ? "right-0" : "left-0"}`}
       onPointerDown={onPointerDown}
       onKeyDown={onKeyDown}
     />
@@ -302,7 +302,7 @@ const ToolWindowRailButtonView = memo(function ToolWindowRailButtonView({
       aria-label={item.label}
       data-active={item.active || undefined}
       disabled={item.disabled}
-      title={title}
+      data-taomni-tooltip={title}
       className={toolWindowRailButtonClass}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
@@ -310,10 +310,10 @@ const ToolWindowRailButtonView = memo(function ToolWindowRailButtonView({
     >
       <span aria-hidden="true" className="flex h-[20px] w-[20px] items-center justify-center [&>svg]:h-[16px] [&>svg]:w-[16px]">{item.icon}</span>
       {showNames && (
-        <span className="w-full truncate px-0.5 text-center text-[10px] leading-[12px]">{item.label}</span>
+        <span className="w-full truncate px-0.5 text-center text-ui-caption leading-[12px]">{item.label}</span>
       )}
       {showBadge && (
-        <span className="absolute right-0.5 top-0.5 rounded bg-[var(--taomni-code-active-line-bg)] px-0.5 text-[8px] leading-3 tabular-nums text-[var(--taomni-code-text)]">
+        <span className="absolute right-0.5 top-0.5 rounded bg-[var(--taomni-code-active-line-bg)] px-0.5 text-ui-caption leading-3 tabular-nums text-[var(--taomni-code-text)]">
           {item.badge}
         </span>
       )}
@@ -337,29 +337,6 @@ export function MoreToolWindowsButton({
 }) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target) || buttonRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      setOpen(false);
-      buttonRef.current?.focus();
-    };
-    document.addEventListener("mousedown", onPointer);
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [open]);
-  const rect = open ? buttonRef.current?.getBoundingClientRect() : null;
   return (
     <div className="relative">
       <button
@@ -371,38 +348,19 @@ export function MoreToolWindowsButton({
         aria-expanded={open}
         title="More tool windows"
         className={toolWindowRailButtonClass}
-        onClick={() => setOpen((value) => !value)}
+        onClick={(event) => {
+          event.currentTarget.focus({ preventScroll: true });
+          setOpen((value) => !value);
+        }}
       >
         <MoreHorizontal className="h-[16px] w-[16px]" />
       </button>
-      {open && rect && createPortal(
-        <div
-          ref={menuRef}
-          role="menu"
-          aria-label="More tool windows"
-          data-testid="code-workspace-bottom-tab-overflow-menu"
-          style={{ position: "fixed", left: rect.right + 4, bottom: Math.max(8, window.innerHeight - rect.bottom) }}
-          className="z-50 min-w-48 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 shadow-lg"
-        >
-          {tools.map((tool) => (
-            <button
-              key={tool.id}
-              type="button"
-              role="menuitem"
-              data-testid={`code-workspace-bottom-tab-overflow-${tool.id}`}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
-              onClick={() => {
-                setOpen(false);
-                onPick(tool.id);
-              }}
-            >
-              <span className="shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5">{tool.icon}</span>
-              <span className="flex-1 truncate text-left">{tool.label}</span>
-            </button>
-          ))}
-        </div>,
-        document.body,
-      )}
+      {open && <AnchoredMenu anchor={buttonRef} side="right"
+        testId="code-workspace-bottom-tab-overflow-menu" ariaLabel="More tool windows"
+        onClose={() => setOpen(false)} items={tools.map((tool) => ({
+          label: tool.label, testId: `code-workspace-bottom-tab-overflow-${tool.id}`,
+          icon: tool.icon, onClick: () => onPick(tool.id),
+        }))} />}
     </div>
   );
 }

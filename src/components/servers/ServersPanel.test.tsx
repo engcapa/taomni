@@ -196,7 +196,8 @@ describe("ServersTabBlockedDialog", () => {
     act(() => {
       useServersStore.getState().setTabBlockedMessage("Already open in another Taomni instance.");
     });
-    const dialog = screen.getByTestId("servers-blocked-dialog");
+    const dialog = screen.getByRole("alertdialog");
+    expect(screen.getByTestId("servers-blocked-ok")).toHaveFocus();
     expect(screen.getByTestId("servers-blocked-message")).toHaveTextContent(
       "Already open in another Taomni instance.",
     );

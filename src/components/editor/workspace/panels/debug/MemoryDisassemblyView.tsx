@@ -36,7 +36,7 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
   const canWrite = active && debug.capabilities.supportsWriteMemoryRequest === true;
   const canDisassemble = active && debug.capabilities.supportsDisassembleRequest === true;
   const anySupported = canRead || canWrite || canDisassemble;
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none disabled:opacity-40";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none disabled:opacity-40";
 
   useEffect(() => {
     setReadResult(null);
@@ -106,14 +106,14 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
   return (
     <div data-testid="debug-memory-disassembly" className="border-t border-[var(--taomni-code-border)]/60">
       {!anySupported && active && (
-        <div data-testid="debug-memory-unsupported" className="px-3 py-1 text-[10px] text-amber-500">
+        <div data-testid="debug-memory-unsupported" className="px-3 py-1 text-ui-caption text-ui-warning">
           The active debug adapter does not expose memory or disassembly requests.
         </div>
       )}
       {anySupported && (
         <div className="space-y-1 px-3 py-1">
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center gap-1">
-            <label htmlFor="debug-memory-reference" className="text-[10px] text-[var(--taomni-text-muted)]">Reference</label>
+            <label htmlFor="debug-memory-reference" className="text-ui-caption text-[var(--taomni-text-muted)]">Reference</label>
             <input
               id="debug-memory-reference"
               data-testid="debug-memory-reference"
@@ -126,7 +126,7 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
             />
           </div>
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center gap-1">
-            <span className="text-[10px] text-[var(--taomni-text-muted)]">Read</span>
+            <span className="text-ui-caption text-[var(--taomni-text-muted)]">Read</span>
             <div className="flex min-w-0 flex-wrap items-center gap-1">
               <input
                 data-testid="debug-memory-offset"
@@ -151,7 +151,7 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
                 <button
                   type="button"
                   data-testid="debug-memory-read"
-                  className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1 text-[10px] hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30"
+                  className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1 text-ui-caption hover:bg-[var(--taomni-hover)] disabled:opacity-30"
                   aria-label="Read memory"
                   title="Read memory"
                   disabled={busy !== null}
@@ -165,15 +165,15 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
           </div>
           {readResult && (
             <div data-testid="debug-memory-result" className="rounded border border-[var(--taomni-code-border)]/60 px-2 py-1">
-              <div className="text-[10px] text-[var(--taomni-text-muted)]">
+              <div className="text-ui-caption text-[var(--taomni-text-muted)]">
                 {readResult.address ?? memoryReference}{readResult.unreadableBytes > 0 ? ` · ${readResult.unreadableBytes} unreadable` : ""}
               </div>
-              <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-all font-mono text-[10px]">{readResult.hex || "(empty)"}</pre>
+              <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-all font-mono text-ui-caption">{readResult.hex || "(empty)"}</pre>
             </div>
           )}
           {canWrite && (
             <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-1">
-              <label htmlFor="debug-memory-write-data" className="pt-1 text-[10px] text-[var(--taomni-text-muted)]">Write</label>
+              <label htmlFor="debug-memory-write-data" className="pt-1 text-ui-caption text-[var(--taomni-text-muted)]">Write</label>
               <div className="flex min-w-0 flex-wrap items-center gap-1">
                 <input
                   id="debug-memory-write-data"
@@ -187,7 +187,7 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
                 <button
                   type="button"
                   data-testid="debug-memory-write"
-                  className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1 text-[10px] hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30"
+                  className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1 text-ui-caption hover:bg-[var(--taomni-hover)] disabled:opacity-30"
                   aria-label="Write memory"
                   title="Write memory"
                   disabled={busy !== null || !writeData.trim()}
@@ -196,13 +196,13 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
                   <ArrowUpFromLine className="h-3 w-3" />
                   Write
                 </button>
-                {writeStatus && <span data-testid="debug-memory-write-status" className="text-[10px] text-[var(--taomni-text-muted)]">{writeStatus}</span>}
+                {writeStatus && <span data-testid="debug-memory-write-status" className="text-ui-caption text-[var(--taomni-text-muted)]">{writeStatus}</span>}
               </div>
             </div>
           )}
           {canDisassemble && (
             <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-1">
-              <span className="pt-1 text-[10px] text-[var(--taomni-text-muted)]">Disassemble</span>
+              <span className="pt-1 text-ui-caption text-[var(--taomni-text-muted)]">Disassemble</span>
               <div className="flex min-w-0 flex-wrap items-center gap-1">
                 <input
                   data-testid="debug-disassemble-offset"
@@ -230,7 +230,7 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
                   value={instructionCount}
                   onChange={(event) => setInstructionCount(event.target.value)}
                 />
-                <label className="flex items-center gap-1 text-[10px] text-[var(--taomni-text-muted)]">
+                <label className="flex items-center gap-1 text-ui-caption text-[var(--taomni-text-muted)]">
                   <input
                     type="checkbox"
                     data-testid="debug-disassemble-resolve-symbols"
@@ -242,7 +242,7 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
                 <button
                   type="button"
                   data-testid="debug-disassemble"
-                  className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1 text-[10px] hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30"
+                  className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1 text-ui-caption hover:bg-[var(--taomni-hover)] disabled:opacity-30"
                   aria-label="Disassemble memory"
                   title="Disassemble memory"
                   disabled={busy !== null}
@@ -257,10 +257,10 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
         </div>
       )}
       {notice && (
-        <div data-testid="debug-memory-notice" role="status" className="px-3 pb-1 text-[10px] text-rose-500">{notice}</div>
+        <div data-testid="debug-memory-notice" role="status" className="px-3 pb-1 text-ui-caption text-ui-danger">{notice}</div>
       )}
       {instructions.length > 0 && (
-        <div data-testid="debug-disassembly-output" className="max-h-48 overflow-auto border-t border-[var(--taomni-code-border)]/40 px-3 py-1 font-mono text-[10px]">
+        <div data-testid="debug-disassembly-output" className="max-h-48 overflow-auto border-t border-[var(--taomni-code-border)]/40 px-3 py-1 font-mono text-ui-caption">
           {instructions.map((instruction, index) => (
             <div key={`${instruction.address}:${index}`} data-testid="debug-disassembly-row" className="flex min-w-0 gap-2 leading-4">
               <span className="w-24 shrink-0 text-[var(--taomni-text-muted)]">{instruction.address}</span>

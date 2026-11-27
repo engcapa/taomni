@@ -60,9 +60,9 @@ function formatSize(bytes: number | undefined, unknownLabel: string): string {
 
 function statusClass(record: ModuleRecord | undefined): string {
   switch (record?.lifecycle) {
-    case "enabled": return "border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
-    case "disabled": return "border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-400";
-    case "rollback": return "border-blue-500/35 bg-blue-500/10 text-blue-700 dark:text-blue-400";
+    case"enabled": return"border-ui-success-border bg-ui-success-surface text-ui-success";
+    case"disabled": return"border-ui-warning-border bg-ui-warning-surface text-ui-warning";
+    case"rollback": return"border-ui-info-border bg-ui-info-surface text-ui-info";
     case "uninstalled": return "border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[var(--taomni-text-muted)]";
     default: return "border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[var(--taomni-text-muted)]";
   }
@@ -171,10 +171,10 @@ export function ModuleStorePanel({
       <div className="mb-3 flex flex-wrap items-start gap-2">
         <Package className="mt-0.5 h-4 w-4 shrink-0 text-[var(--taomni-accent)]" />
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-semibold">{t("settings.moduleStoreTitle")}</div>
-          <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("settings.moduleStoreSubtitle")}</div>
+          <div className="text-ui-title font-semibold">{t("settings.moduleStoreTitle")}</div>
+          <div className="text-ui-body text-[var(--taomni-text-muted)]">{t("settings.moduleStoreSubtitle")}</div>
         </div>
-        <span data-testid="module-store-core-api" className="text-[11px] text-[var(--taomni-text-muted)]">
+        <span data-testid="module-store-core-api" className="text-ui-small text-[var(--taomni-text-muted)]">
           {t("settings.moduleStoreCoreApi", { version: coreApiVersion })}
         </span>
       </div>
@@ -187,39 +187,49 @@ export function ModuleStorePanel({
         <div
           data-testid="module-upgrade-status"
           data-state={migrationSnapshot.candidates.length > 0 ? "candidates" : "empty"}
-          className="mb-3 rounded border border-blue-500/30 bg-blue-500/10 p-3"
+          className="mb-3 rounded border border-ui-info-border bg-ui-info-surface p-3"
         >
-          <div className="text-[13px] font-semibold">{t("settings.moduleUpgradeTitle")}</div>
-          <div className="mt-1 text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-body font-semibold">{t("settings.moduleUpgradeTitle")}</div>
+          <div className="mt-1 text-ui-body text-[var(--taomni-text-muted)]">
             {t("settings.moduleUpgradeSubtitle", { version: migrationSnapshot.from_version })}
           </div>
           {migrationSnapshot.candidates.length > 0 ? (
-            <ul data-testid="module-upgrade-candidates" className="mt-2 list-disc pl-5 text-[12px]">
+            <ul data-testid="module-upgrade-candidates" className="mt-2 list-disc pl-5 text-ui-body">
               {migrationModules.map((slug) => (
                 <li key={slug}>{slug}</li>
               ))}
             </ul>
           ) : (
-            <div data-testid="module-upgrade-empty" className="mt-2 text-[12px] text-[var(--taomni-text-muted)]">
+            <div data-testid="module-upgrade-empty" className="mt-2 text-ui-body text-[var(--taomni-text-muted)]">
               {t("settings.moduleUpgradeNone")}
             </div>
           )}
           {migrationSnapshot.retained_paths.length > 0 && (
-            <div data-testid="module-upgrade-retained" className="mt-2 text-[11px] text-[var(--taomni-text-muted)]">
+            <div data-testid="module-upgrade-retained" className="mt-2 text-ui-small text-[var(--taomni-text-muted)]">
               {t("settings.moduleUpgradeRetained", { count: migrationSnapshot.retained_paths.length })}
             </div>
           )}
+          {migrationModules.includes("mfa") && (
+            <p data-testid="module-upgrade-mfa-hint" className="mt-2 text-ui-small text-[var(--taomni-text-muted)]">
+              {t("settings.moduleUpgradeMfaHint")}
+            </p>
+          )}
+          {migrationModules.includes("mail") && (
+            <p data-testid="module-upgrade-mail-hint" className="mt-2 text-ui-small text-[var(--taomni-text-muted)]">
+              {t("settings.moduleUpgradeMailHint")}
+            </p>
+          )}
           {migrationResult?.pending.length ? (
-            <div data-testid="module-upgrade-pending" className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[12px] text-amber-800 dark:text-amber-200">
+            <div data-testid="module-upgrade-pending" className="mt-2 rounded border border-ui-warning-border bg-ui-warning-surface p-2 text-ui-body text-ui-warning">
               {migrationResult.pending_reason || t("settings.moduleUpgradePending")}
             </div>
           ) : null}
-          {migrationError && <div role="alert" data-testid="module-upgrade-error" className="mt-2 text-[12px] text-red-700 dark:text-red-300">{migrationError}</div>}
+          {migrationError && <div role="alert" data-testid="module-upgrade-error" className="mt-2 text-ui-body text-ui-danger">{migrationError}</div>}
           {migrationSnapshot.candidates.length > 0 && (
             <button
               type="button"
               data-testid="module-upgrade-migrate"
-              className="taomni-btn mt-3 h-7 px-2.5 text-[11px]"
+              className="taomni-btn mt-3 h-7 px-2.5 text-ui-small"
               disabled={migrationLoading || migrationBusy || !onMigrationExecute}
               onClick={() => {
                 if (!onMigrationExecute) return;
@@ -235,17 +245,17 @@ export function ModuleStorePanel({
         </div>
       )}
       {migrationError && !migrationSnapshot && (
-        <div data-testid="module-upgrade-status" data-state="error" className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-3">
-          <div className="text-[13px] font-semibold">{t("settings.moduleUpgradeTitle")}</div>
-          <div role="alert" data-testid="module-upgrade-error" className="mt-1 text-[12px] text-red-700 dark:text-red-300">{migrationError}</div>
+        <div data-testid="module-upgrade-status" data-state="error" className="mb-3 rounded border border-ui-danger-border bg-ui-danger-surface p-3">
+          <div className="text-ui-body font-semibold">{t("settings.moduleUpgradeTitle")}</div>
+          <div role="alert" data-testid="module-upgrade-error" className="mt-1 text-ui-body text-ui-danger">{migrationError}</div>
         </div>
       )}
-      {catalogError && <div role="alert" data-testid="module-store-catalog-error" className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-2 text-[12px] text-red-700 dark:text-red-300">{catalogError}</div>}
-      {error && <div role="alert" data-testid="module-store-error" className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-2 text-[12px] text-red-700 dark:text-red-300">{error}</div>}
+      {catalogError && <div role="alert" data-testid="module-store-catalog-error" className="mb-3 rounded border border-ui-danger-border bg-ui-danger-surface p-2 text-ui-body text-ui-danger">{catalogError}</div>}
+      {error && <div role="alert" data-testid="module-store-error" className="mb-3 rounded border border-ui-danger-border bg-ui-danger-surface p-2 text-ui-body text-ui-danger">{error}</div>}
       {catalogLoading ? (
-        <div data-testid="module-store-loading" className="rounded border border-dashed border-[var(--taomni-divider)] p-4 text-[12px] text-[var(--taomni-text-muted)]">{t("settings.moduleStoreLoading")}</div>
+        <div data-testid="module-store-loading" className="rounded border border-dashed border-[var(--taomni-divider)] p-4 text-ui-body text-[var(--taomni-text-muted)]">{t("settings.moduleStoreLoading")}</div>
       ) : entries.length === 0 ? (
-        <div data-testid="module-store-empty" className="rounded border border-dashed border-[var(--taomni-divider)] p-4 text-[12px] text-[var(--taomni-text-muted)]">{t("settings.moduleStoreEmpty")}</div>
+        <div data-testid="module-store-empty" className="rounded border border-dashed border-[var(--taomni-divider)] p-4 text-ui-body text-[var(--taomni-text-muted)]">{t("settings.moduleStoreEmpty")}</div>
       ) : (
         <div data-testid="module-store-list" className="space-y-2">
           {entries.map((entry) => {
@@ -256,39 +266,39 @@ export function ModuleStorePanel({
               <article key={entry.slug} data-testid={`module-card-${entry.slug}`} className="rounded border border-[var(--taomni-divider)] p-3">
                 <div className="flex flex-wrap items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-[13px] font-semibold">
+                    <div className="flex items-center gap-2 text-ui-body font-semibold">
                       <span>{entry.name}</span>
-                      {compatible && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-label={t("settings.moduleStoreCompatible")} />}
+                      {compatible && <CheckCircle2 className="h-3.5 w-3.5 text-ui-success" aria-label={t("settings.moduleStoreCompatible")} />}
                     </div>
-                    <p className="mt-1 text-[12px] text-[var(--taomni-text-muted)]">{entry.description}</p>
+                    <p className="mt-1 text-ui-body text-[var(--taomni-text-muted)]">{entry.description}</p>
                   </div>
-                  <span data-testid={`module-status-${entry.slug}`} className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] ${statusClass(record)}`}>
+                  <span data-testid={`module-status-${entry.slug}`} className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-ui-small ${statusClass(record)}`}>
                     {statusIcon(record)} {lifecycleLabel(record, t)}
                   </span>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--taomni-text-muted)]">
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-ui-small text-[var(--taomni-text-muted)]">
                   <span data-testid={`module-version-${entry.slug}`}>{t("settings.moduleStoreVersion", { version: entry.version })}</span>
                   <span>{formatSize(entry.sizeBytes, t("settings.moduleStoreSizeUnknown"))}</span>
-                  <span className={compatible ? "" : "text-amber-700 dark:text-amber-400"}>{compatible ? t("settings.moduleStoreCompatible") : t("settings.moduleStoreIncompatible")}</span>
+                  <span className={compatible ? "" : "text-ui-warning"}>{compatible ? t("settings.moduleStoreCompatible") : t("settings.moduleStoreIncompatible")}</span>
                   {record?.dataRetained && record.lifecycle === "uninstalled" && <span data-testid={`module-data-retained-${entry.slug}`}>{t("settings.moduleStoreDataRetained")}</span>}
                 </div>
-                {entry.permissions && entry.permissions.length > 0 && <div data-testid={`module-permissions-${entry.slug}`} className="mt-2 text-[11px] text-[var(--taomni-text-muted)]">{t("settings.moduleStorePermissions", { permissions: entry.permissions.join(", ") })}</div>}
+                {entry.permissions && entry.permissions.length > 0 && <div data-testid={`module-permissions-${entry.slug}`} className="mt-2 text-ui-small text-[var(--taomni-text-muted)]">{t("settings.moduleStorePermissions", { permissions: entry.permissions.join(", ") })}</div>}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <ModuleTabActions slug={entry.slug} disabled={isBusy} />
                   {!record || record.lifecycle === "uninstalled" ? (
-                    <button type="button" data-testid={`module-action-install-${entry.slug}`} className="taomni-btn inline-flex h-7 items-center gap-1 px-2.5 text-[11px]" disabled={!compatible || isBusy} onClick={() => void install(entry)}>
+                    <button type="button" data-testid={`module-action-install-${entry.slug}`} className="taomni-btn inline-flex h-7 items-center gap-1 px-2.5 text-ui-small" disabled={!compatible || isBusy} onClick={() => void install(entry)}>
                       {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} {t("settings.moduleStoreInstall")}
                     </button>
                   ) : record.lifecycle === "enabled" ? (
-                    <button type="button" data-testid={`module-action-disable-${entry.slug}`} className="taomni-btn h-7 px-2.5 text-[11px]" disabled={isBusy} onClick={() => void disable(entry)}>{t("settings.moduleStoreDisable")}</button>
+                    <button type="button" data-testid={`module-action-disable-${entry.slug}`} className="taomni-btn h-7 px-2.5 text-ui-small" disabled={isBusy} onClick={() => void disable(entry)}>{t("settings.moduleStoreDisable")}</button>
                   ) : record.lifecycle !== "rollback" && (
-                    <button type="button" data-testid={`module-action-enable-${entry.slug}`} className="taomni-btn h-7 px-2.5 text-[11px]" disabled={!compatible || isBusy} onClick={() => void enable(entry)}>{t("settings.moduleStoreEnable")}</button>
+                    <button type="button" data-testid={`module-action-enable-${entry.slug}`} className="taomni-btn h-7 px-2.5 text-ui-small" disabled={!compatible || isBusy} onClick={() => void enable(entry)}>{t("settings.moduleStoreEnable")}</button>
                   )}
                   {record && record.lifecycle !== "uninstalled" && record.lifecycle !== "rollback" && <>
-                    <button type="button" data-testid={`module-action-uninstall-${entry.slug}`} className="taomni-btn inline-flex h-7 items-center gap-1 px-2.5 text-[11px]" disabled={isBusy} onClick={() => void uninstall(entry)}><Trash2 className="h-3.5 w-3.5" /> {t("settings.moduleStoreUninstall")}</button>
-                    <label className="inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]"><input type="checkbox" data-testid={`module-delete-data-${entry.slug}`} checked={deleteData[entry.slug] === true} onChange={(event) => setDeleteData((current) => ({ ...current, [entry.slug]: event.target.checked }))} /> {t("settings.moduleStoreDeleteData")}</label>
+                    <button type="button" data-testid={`module-action-uninstall-${entry.slug}`} className="taomni-btn inline-flex h-7 items-center gap-1 px-2.5 text-ui-small" disabled={isBusy} onClick={() => void uninstall(entry)}><Trash2 className="h-3.5 w-3.5" /> {t("settings.moduleStoreUninstall")}</button>
+                    <label className="inline-flex items-center gap-1 text-ui-small text-[var(--taomni-text-muted)]"><input type="checkbox" data-testid={`module-delete-data-${entry.slug}`} checked={deleteData[entry.slug] === true} onChange={(event) => setDeleteData((current) => ({ ...current, [entry.slug]: event.target.checked }))} /> {t("settings.moduleStoreDeleteData")}</label>
                   </>}
-                  {record?.previousVersion && record.lifecycle !== "uninstalled" && <button type="button" data-testid={`module-action-rollback-${entry.slug}`} className="taomni-btn inline-flex h-7 items-center gap-1 px-2.5 text-[11px]" disabled={isBusy || !compatible} onClick={() => rollback(entry, record)}><RotateCcw className="h-3.5 w-3.5" /> {t("settings.moduleStoreRollback", { version: record.previousVersion })}</button>}
+                  {record?.previousVersion && record.lifecycle !== "uninstalled" && <button type="button" data-testid={`module-action-rollback-${entry.slug}`} className="taomni-btn inline-flex h-7 items-center gap-1 px-2.5 text-ui-small" disabled={isBusy || !compatible} onClick={() => rollback(entry, record)}><RotateCcw className="h-3.5 w-3.5" /> {t("settings.moduleStoreRollback", { version: record.previousVersion })}</button>}
                 </div>
               </article>
             );

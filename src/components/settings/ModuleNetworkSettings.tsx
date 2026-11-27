@@ -8,10 +8,10 @@ export function ModuleNetworkSettings() {
   const { config, load, save, retry, loading, saving, error } = useModuleNetworkStore();
   useEffect(() => { void load(); }, [load]);
   return <section data-testid="module-network-settings" className="mb-5 rounded-md border border-[var(--taomni-divider)] p-3">
-    <h3 className="text-[13px] font-semibold">{t("plugins.networkTitle")}</h3>
-    <p className="my-2 text-[12px] text-[var(--taomni-text-muted)]">{t("plugins.networkHint")}</p>
+    <h3 className="text-ui-body font-semibold">{t("plugins.networkTitle")}</h3>
+    <p className="my-2 text-ui-body text-[var(--taomni-text-muted)]">{t("plugins.networkHint")}</p>
     {config ? <>
-      <label className="flex items-center gap-3 text-[12px]">
+      <label className="flex items-center gap-3 text-ui-body">
         {t("plugins.networkRoute")}
         <select data-testid="module-network-mode" className="taomni-input h-8" value={config.mode}
           onChange={(event) => { void save({ ...config, mode: event.target.value as typeof config.mode }).catch(() => undefined); }}>
@@ -25,7 +25,7 @@ export function ModuleNetworkSettings() {
       </div>}
     </> : loading ? <p>{t("plugins.networkLoading")}</p> : null}
     <div data-testid="module-network-save-status" data-state={error ? "failed" : saving ? "saving" : loading ? "loading" : "saved"}
-      className="mt-2 text-[12px] text-[var(--taomni-text-muted)]">
+      className="mt-2 text-ui-body text-[var(--taomni-text-muted)]">
       {error ? <><span role="alert">{error}</span> <button type="button" data-testid="module-network-retry" className="taomni-btn"
         onClick={() => { void retry().catch(() => undefined); }}>{t("plugins.networkRetry")}</button></>
         : saving ? t("plugins.networkSaving") : loading ? t("plugins.networkLoading") : t("plugins.networkSaved")}

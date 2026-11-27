@@ -71,14 +71,20 @@ function StartupVaultCheckOverlay({ onCancel }: { onCancel: () => void }) {
       data-testid="startup-vault-check"
       className="fixed inset-0 flex items-center justify-center"
       style={{
-        background: "rgba(0,0,0,0.4)",
-        color: "white",
-        zIndex: 10001,
+        background: "var(--taomni-overlay)",
+        zIndex: "var(--taomni-z-blocking-gate)",
       }}
     >
-      <div className="flex flex-col items-center gap-3 text-[12px]">
+      <div
+        className="flex flex-col items-center gap-3 rounded border px-5 py-4 text-ui-body shadow-lg"
+        style={{
+          background: "var(--taomni-card-bg)",
+          color: "var(--taomni-text)",
+          borderColor: "var(--taomni-card-border)",
+        }}
+      >
         <span>{t("common.loading")}</span>
-        <button type="button" data-testid="startup-vault-check-cancel" className="rounded border px-3 py-1" onClick={onCancel}>
+        <button type="button" data-testid="startup-vault-check-cancel" className="taomni-btn" onClick={onCancel}>
           {t("common.cancel")}
         </button>
       </div>

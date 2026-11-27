@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type MouseEvent } from "react";
+import { useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { ChevronDown, ChevronRight, Folder } from "lucide-react";
 import { gitChangeLabel, type GitChange } from "../../lib/git";
 import { gitChangeStatusColor } from "./shared/changeStatus";
@@ -24,6 +24,12 @@ export interface ChangesTreeProps {
   activePath: string | null;
   onSelect: (path: string, mods: { ctrl: boolean; shift: boolean }) => void;
   onContextMenu: (path: string, event: MouseEvent) => void;
+}
+
+function isRowActivation(event: KeyboardEvent<HTMLDivElement>) {
+  return event.target === event.currentTarget && !event.nativeEvent.isComposing
+    && event.nativeEvent.keyCode !== 229 && !event.altKey && !event.repeat
+    && (event.key === "Enter" || event.key === " ");
 }
 
 type TriState = "all" | "none" | "some";
@@ -64,7 +70,7 @@ function StatusPill({ change }: { change: GitChange }) {
     <span
       data-testid="git-change-status"
       data-change-status={change.conflict ? "conflict" : change.status}
-      className={`shrink-0 w-[68px] text-center rounded px-1 py-0.5 text-[10px] uppercase ${color}`}
+      className={`shrink-0 w-[68px] text-center rounded px-1 py-0.5 text-ui-caption uppercase ${color}`}
     >
       {gitChangeLabel(change)}
     </span>
@@ -105,30 +111,42 @@ export function ChangesTree({
   const renderFile = (change: GitChange, depth: number, sectionKey = "all") => {
     const isActive = activePath === change.path;
     const isSelected = selected.has(change.path);
+    const select = (event: MouseEvent | KeyboardEvent) =>
+      onSelect(change.path, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey });
     return (
       <div
         key={`${sectionKey}-${change.status}-${change.path}`}
         role="button"
+        data-testid="git-change-row"
+        data-path={change.path}
+        aria-pressed={isSelected}
+        onKeyDown={(event) => {
+          if (!isRowActivation(event)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          select(event);
+        }}
         tabIndex={0}
         style={{ paddingLeft: 8 + depth * 14 }}
         className={`w-full pr-2 py-1 flex items-center gap-2 text-left cursor-pointer border-b border-[var(--taomni-divider)] ${
           isActive ? "bg-[var(--taomni-hover)]" : isSelected ? "bg-[var(--taomni-accent)]/10" : "hover:bg-[var(--taomni-hover)]"
         }`}
-        onClick={(e) => onSelect(change.path, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey })}
+        onClick={select}
         onContextMenu={(e) => onContextMenu(change.path, e)}
       >
         <input
           type="checkbox"
           className="shrink-0"
+          aria-label={change.path}
           checked={checked.has(change.path)}
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => onToggleChecked([change.path], e.target.checked)}
         />
         <StatusPill change={change} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px]">{treeMode ? lastSegment(change.path) : change.path}</div>
+          <div className="truncate text-ui-body">{treeMode ? lastSegment(change.path) : change.path}</div>
           {change.oldPath && (
-            <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">from {change.oldPath}</div>
+            <div className="truncate text-ui-small text-[var(--taomni-text-muted)]">from {change.oldPath}</div>
           )}
         </div>
       </div>
@@ -139,21 +157,26 @@ export function ChangesTree({
     if (node.type === "file") return renderFile(node.change, depth, sectionKey);
     const collapsedKey = `${sectionKey}:${node.path}`;
     const isCollapsed = collapsed.has(collapsedKey);
+    const toggle = () => setCollapsed((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(collapsedKey)) next.add(collapsedKey);
+      return next;
+    });
     return (
       <div key={`${sectionKey}-dir-${node.path}`}>
         <div
           role="button"
+          aria-expanded={!isCollapsed}
+          onKeyDown={(event) => {
+            if (!isRowActivation(event)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            toggle();
+          }}
           tabIndex={0}
           style={{ paddingLeft: 8 + depth * 14 }}
           className="w-full pr-2 py-1 flex items-center gap-2 cursor-pointer hover:bg-[var(--taomni-hover)] border-b border-[var(--taomni-divider)]"
-          onClick={() =>
-            setCollapsed((prev) => {
-              const next = new Set(prev);
-              if (next.has(collapsedKey)) next.delete(collapsedKey);
-              else next.add(collapsedKey);
-              return next;
-            })
-          }
+          onClick={toggle}
           onContextMenu={(e) => {
             e.preventDefault();
             const first = collectFilePaths(node)[0];
@@ -166,7 +189,7 @@ export function ChangesTree({
           />
           {isCollapsed ? <ChevronRight className="w-3.5 h-3.5 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" />}
           <Folder className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
-          <span className="truncate text-[12px]">{node.name}</span>
+          <span className="truncate text-ui-body">{node.name}</span>
         </div>
         {!isCollapsed && node.children.map((child) => renderNode(child, depth + 1, sectionKey))}
       </div>
@@ -212,14 +235,14 @@ export function ChangesTree({
             state={pathsState(paths)}
             onChange={(value) => onToggleChecked(paths, value)}
           />
-          <span className="min-w-0 truncate text-[11px] font-semibold uppercase text-[var(--taomni-text-muted)]">
+          <span className="min-w-0 truncate text-ui-small font-semibold uppercase text-[var(--taomni-text-muted)]">
             {section.title} ({section.changes.length})
           </span>
           <div className="flex-1" />
           {showSectionActions && action.run ? (
             <button
               type="button"
-              className="taomni-btn h-6 px-1.5 text-[10px]"
+              className="taomni-btn h-6 px-1.5 text-ui-caption"
               disabled={busy || paths.length === 0}
               onClick={(event) => {
                 event.stopPropagation();
@@ -237,7 +260,7 @@ export function ChangesTree({
 
   if (changes.length === 0) {
     return (
-      <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+      <div className="h-full min-h-24 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
         {emptyLabel}
       </div>
     );

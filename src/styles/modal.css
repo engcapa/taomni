@@ -1,0 +1,42 @@
+.taomni-dialog-backdrop {
+  z-index: var(--taomni-z-modal, 1000);
+  background: var(--taomni-overlay, rgb(0 0 0 / 40%));
+}
+.taomni-modal {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 16px;
+  border: 1px solid var(--taomni-card-border);
+  border-radius: var(--taomni-radius-lg, 4px);
+  color: var(--taomni-text);
+  background: var(--taomni-card-bg);
+  box-shadow: var(--taomni-shadow-lg);
+  font-size: var(--taomni-fs-body, var(--taomni-ui-font-size, 12px));
+}
+.taomni-modal[open] { display: flex; flex-direction: column; gap: 16px; }
+.taomni-modal::backdrop { background: var(--taomni-overlay, rgb(0 0 0 / 40%)); }
+.taomni-modal-header { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; }
+.taomni-modal > h2, .taomni-modal-header > h2 { flex: none; font-size: var(--taomni-fs-title, calc(var(--taomni-ui-font-size, 12px) + 2px)); font-weight: 600; }
+.taomni-modal[data-tone="error"] > h2 { color: var(--taomni-danger-text); }
+.taomni-modal[data-tone="success"] > h2 { color: var(--taomni-success-text); }
+.taomni-modal-body { min-height: 0; overflow: auto; overflow-wrap: anywhere; }
+.taomni-modal-body p { white-space: pre-wrap; user-select: text; }
+.taomni-modal-footer { display: flex; flex: none; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+.taomni-modal[data-size="wide"] { width: min(760px, calc(100vw - 32px)); }
+.taomni-modal[data-size="complex"] { width: min(960px, calc(100vw - 32px)); }
+.taomni-modal[data-bleed="true"] { padding: 0; gap: 0; overflow: hidden; }
+
+.taomni-workspace-modal {
+  background: var(--taomni-code-bg);
+  border-color: var(--taomni-code-border);
+  color: var(--taomni-code-text);
+}
+
+.taomni-workspace-modal[data-position="top"] {
+  margin: max(16px, 12vh) auto auto;
+  max-height: calc(88vh - 16px);
+}

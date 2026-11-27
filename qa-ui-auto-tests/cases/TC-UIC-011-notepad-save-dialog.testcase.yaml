@@ -1,0 +1,48 @@
+id: TC-UIC-011-notepad-save-dialog
+title: Save As selects the draft path and Escape preserves the unsaved Notepad buffer
+covers: [F-NOTEPAD-1]
+fixtures: [reset_db]
+modes: [browser, native]
+tags: [ui-contract, notepad, keyboard]
+ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-06]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-notepad-modal
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="viewer-editor"] .cm-content'
+- click: '[data-testid="viewer-editor"] .cm-content'
+- type: Text before opening Save As
+- click: '[data-testid="notepad-menu-file"]'
+- click: '[data-testid="notepad-menu-item-file.saveAs"]'
+- wait_for: '[data-testid="notepad-save-as-dialog"][open][role="dialog"][aria-labelledby][aria-modal="true"]'
+- assert_focus_on: '[data-testid="notepad-save-as-input"]'
+- press: Escape
+- assert_not_visible: '[data-testid="notepad-save-as-dialog"]'
+- assert_text: {selector: '[data-testid="viewer-editor"] .cm-content', contains: Text before opening Save As}
+- assert_attribute: {selector: '[data-testid="file-viewer"][data-active="true"]', name: data-dirty, equals: 'true'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: open-from-menu
+    requirement: The Save As command opens a named modal with the editable destination focused.
+    ui_standard: [UI-DLG-03, UI-DLG-06]
+    actions: [8, 9]
+    checkpoints:
+    - {step: 10, expectation: A named application modal is open.}
+    - {step: 11, expectation: The destination owns the current document focus.}
+    results: [10, 11]
+  - id: cancel-save
+    requirement: Escape keeps the same editor contents and dirty state.
+    ui_standard: [UI-DLG-04]
+    actions: [7, 12]
+    checkpoints:
+    - {step: 13, expectation: The top modal closes.}
+    - {step: 14, expectation: The document still contains the typed text.}
+    - {step: 15, expectation: The active document is still unsaved.}
+    results: [13, 14, 15]
+  visual:
+  - {check: Visible form and draft, method: automated, reason: Verifies the actual dialog and active editor.}
+  native:
+  - {check: Desktop top layer and focus, method: automated, reason: Uses the packaged WebView and its native dialog implementation.}

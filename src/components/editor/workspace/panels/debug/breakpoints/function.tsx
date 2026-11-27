@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../../ui/IconButton";
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { type DebugFunctionBreakpoint } from "../../../dapDebugModel";
@@ -26,13 +27,13 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
       className="mt-1 border-t border-[var(--taomni-code-border)]/60 pt-1"
     >
       <div className="flex items-center gap-1 px-3 py-1">
-        <span className="w-24 shrink-0 text-[10px] font-medium text-[var(--taomni-text-muted)]">
+        <span className="w-24 shrink-0 text-ui-caption font-medium text-[var(--taomni-text-muted)]">
           Function / method
         </span>
         <input
           data-testid="debug-function-breakpoint-input"
           aria-label="Function breakpoint name"
-          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none disabled:opacity-40"
+          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline disabled:opacity-40"
           placeholder="Type a qualified function name"
           maxLength={1024}
           value={name}
@@ -43,7 +44,7 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
         <button
           type="button"
           data-testid="debug-function-breakpoint-add"
-          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30"
+          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-30"
           title={canAdd ? "Add function breakpoint" : "The active adapter does not support function breakpoints"}
           aria-label="Add function breakpoint"
           disabled={!canAdd || !name.trim()}
@@ -53,7 +54,7 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
         </button>
       </div>
       {active && !supported && (
-        <div data-testid="debug-function-breakpoint-unsupported" className="px-3 pb-1 text-[10px] text-amber-500">
+        <div data-testid="debug-function-breakpoint-unsupported" className="px-3 pb-1 text-ui-caption text-ui-warning">
           The active debug adapter does not support function breakpoints.
         </div>
       )}
@@ -72,7 +73,7 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
             data-function-name={breakpoint.name}
             className="border-t border-[var(--taomni-code-border)]/40"
           >
-            <div className="group flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover-bg)]">
+            <div className="group flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover)]">
               <input
                 type="checkbox"
                 data-testid={`debug-function-breakpoint-enabled-${index}`}
@@ -86,12 +87,12 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
               <span className={`min-w-0 flex-1 truncate font-mono ${disabled ? "text-[var(--taomni-text-muted)] line-through" : ""
                 }`} title={breakpoint.name}>
                 {breakpoint.name}
-                {breakpoint.condition && <span className="ml-2 text-amber-500">if {breakpoint.condition}</span>}
-                {breakpoint.hitCondition && <span className="ml-2 text-amber-500">hit {breakpoint.hitCondition}</span>}
+                {breakpoint.condition && <span className="ml-2 text-ui-warning">if {breakpoint.condition}</span>}
+                {breakpoint.hitCondition && <span className="ml-2 text-ui-warning">hit {breakpoint.hitCondition}</span>}
                 {bindingHint && (
                   <span
                     data-testid={`debug-function-breakpoint-binding-${index}`}
-                    className={`ml-2 ${bindingHint.status === "failed" ? "text-rose-500" : "text-[var(--taomni-text-muted)]"}`}
+                    className={`ml-2 ${bindingHint.status === "failed" ? "text-ui-danger" : "text-[var(--taomni-text-muted)]"}`}
                     title={bindingHint.message ?? undefined}
                   >
                     {bindingHint.status === "failed" ? "not bound" : "pending"}
@@ -101,20 +102,20 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
               <button
                 type="button"
                 data-testid={`debug-function-breakpoint-edit-${index}`}
-                className="shrink-0 text-[10px] text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100"
+                className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100"
                 onClick={() => setEditingName(open ? null : breakpoint.name)}
               >
                 {open ? "Done" : "Edit"}
               </button>
-              <button
+              <IconButton
                 type="button"
                 data-testid={`debug-function-breakpoint-remove-${index}`}
-                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-rose-500"
-                title="Remove function breakpoint"
+                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-ui-danger"
+                labelKey="removeFunctionBreakpoint"
                 onClick={() => debug.removeFunctionBreakpoint(breakpoint.name)}
               >
                 <Trash2 className="h-3 w-3" />
-              </button>
+              </IconButton>
             </div>
             {open && (
               <FunctionBreakpointEditor
@@ -139,7 +140,7 @@ export function FunctionBreakpointEditor({
   index: number;
   onChange: (options: Partial<DebugFunctionBreakpoint>) => void;
 }) {
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline";
   return (
     <div className="space-y-1 bg-[var(--taomni-code-bg)] px-3 pb-1.5 pt-1">
       <CommitField

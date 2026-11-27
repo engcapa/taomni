@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../../ui/IconButton";
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { dataBreakpointKey, type DebugBreakpointMode, type DebugDataBreakpoint } from "../../../dapDebugModel";
@@ -79,14 +80,14 @@ export function DataBreakpointsView({
       className="mt-1 border-t border-[var(--taomni-code-border)]/60 pt-1"
     >
       <div className="flex items-center gap-2 px-3 py-1">
-        <span className="text-[10px] font-medium text-[var(--taomni-text-muted)]">Data watchpoints</span>
+        <span className="text-ui-caption font-medium text-[var(--taomni-text-muted)]">Data watchpoints</span>
         {modes.length > 0 && (
           <select
             data-testid="debug-data-breakpoint-mode"
             aria-label="Mode for new data breakpoint"
             title={modes.find((mode) => mode.mode === newMode)?.description
               ?? "Mode for new data breakpoints"}
-            className="h-5 min-w-0 max-w-28 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[10px]"
+            className="h-5 min-w-0 max-w-28 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-ui-caption"
             value={newMode ?? modes[0].mode}
             onChange={(event) => onNewModeChange(event.target.value)}
           >
@@ -95,7 +96,7 @@ export function DataBreakpointsView({
             ))}
           </select>
         )}
-        <span className="ml-auto text-[10px] tabular-nums text-[var(--taomni-text-muted)]">{entries.length}</span>
+        <span className="ml-auto text-ui-caption tabular-nums text-[var(--taomni-text-muted)]">{entries.length}</span>
       </div>
       {canAddTarget && (
         <div className="space-y-1 px-3 pb-1" data-testid="debug-data-breakpoint-create">
@@ -103,7 +104,7 @@ export function DataBreakpointsView({
             <input
               data-testid="debug-data-breakpoint-target"
               aria-label="Data breakpoint expression or address"
-              className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none"
+              className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline"
               placeholder={supportsBytes ? "Expression or address" : "Expression"}
               maxLength={4096}
               value={targetName}
@@ -113,7 +114,7 @@ export function DataBreakpointsView({
             <button
               type="button"
               data-testid="debug-data-breakpoint-add"
-              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30"
+              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-30"
               title="Add data breakpoint for the expression or address"
               aria-label="Add data breakpoint"
               disabled={!targetName.trim() || addingTarget}
@@ -124,19 +125,19 @@ export function DataBreakpointsView({
           </div>
           {supportsBytes && (
             <div className="flex items-center gap-2">
-              <label className="flex min-w-0 flex-1 items-center gap-1 text-[10px] text-[var(--taomni-text-muted)]">
+              <label className="flex min-w-0 flex-1 items-center gap-1 text-ui-caption text-[var(--taomni-text-muted)]">
                 <span className="shrink-0">Bytes</span>
                 <input
                   data-testid="debug-data-breakpoint-bytes"
                   aria-label="Data breakpoint byte count"
-                  className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none"
+                  className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline"
                   inputMode="numeric"
                   placeholder="optional range size"
                   value={targetBytes}
                   onChange={(event) => setTargetBytes(event.target.value)}
                 />
               </label>
-              <label className="flex shrink-0 items-center gap-1 text-[10px] text-[var(--taomni-text-muted)]" title="Interpret the target as a decimal or hexadecimal memory address">
+              <label className="flex shrink-0 items-center gap-1 text-ui-caption text-[var(--taomni-text-muted)]" title="Interpret the target as a decimal or hexadecimal memory address">
                 <input
                   type="checkbox"
                   data-testid="debug-data-breakpoint-as-address"
@@ -152,7 +153,7 @@ export function DataBreakpointsView({
             <div
               data-testid="debug-data-breakpoint-create-notice"
               role="status"
-              className={targetNotice.added ? "text-emerald-500" : "text-rose-500"}
+              className={targetNotice.added ? "text-ui-success" : "text-ui-danger"}
             >
               {targetNotice.message}
             </div>
@@ -160,7 +161,7 @@ export function DataBreakpointsView({
         </div>
       )}
       {hasUnsupportedEntries && (
-        <div data-testid="debug-data-breakpoint-unsupported" className="px-3 pb-1 text-[10px] text-amber-500">
+        <div data-testid="debug-data-breakpoint-unsupported" className="px-3 pb-1 text-ui-caption text-ui-warning">
           The active debug adapter does not support data breakpoints.
         </div>
       )}
@@ -186,7 +187,7 @@ export function DataBreakpointsView({
             data-data-breakpoint-persistent={breakpoint.canPersist ? "true" : "false"}
             className="border-t border-[var(--taomni-code-border)]/40"
           >
-            <div className="group flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover-bg)]">
+            <div className="group flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover)]">
               <input
                 type="checkbox"
                 data-testid={`debug-data-breakpoint-enabled-${index}`}
@@ -200,15 +201,15 @@ export function DataBreakpointsView({
                 title={breakpoint.description}
               >
                 {breakpoint.description}
-                {breakpoint.condition && <span className="ml-2 text-amber-500">if {breakpoint.condition}</span>}
-                {breakpoint.hitCondition && <span className="ml-2 text-amber-500">hit {breakpoint.hitCondition}</span>}
-                {breakpoint.asAddress && <span className="ml-2 text-sky-600 dark:text-sky-400">address</span>}
-                {breakpoint.bytes && <span className="ml-2 text-sky-600 dark:text-sky-400">{breakpoint.bytes} bytes</span>}
-                {modeLabel && <span className="ml-2 text-emerald-600 dark:text-emerald-400">{modeLabel}</span>}
+                {breakpoint.condition && <span className="ml-2 text-ui-warning">if {breakpoint.condition}</span>}
+                {breakpoint.hitCondition && <span className="ml-2 text-ui-warning">hit {breakpoint.hitCondition}</span>}
+                {breakpoint.asAddress && <span className="ml-2 text-ui-info">address</span>}
+                {breakpoint.bytes && <span className="ml-2 text-ui-info">{breakpoint.bytes} bytes</span>}
+                {modeLabel && <span className="ml-2 text-ui-success">{modeLabel}</span>}
                 {bindingHint && (
                   <span
                     data-testid={`debug-data-breakpoint-binding-${index}`}
-                    className={`ml-2 ${bindingHint.status === "failed" ? "text-rose-500" : "text-[var(--taomni-text-muted)]"}`}
+                    className={`ml-2 ${bindingHint.status === "failed" ? "text-ui-danger" : "text-[var(--taomni-text-muted)]"}`}
                     title={bindingHint.message ?? undefined}
                   >
                     {bindingHint.status === "failed" ? "not bound" : "pending"}
@@ -219,7 +220,7 @@ export function DataBreakpointsView({
                 <select
                   data-testid={`debug-data-breakpoint-access-${index}`}
                   aria-label={`Access type for ${breakpoint.description}`}
-                  className="h-5 max-w-24 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[10px]"
+                  className="h-5 max-w-24 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-ui-caption"
                   value={breakpoint.accessType ?? ""}
                   onChange={(event) => debug.setDataBreakpointOptions(key, {
                     accessType: event.target.value as DebugDataBreakpoint["accessType"],
@@ -230,11 +231,11 @@ export function DataBreakpointsView({
                   ))}
                 </select>
               ) : (
-                <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">default</span>
+                <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">default</span>
               )}
               <span
                 data-testid={`debug-data-breakpoint-scope-${index}`}
-                className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]"
+                className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]"
                 title={breakpoint.canPersist
                   ? `Saved for ${breakpoint.adapterId} debug sessions`
                   : "Available only in the debug session that created it"}
@@ -244,20 +245,20 @@ export function DataBreakpointsView({
               <button
                 type="button"
                 data-testid={`debug-data-breakpoint-edit-${index}`}
-                className="shrink-0 text-[10px] text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100"
+                className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100"
                 onClick={() => setEditingKey(open ? null : key)}
               >
                 {open ? "Done" : "Edit"}
               </button>
-              <button
+              <IconButton
                 type="button"
                 data-testid={`debug-data-breakpoint-remove-${index}`}
-                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-rose-500"
-                title="Remove data breakpoint"
+                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-ui-danger"
+                labelKey="removeDataBreakpoint"
                 onClick={() => debug.removeDataBreakpoint(key)}
               >
                 <Trash2 className="h-3 w-3" />
-              </button>
+              </IconButton>
             </div>
             {open && (
               <DataBreakpointEditor
@@ -282,7 +283,7 @@ export function DataBreakpointEditor({
   index: number;
   onChange: (options: Partial<DebugDataBreakpoint>) => void;
 }) {
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline";
   return (
     <div className="space-y-1 bg-[var(--taomni-code-bg)] px-3 pb-1.5 pt-1">
       <CommitField

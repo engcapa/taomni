@@ -27,6 +27,39 @@ function formFixture(markup = '<input name="username"><input name="password" typ
 describe("macOS QA WebView keyboard defaults", () => {
   beforeEach(() => document.body.replaceChildren());
 
+  it("delivers keyup to a Find field opened during the preceding keydown", () => {
+    const emit = new Function("type", "event", "mods",
+      `${keyboardScript}\nreturn dispatchQaKeyToFocus(type, event.key, event, mods, createQaButtonKeyboard());`);
+    const { form, input } = formFixture();
+    const find = form.querySelectorAll("input")[1];
+    const released = vi.fn();
+    input.focus();
+    input.addEventListener("keydown", (event) => { event.preventDefault(); find.focus(); });
+    find.addEventListener("keyup", released);
+    const mods = { ...plain, Control: true, Shift: true };
+    for (const type of ["keydown", "keyup"]) {
+      emit(type, new KeyboardEvent(type, { key: "F", bubbles: true, cancelable: true }), mods);
+    }
+    expect(find).toHaveFocus();
+    expect(released).toHaveBeenCalledOnce();
+  });
+
+  it("moves a range to each endpoint and emits exactly one change for each movement", () => {
+    const { input } = formFixture('<input type="range" min="10" max="18" value="12">');
+    const values: string[] = [];
+    for (const type of ["input", "change"]) {
+      input.addEventListener(type, () => values.push(type + "=" + input.value));
+    }
+    press(input, "Home");
+    press(input, "Home");
+    press(input, "End");
+    press(input, "Home", { ...plain, Meta: true });
+    input.disabled = true;
+    press(input, "Home");
+    expect(values).toEqual(["input=10", "change=10", "input=18", "change=18"]);
+    expect(input.value).toBe("18");
+  });
+
   it("submits a credential form once without changing the password", () => {
     const { form, submit } = formFixture();
     const password = form.querySelector<HTMLInputElement>('[type="password"]')!;
@@ -116,6 +149,22 @@ describe("macOS QA WebView keyboard defaults", () => {
     press(input, "Enter");
     expect(input.checked).toBe(false);
     expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("toggles a focused checkbox on Space release without throwing InvalidStateError", () => {
+    const emit = new Function("type", "event", "mods", "buttonKeyboard",
+      `${keyboardScript}\nreturn dispatchQaKeyToFocus(type, event.key, event, mods, buttonKeyboard);`);
+    const buttonKeyboard = new Function(`${keyboardScript}\nreturn createQaButtonKeyboard();`)();
+    const { input } = formFixture('<input type="checkbox">');
+    const changes = vi.fn();
+    input.addEventListener("change", changes);
+    input.focus();
+
+    emit("keydown", new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true }), plain, buttonKeyboard);
+    expect(input.checked).toBe(false);
+    emit("keyup", new KeyboardEvent("keyup", { key: " ", bubbles: true, cancelable: true }), plain, buttonKeyboard);
+    expect(input.checked).toBe(true);
+    expect(changes).toHaveBeenCalledTimes(1);
   });
 
   it("moves an input caret before inserting without appending to the end", () => {

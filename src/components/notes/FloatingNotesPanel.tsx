@@ -25,7 +25,7 @@ function clampPosition(pos: NotesPanelPosition): NotesPanelPosition {
  * FloatingNotesPanel — a single, draggable/resizable in-app overlay that hosts
  * the notes panel when panel mode is "floating" (§4.3). Mounted once at the app
  * root, so there is never more than one notes panel. Its z-index stays below
- * modal dialogs (z-50: vault unlock, auth prompts) so it can never occlude them.
+ * modal dialogs (including vault unlock and authentication) so it can never occlude them.
  */
 export function FloatingNotesPanel() {
   const t = useT();
@@ -143,7 +143,7 @@ export function FloatingNotesPanel() {
 
   return (
     <div
-      className={`fixed notes-sticky-window notes-floating-window flex flex-col shadow-2xl overflow-hidden ${alwaysOnTop ? "z-40" : "z-30"}`}
+      className={`fixed notes-sticky-window notes-floating-window flex flex-col shadow-2xl overflow-hidden ${alwaysOnTop ? "z-[var(--taomni-z-popover)]" : "z-[var(--taomni-z-docked-overlay)]"}`}
       style={{ ...style, background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)" }}
       data-testid="floating-notes-panel"
       data-always-on-top={alwaysOnTop || undefined}

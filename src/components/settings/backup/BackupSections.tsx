@@ -16,7 +16,7 @@ export function BackupGlobalDefaults() {
       <span data-testid="backup-settings-save-status" role="status" className="text-xs text-theme-muted">{t(`backupUnified.${status}`)}</span>
     </div>
     <p className="text-xs text-theme-muted">{t("backupUnified.globalHint")}</p>
-    {error && <div className="space-y-2"><BackupError error={error} t={t} /><button className={backupButton} data-testid="backup-settings-retry" onClick={() => void retry()}>{t("backupUnified.retrySave")}</button></div>}
+    {error && <div className="space-y-2"><BackupError error={error} t={t} /><button type="button" className={backupButton} data-testid="backup-settings-retry" onClick={() => void retry()}>{t("backupUnified.retrySave")}</button></div>}
     {policy && <>
       <BackupRangeEditor value={globalRange(policy)} onChange={(range) => editPolicy({ defaultScope: range.scope, includeMail: range.customOptions?.includeMail ?? null, defaultCustomOptions: range.scope === "custom" ? range.customOptions : null })} />
       <label className="flex items-center gap-2 text-xs text-theme-text"><input data-testid="backup-auto-enabled" aria-checked={policy.autoBackupEnabled} type="checkbox" checked={policy.autoBackupEnabled} onChange={(e) => editPolicy({ autoBackupEnabled: e.target.checked })} />{t("backupSettings.enableAutoBackup")}</label>
@@ -44,8 +44,8 @@ export function BackupLocalDestination(props: BackupSettingsViewProps) {
       <label className="flex items-center gap-2 text-xs text-theme-text"><input data-testid="backup-local-enabled" type="checkbox" checked={policy.localChannelEnabled !== false} onChange={(e) => editPolicy({ localChannelEnabled: e.target.checked })} />{t("backupUnified.enableDestination")}</label>
       <p className="text-xs text-theme-muted">{t("backupSettings.targetDirDesc")}</p>
       <code className="block break-all text-xs text-theme-text" data-testid="backup-effective-directory">{props.effectiveBackupDir}</code>
-      <div className="flex gap-2"><button data-testid="backup-change-directory" className={backupButton} onClick={props.handleChangeDirectory}>{t("backupSettings.changeDir")}</button>
-        {props.isCustomDir && <button className={backupButton} onClick={props.handleResetDefaultDirectory}>{t("backupSettings.resetDefaultDir")}</button>}</div>
+      <div className="flex gap-2"><button type="button" data-testid="backup-change-directory" className={backupButton} onClick={props.handleChangeDirectory}>{t("backupSettings.changeDir")}</button>
+        {props.isCustomDir && <button type="button" className={backupButton} onClick={props.handleResetDefaultDirectory}>{t("backupSettings.resetDefaultDir")}</button>}</div>
       <label className="block space-y-1 text-xs text-theme-muted">{t("backupUnified.automaticRange")}<select data-testid="backup-local-range-mode" className={backupInput} value={range ? "custom" : "inherit"} onChange={(e) => editPolicy({ localRangeOverride: e.target.value === "inherit" ? null : globalRange(policy) })}>
         <option value="inherit">{t("backupUnified.inherit")}</option><option value="custom">{t("backupUnified.customRange")}</option>
       </select></label>
@@ -75,8 +75,8 @@ export function BackupManual(props: BackupSettingsViewProps) {
     {props.usePassword && <input type="password" autoComplete="new-password" data-testid="backup-local-password" aria-label={t("backupSettings.passwordPlaceholder")} className={backupInput} placeholder={t("backupSettings.passwordPlaceholder")} value={props.password} onChange={(e) => props.setPassword(e.target.value)} />}
     <p className="text-xs text-theme-muted">{t("backupUnified.cloudEncryption")}</p>
     <div className="flex flex-wrap gap-2">
-      <button data-testid="backup-selected-start" className={backupButton} disabled={props.creating || status === "error" || blocked && selected.some((id) => id !== "local") || !selected.length || invalid || props.usePassword && !props.password.trim()} onClick={props.handleBackupNow}>{t(props.creating ? "backupSettings.creating" : "remoteBackup.startSelected")}</button>
-      <button data-testid="backup-export" className={backupButton} disabled={props.creating || status === "error" || props.usePassword && !props.password.trim()} onClick={props.handleExportBackup}>{t("backupSettings.exportTo")}</button>
+      <button type="button" data-testid="backup-selected-start" className={backupButton} disabled={props.creating || status === "error" || blocked && selected.some((id) => id !== "local") || !selected.length || invalid || props.usePassword && !props.password.trim()} onClick={props.handleBackupNow}>{t(props.creating ? "backupSettings.creating" : "remoteBackup.startSelected")}</button>
+      <button type="button" data-testid="backup-export" className={backupButton} disabled={props.creating || status === "error" || props.usePassword && !props.password.trim()} onClick={props.handleExportBackup}>{t("backupSettings.exportTo")}</button>
     </div>
     {props.manualResults.map((result) => <div key={result.targetId} role="status" data-testid="backup-manual-result" data-target-id={result.targetId} data-job-id={result.jobId} className="space-y-1 text-xs text-theme-muted">
       <p>{result.targetId === "local" ? t("remoteBackup.localDestination") : config.targets.find((target) => target.id === result.targetId)?.name}: {t(result.error ? "remoteBackup.phases.failed" : result.jobId ? "remoteBackup.taskCreated" : "remoteBackup.completed")}</p>

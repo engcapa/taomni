@@ -1,0 +1,64 @@
+id: TC-UIC-018-desktop-overlay-layers
+title: Session and MFA forms share the modal backdrop and Explorer tab search uses the popover layer
+covers: [F6.2, F-MFA-2, F-EXPLORER-1]
+modes: [browser, native]
+tags: [ui-contract, modal, explorer, mfa]
+fixtures: [reset_db]
+ui_standard: [UI-FND-09, UI-DLG-01]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- assert_computed_style: {selector: '.taomni-dialog-backdrop:has(> [data-testid="session-editor"])', property: background-color, equals: 'rgba(0, 0, 0, 0.4)'}
+- assert_computed_style: {selector: '.taomni-dialog-backdrop:has(> [data-testid="session-editor"])', property: z-index, equals: '1000'}
+- click: '[data-testid="session-cancel"]'
+- assert_not_visible: '[data-testid="session-editor"]'
+- click: '[data-testid="side-tab-explorer"]'
+- press: {selector: '[data-testid="explorer-tabs-filter-trigger"]', key: Enter}
+- assert_computed_style: {selector: '[data-testid="explorer-tabs-filter-menu"]', property: z-index, equals: '900'}
+- assert_focus_on: '[data-testid="explorer-tabs-filter-search"]'
+- press: Escape
+- assert_focus_on: '[data-testid="explorer-tabs-filter-trigger"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-overlay-layers
+- click: '[data-testid="mfa-empty-add-secret"]'
+- wait_for: '[data-testid="mfa-secret-form"]'
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('dialog.mfa-add-dialog'), '::backdrop').backgroundColor === 'rgba(0, 0, 0, 0.4)'
+    expect_truthy: true
+- assert_visible: '[data-testid="mfa-add-dialog"]:modal'
+- click: '[data-testid="mfa-add-close"]'
+- assert_visible: '[data-testid="mfa-empty-add-secret"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: modal-backdrops
+    requirement: An application form and an independently packaged module paint the same backdrop color. The session form uses the modal layer and the MFA dialog opens in the native top layer.
+    ui_standard: [UI-DLG-01, UI-FND-09]
+    actions: [4, 8, 20, 24]
+    checkpoints:
+    - {step: 6, expectation: The session form paints the shared translucent backdrop.}
+    - {step: 7, expectation: The form uses the modal layer.}
+    - {step: 9, expectation: Cancel removes the session form.}
+    - {step: 22, expectation: MFA paints the same backdrop.}
+    - {step: 23, expectation: The open MFA dialog occupies the WebView modal top layer.}
+    - {step: 25, expectation: Closing MFA returns to the empty account page.}
+    results: [6, 7, 9, 22, 23, 25]
+  - id: filter-popover
+    requirement: Open-tab search is a popover below the modal layer and returns focus on Escape.
+    ui_standard: [UI-FND-09]
+    actions: [11, 14]
+    checkpoints:
+    - {step: 12, expectation: The window portal resolves the popover z-index.}
+    - {step: 13, expectation: Search receives keyboard input.}
+    - {step: 15, expectation: Escape restores the trigger.}
+    results: [12, 13, 15]
+  visual:
+  - {check: Painted backdrop and overlay layers, method: automated, reason: Measures actual computed styles.}
+  native:
+  - {check: Module and shell styling in the packaged window, method: automated, reason: Opens the forms and the portal in the desktop WebView.}

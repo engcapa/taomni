@@ -109,7 +109,7 @@ def click(ctx: Any, args: Any, mode: str) -> str:
         receipt["geometry"] = second
         if mode == "native" and platform.system() == "Darwin":
             env = os.environ.copy()
-            env.update(QA_HTML_APPLICATION=str(Path(ctx.session.application).resolve()),
+            env.update(QA_WEBVIEW_POINTER_ACTION="click", QA_HTML_APPLICATION=str(Path(ctx.session.application).resolve()),
                        QA_HTML_CLIENT_X=str(second["x"]), QA_HTML_CLIENT_Y=str(second["y"]),
                        QA_HTML_CLIENT_WIDTH=str(second["viewport"]["width"]), QA_HTML_CLIENT_HEIGHT=str(second["viewport"]["height"]))
             result = subprocess.run(["osascript", "-l", "JavaScript", str(Path(__file__).with_name("html_preview_macos.js"))],

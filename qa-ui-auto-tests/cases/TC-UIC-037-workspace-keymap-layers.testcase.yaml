@@ -1,0 +1,66 @@
+id: TC-UIC-037-workspace-keymap-layers
+title: Workspace Keymap keeps shortcut recording in the top dialog and preserves the selected action
+covers: [F25.5]
+modes: [browser, native]
+fixtures: [reset_db, platform_workspace_root]
+tags: [ui-contract, code-workspace, keymap]
+ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-07, UI-MNU-02, UI-KEY-07]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-keymap-layers
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-keymap","name":"qa-keymap","roots":[{"id":"qa-keymap","name":"qa-keymap","path":"${fixture.platform_workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-keymap","path":"README.md"},"lastOpenedAt":1756500000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- press: {selector: '[data-testid="code-workspace-editor"] .cm-content', key: Control+Shift+a, macos_key: Meta+Shift+a}
+- fill: {selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]', value: Keymap Settings}
+- press: Enter
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]:modal'
+- assert_focus_on: '[data-testid="keymap-action-filter"]'
+- fill: {selector: '[data-testid="keymap-action-filter"]', value: Recent Files}
+- right_click: '[data-testid="keymap-row-workspace.recentFiles"]'
+- assert_focus_on: '[data-testid="keymap-row-menu"]'
+- press: Enter
+- wait_for: '[data-testid="keymap-recorder"]:modal'
+- assert_focus_on: '[data-testid="keymap-recorder"] [role="textbox"]'
+- press: Shift+Tab
+- assert_focus_on: '[data-testid="keymap-recorder-cancel"]'
+- press: Escape
+- assert_not_visible: '[data-testid="keymap-recorder"]'
+- assert_visible: '[data-testid="keymap-row-workspace.recentFiles"]'
+- assert_focus_on: '[data-testid="keymap-add-workspace.recentFiles"]'
+- assert_disabled: '[data-testid="keymap-settings-apply"]'
+- press: Escape
+- assert_not_visible: '[data-testid="workspace-keymap-settings-dialog"]'
+- assert_visible: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: recording-layer
+    ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-07, UI-MNU-02, UI-KEY-07]
+    requirement: The shared Keymap menu and recorder own their keyboard actions. Reverse Tab reaches recorder Cancel. Escape dismisses one layer and returns focus to the selected action with no changes to apply.
+    actions: [9, 11, 14, 15, 17, 20, 22, 27]
+    checkpoints:
+    - {step: 12, expectation: Keymap opens as a modal.}
+    - {step: 13, expectation: The filter is the starting point.}
+    - {step: 16, expectation: The selected action's menu owns input.}
+    - {step: 18, expectation: Its recorder opens in the top layer.}
+    - {step: 19, expectation: Recording starts in the keystroke field.}
+    - {step: 21, expectation: Reverse Tab wraps to Cancel.}
+    - {step: 23, expectation: Escape dismisses the recorder.}
+    - {step: 24, expectation: The original action is visible in Keymap.}
+    - {step: 25, expectation: Focus returns to the original action's Add button.}
+    - {step: 26, expectation: Cancelling recording leaves the stored binding unchanged.}
+    - {step: 28, expectation: A second Escape dismisses Keymap.}
+    - {step: 29, expectation: The original editor stays open.}
+    - {step: 30, expectation: No runtime errors occur.}
+    results: [12, 13, 16, 18, 19, 21, 23, 24, 25, 26, 28, 29, 30]
+  visual:
+  - {check: Menu and dialog layering, method: automated, reason: Checks the active element and modal presence on both layers.}
+  native:
+  - {check: Packaged keyboard routing, method: automated, reason: Drives nested dialogs in the same native editor WebView.}

@@ -1,4 +1,9 @@
+import { IconButton } from "../ui/IconButton";
+import { Button } from "../ui/Button";
+import { ModalSurface } from "../ui/ModalSurface";
+import { confirmAppDialog } from "../../lib/appDialogs";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { AlertTriangle, Loader2, Plus, Shield, Sliders, Trash2, X } from "lucide-react";
@@ -154,11 +159,11 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
     if (!activeProfileId) setActiveProfileId(id);
   };
 
-  const deleteProfile = (id: string, e: React.MouseEvent) => {
+  const deleteProfile = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const p = profiles.find((x) => x.id === id);
     if (!p) return;
-    if (!window.confirm(t("aiSettings.ccCustomConfirmDelete", { name: p.name }))) return;
+    if (!await confirmAppDialog({ message: t("aiSettings.ccCustomConfirmDelete", { name: p.name }), danger: true })) return;
     setDeleted((cur) => new Set(cur).add(id));
     if (selectedProfileId === id) {
       const rest = sortedProfiles.filter((x) => x.id !== id);
@@ -274,36 +279,36 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(20,30,45,0.4)" }}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
-        style={{
-          width: "min(860px, 96vw)",
-          height: "min(640px, 85vh)",
-          minWidth: "min(640px, 96vw)",
-          minHeight: "min(420px, 85vh)",
-          maxWidth: "96vw",
-          maxHeight: "85vh",
-          resize: "both",
-          background: "var(--taomni-panel-bg)",
-          borderColor: "var(--taomni-chrome-border)",
-          color: "var(--taomni-text)",
-        }}
-      >
-        <div className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none" style={{ background: "linear-gradient(to bottom, #5895c8, #2b5d8b)", color: "white" }}>
+  return createPortal(
+    <ModalSurface
+      initialFocus="input:enabled, button:enabled"
+      onCancel={onClose}
+      aria-label={t("aiSettings.codexCustomModalTitle")}
+      className="m-auto p-0 open:flex flex-col rounded-[6px] shadow-2xl border overflow-hidden backdrop:bg-[var(--taomni-overlay)]"
+      style={{
+        width: "min(860px, 96vw)",
+        height: "min(640px, 85vh)",
+        minWidth: "min(640px, 96vw)",
+        minHeight: "min(420px, 85vh)",
+        maxWidth: "96vw",
+        maxHeight: "85vh",
+        resize: "both",
+        background: "var(--taomni-panel-bg)",
+        borderColor: "var(--taomni-chrome-border)",
+        color: "var(--taomni-text)",
+      }}
+    >
+      <div className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none" style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}>
           <Sliders className="w-3.5 h-3.5 mr-1.5" />
-          <div className="text-[12px] font-semibold">{t("aiSettings.codexCustomModalTitle")}</div>
-          <button className="ml-auto hover:bg-red-500 rounded p-0.5" onClick={onClose} type="button" title={t("common.close")}>
+          <div className="text-ui-body font-semibold">{t("aiSettings.codexCustomModalTitle")}</div>
+          <IconButton className="ml-auto hover:bg-[var(--taomni-control-hover)] rounded p-0.5" onClick={onClose} type="button" label={t("common.close")}>
             <X className="w-3.5 h-3.5" />
-          </button>
+          </IconButton>
         </div>
 
         <div className="flex-1 min-h-0 flex border-x border-b overflow-hidden" style={{ borderColor: "var(--taomni-input-border)", background: "var(--taomni-bg)" }}>
           <div className="w-[240px] border-r flex flex-col shrink-0" style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}>
-            <div className="p-2 border-b text-[11px] font-semibold" style={{ borderColor: "var(--taomni-divider)" }}>
+            <div className="p-2 border-b text-ui-small font-semibold" style={{ borderColor: "var(--taomni-divider)" }}>
               {t("aiSettings.ccCustomListHeader")}
             </div>
             <div className="flex-1 overflow-auto p-1.5 space-y-1">
@@ -313,7 +318,7 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
                 return (
                   <div
                     key={p.id}
-                    className={`group flex items-center justify-between p-2 rounded cursor-pointer transition-colors text-[11px] ${
+                    className={`group flex items-center justify-between p-2 rounded cursor-pointer transition-colors text-ui-small ${
                       isSelected ? "bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] font-medium" : "hover:bg-[var(--taomni-hover)]"
                     }`}
                     onClick={() => setSelectedProfileId(p.id)}
@@ -321,25 +326,25 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <span className="truncate">{p.name}</span>
                       {isActive && (
-                        <span className="px-1 text-[8px] leading-tight bg-green-500/15 text-green-400 border border-green-500/35 rounded shrink-0">
+                        <span className="px-1 text-ui-caption leading-tight bg-ui-success-surface text-ui-success border border-ui-success-border rounded shrink-0">
                           {t("aiSettings.ccCustomActiveLabel")}
                         </span>
                       )}
                       {!p.enabled && (
-                        <span className="px-1 text-[8px] leading-tight bg-[var(--taomni-divider)] text-[var(--taomni-text-muted)] border rounded shrink-0">
+                        <span className="px-1 text-ui-caption leading-tight bg-[var(--taomni-divider)] text-[var(--taomni-text-muted)] border rounded shrink-0">
                           {t("aiSettings.ccCustomDisabled")}
                         </span>
                       )}
                     </div>
-                    <button type="button" title={t("common.delete")} className="opacity-0 group-hover:opacity-100 hover:text-red-400 p-0.5 transition-opacity rounded" onClick={(e) => deleteProfile(p.id, e)}>
+                    <IconButton type="button" label={t("common.delete")} className="opacity-0 group-hover:opacity-100 hover:text-ui-danger p-0.5 transition-opacity rounded" onClick={(e) => deleteProfile(p.id, e)}>
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                   </div>
                 );
               })}
             </div>
             <div className="p-2 border-t" style={{ borderColor: "var(--taomni-divider)" }}>
-              <button type="button" className="taomni-btn w-full h-7 px-3 text-[11px] inline-flex items-center justify-center gap-1" onClick={addProfile}>
+              <button type="button" className="taomni-btn w-full h-7 px-3 text-ui-small inline-flex items-center justify-center gap-1" onClick={addProfile}>
                 <Plus className="w-3.5 h-3.5" />
                 {t("aiSettings.ccCustomAddProfile")}
               </button>
@@ -351,21 +356,21 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
               <div className="flex-1 flex flex-col gap-3 min-h-0">
                 <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.ccCustomProfileNameLabel")}</label>
-                    <input type="text" className="taomni-input h-7 w-full text-[12px]" value={selected.name} onChange={(e) => updateSelectedProfile({ name: e.target.value })} />
+                    <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.ccCustomProfileNameLabel")}</label>
+                    <input type="text" className="taomni-input h-7 w-full text-ui-body" value={selected.name} onChange={(e) => updateSelectedProfile({ name: e.target.value })} />
                   </div>
                   <div className="flex flex-wrap gap-4">
-                    <label className="flex items-center gap-2 text-[11px] cursor-pointer">
+                    <label className="flex items-center gap-2 text-ui-small cursor-pointer">
                       <input type="checkbox" className="taomni-checkbox" checked={activeProfileId === selected.id} onChange={(e) => e.target.checked && setActiveProfileId(selected.id)} />
                       <span>{t("aiSettings.ccCustomActiveLabel")}</span>
                     </label>
-                    <label className="flex items-center gap-2 text-[11px] cursor-pointer">
+                    <label className="flex items-center gap-2 text-ui-small cursor-pointer">
                       <input type="checkbox" className="taomni-checkbox" checked={selected.enabled} onChange={(e) => updateSelectedProfile({ enabled: e.target.checked })} />
                       <span>{t("aiSettings.ccCustomToggleEnable")}</span>
                     </label>
                   </div>
                   <div>
-                    <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
+                    <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
                     <CodexProxyFields
                       includeInherit
                       mode={selected.proxy_mode}
@@ -377,14 +382,14 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
                 </div>
 
                 <div className="flex-1 flex flex-col min-h-[220px] mt-2 relative">
-                  <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexCustomTomlLabel")}</label>
+                  <label className="text-ui-small text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexCustomTomlLabel")}</label>
                   {selectedLoading ? (
                     <div className="flex-1 flex items-center justify-center border rounded" style={{ borderColor: "var(--taomni-input-border)" }}>
                       <Loader2 className="w-6 h-6 animate-spin text-[var(--taomni-text-muted)]" />
                     </div>
                   ) : (
                     <textarea
-                      className="taomni-input flex-1 font-mono text-[11px] leading-relaxed w-full resize-none"
+                      className="taomni-input flex-1 font-mono text-ui-small leading-relaxed w-full resize-none"
                       spellCheck={false}
                       value={selectedContent}
                       onChange={(e) => {
@@ -398,8 +403,8 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
 
                 <div className="border border-[var(--taomni-divider)] rounded p-2 bg-[var(--taomni-panel-bg)]/50 flex flex-col gap-1.5 shrink-0 mt-1">
                   <div className="flex items-center justify-between">
-                    <div className="text-[11px] font-semibold text-[var(--taomni-text)]">{t("aiSettings.ccTestTitle")}</div>
-                    <button type="button" className="taomni-btn h-6 px-2 text-[10px]" onClick={test} disabled={testing || selectedLoading}>
+                    <div className="text-ui-small font-semibold text-[var(--taomni-text)]">{t("aiSettings.ccTestTitle")}</div>
+                    <button type="button" className="taomni-btn h-6 px-2 text-ui-caption" onClick={test} disabled={testing || selectedLoading}>
                       {testing ? (
                         <>
                           <Loader2 className="w-3 h-3 animate-spin mr-1 inline" />
@@ -411,8 +416,8 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
                     </button>
                   </div>
                   {(testOutput !== null || testError !== null || testing) && (
-                    <div className="bg-[var(--taomni-bg)] border border-[var(--taomni-input-border)] rounded p-1.5 text-[10px] font-mono max-h-[100px] overflow-y-auto leading-relaxed relative">
-                      <div className="text-[9px] text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] pb-0.5 mb-1">
+                    <div className="bg-[var(--taomni-bg)] border border-[var(--taomni-input-border)] rounded p-1.5 text-ui-caption font-mono max-h-[100px] overflow-y-auto leading-relaxed relative">
+                      <div className="text-ui-caption text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] pb-0.5 mb-1">
                         Prompt: "Hello, My name is Taomni, Can you help me?"
                       </div>
                       {testing && !testOutput && (
@@ -422,12 +427,12 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
                         </div>
                       )}
                       {testOutput && <div className="whitespace-pre-wrap text-[var(--taomni-text)]">{testOutput}</div>}
-                      {testError && <div className="text-red-400 whitespace-pre-wrap">Error: {testError}</div>}
+                      {testError && <div className="text-ui-danger whitespace-pre-wrap">Error: {testError}</div>}
                     </div>
                   )}
                 </div>
 
-                <div className="text-[10px] text-[var(--taomni-text-muted)] flex items-center gap-1 shrink-0">
+                <div className="text-ui-caption text-[var(--taomni-text-muted)] flex items-center gap-1 shrink-0">
                   <Shield className="w-3.5 h-3.5 shrink-0" />
                   <span>{t("aiSettings.codexCustomNote")}</span>
                 </div>
@@ -435,7 +440,7 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-[var(--taomni-text-muted)] gap-2">
                 <Sliders className="w-8 h-8 opacity-40" />
-                <span className="text-[11px]">{t("aiSettings.codexCustomEmpty")}</span>
+                <span className="text-ui-small">{t("aiSettings.codexCustomEmpty")}</span>
               </div>
             )}
           </div>
@@ -443,21 +448,20 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
 
         <div className="h-10 px-3 flex items-center gap-2 border-t shrink-0" style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)" }}>
           {error && (
-            <span className="text-[11px] text-red-400 flex items-center gap-1">
+            <span role="alert" className="text-ui-small text-ui-danger flex items-center gap-1">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate max-w-[400px]">{error}</span>
             </span>
           )}
           <div className="flex-1" />
-          <button className="taomni-btn" onClick={onClose} disabled={saving} type="button">
+          <Button onClick={onClose} disabled={saving}>
             {t("common.cancel")}
-          </button>
-          <button className="taomni-btn" data-primary="true" onClick={save} disabled={saving} type="button">
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1 inline" /> : null}
+          </Button>
+          <Button variant="primary" onClick={save} busy={saving}>
             {t("common.save")}
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+    </ModalSurface>,
+    document.body,
   );
 }

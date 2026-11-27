@@ -4,6 +4,23 @@ import { installStubMailQaControl, type StubMailQaControl } from "../mailServerS
 import { invokeMail } from "./mail";
 
 describe("browser mail Sent copy", () => {
+  it("suggests each accepted recipient in the sending account before the next sync", async () => {
+    const accountId = "browser-sent-recipients";
+    await invokeMail("mail_send_message", {
+      config: { sessionId: accountId },
+      request: { to: ["Ada <ada@example.org>"], cc: ["ADA@example.org"], bcc: ["private@example.org"] },
+    });
+    const search = (account: string, query: string) =>
+      invokeMail("mail_search_contacts", { accountId: account, query, limit: 8 });
+    expect(await search(accountId, "ada")).toEqual([
+      expect.objectContaining({ email: "ada@example.org", name: "Ada", source: "sent" }),
+    ]);
+    expect(await search(accountId, "private")).toEqual([
+      expect.objectContaining({ email: "private@example.org", source: "sent" }),
+    ]);
+    expect(await search("another-account", "private")).toEqual([]);
+  });
+
   it("returns the complete composed body after synchronizing the Sent folder", async () => {
     const accountId = "browser-sent-copy";
     const subject = "Sent copy body";

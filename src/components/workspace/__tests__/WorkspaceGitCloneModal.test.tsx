@@ -218,4 +218,25 @@ describe("WorkspaceGitCloneModal", () => {
     );
     expect(screen.getByTestId("workspace-git-clone-retry")).toBeEnabled();
   });
+
+  it("opens as a top-layer dialog, guards IME Escape, dismisses on Escape, and restores focus", () => {
+    const opener = document.createElement("button");
+    document.body.append(opener);
+    opener.focus();
+    seedOpen();
+
+    render(<WorkspaceGitCloneModal />);
+    const dialog = screen.getByTestId("workspace-git-clone-modal");
+    expect(dialog.tagName).toBe("DIALOG");
+    const url = screen.getByTestId("workspace-git-clone-url");
+    expect(url).toHaveFocus();
+
+    fireEvent.keyDown(url, { key: "Escape", isComposing: true });
+    expect(useGitCloneStore.getState().open).toBe(true);
+
+    fireEvent.keyDown(url, { key: "Escape" });
+    expect(useGitCloneStore.getState().open).toBe(false);
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
 });

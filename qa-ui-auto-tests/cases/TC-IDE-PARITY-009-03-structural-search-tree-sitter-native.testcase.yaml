@@ -12,6 +12,7 @@ tags: [code-workspace, structural-search, parity009, native-gate, p2]
 modes: [native]
 native_platforms: [Windows, Linux]
 fixtures: [reset_db, parity009_ssr]
+ui_standard: [UI-DLG-04, UI-DLG-07]
 timeout_sec: 420
 steps:
   - open: ${cfg.app.base_url}
@@ -96,7 +97,7 @@ steps:
   - click: '[data-testid="structural-search-scope-workspace"]'
   - click: '[data-testid="structural-search-find"]'
   - wait_for: '[data-testid="structural-search-running"]'
-  - wait: 1
+  - assert_focus_within: '[data-testid="structural-search-dialog"]'
   - press: Escape
   - assert_not_visible: '[data-testid="structural-search-dialog"]'
   - wait_for:
@@ -150,7 +151,8 @@ verification:
     - 36
     - 37
   - id: ED-PARITY-009-N2
-    requirement: 无效模板为类型化错误；大工作区 In Project 运行中 Esc 取消，后端 active requests 回到 0；源文件 SHA-256 不变、编辑器不 dirty。
+    ui_standard: [UI-DLG-04, UI-DLG-07]
+    requirement: 无效模板显示类型化错误。大工作区 In Project 搜索运行期间，焦点留在对话框内。按 Esc 取消后，后端 active requests 回到 0，源文件 SHA-256 不变，编辑器没有未保存的修改。
     actions:
     - 40
     - 41
@@ -164,6 +166,8 @@ verification:
       expectation: '{assert_text: {contains: ''not a single Java statement, expression or class member'', selector: ''[data-testid="structural-search-error"]''}}'
     - step: 48
       expectation: '{wait_for: ''[data-testid="structural-search-running"]''}'
+    - step: 49
+      expectation: The running search keeps keyboard focus in its dialog.
     - step: 51
       expectation: '{assert_not_visible: ''[data-testid="structural-search-dialog"]''}'
     - step: 52
@@ -176,6 +180,9 @@ verification:
     - step: 56
       expectation: '{assert_file_sha256: {equals: ''${fixture.parity009_target_sha256}'', path: ''${fixture.parity009_target}''}}'
     results:
+    - 49
+    - 51
+    - 52
     - 53
     - 55
     - 56
@@ -184,6 +191,6 @@ verification:
     method: manual
     reason: 像素与视觉 parity 不能由 DOM 断言替代。
   native:
-  - check: 当前平台 Windows/WebView2 真实 Tauri IPC 与主机文件 SHA-256；Linux/macOS 未在本机执行。
+  - check: Windows/WebView2 或 Linux/WebKitGTK 的真实 Tauri IPC 与主机文件 SHA-256。
     method: automated
     reason: assert_file_sha256 由 harness 在主机侧独立读取字节。

@@ -341,7 +341,7 @@ export function QueryResultGrid({
 
   if (result.columns.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+      <div className="flex-1 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
         {result.rowsAffected > 0
           ? `${result.rowsAffected} row(s) affected`
           : "Statement executed. No result set."}

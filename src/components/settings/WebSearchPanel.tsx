@@ -30,7 +30,7 @@ export function WebSearchPanel() {
     if (!config) loadConfig();
   }, []);
 
-  if (!config) return <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("aiSettings.loading")}</div>;
+  if (!config) return <div className="text-ui-body text-[var(--taomni-text-muted)]">{t("aiSettings.loading")}</div>;
 
   const ws = config.web_search;
 
@@ -55,8 +55,8 @@ export function WebSearchPanel() {
   return (
     <div className="space-y-3">
       <div>
-        <div className="text-[13px] font-semibold">{t("aiSettings.webTitle")}</div>
-        <div className="text-[11px] text-[var(--taomni-text-muted)]">
+        <div className="text-ui-body font-semibold">{t("aiSettings.webTitle")}</div>
+        <div className="text-ui-small text-[var(--taomni-text-muted)]">
           {t("aiSettings.webSubtitle")}
         </div>
       </div>
@@ -73,8 +73,8 @@ export function WebSearchPanel() {
       >
         <Globe className={`w-4 h-4 shrink-0 ${ws.client_enabled ? "text-[var(--taomni-accent)]" : "text-[var(--taomni-text-muted)]"}`} />
         <div className="flex-1">
-          <div className="text-[13px] font-semibold">{t("aiSettings.webEnable")}</div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-body font-semibold">{t("aiSettings.webEnable")}</div>
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">
             {t("aiSettings.webEnableDesc")}
           </div>
         </div>
@@ -87,7 +87,7 @@ export function WebSearchPanel() {
         <>
           {/* Provider selection */}
           <div>
-            <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1.5">{t("aiSettings.webProvider")}</div>
+            <div className="text-ui-small text-[var(--taomni-text-muted)] mb-1.5">{t("aiSettings.webProvider")}</div>
             <div className="space-y-1">
               {PROVIDER_OPTIONS.map(({ value, label }) => (
                 <label key={value} className="flex items-center gap-2 cursor-pointer">
@@ -99,7 +99,7 @@ export function WebSearchPanel() {
                     onChange={() => update({ client_provider: value })}
                     className="accent-[var(--taomni-accent)]"
                   />
-                  <span className="text-[12px]">{label}</span>
+                  <span className="text-ui-body">{label}</span>
                 </label>
               ))}
             </div>
@@ -108,18 +108,18 @@ export function WebSearchPanel() {
           {/* SearXNG URL */}
           {ws.client_provider === "searxng" && (
             <div>
-              <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1">{t("aiSettings.webSearxngUrl")}</div>
+              <div className="text-ui-small text-[var(--taomni-text-muted)] mb-1">{t("aiSettings.webSearxngUrl")}</div>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  className="taomni-input h-7 flex-1 text-[12px]"
+                  className="taomni-input h-7 flex-1 text-ui-body"
                   placeholder="https://searx.be"
                   value={ws.searxng_url ?? ""}
                   onChange={(e) => update({ searxng_url: e.target.value || undefined })}
                 />
                 <button
                   type="button"
-                  className="taomni-btn h-7 px-2 text-[11px] inline-flex items-center gap-1 shrink-0"
+                  className="taomni-btn h-7 px-2 text-ui-small inline-flex items-center gap-1 shrink-0"
                   onClick={handleProbe}
                   disabled={probing}
                 >
@@ -127,7 +127,7 @@ export function WebSearchPanel() {
                 </button>
               </div>
               {probeResult && (
-                <div className="text-[11px] text-green-400 mt-1">{probeResult}</div>
+                <div className="text-ui-small text-ui-success mt-1">{probeResult}</div>
               )}
             </div>
           )}
@@ -139,7 +139,7 @@ export function WebSearchPanel() {
             ws.client_provider === "exa" ||
             ws.client_provider === "google_cse") && (
             <div>
-              <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1">
+              <div className="text-ui-small text-[var(--taomni-text-muted)] mb-1">
                 {ws.client_provider === "tavily" && t("aiSettings.webApiKeyTavily")}
                 {ws.client_provider === "serper" && t("aiSettings.webApiKeySerper")}
                 {ws.client_provider === "brave" && t("aiSettings.webApiKeyBrave")}
@@ -148,7 +148,7 @@ export function WebSearchPanel() {
               </div>
               <input
                 type="password"
-                className="taomni-input h-7 w-full text-[12px]"
+                className="taomni-input h-7 w-full text-ui-body"
                 placeholder={
                   ws.client_provider === "google_cse"
                     ? t("aiSettings.webApiKeyGooglePlaceholder")
@@ -162,7 +162,7 @@ export function WebSearchPanel() {
 
           {/* Confirmation mode */}
           <div>
-            <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1.5">{t("aiSettings.webConfirmMode")}</div>
+            <div className="text-ui-small text-[var(--taomni-text-muted)] mb-1.5">{t("aiSettings.webConfirmMode")}</div>
             <div className="space-y-1">
               {CONFIRM_MODE_OPTIONS.map(({ value, label, desc }) => (
                 <label key={value} className="flex items-start gap-2 cursor-pointer">
@@ -175,8 +175,8 @@ export function WebSearchPanel() {
                     className="mt-0.5 accent-[var(--taomni-accent)]"
                   />
                   <div>
-                    <div className="text-[12px]">{label}</div>
-                    <div className="text-[10px] text-[var(--taomni-text-muted)]">{desc}</div>
+                    <div className="text-ui-body">{label}</div>
+                    <div className="text-ui-caption text-[var(--taomni-text-muted)]">{desc}</div>
                   </div>
                 </label>
               ))}

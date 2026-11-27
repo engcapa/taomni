@@ -120,7 +120,7 @@ export const NOTEPAD_COMMAND_CATALOG: readonly NotepadCommandDefinition[] = [
 
   // Search
   { id: "search.find", titleKey: "notepad.cmd.find", defaultLabel: "Find...", zhLabel: "查找…", category: "search", defaultShortcut: "Mod+F", recordable: false },
-  { id: "search.replace", titleKey: "notepad.cmd.replace", defaultLabel: "Replace...", zhLabel: "替换…", category: "search", defaultShortcut: "Mod+H", recordable: false },
+  { id: "search.replace", titleKey: "notepad.cmd.replace", defaultLabel: "Replace...", zhLabel: "替换…", category: "search", defaultShortcut: "Mod+H", macosShortcut: "Mod+Alt+F", recordable: false },
   { id: "search.findInFiles", titleKey: "notepad.cmd.findInFiles", defaultLabel: "Find in Files...", zhLabel: "在文件中查找…", category: "search", defaultShortcut: "Mod+Shift+F", recordable: false },
   { id: "search.findNext", titleKey: "notepad.cmd.findNext", defaultLabel: "Find Next", zhLabel: "查找下一个", category: "search", defaultShortcut: "F3", recordable: true },
   { id: "search.findPrev", titleKey: "notepad.cmd.findPrev", defaultLabel: "Find Previous", zhLabel: "查找上一个", category: "search", defaultShortcut: "Shift+F3", recordable: true },

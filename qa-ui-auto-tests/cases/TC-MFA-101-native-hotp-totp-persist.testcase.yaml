@@ -10,6 +10,7 @@ description: >-
   a code through the desktop clipboard path is announced.
 covers: [F-MFA-1, F-MFA-2]
 tags: [mfa, native-boundary, p0]
+ui_standard: [UI-A11Y-01, UI-MNU-04]
 modes: [native]
 fixtures: [reset_db]
 timeout_sec: 300
@@ -53,6 +54,17 @@ steps:
 - click: '[data-testid="mfa-account-copy"]:is([data-issuer="QA Bank"] *)'
 - assert_text: {selector: '[data-testid="mfa-status"]', contains: Copied QA Bank}
 - screenshot: mfa-101-native-rows.png
+- press: {selector: '[data-testid="mfa-account-drag"]:is([data-issuer="QA TOTP"] *)', key: Enter}
+- press: End
+- press: ArrowUp
+- assert_attribute: {selector: '[data-testid="mfa-menu-move-up"]', name: data-active, equals: 'true'}
+- press: Enter
+- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [QA TOTP, QA Bank]}
+- reload: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [QA TOTP, QA Bank]}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -84,6 +96,16 @@ verification:
     - {step: 36, expectation: TOTP still correct}
     - {step: 38, expectation: copy announced}
     results: [38]
+  - id: keyboard-reorder
+    ui_standard: [UI-A11Y-01, UI-MNU-04]
+    requirement: A keyboard user can move the second account first from its drag handle and retain the custom order after reopening MFA.
+    actions: [40, 41, 42, 44, 46, 47, 48]
+    checkpoints:
+    - {step: 43, expectation: Menu focus selects Move up.}
+    - {step: 45, expectation: QA TOTP moves above QA Bank.}
+    - {step: 49, expectation: The native store restores that order after reload.}
+    - {step: 50, expectation: No runtime error accompanies keyboard reordering.}
+    results: [43, 45, 49, 50]
   visual:
   - check: Native WebView renders the MFA rows without clipping.
     method: manual

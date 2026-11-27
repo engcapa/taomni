@@ -26,7 +26,7 @@ export function TerminalPreview({
       style={{ background, color: foreground, fontFamily, fontSize }}
     >
       <span style={{ color: theme.green ?? "#62d36f" }}>user@host</span>
-      <span style={{ color: "#bbbbbb" }}>:</span>
+      <span className="opacity-70">:</span>
       <span style={{ color: theme.blue ?? "#83a7d8" }}>~/srv</span>
       {"$ tail -f /var/log/nginx/error.log"}
       <br />

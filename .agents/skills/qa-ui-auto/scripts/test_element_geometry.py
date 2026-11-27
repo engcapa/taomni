@@ -16,6 +16,13 @@ class ElementGeometryTest(TestCase):
         self.samples = [{"id": name, "width": 34, "height": 32, "icon": {"width": 16, "height": 16}}
                         for name in ("sessions", "tools", "project")]
 
+    def test_zoomed_hit_height_uses_viewport_pixels_and_rejects_an_unscaled_row(self):
+        args = {"selector": ".selected", "min_width": 24, "min_height": 24, "hit_height": 31}
+        sample = {"width": 300, "height": 28, "hit_height": 31}
+        assert_geometry(args, [sample])
+        with self.assertRaisesRegex(StepError, "hit height 28"):
+            assert_geometry(args, [dict(sample, hit_height=28)])
+
     def test_checks_every_button_and_icon(self):
         assert_geometry(self.args, self.samples)
         self.samples[-1]["width"] = 25

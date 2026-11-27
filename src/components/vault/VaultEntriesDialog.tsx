@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useState } from "react";
 import { useVaultStore } from "../../stores/vaultStore";
 import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
@@ -60,8 +61,7 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(20,30,45,0.4)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
     >
       <div
         ref={containerRef}
@@ -77,23 +77,23 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
           ref={handleRef}
           className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none"
           style={{
-            background: "linear-gradient(to bottom, #5895c8, #2b5d8b)",
-            color: "white",
+            background: "var(--taomni-chrome-bg)",
+            color: "var(--taomni-text)",
           }}
         >
           <Shield className="w-3.5 h-3.5 mr-1.5" />
-          <div className="text-[12px] font-semibold">
+          <div className="text-ui-body font-semibold">
             {t("vaultSettings.manageEntries")}
           </div>
           <div className="ml-auto flex items-center">
-            <button
-              title={t("vaultSettings.close")}
-              className="hover:bg-red-500 rounded p-0.5 animate-all duration-150"
+            <IconButton
+              label={t("vaultSettings.close")}
+              className="hover:bg-[var(--taomni-control-hover)] rounded p-0.5 animate-all duration-150"
               onClick={onClose}
               type="button"
             >
               <X className="w-3.5 h-3.5" />
-            </button>
+            </IconButton>
           </div>
         </div>
 
@@ -107,7 +107,7 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
             <input
               type="search"
               placeholder={t("vaultSettings.searchPlaceholder")}
-              className="taomni-input w-full text-[12px] h-7"
+              className="taomni-input w-full text-ui-body h-7"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ paddingLeft: "28px" }}
@@ -121,7 +121,7 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
           style={{ borderColor: "var(--taomni-input-border)", background: "var(--taomni-bg)" }}
         >
           {filteredEntries.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>
+            <div className="flex flex-col items-center justify-center h-full text-ui-body" style={{ color: "var(--taomni-text-muted)" }}>
               {searchQuery ? t("vaultSettings.noMatchingEntries") : t("vaultSettings.noEntries")}
             </div>
           ) : (
@@ -130,7 +130,7 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
                 <div
                   key={e.id}
                   data-testid={`vault-entry-${e.id}`}
-                  className="flex items-center gap-3 text-[12px] px-3 py-2 rounded transition-colors"
+                  className="flex items-center gap-3 text-ui-body px-3 py-2 rounded transition-colors"
                   style={{
                     border: "1px solid var(--taomni-card-border)",
                     background: "var(--taomni-card-bg, var(--taomni-quick-bg))"
@@ -153,15 +153,15 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
                       <Lock className="w-3.5 h-3.5" style={{ color: "var(--taomni-text-muted)" }} />
                     </span>
                   ) : (
-                    <button
+                    <IconButton
                       type="button"
-                      className="p-1 rounded text-red-600 hover:bg-red-500/10 shrink-0"
+                      className="p-1 rounded text-ui-danger hover:bg-ui-danger-surface shrink-0"
                       onClick={() => handleDelete(e.id, e.label)}
-                      title={t("vaultSettings.deleteEntry")}
+                      label={t("vaultSettings.deleteEntry")}
                       data-testid={`vault-entry-delete-${e.id}`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                   )}
                 </div>
               ))}
@@ -174,12 +174,12 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
           className="h-12 flex items-center px-4 border-t shrink-0"
           style={{ background: "var(--taomni-quick-bg)", borderColor: "var(--taomni-divider)" }}
         >
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">
             {t("vaultSettings.savedEntries", { count: filteredEntries.length })}
           </div>
           <div className="flex-1" />
           <button
-            className="taomni-btn px-4 py-1.5 text-[12px]"
+            className="taomni-btn px-4 py-1.5 text-ui-body"
             onClick={onClose}
             type="button"
           >

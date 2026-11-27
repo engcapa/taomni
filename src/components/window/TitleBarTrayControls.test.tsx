@@ -72,6 +72,10 @@ describe("TitleBarTrayControls responsive layout", () => {
     fireEvent.click(screen.getByTestId("titlebar-actions-more"));
 
     expect(screen.getByTestId("titlebar-actions-menu")).toBeInTheDocument();
+    expect(screen.getByTestId("titlebar-actions-menu")).toHaveAttribute("role", "region");
+    expect(screen.getByTestId("titlebar-actions-more")).toHaveAttribute("aria-haspopup", "true");
+    expect(screen.getByTestId("tab-split-view")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("tab-multiexec-toggle")).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId("tab-split-view")).toBeInTheDocument();
     expect(screen.getByTestId("tab-multiexec-toggle")).toBeInTheDocument();
     // v6.1 AC-04: theme/language moved to the primary rail bottom group.

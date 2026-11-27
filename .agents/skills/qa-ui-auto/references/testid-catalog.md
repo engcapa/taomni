@@ -59,7 +59,7 @@
 - `[data-testid="ai-chat-composer-resize"]` — interactive [optional] — F-AI-2.4.ai-chat-composer-resize
 - `[data-testid="ai-chat-attachment-error"]` — display [optional] — F-AI-2.4.ai-chat-attachment-error
 - `button[title="New chat"]` — interactive [optional] — F-AI-2.4.ai-chat-new
-- `button[title="History"]` — interactive [optional] — F-AI-2.4.ai-chat-history
+- `button[aria-label="History"]` — interactive [optional] — F-AI-2.4.ai-chat-history
 - `button[aria-label="Copy entire conversation"]` — interactive [optional] — F-AI-2.4.ai-chat-copy-all
 - `[data-testid="ai-chat-drawer-hide"]` — interactive [optional] — F-AI-2.4.ai-chat-close
 - `[data-testid="ai-chat-drawer-position"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-position
@@ -947,6 +947,10 @@
 ## database/hbase (F-DB-3)
 
 - `[data-testid="hbase-connection-mode"]` — interactive [optional] — F-DB-3.connection-mode
+- `input[aria-label="HBase site config file path"]` — interactive [optional] — F-DB-3.site-path
+- `input[aria-label="HBase ZooKeeper quorum"]` — interactive [optional] — F-DB-3.connection-quorum
+- `[data-testid="hbase-settings"] button[title="Read hbase-site.xml and populate the connection fields"]` — interactive [optional] — F-DB-3.analyze-site
+- `[data-testid="hbase-settings"] [role="alert"]` — display [optional] — F-DB-3.site-analysis-error
 - `input[aria-label="Remote host"]` — interactive [optional] — F-DB-3.remote-host
 - `input[aria-label="HBase namespace"]` — interactive [optional] — F-DB-3.namespace
 - `[data-testid="hbase-schema-tree"]` — display [optional] — F-DB-3.schema-tree
@@ -1425,6 +1429,7 @@
 - `[data-testid="explorer-properties-close"]` — interactive — F-EXPLORER-1.explorer-properties-close
 - `[data-testid="explorer-properties-size"]` — display — F-EXPLORER-1.explorer-properties-size
 - `[data-testid="explorer-refresh"]` — interactive — F-EXPLORER-1.explorer-refresh
+- `[data-testid="explorer-rename-error"]` — display — F-EXPLORER-1.explorer-rename-error
 - `[data-testid="explorer-rename-input"]` — interactive — F-EXPLORER-1.explorer-rename-input
 - `[data-testid="explorer-restore-tabs"]` — interactive — F-EXPLORER-1.explorer-restore-tabs
 - `[data-testid="explorer-sort-asc"]` — interactive — F-EXPLORER-1.explorer-sort-asc
@@ -1766,12 +1771,13 @@
 - `[data-testid="mail-attachment-open"]` — interactive — F-FILEOPEN-1.mail-attachment-open
 - `[data-testid="mail-attachment-preview"]` — interactive — F-FILEOPEN-1.mail-attachment-preview
 - `[data-testid="mail-attachment-system"]` — interactive — F-FILEOPEN-1.mail-attachment-system
-- `[data-testid="ai-chat-drawer"] button[title="History"]` — interactive — F-FILEOPEN-1.file-open-chat-history
+- `[data-testid="ai-chat-drawer"] button[aria-label="History"]` — interactive — F-FILEOPEN-1.file-open-chat-history
 - `xpath=//*[@data-testid="ai-chat-drawer"]//div[text()="QA file path entry"]` — interactive — F-FILEOPEN-1.file-open-chat-thread
 - `[data-testid="ai-file-link"]` — interactive — F-FILEOPEN-1.ai-file-link
 
 ## git/diff (F26.1)
 
+- `[data-testid="git-change-row"]` — interactive — F26.1.git-change-row
 - `[data-testid="git-change-status"]` — display — F26.1.git-change-status
 - `[data-testid="git-log-file-status"]` — display — F26.1.git-log-file-status
 - `[data-testid="git-changes-list-resize-handle"]` — interactive — F26.1.git-changes-list-resize-handle
@@ -2216,6 +2222,8 @@
 - `[data-testid="terminal-detach"]` — interactive — F-Detach-1.terminal-detach
 - `[data-testid="terminal-maximize"]` — interactive [optional] — F-Detach-1.terminal-maximize
 - `[data-testid="vnc-detach"]` — interactive [optional] — F-Detach-1.vnc-detach
+- `[data-testid="detached-handoff"]` — display [optional] — F-Detach-1.detached-handoff
+- `[data-testid="detached-handoff-close"]` — interactive [optional] — F-Detach-1.detached-handoff-close
 - `[data-testid="detached-session-window"]` — display [optional] — F-Detach-1.detached-window
 - `[data-testid="detached-reattach"]` — interactive [optional] — F-Detach-1.detached-reattach
 - `[data-testid="detached-os-fullscreen"]` — interactive [optional] — F-Detach-1.detached-os-fullscreen
@@ -2227,6 +2235,7 @@
 ## main/menubar (F1.8)
 
 - `[data-testid="about-check-update"]` — interactive — F1.8.about-check-update
+- `[data-testid="about-close"]` — interactive — F1.8.about-close
 - `[data-testid="about-version"]` — interactive — F1.8.about-version
 - `[data-testid="app-main-menu"]` — interactive — F1.8.app-main-menu
 - `[data-testid="about-dialog"]` — display [optional] — F1.8.about-dialog
@@ -2243,6 +2252,11 @@
 
 ## main/recovery (F1.10)
 
+- `[data-testid="recovery-page"]` — display — F1.10.recovery-page
+- `[data-testid="recovery-view-menu"]` — interactive — F1.10.recovery-view-menu
+- `[data-testid="recovery-zoom-in"]` — interactive — F1.10.recovery-zoom-in
+- `[data-testid="recovery-zoom-out"]` — interactive — F1.10.recovery-zoom-out
+- `[data-testid="recovery-zoom-reset"]` — interactive — F1.10.recovery-zoom-reset
 - `[data-testid="recovery-background-refresh"]` — interactive — F1.10.recovery-background-refresh
 - `[data-testid="recovery-background-status"]` — display — F1.10.recovery-background-status
 - `[data-testid="recovery-workspace"]` — display — F1.10.recovery-workspace
@@ -2332,6 +2346,7 @@
   ↳ `[data-testid="app-theme-light"]` — alias
   ↳ `[data-testid="app-theme-system"]` — alias
 - `button[aria-label="Cycle application theme"]` — interactive [optional] — F5.5.theme-icon-button
+- `[role="tooltip"]` — display [optional] — F5.5.desktop-control-tooltip
 - `html` — display — F5.5.root-theme-attr
 
 ## main/welcome (F1.6)
@@ -3586,6 +3601,8 @@
 - `[data-testid="screenshot-edit"]` — interactive [optional] — F27.1.screenshot-edit
 - `[data-testid="screenshot-edit-external"]` — interactive [optional] — F27.1.screenshot-edit-external
 - `[data-testid="screenshot-edit-panel"]` — display [optional] — F27.1.screenshot-edit-panel
+- `[data-testid="screenshot-edit-close"]` — interactive [optional] — F27.1.screenshot-edit-close
+- `[data-testid="screenshot-edit-width"]` — interactive [optional] — F27.1.screenshot-edit-width
 - `[data-testid="screenshot-edit-redo"]` — interactive [optional] — F27.1.screenshot-edit-redo
 - `[data-testid="screenshot-edit-rotate"]` — interactive [optional] — F27.1.screenshot-edit-rotate
 - `[data-testid="screenshot-edit-undo"]` — interactive [optional] — F27.1.screenshot-edit-undo
@@ -3685,6 +3702,7 @@
 - `[data-testid="sidebar"]` — display — F6.2.sidebar
 - `[data-testid="side-tab-sessions"]` — interactive — F6.2.side-tab-sessions
 - `[data-testid="session-tree"]` — display — F6.2.session-tree
+- `[data-testid="session-protocol-label"]` — display — F6.2.session-protocol-label
 - `[data-testid="session-tree-item"]` — interactive — F6.2.session-tree-item
 - `[data-testid="session-tree-folder"]` — interactive — F6.2.session-tree-folder
 - `[data-testid="context-menu-item-move-to-folder"]` — interactive [optional] — F6.2.context-move-to-folder
@@ -3974,6 +3992,7 @@
 - `[data-testid="backup-restore-password"]` — interactive — F-BACKUP-1.restore-password
 - `[data-testid="backup-restore-unlock"]` — interactive — F-BACKUP-1.restore-unlock
 - `[data-testid="backup-restore-dialog"]` — display — F-BACKUP-1.restore-dialog
+- `[data-testid="backup-restore-name"]` — interactive — F-BACKUP-1.restore-name
 - `[data-testid="backup-restore-vault-password"]` — interactive — F-BACKUP-1.restore-vault-password
 - `[data-testid="backup-restore-confirm"]` — interactive — F-BACKUP-1.restore-confirm
 - `[data-testid="backup-restore-error"]` — display — F-BACKUP-1.restore-error
@@ -4006,6 +4025,7 @@
 - `[data-testid="backup-local-includeMailOriginals"]` — interactive — F-BACKUP-1.backup-local-includeMailOriginals
 - `[data-testid="backup-local-includeMailAttachments"]` — interactive — F-BACKUP-1.backup-local-includeMailAttachments
 - `[data-testid="backup-local-restore"]` — interactive — F-BACKUP-1.local-completed-restore
+- `:nth-child(1 of [data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]) [data-testid="backup-local-restore"]` — interactive — F-BACKUP-1.first-completed-local-restore
 - `[data-testid="backup-destination-select"]` — interactive — F-BACKUP-1.destination-select
 
 ## settings/backup (F-BACKUP-2)
@@ -4551,6 +4571,12 @@
 - `[data-testid="terminal-event-log"]` — display [optional] — F4.7.event-log-panel
 - `[data-testid="terminal-event-log-close"]` — interactive [optional] — F4.7.event-log-close
 
+## terminal/right-menu (F4.8)
+
+- `input[aria-label="Find"]` — interactive — F4.8.terminal-find-input
+- `[data-testid="terminal-search-bar"]` — display — F4.8.terminal-search-bar
+- `[data-testid="terminal-find-status"]` — display — F4.8.terminal-find-status
+
 ## terminal/split (F-Split-1)
 
 - `[data-testid="terminal-split-stage"]` — display [optional] — F-Split-1.split-stage
@@ -4817,12 +4843,18 @@
 - `[data-testid="vnc-send-cad"]` — interactive [optional] — F9.6.send-ctrl-alt-del
 - `[data-testid="vnc-fullscreen"]` — interactive [optional] — F9.6.fullscreen
 - `[data-testid="vnc-session-menu"]` — interactive [optional] — F9.6.session-menu
+- `[data-testid="vnc-menu-properties"]` — interactive — F9.6.vnc-menu-properties
+- `[data-testid="vnc-prop-quality"]` — interactive — F9.6.vnc-prop-quality
+- `[data-testid="vnc-prop-cancel"]` — interactive — F9.6.vnc-prop-cancel
+- `[data-testid="vnc-session-info-ok"]` — interactive — F9.6.vnc-session-info-ok
 - `[data-testid="vnc-menu-info"]` — interactive [optional] — F9.6.menu-info
 - `[data-testid="vnc-menu-quality"]` — interactive [optional] — F9.6.menu-quality
 - `[data-testid="vnc-quality-low"]` — interactive [optional] — F9.6.quality-low
 - `[data-testid="vnc-menu-send-f8"]` — interactive [optional] — F9.6.menu-send-f8
 - `[data-testid="vnc-session-info"]` — display [optional] — F9.6.session-info
 - `[data-testid="vnc-reconnect"]` — interactive [optional] — F9.6.reconnect
+  ↳ `[data-testid="vnc-overlay-disconnected"] [data-testid="vnc-reconnect"]` — alias
+- `[data-testid="vnc-connect-stop"]` — interactive [optional] — F9.6.connect-stop
 - `[data-testid="vnc-reconnect-stop"]` — interactive [optional] — F9.6.reconnect-stop
 - `[data-testid="vnc-unencrypted-continue"]` — interactive [optional] — F9.6.unencrypted-continue
 - `[data-testid="vnc-auth-password"]` — interactive [optional] — F9.6.vnc-auth-password

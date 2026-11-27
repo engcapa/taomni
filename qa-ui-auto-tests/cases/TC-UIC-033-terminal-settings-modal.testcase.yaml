@@ -1,0 +1,45 @@
+id: TC-UIC-033-terminal-settings-modal
+title: Current terminal settings opens in the modal top layer, wraps Tab, and returns focus to the terminal
+covers: [F4.1, F5.2]
+fixtures: [reset_db]
+modes: [browser, native]
+tags: [ui-contract, terminal, keyboard]
+ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-06, UI-DLG-07, UI-DLG-15]
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="tao-home-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="terminal-context-change-settings"]'
+- wait_for: '[data-testid="terminal-current-settings-dialog"]:modal'
+- assert_element_geometry: {selector: '[data-testid="terminal-current-settings-dialog"]', min_width: 600, min_height: 200, viewport_margin: 16}
+- assert_focus_on: '[data-testid="terminal-current-settings-footer-close"]'
+- press: Tab
+- assert_focus_within: '[data-testid="terminal-current-settings-dialog"] header'
+- press: Shift+Tab
+- assert_focus_on: '[data-testid="terminal-current-settings-footer-close"]'
+- press: Escape
+- wait_for: {selector: '[data-testid="terminal-current-settings-dialog"]', state: detached}
+- assert_focus_within: '[data-testid="terminal-pane"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: modal-focus-cycle
+    requirement: Current terminal settings opens in the top layer within the viewport, wraps Tab between both ends, and restores terminal focus on Escape.
+    ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-06, UI-DLG-07, UI-DLG-15]
+    actions: [6, 10, 12, 14]
+    checkpoints:
+    - {step: 7, expectation: The terminal settings dialog owns the modal top layer.}
+    - {step: 8, expectation: The dialog fits inside the viewport with the required complex width.}
+    - {step: 9, expectation: Initial focus lands on the footer Close button.}
+    - {step: 11, expectation: Forward Tab wraps to the dialog header close button.}
+    - {step: 13, expectation: Reverse Tab wraps back to the footer Close button.}
+    - {step: 15, expectation: Escape closes the modal dialog.}
+    - {step: 16, expectation: Keyboard focus returns to the active terminal pane.}
+    results: [7, 8, 9, 11, 13, 15, 16]
+  visual:
+  - {check: Modal geometry and header/footer layout, method: automated, reason: Checks the complex modal dimensions and viewport margin.}
+  native:
+  - {check: Packaged WebView top layer and terminal focus restoration, method: automated, reason: "Verifies native context menu launch, WebDriver Tab wrap, and terminal refocus on Escape."}

@@ -116,18 +116,24 @@ export function MfaAccountRow({
           : dropActive
           ? "var(--taomni-selected)"
           : "var(--taomni-card-bg)",
-        boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.03)",
+        boxShadow: "var(--taomni-shadow-sm)",
         outline: dropActive ? "1px dashed var(--taomni-accent)" : undefined,
       }}
     >
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
         {reorderable ? (
-          <span
+          <button
+            type="button"
+            aria-haspopup="menu"
             data-testid="mfa-account-drag"
-            role="button"
             aria-label={t("mfa.dragHandle", { name })}
             title={t("mfa.dragHandle", { name })}
             className="shrink-0 cursor-grab text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] touch-none p-0.5 rounded"
+            onClick={(event) => {
+              // Keyboard and assistive activation open the same Move up/down
+              // actions. Pointer movement remains owned by the drag session.
+              if (event.detail === 0) onMenu(event);
+            }}
             onPointerDown={(event) => {
               if (event.button !== 0) return;
               event.preventDefault();
@@ -139,7 +145,7 @@ export function MfaAccountRow({
             }}
           >
             <GripVertical className="w-3.5 h-3.5" />
-          </span>
+          </button>
         ) : null}
         <button
           type="button"
@@ -153,12 +159,12 @@ export function MfaAccountRow({
           <Star
             className="w-3.5 h-3.5"
             fill={account.pinned ? "currentColor" : "none"}
-            style={{ color: account.pinned ? "#e0a800" : "var(--taomni-text-muted)" }}
+            style={{ color: account.pinned ? "var(--taomni-warning-icon)" : "var(--taomni-text-muted)" }}
           />
         </button>
         <div
           data-testid="mfa-account-avatar"
-          className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center font-bold text-[12px] tracking-wider select-none border"
+          className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center font-bold text-ui-body tracking-wider select-none border"
           style={{
             backgroundColor: avatar.palette.bg,
             color: avatar.palette.text,
@@ -169,19 +175,19 @@ export function MfaAccountRow({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span data-testid="mfa-account-issuer" className="truncate text-[14px] font-semibold tracking-tight">
+            <span data-testid="mfa-account-issuer" className="truncate text-ui-title font-semibold tracking-tight">
               {account.issuer || account.accountName}
             </span>
             {account.group ? (
-              <span data-testid="mfa-account-group" className="taomni-pill shrink-0 text-[10px]" style={{ color: "var(--taomni-text-muted)" }}>
+              <span data-testid="mfa-account-group" className="taomni-pill shrink-0 text-ui-caption" style={{ color: "var(--taomni-text-muted)" }}>
                 {account.group}
               </span>
             ) : null}
             {account.kind === "hotp" ? (
-              <span className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-medium border" style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}>HOTP</span>
+              <span className="shrink-0 px-1.5 py-0.2 rounded text-ui-caption font-medium border" style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}>HOTP</span>
             ) : null}
           </div>
-          <div data-testid="mfa-account-name" className="truncate text-[12px] mt-0.5" style={{ color: "var(--taomni-text-muted)" }}>
+          <div data-testid="mfa-account-name" className="truncate text-ui-body mt-0.5" style={{ color: "var(--taomni-text-muted)" }}>
             {account.issuer ? account.accountName : ""}
           </div>
         </div>
@@ -196,7 +202,7 @@ export function MfaAccountRow({
             aria-label={t("mfa.copyCode", { name })}
             title={t("mfa.copyCode", { name })}
             disabled={!code}
-            className="group/code relative rounded-md px-2 py-0.5 font-mono text-[22px] sm:text-[24px] font-bold tabular-nums tracking-widest hover:bg-[var(--taomni-hover)] focus-visible:outline focus-visible:outline-2 disabled:opacity-40 transition-colors"
+            className="group/code relative rounded-md px-2 py-0.5 font-mono text-[length:calc(var(--taomni-ui-font-size,12px)*1.8333)] sm:text-[length:calc(var(--taomni-ui-font-size,12px)*2)] font-bold tabular-nums tracking-widest hover:bg-[var(--taomni-hover)] focus-visible:outline focus-visible:outline-2 disabled:opacity-40 transition-colors"
             style={{ color: "var(--taomni-accent)" }}
             onClick={() => onCopy("current")}
             onKeyDown={onCodeKeyDown}
@@ -209,7 +215,7 @@ export function MfaAccountRow({
               data-testid="mfa-account-next-code"
               aria-label={t("mfa.copyNextCode", { name })}
               title={t("mfa.copyNextCode", { name })}
-              className="rounded px-1.5 py-0.2 text-[11px] font-mono tabular-nums hover:bg-[var(--taomni-hover)] transition-colors"
+              className="rounded px-1.5 py-0.2 text-ui-small font-mono tabular-nums hover:bg-[var(--taomni-hover)] transition-colors"
               style={{ color: "var(--taomni-text-muted)" }}
               onClick={() => onCopy("next")}
             >
@@ -227,7 +233,7 @@ export function MfaAccountRow({
               data-testid="mfa-account-hotp-next"
               aria-label={t("mfa.hotpNextLabel", { name })}
               title={t("mfa.hotpNextLabel", { name })}
-              className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium hover:bg-[var(--taomni-hover)] transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-ui-small font-medium hover:bg-[var(--taomni-hover)] transition-colors"
               style={{ borderColor: "var(--taomni-input-border)" }}
               onClick={onHotpNext}
             >
@@ -251,6 +257,7 @@ export function MfaAccountRow({
           </button>
           <button
             type="button"
+            aria-haspopup="menu"
             data-testid="mfa-account-menu"
             aria-label={t("mfa.more", { name })}
             title={t("mfa.more", { name })}

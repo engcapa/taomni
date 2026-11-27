@@ -50,7 +50,7 @@ export function HomeSidebar({
         <div className="font-semibold text-[var(--taomni-text)]" style={{ fontSize: "var(--taomni-ui-font-size)" }}>
           {t("platform.homeTitle")}
         </div>
-        <div className="mt-0.5 text-[11px] text-[var(--taomni-text-muted)]">{t("platform.homeHint")}</div>
+        <div className="mt-0.5 text-ui-small text-[var(--taomni-text-muted)]">{t("platform.homeHint")}</div>
       </div>
       <div className="flex shrink-0 flex-wrap gap-1 p-2">
         <button
@@ -79,12 +79,12 @@ export function HomeSidebar({
         {navButton("tools", t("platform.tools"), <Wrench className="w-4 h-4" />, "home-nav-tools")}
       </div>
       <div className="mt-1 flex min-h-0 flex-1 flex-col border-t" style={{ borderColor: "var(--taomni-divider)" }}>
-        <div className="px-2.5 py-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
+        <div className="px-2.5 py-1.5 text-ui-caption font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
           {t("welcome.recentSessions")}
         </div>
         <div className="flex-1 overflow-y-auto px-1.5 pb-2" data-testid="home-recent-sessions">
           {recent.length === 0 && (
-            <div className="px-1 py-1 text-[11px] text-[var(--taomni-text-muted)]">{t("sidebar.noRecent")}</div>
+            <div className="px-1 py-1 text-ui-small text-[var(--taomni-text-muted)]">{t("sidebar.noRecent")}</div>
           )}
           {recent.map((session) => (
             <button
@@ -100,11 +100,11 @@ export function HomeSidebar({
                 <span className="block truncate text-[var(--taomni-text)]" style={{ fontSize: "var(--taomni-ui-font-size)" }}>
                   {session.name}
                 </span>
-                <span className="block truncate text-[10.5px] text-[var(--taomni-text-muted)]">
+                <span className="block truncate text-ui-caption text-[var(--taomni-text-muted)]">
                   {session.username ? `${session.username}@` : ""}{session.host}
                 </span>
               </span>
-              <span className="rounded px-1 text-[9px] uppercase text-[var(--taomni-text-muted)]" style={{ border: "1px solid var(--taomni-divider)" }}>
+              <span className="rounded px-1 text-ui-caption uppercase text-[var(--taomni-text-muted)]" style={{ border: "1px solid var(--taomni-divider)" }}>
                 {session.session_type}
               </span>
             </button>

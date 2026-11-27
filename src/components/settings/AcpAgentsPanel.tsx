@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -204,8 +205,8 @@ export function AcpAgentsPanel() {
   return (
     <div className="space-y-3" data-testid="acp-settings">
       <div>
-        <div className="text-[13px] font-semibold">{t("aiSettings.acpTitle")}</div>
-        <div className="text-[11px] text-[var(--taomni-text-muted)]">
+        <div className="text-ui-body font-semibold">{t("aiSettings.acpTitle")}</div>
+        <div className="text-ui-small text-[var(--taomni-text-muted)]">
           {t("aiSettings.acpSubtitle")}
         </div>
       </div>
@@ -224,8 +225,8 @@ export function AcpAgentsPanel() {
       >
         <TerminalSquare className="w-4 h-4 text-[var(--taomni-accent)]" />
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold">{t("aiSettings.acpEnable")}</div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-body font-semibold">{t("aiSettings.acpEnable")}</div>
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">
             {unavailable ? t("aiSettings.acpUnavailable") : t("aiSettings.acpEnableDesc")}
           </div>
         </div>
@@ -241,7 +242,7 @@ export function AcpAgentsPanel() {
       <div className="rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] p-3 space-y-3">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_160px] gap-3">
           <div>
-            <label className="text-[11px] font-semibold block mb-1">
+            <label className="text-ui-small font-semibold block mb-1">
               {t("aiSettings.acpGlobalProxy")}
             </label>
             <AcpProxyFields
@@ -253,7 +254,7 @@ export function AcpAgentsPanel() {
             />
           </div>
           <div>
-            <label className="text-[11px] font-semibold block mb-1" htmlFor="acp-timeout-seconds">
+            <label className="text-ui-small font-semibold block mb-1" htmlFor="acp-timeout-seconds">
               {t("aiSettings.acpTimeout")}
             </label>
             <input
@@ -261,7 +262,7 @@ export function AcpAgentsPanel() {
               type="number"
               min={1}
               max={600}
-              className="taomni-input h-7 w-full text-[12px]"
+              className="taomni-input h-7 w-full text-ui-body"
               value={draft.request_timeout_seconds}
               onChange={(event) => patchBridge({
                 request_timeout_seconds: Math.min(600, Math.max(1, Number(event.target.value) || 1)),
@@ -270,7 +271,7 @@ export function AcpAgentsPanel() {
             />
           </div>
         </div>
-        <div className="text-[10px] text-[var(--taomni-text-muted)]">
+        <div className="text-ui-caption text-[var(--taomni-text-muted)]">
           {t("aiSettings.acpProxyNote")}
         </div>
       </div>
@@ -278,7 +279,7 @@ export function AcpAgentsPanel() {
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+          className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5"
           onClick={addProfile}
           data-testid="acp-add-profile"
         >
@@ -288,7 +289,7 @@ export function AcpAgentsPanel() {
         {!hasGrok && (
           <button
             type="button"
-            className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+            className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5"
             onClick={restoreGrok}
             data-testid="acp-restore-grok"
           >
@@ -298,7 +299,7 @@ export function AcpAgentsPanel() {
         )}
         <button
           type="button"
-          className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+          className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5"
           onClick={() => void persist()}
           disabled={!dirty || saving}
           data-testid="acp-save"
@@ -307,7 +308,7 @@ export function AcpAgentsPanel() {
           {saving ? t("aiSettings.llmSaving") : t("aiSettings.llmSave")}
         </button>
         {saved && !dirty && (
-          <span className="text-[11px] text-green-400">{t("aiSettings.llmSaved")}</span>
+          <span className="text-ui-small text-ui-success">{t("aiSettings.llmSaved")}</span>
         )}
       </div>
 
@@ -329,10 +330,10 @@ export function AcpAgentsPanel() {
                     onChange={(event) => toggleProfile(profile.id, event.target.checked)}
                     data-testid={`acp-profile-${profile.id}-enabled`}
                   />
-                  <span className="text-[12px] font-semibold truncate">{profile.name}</span>
-                  <code className="text-[10px] text-[var(--taomni-text-muted)]">acp:{profile.id}</code>
+                  <span className="text-ui-body font-semibold truncate">{profile.name}</span>
+                  <code className="text-ui-caption text-[var(--taomni-text-muted)]">acp:{profile.id}</code>
                 </label>
-                <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                <label className="flex items-center gap-1.5 text-ui-small cursor-pointer">
                   <input
                     type="radio"
                     name="active-acp-profile"
@@ -343,34 +344,34 @@ export function AcpAgentsPanel() {
                   {t("aiSettings.acpPreferred")}
                 </label>
                 {!isGrok && (
-                  <button
+                  <IconButton
                     type="button"
-                    className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center text-red-400"
+                    className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center text-ui-danger"
                     onClick={() => removeProfile(profile.id)}
-                    title={t("aiSettings.acpRemoveProfile")}
+                    label={t("aiSettings.acpRemoveProfile")}
                     data-testid={`acp-profile-${profile.id}-remove`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  </IconButton>
                 )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className="text-[11px] text-[var(--taomni-text-muted)]">
+                <label className="text-ui-small text-[var(--taomni-text-muted)]">
                   {t("aiSettings.acpProfileName")}
                   <input
                     type="text"
-                    className="taomni-input h-7 w-full mt-1 text-[12px]"
+                    className="taomni-input h-7 w-full mt-1 text-ui-body"
                     value={profile.name}
                     onChange={(event) => patchProfile(profile.id, { name: event.target.value })}
                     data-testid={`acp-profile-${profile.id}-name`}
                   />
                 </label>
-                <label className="text-[11px] text-[var(--taomni-text-muted)]">
+                <label className="text-ui-small text-[var(--taomni-text-muted)]">
                   {t("aiSettings.acpCommand")}
                   <input
                     type="text"
-                    className="taomni-input h-7 w-full mt-1 text-[12px] font-mono"
+                    className="taomni-input h-7 w-full mt-1 text-ui-body font-mono"
                     value={profile.command}
                     onChange={(event) => patchProfile(profile.id, { command: event.target.value })}
                     placeholder="agent-cli"
@@ -380,10 +381,10 @@ export function AcpAgentsPanel() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className="text-[11px] text-[var(--taomni-text-muted)]">
+                <label className="text-ui-small text-[var(--taomni-text-muted)]">
                   {t("aiSettings.acpArgs")}
                   <textarea
-                    className="taomni-input min-h-20 w-full mt-1 py-1.5 text-[12px] font-mono resize-y"
+                    className="taomni-input min-h-20 w-full mt-1 py-1.5 text-ui-body font-mono resize-y"
                     value={profile.args.join("\n")}
                     onChange={(event) => patchProfile(profile.id, {
                       args: event.target.value.split("\n").map((arg) => arg.trim()).filter(Boolean),
@@ -395,11 +396,11 @@ export function AcpAgentsPanel() {
                   />
                 </label>
                 <div className="space-y-2">
-                  <label className="text-[11px] text-[var(--taomni-text-muted)]">
+                  <label className="text-ui-small text-[var(--taomni-text-muted)]">
                     {t("aiSettings.acpAuthMethod")}
                     <input
                       type="text"
-                      className="taomni-input h-7 w-full mt-1 text-[12px] font-mono"
+                      className="taomni-input h-7 w-full mt-1 text-ui-body font-mono"
                       value={profile.auth_method_id ?? ""}
                       onChange={(event) => patchProfile(profile.id, {
                         auth_method_id: event.target.value.trim() || null,
@@ -409,7 +410,7 @@ export function AcpAgentsPanel() {
                     />
                   </label>
                   <div>
-                    <div className="text-[11px] text-[var(--taomni-text-muted)] mb-1">
+                    <div className="text-ui-small text-[var(--taomni-text-muted)] mb-1">
                       {t("aiSettings.acpProfileProxy")}
                     </div>
                     <AcpProxyFields
@@ -425,7 +426,7 @@ export function AcpAgentsPanel() {
               </div>
 
               {isGrok && (
-                <div className="text-[10px] text-[var(--taomni-text-muted)]">
+                <div className="text-ui-caption text-[var(--taomni-text-muted)]">
                   {t("aiSettings.acpGrokNote")}
                 </div>
               )}
@@ -433,7 +434,7 @@ export function AcpAgentsPanel() {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+                  className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5"
                   onClick={() => void probe(profile.id)}
                   disabled={probing !== null || saving || !profile.command.trim()}
                   data-testid={`acp-profile-${profile.id}-probe`}
@@ -445,7 +446,7 @@ export function AcpAgentsPanel() {
                 </button>
                 {result && (
                   <div
-                    className={`flex items-start gap-1.5 text-[11px] ${result.ok ? "text-green-400" : "text-red-400"}`}
+                    className={`flex items-start gap-1.5 text-ui-small ${result.ok ? "text-ui-success" : "text-ui-danger"}`}
                     data-testid={`acp-profile-${profile.id}-probe-result`}
                   >
                     {result.ok
@@ -454,7 +455,7 @@ export function AcpAgentsPanel() {
                     <span>
                       {result.message}
                       {result.agent && (
-                        <span className="block text-[10px] text-[var(--taomni-text-muted)]">
+                        <span className="block text-ui-caption text-[var(--taomni-text-muted)]">
                           {t("aiSettings.acpCapabilities", {
                             load: result.agent.supportsSessionLoad ? t("common.yes") : t("common.no"),
                             mcp: result.agent.supportsMcpHttp ? t("common.yes") : t("common.no"),

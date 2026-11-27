@@ -109,7 +109,17 @@ export function registerMailClientTabHistory3Cases(caseContext: registerMailClie
     fireEvent.click(await caseContext.replyAndReach("mail-compose-subject"));
     fireEvent.change(screen.getByTestId("mail-compose-subject"), { target: { value: "Report attached" } });
     fireEvent.click(screen.getByTestId("mail-compose-send"));
-    expect(await screen.findByTestId("mail-attach-reminder")).toBeInTheDocument();
+    const reminder = await screen.findByRole("dialog", { name: "Attachment missing" });
+    expect(reminder).toHaveAccessibleDescription(/no file is attached/);
+    const cancel = screen.getByTestId("mail-attach-reminder-cancel");
+    expect(cancel).toHaveFocus();
+    fireEvent.keyDown(cancel, { key: "Escape", isComposing: true });
+    expect(reminder).toBeInTheDocument();
+    fireEvent.keyDown(cancel, { key: "Escape" });
+    expect(screen.queryByTestId("mail-attach-reminder")).toBeNull();
+    expect(screen.getByTestId("mail-compose-subject")).toHaveValue("Report attached");
+    fireEvent.click(screen.getByTestId("mail-compose-send"));
+    expect(await screen.findByTestId("mail-attach-reminder-cancel")).toHaveFocus();
     expect(mailMocks.mailSendMessage).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("mail-attach-reminder-send"));
     await waitFor(() => expect(mailMocks.mailSendMessage).toHaveBeenCalledTimes(1));
@@ -126,7 +136,9 @@ export function registerMailClientTabHistory3Cases(caseContext: registerMailClie
     fireEvent.click(screen.getByTestId("mail-compose-send"));
 
     const dialog = await screen.findByTestId("mail-compose-error-dialog");
-    expect(dialog).toHaveTextContent("Invalid recipient: not-an-email");
+    expect(dialog).toHaveRole("alertdialog");
+    expect(dialog).toHaveAccessibleDescription("Invalid recipient: not-an-email");
+    expect(screen.getByTestId("mail-compose-error-ok")).toHaveFocus();
     expect(mailMocks.mailSendMessage).not.toHaveBeenCalled();
     expect(screen.queryByTestId("mail-attach-reminder")).toBeNull();
     fireEvent.click(screen.getByTestId("mail-compose-error-ok"));

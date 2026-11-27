@@ -1,3 +1,4 @@
+import { AlertCircle } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { sftpLocalHome, formatBytes } from "../../lib/sftp";
 import { openExplorer } from "../../lib/explorer/openExplorer";
@@ -21,6 +22,8 @@ import { useExplorerDrop } from "./useExplorerDrop";
 import { useExplorerLabels } from "./explorerLabels";
 import { useElementResizeFrame } from "../../hooks/useElementResizeFrame";
 import { useExplorerSearch } from "./useExplorerSearch";
+import { CopyErrorDetails, ToastStack } from "../ui/Toast";
+import { useT } from "../../lib/i18n";
 import "./explorer.css";
 
 export interface ExplorerShellProps {
@@ -34,6 +37,7 @@ export interface ExplorerShellProps {
 /** Composition only: directory, filesystem work, preview and navigation have independent owners. */
 export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, onOpenTerminal }: ExplorerShellProps) {
   const label = useExplorerLabels();
+  const t = useT();
   const preferences = useExplorerPreferences();
   const operations = useExplorerOperations(tabId, workspaceId);
   const pane = useExplorerDirectory(tabId, initialPath, operations.notify);
@@ -159,9 +163,17 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
           {narrow && previewOverlay ? <div className="ex-preview-overlay" data-position={preferences.previewPosition}>{preview}</div> : preview}
         </div>
       </div>
+      {operations.renamePath && operations.renameError && <div id={operations.renameErrorId}
+        data-testid="explorer-rename-error" role="alert" className="flex items-center gap-2 bg-ui-danger-surface px-3 py-1 text-ui-danger select-text">
+        <AlertCircle aria-hidden="true" className="size-3.5 shrink-0" />
+        {t("feedback.renameFailed", { detail: operations.renameError })}
+      </div>}
       <ExplorerStatusBar entries={visible} selected={selected} />
-      {operations.busy && <div className="ex-toast" role="status" data-testid="explorer-progress"><span>{operations.progress ? `${operations.progress.items} ${label("项", "items")} · ${formatBytes(operations.progress.bytes)}` : label("正在处理…", "Working…")}</span><button onClick={operations.cancel}>{label("取消", "Cancel")}</button></div>}
-      {operations.toast && <div className={`ex-toast ${operations.toast.error ? "error" : ""}`} role="status" data-testid="explorer-toast"><span>{operations.toast.message}</span>{operations.toast.undo && <button data-testid="explorer-undo" onClick={operations.toast.undo}>{label("撤销", "Undo")}</button>}</div>}
+      {operations.busy && <div className="ex-progress" role="status" data-testid="explorer-progress"><span>{operations.progress ? `${operations.progress.items} ${label("项", "items")} · ${formatBytes(operations.progress.bytes)}` : label("正在处理…", "Working…")}</span><button type="button" onClick={operations.cancel}>{label("取消", "Cancel")}</button></div>}
+      <ToastStack entries={operations.toasts} dismiss={operations.dismiss} closeLabel={t("feedback.dismiss")}
+        paused={!active || Boolean(operations.deletePrompt || operations.newFile || operations.properties)}
+        returnFocus={() => root.current?.querySelector<HTMLElement>('[data-testid="explorer-file-list"]')?.focus()}
+        errorAction={(message) => <CopyErrorDetails message={message} />} testId="explorer-toast" />
       <ExplorerDialogs operations={operations} />
     </div>
   </ExplorerContext.Provider>;

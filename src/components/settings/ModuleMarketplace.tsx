@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useT } from "../../lib/i18n";
 import type { ModuleCatalogPlugin, ModuleCatalogSelection } from "../../lib/ipc/plugin";
 import { PLUGIN_CORE_API_VERSION } from "../../lib/pluginRegistry";
+import { relaunchApp } from "../../lib/updateService";
 import { useModuleDownloadStore } from "../../stores/moduleDownloadStore";
 import { useModuleMarketplaceStore } from "../../stores/moduleMarketplaceStore";
 import { useModuleStore } from "../../stores/moduleStore";
@@ -18,6 +19,8 @@ export function ModuleMarketplace() {
   const [download, setDownload] = useState<{
     entry: ModuleCatalogPlugin; selection: ModuleCatalogSelection; size: number; installedVersion?: string;
   } | null>(null);
+  const [restarting, setRestarting] = useState(false);
+  const [restartError, setRestartError] = useState<string | null>(null);
   useEffect(() => { void state.refresh(); }, [state.refresh]);
 
   const entries = useMemo(() => Object.values(state.catalog?.catalog.plugins ?? {})
@@ -35,27 +38,27 @@ export function ModuleMarketplace() {
 
   const review = state.review;
   return <section data-testid="module-marketplace" className="mb-5 rounded-md border border-[var(--taomni-divider)] p-3">
-    <h3 className="text-[14px] font-semibold">{t("plugins.marketTitle")}</h3>
-    <p className="my-2 text-[12px] text-[var(--taomni-text-muted)]">{t("plugins.marketHint")}</p>
+    <h3 className="text-ui-title font-semibold">{t("plugins.marketTitle")}</h3>
+    <p className="my-2 text-ui-body text-[var(--taomni-text-muted)]">{t("plugins.marketHint")}</p>
     <div className="flex gap-2">
       <input data-testid="module-marketplace-search" aria-label={t("plugins.marketSearch")} value={query}
-        onChange={(event) => setQuery(event.target.value)} className="taomni-input min-w-0 flex-1 text-[12px]" />
-      <button type="button" data-testid="module-marketplace-refresh" className="taomni-btn text-[12px]" disabled={state.loading}
+        onChange={(event) => setQuery(event.target.value)} className="taomni-input min-w-0 flex-1 text-ui-body" />
+      <button type="button" data-testid="module-marketplace-refresh" className="taomni-btn text-ui-body" disabled={state.loading}
         onClick={() => { void state.refresh(source); }}>{t("plugins.marketRefresh")}</button>
     </div>
-    <details className="mt-2 text-[12px]">
+    <details className="mt-2 text-ui-body">
       <summary data-testid="module-marketplace-source-toggle" className="cursor-pointer">{t("plugins.marketSource")}</summary>
       <p className="my-2 text-[var(--taomni-text-muted)]">{t("plugins.marketSourceHint")}</p>
       <input data-testid="module-marketplace-source" aria-label={t("plugins.marketSource")} value={source}
-        onChange={(event) => setSource(event.target.value)} className="taomni-input w-full text-[12px]" />
+        onChange={(event) => setSource(event.target.value)} className="taomni-input w-full text-ui-body" />
     </details>
-    {state.loading && <p data-testid="module-marketplace-loading" className="my-2 text-[12px]">{t("plugins.marketLoading")}</p>}
-    {state.error && <p data-testid="module-marketplace-error" role="alert" className="my-2 text-[12px] text-red-500">{state.error}</p>}
-    {state.catalog && <p data-testid="module-marketplace-checked" className="my-2 text-[11px] text-[var(--taomni-text-muted)]">
+    {state.loading && <p data-testid="module-marketplace-loading" className="my-2 text-ui-body">{t("plugins.marketLoading")}</p>}
+    {state.error && <p data-testid="module-marketplace-error" role="alert" className="my-2 text-ui-body text-ui-danger">{state.error}</p>}
+    {state.catalog && <p data-testid="module-marketplace-checked" className="my-2 text-ui-small text-[var(--taomni-text-muted)]">
       {t("plugins.marketChecked", { date: state.catalog.catalog.updatedAt })}
       {state.catalogSource && <span className="block break-all">{t("plugins.marketCatalogSource", { source: state.catalogSource })}</span>}
     </p>}
-    {state.catalog && !entries.length && <p data-testid="module-marketplace-empty" className="my-2 text-[12px]">{t("plugins.marketEmpty")}</p>}
+    {state.catalog && !entries.length && <p data-testid="module-marketplace-empty" className="my-2 text-ui-body">{t("plugins.marketEmpty")}</p>}
     <div className="mt-3 space-y-3">
       {entries.map((entry) => {
         const asset = entry.platforms[state.catalog!.platform];
@@ -66,11 +69,14 @@ export function ModuleMarketplace() {
         const release = state.catalog?.release;
         const update = !!installedVersion && installedVersion !== entry.version && release?.updates.includes(entry.id);
         const legacyPending = release?.legacyPending.includes(entry.id);
+        const restartRequired = !!(legacyPending && release?.legacyRestartRequired?.includes(entry.id));
+        const importFailed = !!(legacyPending && release?.legacyImportFailed?.includes(entry.id));
+        const importError = release?.legacyImportErrors?.[entry.id];
         const isNew = !installedVersion && release?.newModules.includes(entry.id);
         const compatible = entry.coreApiVersion === PLUGIN_CORE_API_VERSION;
         const busy = state.busy[entry.id];
         return <article key={entry.id} data-testid="module-marketplace-card" data-module-id={entry.id}
-          className="rounded border border-[var(--taomni-divider)] p-3 text-[12px]">
+          className="rounded border border-[var(--taomni-divider)] p-3 text-ui-body">
           <div className="flex flex-wrap justify-between gap-2 font-medium"><span>{entry.name}</span>
             <span>{entry.version} · {displaySize(asset?.size)}</span></div>
           <p className="mt-1 text-[var(--taomni-text-muted)]">{t(`plugins.category.${entry.kind ?? "other"}`)}</p>
@@ -82,16 +88,30 @@ export function ModuleMarketplace() {
           {isNew && <p data-testid="module-marketplace-new">{t("plugins.marketNew")}</p>}
           {(!asset || !compatible) && <p data-testid="module-marketplace-unavailable">{t("plugins.marketUnavailable")}</p>}
           {task && <p data-testid="module-marketplace-task">{t(`plugins.downloadPhase${task.progress.phase}`)}</p>}
-          {legacyPending && release?.legacyRestartRequired?.includes(entry.id)
-            && <p>{t("plugins.marketMailRestartRequired")}</p>}
-          {legacyPending && release?.legacyImportFailed?.includes(entry.id)
-            && <p role="alert" data-testid="module-marketplace-mail-import-failed">{t("plugins.marketMailImportFailed")}</p>}
-          {state.errors[entry.id] && <p data-testid="module-marketplace-action-error" role="alert" className="my-2 text-red-500">{state.errors[entry.id]}</p>}
+          {restartRequired && <p>{t("plugins.marketMailRestartRequired")}</p>}
+          {importFailed && <p role="alert" data-testid="module-marketplace-mail-import-failed" className="text-ui-danger">
+            {t("plugins.marketMailImportFailed")}
+            {importError && <span className="mt-1 block break-words text-ui-small">{importError}</span>}
+          </p>}
+          {restartRequired && !importFailed && restartError && <p role="alert" data-testid="module-marketplace-restart-error" className="my-2 text-ui-danger">{restartError}</p>}
+          {state.errors[entry.id] && <p data-testid="module-marketplace-action-error" role="alert" className="my-2 text-ui-danger">{state.errors[entry.id]}</p>}
           <div className="mt-2 flex gap-2">
-            {legacyPending && !installedVersion ? <button type="button" data-testid="module-marketplace-provision" className="taomni-btn"
-              disabled={!!busy || !asset || !compatible} onClick={() => { void state.provision(entry.id, true); }}>
-              {busy ? t("plugins.marketWorking") : t("plugins.marketLegacyResume")}
-            </button> : installedVersion && !update ? (
+            {legacyPending && !installedVersion ? (
+              restartRequired && !importFailed ? <button type="button" data-testid="module-marketplace-restart" className="taomni-btn"
+                disabled={restarting} onClick={() => {
+                  setRestartError(null);
+                  setRestarting(true);
+                  void relaunchApp().catch((reason: unknown) => {
+                    setRestartError(reason instanceof Error ? reason.message : String(reason));
+                    setRestarting(false);
+                  });
+                }}>
+                {restarting ? t("plugins.marketWorking") : t("plugins.marketRestartToFinish")}
+              </button> : <button type="button" data-testid="module-marketplace-provision" className="taomni-btn"
+                disabled={!!busy || !asset || !compatible} onClick={() => { void state.provision(entry.id, true); }}>
+                {busy ? t("plugins.marketWorking") : t("plugins.marketLegacyResume")}
+              </button>
+            ) : installedVersion && !update ? (
               installedVersion === entry.version ? <span data-testid="module-marketplace-current">{t("plugins.marketCurrent")}</span> : null
             ) : task?.progress.phase === "completed" ? <button type="button" data-testid="module-marketplace-review" className="taomni-btn"
               disabled={!!busy || !compatible || !asset} onClick={() => { void state.openReview(selection(entry), installedVersion); }}>

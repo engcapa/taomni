@@ -34,7 +34,7 @@ export interface MailFiltersPanelProps {
   recentErrors?: string[];
 }
 
-const inputClass = "h-7 px-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-[12px] min-w-0";
+const inputClass = "h-7 px-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-ui-body min-w-0";
 
 function runSummary(result: MailFilterRunResult): string {
   const base = `Filters matched ${result.matched} of ${result.examined} message${result.examined === 1 ? "" : "s"}`;
@@ -78,7 +78,7 @@ function MailFilterEditor({ draft, folders, saving, onChange, onSave, onCancel }
 
   return (
     <div className="flex-1 min-h-0 flex flex-col" data-testid="mail-filter-editor">
-      <div className="flex-1 min-h-0 overflow-auto p-3 space-y-3 text-[12px]">
+      <div className="flex-1 min-h-0 overflow-auto p-3 space-y-3 text-ui-body">
         <label className="flex items-center gap-2">
           <span className="w-20 shrink-0 text-[var(--taomni-text-muted)]">Name</span>
           <input
@@ -254,11 +254,11 @@ function MailFilterEditor({ draft, folders, saving, onChange, onSave, onCancel }
             <Plus className="w-3.5 h-3.5" /> Action
           </button>
         </fieldset>
-        <p className="text-[11px] text-[var(--taomni-text-muted)]">
+        <p className="text-ui-small text-[var(--taomni-text-muted)]">
           New mail is filtered while this tab is open. Body conditions on mail whose body is not cached are checked with a server search.
         </p>
       </div>
-      <div className="h-11 shrink-0 px-3 flex items-center gap-2 border-t border-[var(--taomni-divider)] text-[12px]">
+      <div className="h-11 shrink-0 px-3 flex items-center gap-2 border-t border-[var(--taomni-divider)] text-ui-body">
         {problem && <span className="min-w-0 truncate text-[var(--taomni-text-muted)]" data-testid="mail-filter-problem">{problem}</span>}
         <span className="flex-1" />
         <button type="button" className="taomni-btn h-7 px-3" onClick={onCancel}>Cancel</button>
@@ -396,7 +396,7 @@ export function MailFiltersPanel({ accountId, folders, currentFolder, initialDra
 
   const iconButton = "taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center";
   return (
-    <div className="flex-1 min-h-0 flex flex-col text-[12px]" data-testid="mail-filters-panel">
+    <div className="flex-1 min-h-0 flex flex-col text-ui-body" data-testid="mail-filters-panel">
       <div className="h-9 shrink-0 px-3 flex items-center gap-1.5 border-b border-[var(--taomni-divider)]">
         <button
           type="button"
@@ -425,17 +425,17 @@ export function MailFiltersPanel({ accountId, folders, currentFolder, initialDra
           <Download className="w-3.5 h-3.5" />
         </button>
       </div>
-      {error && <div className="px-3 py-1.5 text-red-500 border-b border-[var(--taomni-divider)]" data-testid="mail-filters-error">{error}</div>}
+      {error && <div className="px-3 py-1.5 text-ui-danger border-b border-[var(--taomni-divider)]" data-testid="mail-filters-error">{error}</div>}
       {recentErrors.length > 0 && (
         <div className="px-3 py-1.5 border-b border-[var(--taomni-divider)]" data-testid="mail-filters-recent-errors">
           <div className="text-[var(--taomni-text-muted)]">Last run on new mail: these actions failed and the messages stayed where they were.</div>
-          {recentErrors.map((message) => <div key={message} className="text-red-500">{message}</div>)}
+          {recentErrors.map((message) => <div key={message} className="text-ui-danger">{message}</div>)}
         </div>
       )}
       {lastRun && (
         <div className="px-3 py-1.5 border-b border-[var(--taomni-divider)] text-[var(--taomni-text-muted)]" data-testid="mail-filters-last-run">
           {runSummary(lastRun)}
-          {lastRun.errors.map((message) => <div key={message} className="text-red-500">{message}</div>)}
+          {lastRun.errors.map((message) => <div key={message} className="text-ui-danger">{message}</div>)}
         </div>
       )}
       <div className="flex-1 min-h-0 overflow-auto p-2">
@@ -463,7 +463,7 @@ export function MailFiltersPanel({ accountId, folders, currentFolder, initialDra
             />
             <div className="min-w-0 flex-1">
               <div className="truncate font-medium">{filter.name}{filter.onIncoming ? "" : " (manual only)"}</div>
-              <div className="truncate text-[11px] text-[var(--taomni-text-muted)]" title={describeFilter(filter)}>{describeFilter(filter)}</div>
+              <div className="truncate text-ui-small text-[var(--taomni-text-muted)]" title={describeFilter(filter)}>{describeFilter(filter)}</div>
             </div>
             <button type="button" className={iconButton} title="Move up" aria-label={`Move ${filter.name} up`} disabled={index === 0 || saving} onClick={() => move(index, -1)}>
               <ArrowUp className="w-3 h-3" />

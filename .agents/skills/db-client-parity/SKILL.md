@@ -60,3 +60,5 @@ description: 统筹 Taomni 数据库会话（database TabKind 的 MySQL/PostgreS
 ## 收尾
 
 报告阶段、卡 ID 或范围、结果、UI 差异、实际测试与构建次数、平台与前端模式、未运行层和剩余缺口。仅要求维护 skill 时，停留在 skill 文件，不预填任何真实任务或能力状态。
+
+桌面控件与交互对齐遵循 `docs-feature/ui-standard/UI-STANDARD.md` §0.2，偏离须登记在 §9。

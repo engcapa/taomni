@@ -131,7 +131,6 @@ export interface NotepadStoreState {
   viewMode: NotepadViewMode;
   insertMode: boolean;
   virtualSpace: boolean;
-  zoomDelta: number;
   symbols: NotepadSymbolFlags;
   clipboardHistory: string[];
   results: NotepadSearchResultHit[];
@@ -153,7 +152,6 @@ export interface NotepadStoreState {
   setViewMode: (mode: NotepadViewMode) => void;
   setInsertMode: (insertMode: boolean) => void;
   setVirtualSpace: (virtualSpace: boolean) => void;
-  setZoomDelta: (delta: number) => void;
   toggleSymbol: (key: keyof NotepadSymbolFlags) => void;
   toggleAllSymbols: () => void;
   pushClipboardHistory: (text: string) => void;
@@ -259,7 +257,6 @@ export const useNotepadStore = create<NotepadStoreState>((set, get) => ({
   viewMode: "",
   insertMode: true,
   virtualSpace: false,
-  zoomDelta: 0,
   symbols: { space: false, tab: false, eol: false, nonprint: false, indent: false, wrap: false },
   clipboardHistory: [],
   results: [],
@@ -408,9 +405,6 @@ export const useNotepadStore = create<NotepadStoreState>((set, get) => ({
     set({ virtualSpace });
   },
 
-  setZoomDelta(zoomDelta) {
-    set({ zoomDelta: Math.max(-5, Math.min(19, zoomDelta)) });
-  },
 
   toggleSymbol(key) {
     set((state) => ({ symbols: { ...state.symbols, [key]: !state.symbols[key] } }));

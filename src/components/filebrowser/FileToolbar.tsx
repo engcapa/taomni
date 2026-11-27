@@ -265,7 +265,7 @@ function ToolBtn({
       className="w-6 h-6 inline-flex items-center justify-center rounded shrink-0 hover:bg-[var(--taomni-hover)] disabled:opacity-30 disabled:cursor-default"
       style={{
         background: active ? "var(--taomni-selected)" : undefined,
-        color: danger && !disabled ? "#c0392b" : undefined,
+        color: danger && !disabled ? "var(--taomni-danger-text)" : undefined,
       }}
     >
       {children}

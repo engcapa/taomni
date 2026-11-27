@@ -54,11 +54,11 @@ export function LocalDirectoriesPanel({
       </div>
       {loadStatus === "error" && directories.length === 0 ? (<div
         data-testid="welcome-local-directories-error"
-        className="mb-2 flex flex-wrap items-center gap-2 rounded border px-2 py-2 text-[12px]"
+        className="mb-2 flex flex-wrap items-center gap-2 rounded border px-2 py-2 text-ui-body"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-input-bg)" }}
         role="alert"
       >
-        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-warning, #d97706)]" />
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-warning-text, #d97706)]" />
         <span className="min-w-0 flex-1 text-[var(--taomni-text-muted)]">
           {t("welcome.localDirectoriesLoadFailed", { error: loadError ?? "" })}
         </span>
@@ -75,7 +75,7 @@ export function LocalDirectoriesPanel({
       ) : null}
       {loadError != null && directories.length > 0 ? (
         <div
-          className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]"
+          className="mb-2 flex flex-wrap items-center gap-2 text-ui-small text-[var(--taomni-text-muted)]"
           role="status"
         >
           <span>{t("welcome.localDirectoriesRefreshFailed")}</span>
@@ -92,13 +92,13 @@ export function LocalDirectoriesPanel({
       ) : null}
       <div className="max-h-[320px] overflow-auto pr-1">
         {directories.length === 0 ? (
-          <div className="py-4 text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="py-4 text-ui-body text-[var(--taomni-text-muted)]">
             {loadStatus === "loading"
               ? t("welcome.localDirectoriesLoading")
               : t("welcome.localDirectoriesEmpty")}
           </div>
         ) : filteredDirectories.length === 0 ? (
-          <div className="py-4 text-[12px] text-[var(--taomni-text-muted)]" data-testid="welcome-local-directories-no-matches">
+          <div className="py-4 text-ui-body text-[var(--taomni-text-muted)]" data-testid="welcome-local-directories-no-matches">
             {t("welcome.localDirectoriesNoMatches")}
           </div>
         ) : (
@@ -129,24 +129,24 @@ export function LocalDirectoriesPanel({
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <FolderOpen className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
-                    <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--taomni-text)]">
+                    <span className="min-w-0 flex-1 truncate text-ui-body font-medium text-[var(--taomni-text)]">
                       {directory.label}
                     </span>
                     {unavailable ? (
                       <span
                         data-testid="welcome-local-directory-unavailable"
-                        className="shrink-0 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] text-[var(--taomni-warning, #d97706)]"
+                        className="shrink-0 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-ui-caption text-[var(--taomni-warning-text, #d97706)]"
                         style={{ borderColor: "var(--taomni-divider)" }}
                       >
                         <AlertTriangle className="w-3 h-3" />
                         {t("welcome.localDirectoryUnavailableShort")}
                       </span>
                     ) : null}
-                    <span className="shrink-0 rounded border px-1.5 py-0.5 text-[10px] taomni-mono text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
+                    <span className="shrink-0 rounded border px-1.5 py-0.5 text-ui-caption taomni-mono text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
                       {directory.kind === "personal" ? t("welcome.localDirectoryPersonal") : t("welcome.localDirectorySystem")}
                     </span>
                     <span
-                      className="shrink-0 text-[10px] taomni-mono text-[var(--taomni-text-muted)]"
+                      className="shrink-0 text-ui-caption taomni-mono text-[var(--taomni-text-muted)]"
                       data-testid="welcome-local-directory-last-used"
                     >
                       {directory.lastUsedAtMs != null
@@ -156,7 +156,7 @@ export function LocalDirectoriesPanel({
                           : ""}
                     </span>
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] taomni-mono text-[var(--taomni-text-muted)]">
+                  <span className="mt-0.5 block truncate text-ui-small taomni-mono text-[var(--taomni-text-muted)]">
                     {directory.path}
                   </span>
                 </button>
@@ -166,7 +166,7 @@ export function LocalDirectoriesPanel({
         )}
       </div>
       {hasFilter && filteredDirectories.length > 0 ? (
-        <div className="mt-2 text-[11px] text-[var(--taomni-text-muted)]" data-testid="welcome-local-directories-filter-count">
+        <div className="mt-2 text-ui-small text-[var(--taomni-text-muted)]" data-testid="welcome-local-directories-filter-count">
           {t("welcome.localDirectoriesFilterCount", {
             visible: filteredDirectories.length,
             total: directories.length,

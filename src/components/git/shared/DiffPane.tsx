@@ -74,7 +74,7 @@ export function DiffPane({
               <ChevronLeft className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text)]" />
             </button>
             <span
-              className="min-w-[4.5rem] text-center text-[11px] text-[var(--taomni-accent)] tabular-nums"
+              className="min-w-[4.5rem] text-center text-ui-small text-[var(--taomni-accent)] tabular-nums"
               data-testid="workspace-diff-file-position"
               aria-live="polite"
             >
@@ -93,7 +93,7 @@ export function DiffPane({
             </button>
           </div>
         ) : null}
-        <span className="font-semibold truncate text-[12px]" data-testid="workspace-diff-title">{title}</span>
+        <span className="font-semibold truncate text-ui-body" data-testid="workspace-diff-title">{title}</span>
         <div className="flex-1" />
         {onOpenInEditor ? (
           <button
@@ -108,10 +108,10 @@ export function DiffPane({
         ) : null}
         <button className="taomni-btn h-7 px-2" type="button" data-testid="git-diff-stage" disabled={busy || selectedCount === 0} onClick={onStage}>Stage</button>
         <button className="taomni-btn h-7 px-2" type="button" data-testid="git-diff-unstage" disabled={busy || selectedCount === 0} onClick={onUnstage}>Unstage</button>
-        <button className="taomni-btn h-7 px-2 text-red-500" type="button" data-testid="git-diff-discard" disabled={busy || selectedCount === 0} onClick={onDiscard}>Discard</button>
+        <button className="taomni-btn h-7 px-2 text-ui-danger" type="button" data-testid="git-diff-discard" disabled={busy || selectedCount === 0} onClick={onDiscard}>Discard</button>
       </div>
       {sideLabels ? (
-        <div className="h-6 shrink-0 grid grid-cols-2 border-b border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]">
+        <div className="h-6 shrink-0 grid grid-cols-2 border-b border-[var(--taomni-divider)] text-ui-small text-[var(--taomni-text-muted)]">
           <span className="min-w-0 truncate px-3 leading-6 font-mono" data-testid="workspace-diff-old-label">{sideLabels.old}</span>
           <span className="min-w-0 truncate px-3 leading-6 font-mono border-l border-[var(--taomni-divider)]" data-testid="workspace-diff-new-label">{sideLabels.new}</span>
         </div>

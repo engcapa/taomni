@@ -95,8 +95,8 @@ describe("PinnedImage", () => {
     const view = render(<PinnedImage />);
     expect(await screen.findByTestId("screenshot-pin-image")).toHaveAttribute("src", "blob:pin-unit");
     const pin = screen.getByTestId("screenshot-pin-window");
-    // jsdom does not parse conic gradients; TC-SHOT-023 checks the real CSS.
-    expect(screen.getByTestId("screenshot-pin-surface")).toHaveStyle({ backgroundColor: "#e2e2e2", backgroundSize: "16px 16px" });
+    // TC-SHOT-023 checks the painted checkerboard in Chromium.
+    expect(screen.getByTestId("screenshot-pin-surface")).toHaveClass("screenshot-pin-surface");
     fireEvent.mouseDown(pin, { button: 0, detail: 1 });
     expect(mocks.startDragging).toHaveBeenCalledOnce();
     fireEvent.mouseDown(pin, { button: 0, detail: 2 });

@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { CheckCircle, Loader2, X, XCircle } from "lucide-react";
 import { useT, type TranslateFn } from "../../lib/i18n";
 
@@ -43,34 +44,36 @@ export function ActionCard({
 
   return (
     <div
-      className={`rounded-lg border p-3 shadow-md max-w-md w-full bg-[var(--taomni-panel-bg)] ${
+      aria-busy={executing || undefined}
+      className={`rounded border p-3 shadow-[var(--taomni-shadow-md)] max-w-md w-full bg-[var(--taomni-panel-bg)] ${
         isWrite
-          ? "border-yellow-500/50"
+          ? "border-ui-warning-border"
           : "border-[var(--taomni-divider)]"
       }`}
     >
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-[12px] font-semibold">
+        <span className="text-ui-body font-semibold">
           {t("agent.agentWants", { label })}
         </span>
         {isWrite && (
-          <span className="text-[10px] text-yellow-400 border border-yellow-500/40 rounded px-1.5 py-0.5">
+          <span className="text-ui-caption text-ui-warning border border-ui-warning-border rounded px-1.5 py-0.5">
             {t("agent.writeBadge")}
           </span>
         )}
-        <button
+        <IconButton labelKey="denyRequest"
+          disabled={executing}
           type="button"
           className="ml-auto text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
           onClick={() => onDecide("deny")}
         >
           <X className="w-3.5 h-3.5" />
-        </button>
+        </IconButton>
       </div>
 
-      <div className="text-[11px] text-[var(--taomni-text-muted)] mb-2">{description}</div>
+      <div className="text-ui-small text-[var(--taomni-text-muted)] mb-2">{description}</div>
 
       {preview && (
-        <pre className="font-mono text-[11px] bg-[var(--taomni-bg)] rounded px-2 py-1.5 mb-2 overflow-x-auto whitespace-pre-wrap break-all">
+        <pre className="font-mono text-ui-small bg-[var(--taomni-bg)] rounded px-2 py-1.5 mb-2 overflow-x-auto whitespace-pre-wrap break-all">
           {preview}
         </pre>
       )}
@@ -82,7 +85,7 @@ export function ActionCard({
           <>
             <button
               type="button"
-              className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+              className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5"
               data-testid="ai-chat-cc-permission-allow"
               onClick={() => onDecide("allow")}
             >
@@ -91,7 +94,7 @@ export function ActionCard({
             </button>
             <button
               type="button"
-              className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+              className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5"
               data-testid="ai-chat-cc-permission-allow-session"
               onClick={() => onDecide("allow-session")}
               title={t("agent.actionAllowSessionTitle")}
@@ -100,7 +103,7 @@ export function ActionCard({
             </button>
             <button
               type="button"
-              className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 text-[var(--taomni-text-muted)]"
+              className="taomni-btn h-7 px-3 text-ui-body inline-flex items-center gap-1.5 text-[var(--taomni-text-muted)]"
               data-testid="ai-chat-cc-permission-deny"
               onClick={() => onDecide("deny")}
             >

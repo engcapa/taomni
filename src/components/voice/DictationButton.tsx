@@ -222,7 +222,7 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
       aria-pressed={phase === "recording"} disabled={disabled || phase === "preparing" || phase === "transcribing"}
       className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center shrink-0"
       onClick={() => phase === "recording" && session.current ? void finish(session.current) : void start()}>
-      {phase === "recording" ? <Square className="h-4 w-4 text-red-400" /> : phase === "idle" ? <Mic className="h-4 w-4" /> : <Loader2 className="h-4 w-4 animate-spin" />}
+      {phase === "recording" ? <Square className="h-4 w-4 text-ui-danger" /> : phase === "idle" ? <Mic className="h-4 w-4" /> : <Loader2 className="h-4 w-4 animate-spin" />}
     </button>
     {phase !== "idle" && <button type="button" title={t("voice.cancel")} aria-label={t("voice.cancel")} data-testid={`${testId}-cancel`} onClick={cancel}><X className="h-4 w-4" /></button>}
     {interim && <span role="status" data-testid={`${testId}-interim`} className="max-w-64 truncate text-xs text-[var(--taomni-text-muted)]">{interim}</span>}
@@ -232,7 +232,7 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
         else setError("The draft has changed. Original transcript remains available above.");
       }}>Undo cleanup</button>}
     </details>}
-    {error && createPortal(<div role="alert" data-testid="voice-dictation-error" className="fixed top-14 right-4 z-[10001] w-80 rounded border bg-[var(--taomni-panel-bg)] p-3 text-xs text-red-400">
+    {error && createPortal(<div role="alert" data-testid="voice-dictation-error" className="fixed top-14 right-4 z-[var(--taomni-z-toast)] w-80 rounded border bg-[var(--taomni-panel-bg)] p-3 text-xs text-ui-danger">
       {moduleError ?? error}
       <button type="button" className="ml-2 underline" data-testid={moduleError ? "voice-open-module-store" : undefined}
         onClick={() => { setError(""); if (moduleError) openSettingsSection("module-store"); else setSetup(true); }}>

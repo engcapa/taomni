@@ -263,7 +263,7 @@ export function MessageBubble({
   return (
     <div className={`flex flex-col gap-0.5 group ${isUser ? "items-end" : "items-start"}`}>
       <div
-        className={`relative max-w-[90%] rounded-lg px-3 py-2 text-[12px] leading-relaxed break-words ${
+        className={`relative max-w-[90%] rounded-lg px-3 py-2 text-ui-body leading-relaxed break-words ${
           isUser
             ? "bg-[var(--taomni-accent)] text-white rounded-br-sm whitespace-pre-wrap"
             : `bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] rounded-bl-sm ${
@@ -278,7 +278,7 @@ export function MessageBubble({
           {!isUser && codeBlocks.length > 0 && (
             <button
               type="button"
-              className="h-5 px-1.5 inline-flex items-center gap-1 rounded border border-[var(--taomni-accent)]/40 bg-[var(--taomni-panel-bg)] text-[10px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-accent)]/10 disabled:opacity-50"
+              className="h-5 px-1.5 inline-flex items-center gap-1 rounded border border-[var(--taomni-accent)]/40 bg-[var(--taomni-panel-bg)] text-ui-caption text-[var(--taomni-accent)] hover:bg-[var(--taomni-accent)]/10 disabled:opacity-50"
               onClick={handleSendAll}
               disabled={!targetEntry}
               title={
@@ -289,7 +289,7 @@ export function MessageBubble({
               aria-label={t("chat.sendAllAria")}
             >
               {sentAll ? (
-                <Check className="w-3 h-3 text-green-400" />
+                <Check className="w-3 h-3 text-ui-success" />
               ) : (
                 <Send className="w-3 h-3" />
               )}
@@ -299,13 +299,13 @@ export function MessageBubble({
           {!isUser && codeBlocks.length > 0 && queryTargetEntry && (
             <button
               type="button"
-              className="h-5 px-1.5 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] text-[10px] text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)]"
+              className="h-5 px-1.5 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] text-ui-caption text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)]"
               onClick={handleSendAllToQuery}
               title={t("chat.sendAllToQuery", { count: codeBlocks.length, target: queryTargetEntry.title })}
               aria-label={t("chat.sendAllQueryAria")}
             >
               {sentAllQuery ? (
-                <Check className="w-3 h-3 text-green-400" />
+                <Check className="w-3 h-3 text-ui-success" />
               ) : (
                 <Database className="w-3 h-3" />
               )}
@@ -320,7 +320,7 @@ export function MessageBubble({
             aria-label={t("chat.copyMessageAria")}
           >
             {copied ? (
-              <Check className="w-3 h-3 text-green-400" />
+              <Check className="w-3 h-3 text-ui-success" />
             ) : (
               <Copy className="w-3 h-3 text-[var(--taomni-text-muted)]" />
             )}
@@ -379,11 +379,11 @@ export function MessageBubble({
       {toolCalls.map((call, i) => (
         <div key={i} className="max-w-[90%] mt-1">
           {executed[i] === "denied" ? (
-            <div className="text-[11px] text-[var(--taomni-text-muted)] italic">
+            <div className="text-ui-small text-[var(--taomni-text-muted)] italic">
               {t("chat.toolDenied", { tool: call.tool })}
             </div>
           ) : executed[i] === "approved" ? (
-            <div className="text-[11px] text-[var(--taomni-accent)]">
+            <div className="text-ui-small text-[var(--taomni-accent)]">
               {t("chat.toolApproved", { tool: call.tool })}
             </div>
           ) : (
@@ -399,7 +399,7 @@ export function MessageBubble({
       ))}
       {message.redacted && (
         <div
-          className="inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 self-start"
+          className="inline-flex items-center gap-1 text-ui-caption rounded px-1.5 py-0.5 self-start"
           style={{
             background: "var(--taomni-badge-warning-bg)",
             color: "var(--taomni-badge-warning-text)",

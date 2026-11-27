@@ -3,7 +3,7 @@
   "slug": "mfa",
   "name": "MFA Authenticator",
   "description": "Manage two-factor authentication accounts and generate time-based and counter-based one-time codes.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "coreApiVersion": "1",
   "kind": "auth",
   "status": "stable",

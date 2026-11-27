@@ -1,3 +1,4 @@
+import { IconButton } from "../../../ui/IconButton";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bug,
@@ -239,7 +240,7 @@ export function DebugPanel({
     <div
       ref={containerRef}
       data-testid="debug-panel"
-      className="h-full min-h-0 flex flex-col text-[11px] bg-[var(--taomni-code-bg)]"
+      className="h-full min-h-0 flex flex-col text-ui-small bg-[var(--taomni-code-bg)]"
     >
       {/* Primary Sub Tab Bar (Debugger, Console, Breakpoints, Memory) */}
       <DebugSubTabBar
@@ -266,7 +267,7 @@ export function DebugPanel({
         ) : undefined}
         trailing={
           isCompact && currentTab === "debugger" && state ? (
-            <div className="flex items-center rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-0.5 text-[10px]">
+            <div className="flex items-center rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-0.5 text-ui-caption">
               <button
                 type="button"
                 data-testid="debug-compact-tab-frames"
@@ -315,7 +316,7 @@ export function DebugPanel({
                 title="Select Run/Debug configuration"
                 value={activeConfigurationId ?? configurations[0].id}
                 onChange={(event) => onActiveConfigurationChange?.(event.target.value)}
-                className="ml-2 h-6 min-w-0 max-w-52 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[10px]"
+                className="ml-2 h-6 min-w-0 max-w-52 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-ui-caption"
               >
                 {configurations.map((configuration) => (
                   <option
@@ -333,44 +334,44 @@ export function DebugPanel({
               <div
                 data-testid="debug-configuration-diagnostic"
                 role="status"
-                className="max-w-64 truncate text-[10px] text-amber-600 dark:text-amber-400"
+                className="max-w-64 truncate text-ui-caption text-ui-warning"
                 title={configurationDiagnostic}
               >
                 {configurationDiagnostic}
               </div>
             )}
             <div className="ml-auto flex items-center gap-0.5 rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-0.5 shadow-xs">
-              <button
+              <IconButton
                 type="button"
                 data-testid="debug-start"
-                className={`${controlBtn} hover:bg-emerald-500/15`}
+                className={`${controlBtn} hover:bg-ui-success-surface`}
                 onClick={() => onStart?.()}
                 disabled={!onStart}
-                title="Start debugging the active file"
+                labelKey="debugActiveFile"
               >
-                <CirclePlay className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
-              </button>
+                <CirclePlay className="h-4 w-4 text-ui-success" />
+              </IconButton>
               {onAttach && (
-                <button
+                <IconButton
                   type="button"
                   data-testid="debug-attach"
-                  className={`${controlBtn} hover:bg-sky-500/15`}
+                  className={`${controlBtn} hover:bg-ui-info-surface`}
                   onClick={onAttach}
-                  title="Attach to a remote JVM process"
+                  labelKey="attachRemoteJvm"
                 >
-                  <Plug className="h-4 w-4 text-sky-500 dark:text-sky-400" />
-                </button>
+                  <Plug className="h-4 w-4 text-ui-info" />
+                </IconButton>
               )}
               {debug.canRestart && !state && (
-                <button
+                <IconButton
                   type="button"
                   data-testid="debug-restart"
-                  className={`${controlBtn} hover:bg-emerald-500/15`}
+                  className={`${controlBtn} hover:bg-ui-success-surface`}
                   onClick={() => debug.restart()}
-                  title="Restart debug session"
+                  labelKey="restartDebug"
                 >
-                  <RotateCcw className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
-                </button>
+                  <RotateCcw className="h-4 w-4 text-ui-success" />
+                </IconButton>
               )}
             </div>
           </div>
@@ -426,7 +427,7 @@ export function DebugPanel({
               <PanelResizeHandle
                 aria-label="Resize debugger frames and variables columns"
                 data-testid="debug-split-resize-handle"
-                className="w-[4px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors cursor-col-resize shrink-0 relative after:absolute after:inset-y-0 after:-left-2 after:-right-2 after:z-20"
+                className="w-[4px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors cursor-col-resize shrink-0 relative after:absolute after:inset-y-0 after:-left-2 after:-right-2 after:z-[var(--taomni-z-sticky)]"
               />
 
               {/* Right Column: Variables & Watches */}

@@ -364,6 +364,7 @@ mod containment;
 #[path = "host/process.rs"]
 mod process;
 
+pub use containment::{PLUGIN_WATCHDOG_ARG, enable_plugin_watchdog_exec, run_plugin_watchdog};
 pub use process::{
     HostCancellation, HostProcess, HostProcessError, HostProfileConfig, HostServiceConfig, HostTick,
 };

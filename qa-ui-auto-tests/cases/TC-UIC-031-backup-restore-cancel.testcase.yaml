@@ -1,0 +1,49 @@
+id: TC-UIC-031-backup-restore-cancel
+title: Opening a local backup and pressing Enter cancels the restore and returns to that backup
+covers: [F-BACKUP-1]
+tags: [ui-contract, backup, keyboard]
+fixtures: [reset_db]
+modes: [browser, native]
+ui_standard: [UI-DLG-04, UI-DLG-06, UI-DLG-07, UI-DST-01, UI-DST-02]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-restore-cancel
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: backup}
+- wait_for: '[data-testid="backup-local-select"]'
+- set_check: {selector: '[data-testid="backup-local-select"]', checked: true}
+- click: '[data-testid="backup-selected-start"]'
+- wait_for: {selector: &archiveRestore ':nth-child(1 of [data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]) [data-testid="backup-local-restore"]', timeout_sec: 90}
+- press: {selector: *archiveRestore, key: Enter}
+- wait_for: '[data-testid="backup-restore-dialog"]:modal [data-testid="backup-restore-files"]'
+- assert_focus_on: '[data-testid="backup-restore-cancel"]'
+- press: Enter
+- assert_not_visible: '[data-testid="backup-restore-dialog"]'
+- assert_focus_on: *archiveRestore
+- press: Enter
+- fill: {selector: '[data-testid="backup-restore-name"]', value: different-archive.taobak}
+- assert_attribute: {selector: '[data-testid="backup-restore-confirm"]', name: disabled, equals: ''}
+- press: Escape
+- assert_not_visible: '[data-testid="backup-restore-dialog"]'
+- assert_focus_on: *archiveRestore
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: cancel-restore
+    requirement: The local archive remains available after cancelling. Initial Enter activates Cancel. A mismatched archive name prevents staging even when the inventory is ready.
+    ui_standard: [UI-DLG-04, UI-DLG-06, UI-DLG-07, UI-DST-01, UI-DST-02]
+    actions: [7, 9, 12, 15, 16, 18]
+    checkpoints:
+    - {step: 10, expectation: The archive inventory opens in the window's modal top layer.}
+    - {step: 11, expectation: The safe Cancel action owns keyboard focus.}
+    - {step: 13, expectation: Pressing Enter dismisses the destructive decision.}
+    - {step: 14, expectation: The same completed backup regains focus.}
+    - {step: 17, expectation: Confirm Restore is disabled for a different filename.}
+    - {step: 19, expectation: Escape dismisses the second restore decision.}
+    - {step: 20, expectation: The archive remains available from its original button.}
+    results: [10, 11, 13, 14, 17, 19, 20]
+  native:
+  - {check: Native archive inventory, method: automated, reason: Creates a local backup through Settings and reopens its on-disk inventory after cancelling.}
+  visual:
+  - {check: Destructive decision and archive inventory, method: automated, reason: Checks the visible inventory in the dialog and the rendered Confirm button's disabled state.}

@@ -65,7 +65,7 @@ export function VariableRow({
         aria-expanded={expandable ? node.expanded : undefined}
         data-var-key={key}
         className={`group flex items-start gap-1 py-0.5 pr-2 cursor-default select-none ${
-          selected ? "bg-[var(--taomni-accent)]/20" : "hover:bg-[var(--taomni-hover-bg)]"
+          selected ? "bg-[var(--taomni-accent)]/20" : "hover:bg-[var(--taomni-hover)]"
         }`}
         style={{ paddingLeft: `${8 + depth * 12}px` }}
         onClick={() => onSelect?.(key, node)}
@@ -102,7 +102,7 @@ export function VariableRow({
           <input
             autoFocus
             data-testid="debug-variable-edit-input"
-            className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1 font-mono text-[11px] outline-none"
+            className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1 font-mono text-ui-small focus-visible:keyboard-outline"
             value={edit?.value ?? ""}
             onChange={(e) => onEditChange?.(e.target.value)}
             onKeyDown={(e) => {
@@ -116,7 +116,7 @@ export function VariableRow({
             data-testid={node.hasChanged ? "debug-variable-changed" : undefined}
             className={`truncate ${
               node.hasChanged
-                ? "text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-1 rounded"
+                ? "text-ui-warning font-semibold bg-ui-warning-surface px-1 rounded"
                 : "text-[var(--taomni-text)]"
             }`}
             title={onStartEdit ? "Set Value (F2), or double-click" : undefined}
@@ -132,7 +132,7 @@ export function VariableRow({
                 type="button"
                 tabIndex={-1}
                 data-testid="debug-variable-data-breakpoint"
-                className="text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100 hover:text-rose-500 disabled:opacity-30"
+                className="text-[var(--taomni-text-muted)] opacity-0 group-hover:opacity-100 hover:text-ui-danger disabled:opacity-30"
                 onClick={() => onAddDataBreakpoint(node)}
                 disabled={addingDataBreakpointKey === dataTargetKey}
                 title={`Add data breakpoint for ${node.name}`}

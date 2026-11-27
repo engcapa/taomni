@@ -20,6 +20,7 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-tao-home-002
+- click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="language-switcher"]'
 - click: '[data-testid="language-option-en"]'
 - wait_for: '[data-testid="tao-home-composer-input"]:enabled'

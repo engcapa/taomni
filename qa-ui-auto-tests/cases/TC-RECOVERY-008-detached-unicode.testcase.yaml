@@ -47,7 +47,7 @@ steps:
 - click: '[data-testid="recovery-observe"]'
 - assert_text_equals:
     selector: '[data-testid="recovery-output-status"]'
-    equals: 未订阅输出
+    equals: Output observation is off.
 - screenshot: recovery-detached-unicode.png
 verification:
   review: reviewed

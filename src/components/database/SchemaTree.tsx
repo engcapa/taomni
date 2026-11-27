@@ -210,7 +210,7 @@ export function SchemaTree({
             <span className="flex-1 truncate">{obj.name}</span>
             {typeof obj.rowCount === "number" && obj.rowCount >= 0 && (
               <span
-                className="text-[10px] rounded px-1"
+                className="text-ui-caption rounded px-1"
                 style={{ background: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}
                 title={`${obj.rowCount.toLocaleString()} row(s)`}
               >
@@ -242,19 +242,19 @@ export function SchemaTree({
           title={`${col.type}${col.nullable ? " NULL" : " NOT NULL"}`}
         >
           {col.primaryKey ? (
-            <KeyRound className="w-3 h-3" style={{ color: "#e6a817" }} />
+            <KeyRound className="w-3 h-3" style={{ color: "var(--taomni-warning-text)" }} />
           ) : (
             <Columns3 className="w-3 h-3 text-[var(--taomni-text-muted)]" />
           )}
           <span className="flex-1 truncate">{col.name}</span>
-          <span className="text-[10px] text-[var(--taomni-text-muted)] truncate max-w-[80px]">
+          <span className="text-ui-caption text-[var(--taomni-text-muted)] truncate max-w-[80px]">
             {col.type}
           </span>
         </button>
       ))}
       {(st.indexes ?? []).length > 0 && (
         <div
-          className="px-2 py-0.5 text-[10px] text-[var(--taomni-text-muted)] flex items-center gap-1"
+          className="px-2 py-0.5 text-ui-caption text-[var(--taomni-text-muted)] flex items-center gap-1"
           style={{ paddingLeft: 50 }}
         >
           <ListTree className="w-3 h-3" /> Indexes
@@ -343,7 +343,7 @@ export function SchemaTree({
                     <CatIcon className="w-3.5 h-3.5" style={{ color: meta.color }} />
                     <span className="flex-1 truncate">{meta.label}</span>
                     {count !== null && (
-                      <span className="text-[10px] text-[var(--taomni-text-muted)]">{count}</span>
+                      <span className="text-ui-caption text-[var(--taomni-text-muted)]">{count}</span>
                     )}
                   </button>
                   {(metadata.expandedCat[ckey] || filterActive) && renderObjects(db, kind)}

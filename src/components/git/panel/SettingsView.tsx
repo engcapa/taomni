@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { useState,type ReactNode } from "react";
 import { GitBranch,Plus,Save,Settings,Trash2 } from "lucide-react";
 import { type GitRemote,type GitRepoSettings,type GitSnapshot } from "../../../lib/git";
@@ -25,14 +26,14 @@ export function WorkspaceSettingsSwitcher({
         <div className="inline-flex h-7 rounded border border-[var(--taomni-divider)] overflow-hidden">
           <button
             type="button"
-            className={`px-2 text-[12px] ${mode==="current"? "bg-[var(--taomni-hover)]":"hover:bg-[var(--taomni-hover)]"}`}
+            className={`px-2 text-ui-body ${mode==="current"? "bg-[var(--taomni-hover)]":"hover:bg-[var(--taomni-hover)]"}`}
             onClick={() => setMode("current")}
           >
             Current Repository
           </button>
           <button
             type="button"
-            className={`px-2 text-[12px] border-l border-[var(--taomni-divider)] ${mode==="aggregate"? "bg-[var(--taomni-hover)]":"hover:bg-[var(--taomni-hover)]"}`}
+            className={`px-2 text-ui-body border-l border-[var(--taomni-divider)] ${mode==="aggregate"? "bg-[var(--taomni-hover)]":"hover:bg-[var(--taomni-hover)]"}`}
             onClick={() => setMode("aggregate")}
           >
             Aggregate
@@ -113,20 +114,20 @@ export function SettingsView({
                 <div key={remote.name} className="border border-[var(--taomni-divider)] rounded-md overflow-hidden">
                   <div className="h-8 flex items-center px-3 bg-[var(--taomni-quick-bg)] border-b border-[var(--taomni-divider)]">
                     <span className="font-semibold">{remote.name}</span>
-                    <span className="ml-2 text-[11px] text-[var(--taomni-text-muted)]">{remote.tokenRef? "token stored in Vault":"no token"}</span>
+                    <span className="ml-2 text-ui-small text-[var(--taomni-text-muted)]">{remote.tokenRef? "token stored in Vault":"no token"}</span>
                     <div className="flex-1" />
                     <button className="taomni-btn h-6 px-2" type="button" disabled={busy} onClick={() => onSaveRemote(remote,draft)}>Save</button>
                     <button className="taomni-btn h-6 px-2 ml-1" type="button" disabled={busy||!remote.tokenRef} onClick={() => onClearToken(remote)}>Clear token</button>
-                    <button className="taomni-btn h-6 px-2 ml-1 text-red-500" type="button" disabled={busy} onClick={() => onDeleteRemote(remote)}>
+                    <IconButton labelKey="deleteRemote" className="taomni-btn h-6 px-2 ml-1 text-ui-danger" type="button" disabled={busy} onClick={() => onDeleteRemote(remote)}>
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                   </div>
                   <div className="grid gap-3 p-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
                     <SettingInput label="name" value={draft.name} onChange={(value) => updateDraft({ ...draft,name: value??"" })} />
                     <SettingInput label="fetch URL" value={draft.fetchUrl} onChange={(value) => updateDraft({ ...draft,fetchUrl: value??"" })} />
                     <SettingInput label="push URL" value={draft.pushUrl} onChange={(value) => updateDraft({ ...draft,pushUrl: value??"" })} />
                     <SettingInput label="account / username" value={draft.username} onChange={(value) => updateDraft({ ...draft,username: value??"" })} />
-                    <label className="text-[12px]">
+                    <label className="text-ui-body">
                       <span className="block mb-1 text-[var(--taomni-text-muted)]">token</span>
                       <input
                         className="taomni-input w-full h-8"
@@ -150,7 +151,7 @@ export function SettingsView({
 
 export function SettingInput({ label,value,onChange }: { label: string; value: string|null; onChange: (value: string|null) => void; }) {
   return (
-    <label className="text-[12px]">
+    <label className="text-ui-body">
       <span className="block mb-1 text-[var(--taomni-text-muted)]">{label}</span>
       <input className="taomni-input w-full h-8" value={value??""} onChange={(event) => onChange(emptyToNull(event.target.value))} />
     </label>

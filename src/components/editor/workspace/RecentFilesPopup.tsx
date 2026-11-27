@@ -67,7 +67,7 @@ export function RecentFilesPopup({
           onClick={() => onActivateToolWindow?.(toolWindow.id)}
         >
           <span className="min-w-0 flex-1 truncate">{toolWindow.label}</span>
-          {toolWindow.shortcut && <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">{toolWindow.shortcut}</span>}
+          {toolWindow.shortcut && <span className="shrink-0 text-ui-caption text-[var(--taomni-code-muted)]">{toolWindow.shortcut}</span>}
         </button>
       ))}
       {onOpenRecentLocations && (
@@ -83,7 +83,7 @@ export function RecentFilesPopup({
           onClick={onOpenRecentLocations}
         >
           <span className="min-w-0 flex-1 truncate">Recent Locations</span>
-          <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">Ctrl+Shift+E</span>
+          <span className="shrink-0 text-ui-caption text-[var(--taomni-code-muted)]">Ctrl+Shift+E</span>
         </button>
       )}
     </div>
@@ -118,7 +118,7 @@ export function RecentFilesPopup({
         <>
           <File className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
           <span className="shrink-0 text-[var(--taomni-code-text)]">{entry.title}</span>
-          <span className="min-w-0 flex-1 truncate text-[10px] text-[var(--taomni-code-muted)]">
+          <span className="min-w-0 flex-1 truncate text-ui-caption text-[var(--taomni-code-muted)]">
             {entry.subtitle}
           </span>
           {entry.open && (
@@ -137,7 +137,7 @@ export function RecentFilesPopup({
             : "No recent files yet"
       }
       header={onToggleChangedOnly ? (
-        <div className="flex h-7 shrink-0 items-center justify-between border-b border-[var(--taomni-code-border)] px-3 text-[11px]">
+        <div className="flex h-7 shrink-0 items-center justify-between border-b border-[var(--taomni-code-border)] px-3 text-ui-small">
           <span className="font-medium text-[var(--taomni-code-text)]">{changedOnly ? "Recently Edited Files" : "Recent Files"}</span>
           <label className="inline-flex items-center gap-1 text-[var(--taomni-code-muted)]">
             <input
@@ -149,7 +149,7 @@ export function RecentFilesPopup({
               onMouseDown={(event) => event.preventDefault()}
             />
             Show edited only
-            <span className="text-[10px]">Ctrl+E</span>
+            <span className="text-ui-caption">Ctrl+E</span>
           </label>
         </div>
       ) : undefined}

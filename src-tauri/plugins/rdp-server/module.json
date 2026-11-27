@@ -3,7 +3,7 @@
   "slug": "rdp-server",
   "name": "RDP Server",
   "description": "Share a desktop with Remote Desktop clients using NLA authentication and local approval for interactive control.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "coreApiVersion": "1",
   "kind": "local-server",
   "status": "stable",

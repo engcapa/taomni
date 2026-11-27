@@ -137,7 +137,7 @@ export function QuickDocPopup({
       aria-label="Quick documentation"
       tabIndex={0}
       data-testid="code-workspace-quick-doc"
-      className="absolute right-6 top-16 z-40 flex flex-col overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-xl outline-none"
+      className="absolute right-6 top-16 z-[var(--taomni-z-popover)] flex flex-col overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-xl focus-visible:keyboard-outline"
       style={{
         width: `${size.width}px`,
         height: `${size.height}px`,
@@ -168,7 +168,7 @@ export function QuickDocPopup({
         >
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
-        <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--taomni-code-text)]">
+        <span className="min-w-0 flex-1 truncate text-ui-small font-medium text-[var(--taomni-code-text)]">
           {content.title}
         </span>
         <button
@@ -192,19 +192,19 @@ export function QuickDocPopup({
         </button>
       </div>
       <div
-        className="taomni-chat-md min-h-0 flex-1 overflow-auto px-3 py-2 text-[12px] leading-relaxed text-[var(--taomni-code-text)]"
+        className="taomni-chat-md min-h-0 flex-1 overflow-auto px-3 py-2 text-ui-body leading-relaxed text-[var(--taomni-code-text)]"
         onClick={onBodyClick}
         dangerouslySetInnerHTML={{ __html: html }}
       />
-      {linkError && <div role="status" className="px-2 pb-1 text-[10px] text-red-400">{linkError}</div>}
+      {linkError && <div role="status" className="px-2 pb-1 text-ui-caption text-ui-danger">{linkError}</div>}
       <ReferenceContentFooter content={content} onOpenSource={onOpenSource} />
-      <div className="absolute top-0 left-0 z-10 h-4 w-4 cursor-nw-resize select-none" onMouseDown={handleResizeMouseDown("nw")} />
-      <div className="absolute top-0 right-0 z-10 h-4 w-4 cursor-ne-resize select-none" onMouseDown={handleResizeMouseDown("ne")} />
-      <div className="absolute bottom-0 left-0 z-10 h-4 w-4 cursor-sw-resize select-none" onMouseDown={handleResizeMouseDown("sw")} />
+      <div className="absolute top-0 left-0 z-[var(--taomni-z-sticky)] h-4 w-4 cursor-nw-resize select-none" onMouseDown={handleResizeMouseDown("nw")} />
+      <div className="absolute top-0 right-0 z-[var(--taomni-z-sticky)] h-4 w-4 cursor-ne-resize select-none" onMouseDown={handleResizeMouseDown("ne")} />
+      <div className="absolute bottom-0 left-0 z-[var(--taomni-z-sticky)] h-4 w-4 cursor-sw-resize select-none" onMouseDown={handleResizeMouseDown("sw")} />
       <div
         data-testid="code-workspace-quick-doc-resize-handle"
         aria-label="Resize documentation dialog"
-        className="absolute bottom-0 right-0 z-10 flex h-4 w-4 cursor-se-resize select-none items-end justify-end p-0.5 opacity-40 hover:opacity-100"
+        className="absolute bottom-0 right-0 z-[var(--taomni-z-sticky)] flex h-4 w-4 cursor-se-resize select-none items-end justify-end p-0.5 opacity-40 hover:opacity-100"
         onMouseDown={handleResizeMouseDown("se")}
       >
         <svg viewBox="0 0 6 6" className="h-2.5 w-2.5 fill-current text-[var(--taomni-code-muted)]">

@@ -1,0 +1,72 @@
+id: TC-UIC-002-primary-contrast
+title: Session editor Save remains legible and reachable in both application themes
+covers: [F5.5]
+tags: [ui-contract, theme, session]
+fixtures: [reset_db]
+modes: [browser, native]
+ui_standard: [UI-FND-03a, UI-FND-03c, UI-FND-08a]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ui-contrast
+- click: button[aria-label="Cycle application theme"]
+- assert_attribute: {selector: html, name: data-app-theme, equals: light}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-save"]:enabled'
+- assert_solid_text_contrast: {selector: '[data-testid="session-save"]', minimum: 4.5}
+- hover: {selector: '[data-testid="session-save"]', macos_system_pointer: true}
+- assert_solid_text_contrast: {selector: '[data-testid="session-save"]:hover', minimum: 4.5}
+- assert_element_geometry: {selector: '[data-testid="session-save"]', min_width: 24, min_height: 26, viewport_margin: 0}
+- click: '[data-testid="session-cancel"]'
+- click: button[aria-label="Cycle application theme"]
+- assert_attribute: {selector: html, name: data-app-theme, equals: dark}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-save"]:enabled'
+- assert_solid_text_contrast: {selector: '[data-testid="session-save"]', minimum: 4.5}
+- hover: {selector: '[data-testid="session-save"]', macos_system_pointer: true}
+- assert_solid_text_contrast: {selector: '[data-testid="session-save"]:hover', minimum: 4.5}
+- assert_element_geometry: {selector: '[data-testid="session-save"]', min_width: 24, min_height: 26, viewport_margin: 0}
+- assert_solid_text_contrast: {selector: '[data-testid="session-editor"] h2', minimum: 4.5, composite_ancestors: true}
+- click: '[data-testid="session-cancel"]'
+- click: '[data-testid="theme-cycle"]'
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="light"]'
+- click: '[data-testid="session-new"]'
+- assert_solid_text_contrast: {selector: '[data-testid="session-editor"] h2', minimum: 4.5, composite_ancestors: true}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-FND-03a, UI-FND-03c]
+    requirement: Enabled Save text clears 4.5 to 1 contrast before and after hover in each selected theme.
+    actions: [3, 6, 9, 13, 15, 18]
+    checkpoints:
+    - {step: 4, expectation: The window applies Light.}
+    - {step: 8, expectation: The light normal foreground contrasts with its actual background.}
+    - {step: 10, expectation: The light hovered label is legible.}
+    - {step: 14, expectation: The window applies Dark.}
+    - {step: 17, expectation: The dark normal foreground contrasts with its actual background.}
+    - {step: 19, expectation: The dark hovered label is legible.}
+    results: [8, 10, 17, 19]
+  - id: R2
+    ui_standard: [UI-FND-08a]
+    requirement: The footer action is at least 26 pixels tall and fully inside the viewport.
+    actions: [6, 15]
+    checkpoints:
+    - {step: 11, expectation: Save has the required bounds in Light.}
+    - {step: 20, expectation: Save has the required bounds in Dark.}
+    results: [11, 20]
+  - id: chrome-title
+    ui_standard: [UI-FND-03a]
+    requirement: The editor heading keeps its text readable against the actual window chrome across appearances.
+    actions: [15, 22, 23, 24, 26]
+    checkpoints:
+    - {step: 21, expectation: The title is legible in the dark session editor.}
+    - {step: 25, expectation: The UI switched back to Light.}
+    - {step: 27, expectation: The reopened title is legible in Light.}
+    results: [21, 25, 27]
+  visual:
+  - {check: Primary button readability, method: automated, reason: Computed sRGB foreground and solid painted control background are recorded.}
+  native:
+  - {check: Packaged WebView CSS, method: automated, reason: Native measures rendered colors and geometry using the same thresholds.}

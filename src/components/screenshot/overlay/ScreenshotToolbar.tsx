@@ -43,7 +43,7 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
       ref={state.toolbarRef}
       data-testid="screenshot-toolbar"
       data-drawing={state.drawing}
-      className={state.scrollResult ? "relative z-50 shrink-0 px-4 py-2" : "fixed z-50"}
+      className={state.scrollResult ? "relative z-[var(--taomni-z-capture-toolbar)] shrink-0 px-4 py-2" : "fixed z-[var(--taomni-z-capture-toolbar)]"}
       style={state.scrollResult ? { ...panelStyle, maxHeight: "40vh", overflowY: "auto" } : {
         left: state.toolbarPos?.left ?? -9999,
         top: state.toolbarPos?.top ?? -9999,
@@ -55,7 +55,7 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      {(state.tool === "text" || state.textSelected) && <div data-testid="screenshot-text-style" className="flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 mb-1 text-[12px]" style={panelStyle}>
+      {(state.tool === "text" || state.textSelected) && <div data-testid="screenshot-text-style" className="flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 mb-1 text-ui-body" style={panelStyle}>
         <label className="flex items-center gap-2">{state.t("screenshot.fontFamily")}
           <select data-testid="screenshot-font-family" aria-label={state.t("screenshot.fontFamily")} className="taomni-input h-7 max-w-44" value={state.fontFamily}
             onChange={(e) => { state.setFontFamily(e.target.value); if (state.textSelected) state.canvasRef.current?.updateSelectedStyle({ fontFamily: e.target.value }); }}>
@@ -94,10 +94,10 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
           </ToolButton>
         ))}
         {(FILLABLE_TOOLS.includes(state.tool) || state.fillableSelected) && <button type="button" data-testid="screenshot-fill" aria-pressed={state.fill}
-          title={state.t("screenshot.solidFill")} className="rounded px-2 h-8 text-[12px]" onClick={() => { state.setFill(!state.fill); if (state.fillableSelected) state.canvasRef.current?.updateSelectedStyle({ filled: !state.fill }); }}>
+          title={state.t("screenshot.solidFill")} className="rounded px-2 h-8 text-ui-body" onClick={() => { state.setFill(!state.fill); if (state.fillableSelected) state.canvasRef.current?.updateSelectedStyle({ filled: !state.fill }); }}>
           {state.t(state.fill ? "screenshot.solidFill" : "screenshot.outlineFill")}
         </button>}
-        {state.tool === "eraser" && <select data-testid="screenshot-eraser-mode" aria-label={state.t("screenshot.toolEraser")} className="taomni-input h-8 text-[12px]" value={state.eraserMode} onChange={(e) => state.setEraserMode(e.target.value as EraserMode)}>
+        {state.tool === "eraser" && <select data-testid="screenshot-eraser-mode" aria-label={state.t("screenshot.toolEraser")} className="taomni-input h-8 text-ui-body" value={state.eraserMode} onChange={(e) => state.setEraserMode(e.target.value as EraserMode)}>
           <option value="partial">{state.t("screenshot.erasePartial")}</option><option value="object">{state.t("screenshot.eraseObject")}</option>
         </select>}
         <div className="basis-full h-px my-1" style={{ background: "var(--taomni-divider)" }} />
@@ -122,7 +122,7 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
           value={state.color} className="w-7 h-7 mx-1 shrink-0 cursor-pointer rounded border border-[var(--taomni-divider)] p-0.5"
           onChange={(e) => { state.setColor(e.target.value); if (state.tool === "move") state.canvasRef.current?.updateSelectedStyle({ color: e.target.value }); }} />
         <input type="text" data-testid="screenshot-color-hex" aria-label={state.t("screenshot.colorHex")} title={state.t("screenshot.colorHex")} value={state.colorDraft} maxLength={7}
-          className="taomni-input h-7 w-20 px-1 text-[11px] font-mono" spellCheck={false}
+          className="taomni-input h-7 w-20 px-1 text-ui-small font-mono" spellCheck={false}
           onChange={(e) => { const value = e.target.value; state.setColorDraft(value); if (/^#[0-9a-fA-F]{6}$/.test(value)) { state.setColor(value.toLowerCase()); if (state.tool === "move") state.canvasRef.current?.updateSelectedStyle({ color: value.toLowerCase() }); } }}
           onBlur={() => state.setColorDraft(state.color)} />
         {LINE_WIDTHS.map((w) => (
@@ -190,7 +190,7 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
                 ref={state.watermarkPanelRef}
                 data-testid="screenshot-watermark-panel"
                 className="fixed rounded-lg shadow-2xl p-3 overflow-y-auto"
-                style={{ zIndex: 65, width: Math.min(224, state.viewport.w - 16), maxHeight: state.viewport.h - 16, ...state.watermarkPos, ...panelStyle }}
+                style={{ zIndex: "var(--taomni-z-capture-tool-options)", width: Math.min(224, state.viewport.w - 16), maxHeight: state.viewport.h - 16, ...state.watermarkPos, ...panelStyle }}
               >
                 <input
                   type="text"
@@ -200,9 +200,9 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
                   onChange={(e) => state.setWatermarkText(e.target.value)}
                   placeholder={state.t("screenshot.watermarkPlaceholder")}
                   aria-label={state.t("screenshot.watermarkPlaceholder")}
-                  className="taomni-input w-full h-7 px-2 text-[13px] mb-2"
+                  className="taomni-input w-full h-7 px-2 text-ui-body mb-2"
                 />
-                <label className="flex items-center gap-2 text-[12px] mb-2">
+                <label className="flex items-center gap-2 text-ui-body mb-2">
                   <span className="shrink-0">{state.t("screenshot.watermarkOpacity")}</span>
                   <input
                     type="range"
@@ -242,8 +242,8 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
                       }
                       state.setWatermarkOpen(false);
                     }}
-                    className="flex-1 rounded px-2 py-1 text-[13px]"
-                    style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
+                    className="flex-1 rounded px-2 py-1 text-ui-body"
+                    style={{ background: "var(--taomni-primary-bg)", color: "var(--taomni-primary-text)" }}
                   >
                     {state.t("screenshot.watermarkApply")}
                   </button>
@@ -255,7 +255,7 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
                       state.setWatermarkText("");
                       state.setWatermarkOpen(false);
                     }}
-                    className="rounded px-2 py-1 text-[13px]"
+                    className="rounded px-2 py-1 text-ui-body"
                     style={{ border: "1px solid var(--taomni-divider)" }}
                   >
                     {state.t("screenshot.watermarkClear")}
@@ -284,8 +284,8 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
               <div
                 ref={state.recordMenuRef}
                 data-testid="screenshot-record-menu"
-                className="fixed rounded-xl p-2 shadow-2xl text-[13px] overflow-y-auto"
-                style={{ zIndex: 65, width: Math.min(320, state.viewport.w - 16), maxHeight: state.viewport.h - 16, ...state.recordPos, ...panelStyle }}
+                className="fixed rounded-xl p-2 shadow-2xl text-ui-body overflow-y-auto"
+                style={{ zIndex: "var(--taomni-z-capture-tool-options)", width: Math.min(320, state.viewport.w - 16), maxHeight: state.viewport.h - 16, ...state.recordPos, ...panelStyle }}
               >
                 <p data-testid="screenshot-record-hint" className="px-2 py-2 leading-relaxed whitespace-normal break-words text-[var(--taomni-text-muted)]">{state.t("screenshot.recordHint", { shortcut: state.stopShortcut || state.t("settings.screenshotDisabled") })}</p>
                 <button
@@ -320,8 +320,8 @@ export function createScreenshotToolbar(context: CreateScreenshotToolbarContext)
             data-testid="screenshot-copy"
             title={`${state.t("screenshot.copy")} (Enter / Ctrl+C)`}
             onClick={() => void actions.handleCopy()}
-            className="ml-1 h-8 shrink-0 rounded-lg px-3 flex items-center gap-1 text-[13px] font-medium"
-            style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
+            className="ml-1 h-8 shrink-0 rounded-lg px-3 flex items-center gap-1 text-ui-body font-medium"
+            style={{ background: "var(--taomni-primary-bg)", color: "var(--taomni-primary-text)" }}
           >
             <Check size={15} />
             {state.t("screenshot.done")}

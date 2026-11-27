@@ -102,6 +102,7 @@ steps:
 - assert_text: {selector: '[data-testid="backup-restore-files"]', contains: plugins/mfa/data/mfa.db}
 - assert_text: {selector: '[data-testid="backup-restore-files"]', contains: databases/vault.db}
 - fill: {selector: '[data-testid="backup-restore-vault-password"]', value: qa-signed-mfa-restore-original}
+- fill: {selector: '[data-testid="backup-restore-name"]', value: '${fixture.restore_archive_name}'}
 - click: '[data-testid="backup-restore-confirm"]'
 - assert_text_equals: {selector: '[data-testid="backup-restore-error"]', equals: Incorrect vault master password. Verification failed.}
 - assert_not_visible: '[data-testid="backup-restore-staged"]'
@@ -161,33 +162,33 @@ verification:
     results: [29, 30, 39, 47]
   - id: R2
     requirement: Reinstalling to advance HOTP, rekeying Vault, and uninstalling again precede restore confirmation, rejecting the old password.
-    actions: [52, 54, 61, 72, 76, 78, 83, 88]
+    actions: [52, 54, 61, 72, 76, 78, 83, 89]
     checkpoints:
     - {step: 62, expectation: "HOTP advances to 287 082."}
     - {step: 73, expectation: "Vault master password updates."}
     - {step: 80, expectation: "Settings confirms retained data after second uninstall."}
     - {step: 85, expectation: "Restore dialog lists plugins/mfa/data/mfa.db."}
     - {step: 86, expectation: "Restore dialog lists databases/vault.db."}
-    - {step: 89, expectation: "Incorrect old master password fails verification."}
-    - {step: 90, expectation: "Failed verification does not stage pending restore state."}
-    - {step: 92, expectation: "Archive, mutated counter 1, retained locator, released lease and unchanged generation are ready before confirmation."}
-    - {step: 93, expectation: "Original renderer emits no runtime errors."}
-    results: [62, 73, 80, 85, 86, 89, 90, 92, 93]
+    - {step: 90, expectation: "Incorrect old master password fails verification."}
+    - {step: 91, expectation: "Failed verification does not stage pending restore state."}
+    - {step: 93, expectation: "Archive, mutated counter 1, retained locator, released lease and unchanged generation are ready before confirmation."}
+    - {step: 94, expectation: "Original renderer emits no runtime errors."}
+    results: [62, 73, 80, 85, 86, 90, 91, 93, 94]
   - id: R3
     requirement: Automatic relaunch preserves the uninstalled retained state, rolls back Vault and exact mfa.db bytes, and decrypts HOTP after reinstall.
-    actions: [94, 99, 103, 117, 119, 128]
+    actions: [95, 100, 104, 118, 120, 129]
     checkpoints:
-    - {step: 94, expectation: "Single confirmation exits original desktop at 0 and reattaches to new QA desktop PID."}
-    - {step: 96, expectation: "Generation advances, active pointer stays intact, code stays absent, retained locator and exact archived mfa.db bytes match."}
-    - {step: 100, expectation: "Changed password is rejected after restore."}
-    - {step: 108, expectation: "Manager tab shows the missing-module unavailable notice."}
-    - {step: 109, expectation: "No MFA account codes render while uninstalled."}
-    - {step: 114, expectation: "Module store shows retained data on the uninstalled MFA card."}
-    - {step: 127, expectation: "Reinstalling and enabling decrypts restored HOTP 755 224."}
-    - {step: 129, expectation: "Reinstalled signed host advances restored account to 287 082."}
-    - {step: 130, expectation: "Reinstalled signed MFA host holds the writer lease on the relaunched desktop."}
-    - {step: 131, expectation: "Complete automatic restore produces no runtime errors."}
-    results: [94, 96, 100, 108, 109, 114, 127, 129, 130, 131]
+    - {step: 95, expectation: "Single confirmation exits original desktop at 0 and reattaches to new QA desktop PID."}
+    - {step: 97, expectation: "Generation advances, active pointer stays intact, code stays absent, retained locator and exact archived mfa.db bytes match."}
+    - {step: 101, expectation: "Changed password is rejected after restore."}
+    - {step: 109, expectation: "Manager tab shows the missing-module unavailable notice."}
+    - {step: 110, expectation: "No MFA account codes render while uninstalled."}
+    - {step: 115, expectation: "Module store shows retained data on the uninstalled MFA card."}
+    - {step: 128, expectation: "Reinstalling and enabling decrypts restored HOTP 755 224."}
+    - {step: 130, expectation: "Reinstalled signed host advances restored account to 287 082."}
+    - {step: 131, expectation: "Reinstalled signed MFA host holds the writer lease on the relaunched desktop."}
+    - {step: 132, expectation: "Complete automatic restore produces no runtime errors."}
+    results: [95, 97, 101, 109, 110, 115, 128, 130, 131, 132]
   visual:
   - check: Reinstalled signed MFA pane showing restored HOTP 287 082 after advancing from 755 224.
     method: manual

@@ -40,13 +40,13 @@ export function MultiExecTargets({ selectedCount, totalCount }: { selectedCount:
   }, [open]);
   const matches = tabs.filter((tab) => tab.type === "terminal" && tabSearchText(tab).includes(query.trim().toLowerCase()));
   return <>
-    <button ref={button} type="button" data-testid="multiexec-targets" className="taomni-pill inline-flex shrink-0 items-center gap-1 text-[11px]"
+    <button ref={button} type="button" data-testid="multiexec-targets" className="taomni-pill inline-flex shrink-0 items-center gap-1 text-ui-small"
       title={t("multiExec.targets")} aria-label={t("multiExec.targets")} aria-haspopup="dialog" aria-expanded={open}
       onClick={() => { setQuery(""); setOpen((value) => !value); }}>
       {selectedCount} / {totalCount}<ChevronDown className="h-3 w-3" />
     </button>
     {open && createPortal(<div ref={menu} data-testid="multiexec-target-menu" role="dialog" aria-label={t("multiExec.targets")}
-      className="fixed z-[9999] flex max-h-[60vh] w-80 max-w-[95vw] flex-col rounded-md border p-2 text-xs shadow-lg"
+      className="fixed z-[var(--taomni-z-menu-over-modal)] flex max-h-[60vh] w-80 max-w-[95vw] flex-col rounded-md border p-2 text-xs shadow-lg"
       style={{ ...position, background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
       onKeyDown={(event) => {
         if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setOpen(false); button.current?.focus(); }

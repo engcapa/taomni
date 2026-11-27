@@ -1,4 +1,5 @@
 import { type ClipboardEvent, useRef } from "react";
+import { usePendingAction } from "../../ui/usePendingAction";
 import type { SessionConfig } from "../../../lib/ipc";
 import { selectFilePath, selectFolderPath, selectPrivateKeyFile } from "../../../lib/ipc";
 import { DEFAULT_NETWORK_SETTINGS } from "../../../lib/networkSettings";
@@ -145,7 +146,7 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
     specifyUser: form.specifyUser,
   });
 
-  const handleSave = createHandleSave({
+  const save = usePendingAction(createHandleSave({
     validate,
     setSaveError: form.setSaveError,
     passwordRef: form.passwordRef,
@@ -198,7 +199,7 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
     updateSession: form.updateSession,
     addSession: form.addSession,
     onClose,
-  });
+  }));
 
   const handleSaveTemplate = createHandleSaveTemplate({
     validate,
@@ -504,7 +505,8 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
     handleTestDbConnection,
     handleTestHBaseConnection,
     handleTestProxyConnection,
-    handleSave,
+    handleSave: save.run,
+    saving: save.busy,
     handleProtoChange,
     handleHostPaste,
     handleHostLookup,

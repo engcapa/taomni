@@ -13,6 +13,7 @@ description: 'ED-CHROME-001 browser slice. Opens the browser-VFS README buffer a
   Highest claim on green: L1 browser-wired highlighting chrome contract.
 
   '
+ui_standard: [UI-MNU-01, UI-MNU-02, UI-MNU-04]
 covers:
 - F25.5
 tags:
@@ -88,11 +89,11 @@ steps:
     key: End
     selector: '[data-testid="highlighting-level-option-syntax"]'
 - eval_readonly:
-    expression: document.activeElement?.getAttribute('data-testid') === 'highlighting-level-option-none'
+    expression: document.activeElement?.getAttribute('data-testid') === 'highlighting-widget-open-settings'
     expect_truthy: true
 - press:
     key: Home
-    selector: '[data-testid="highlighting-level-option-none"]'
+    selector: '[data-testid="highlighting-widget-open-settings"]'
 - eval_readonly:
     expression: document.activeElement?.getAttribute('data-testid') === 'highlighting-level-option-all'
     expect_truthy: true
@@ -135,6 +136,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
+    ui_standard: [UI-MNU-01, UI-MNU-02, UI-MNU-04]
     requirement: Per-file highlighting widget level menu and no-provider state：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1

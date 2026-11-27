@@ -1,0 +1,77 @@
+id: TC-UIC-027-editor-go-to-line-native
+title: Go to Line validates a position and returns the keyboard to the real editor
+covers: [F25.5]
+tags: [ui-contract, code-workspace, keyboard]
+modes: [native]
+fixtures: [reset_db, workspace_root]
+ui_standard: [UI-DLG-04, UI-DLG-06, UI-DLG-07, UI-INP-02]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-goto-line
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-line","name":"Go to line","roots":[{"id":"qa-line","name":"qa-line","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-line","path":"notes.txt"},"lastOpenedAt":1788566400000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.workspace_root}"]'
+- assert_text: {selector: '[data-testid="code-workspace-editor"] .cm-content', contains: scratch notes}
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+g
+- assert_focus_on: '[data-testid="code-workspace-goto-line-input"]'
+- fill: {selector: '[data-testid="code-workspace-goto-line-input"]', value: '99'}
+- assert_attribute: {selector: '[data-testid="code-workspace-goto-line-input"]', name: aria-invalid, equals: 'true'}
+- assert_text: {selector: '[data-testid="code-workspace-goto-line-error"]', contains: 'between 1 and 2'}
+- assert_visible: '[data-testid="code-workspace-goto-line-ok"]:disabled'
+- press: Tab
+- assert_focus_on: '[data-testid="code-workspace-goto-line-cancel"]'
+- press: Tab
+- assert_focus_on: '[data-testid="code-workspace-goto-line-input"]'
+- fill: {selector: '[data-testid="code-workspace-goto-line-input"]', value: '1:5'}
+- press: Enter
+- assert_not_visible: '[data-testid="code-workspace-goto-line-dialog"]'
+- assert_focus_on: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_text: {selector: '[data-testid="status-bar-workspace-cursor"]', contains: '1:5'}
+- press: Control+g
+- fill: {selector: '[data-testid="code-workspace-goto-line-input"]', value: '1:2'}
+- press: Escape
+- assert_not_visible: '[data-testid="code-workspace-goto-line-dialog"]'
+- assert_focus_on: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_text: {selector: '[data-testid="status-bar-workspace-cursor"]', contains: '1:5'}
+- press: Control+g
+- fill: {selector: '[data-testid="code-workspace-goto-line-input"]', value: '1:8'}
+- click: '[data-testid="code-workspace-goto-line-ok"]'
+- assert_text: {selector: '[data-testid="status-bar-workspace-cursor"]', contains: '1:8'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: invalid
+    ui_standard: [UI-DLG-06, UI-DLG-07, UI-INP-02]
+    requirement: Opening from the editor focuses the position. An invalid line has an explanation, disables the jump, and keeps Tab inside the dialog.
+    actions: [10, 12, 16, 18]
+    checkpoints:
+    - {step: 11, expectation: The position field owns initial focus.}
+    - {step: 13, expectation: The field reports an invalid value.}
+    - {step: 14, expectation: The diagnostic includes the real line range.}
+    - {step: 15, expectation: The jump button is disabled.}
+    - {step: 17, expectation: Tab reaches Cancel.}
+    - {step: 19, expectation: Tab skips the disabled action and returns to the field.}
+    results: [11, 13, 14, 15, 17, 19]
+  - id: navigate
+    ui_standard: [UI-DLG-04, UI-DLG-07]
+    requirement: Enter moves the real editor caret, and Escape preserves that position when reopening the dialog.
+    actions: [20, 21, 25, 26, 27, 31, 32, 33]
+    checkpoints:
+    - {step: 22, expectation: Submitting the position closes the dialog.}
+    - {step: 23, expectation: The editor regains keyboard focus.}
+    - {step: 24, expectation: The editor caret is at the requested column.}
+    - {step: 28, expectation: Escape closes the second dialog.}
+    - {step: 29, expectation: Focus returns to the editor after cancellation.}
+    - {step: 30, expectation: Cancelling leaves the original caret untouched.}
+    - {step: 34, expectation: Clicking the enabled jump action moves the caret to the newly requested column.}
+    results: [22, 23, 24, 28, 29, 30, 34]
+  native:
+  - {check: Caret and keyboard ownership in the desktop editor., method: automated, reason: Opens the packaged editor on a real local text file and checks its reported caret.}
+  visual:
+  - {check: Invalid position and jump availability., method: automated, reason: Checks the rendered line range and the visible disabled jump action.}

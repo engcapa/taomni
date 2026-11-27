@@ -53,7 +53,7 @@ export function registerfilesLifecycle3Cases(caseContext: registerfilesLifecycle
       expect(screen.getByTitle(/^app \/ other\.txt(?: -|$)/)).toBe(row);
       expect(row).toHaveFocus();
       fireEvent.contextMenu(row);
-      expect(screen.getByRole("button", { name: "Open" })).toBeInTheDocument();
+      expect(screen.getByRole("menuitem", { name: "Open" })).toBeInTheDocument();
       fireEvent.keyDown(document, { key: "Escape" });
       expect(row).toHaveFocus();
       expect(row).toHaveAttribute("aria-selected", "true");
@@ -117,12 +117,12 @@ export function registerfilesLifecycle3Cases(caseContext: registerfilesLifecycle
     const otherRow = (await screen.findAllByTestId("code-workspace-tree-file")).find((r) => r.dataset.path === "other.txt")!;
     fireEvent.contextMenu(otherRow);
 
-    expect(await screen.findByRole("button", { name: "Open" })).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Open" })).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: "Escape" });
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Open" })).not.toBeInTheDocument();
     });
 
     expect(otherRow).toHaveAttribute("data-selected", "true");
@@ -150,7 +150,7 @@ export function registerfilesLifecycle3Cases(caseContext: registerfilesLifecycle
     const otherRow = (await screen.findAllByTestId("code-workspace-tree-file")).find((r) => r.dataset.path === "other.txt")!;
     fireEvent.contextMenu(otherRow);
 
-    expect(await screen.findByRole("button", { name: "Open" })).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Open" })).toBeInTheDocument();
 
     // Hold the next paint until after the simulated unmount focus reset.
     // Real timers can paint during waitFor's async settlement under load,
@@ -168,7 +168,7 @@ export function registerfilesLifecycle3Cases(caseContext: registerfilesLifecycle
     try {
       fireEvent.keyDown(document, { key: "Escape" });
       await waitFor(() => {
-        expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("menuitem", { name: "Open" })).not.toBeInTheDocument();
       });
 
       if (owner === "document") {
@@ -216,7 +216,7 @@ export function registerfilesLifecycle3Cases(caseContext: registerfilesLifecycle
     const otherRow = (await screen.findAllByTestId("code-workspace-tree-file")).find((r) => r.dataset.path === "other.ts")!;
     fireEvent.contextMenu(otherRow);
 
-    const openButton = await screen.findByRole("button", { name: "Open" });
+    const openButton = await screen.findByRole("menuitem", { name: "Open" });
     fireEvent.click(openButton);
 
     await screen.findByTitle("app / other.ts");

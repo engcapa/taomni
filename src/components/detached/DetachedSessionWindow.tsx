@@ -25,6 +25,7 @@ import {
   useState,
   type ReactElement,
 } from "react";
+import { DetachedHandoffStatus } from "./DetachedHandoffStatus";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import {
@@ -40,8 +41,7 @@ import type { DbConnectInfo, Tab, TabKind, VncConnectInfo } from "../../types";
 import type { TerminalProfile } from "../../lib/terminalProfile";
 import type { CommandTerminalConnectInfo, SshConnectInfo } from "../terminal/TerminalPanel";
 import type { LocalShellSelection } from "../../types";
-import { useT, t as tr } from "../../lib/i18n";
-import { useAppTheme } from "../../lib/appTheme";
+import { t as tr } from "../../lib/i18n";
 import { isTauriRuntime } from "../../lib/runtime";
 import { redactVncHandoff, vncConsumeDetachClaim, vncCreateDetachClaim } from "../../lib/vnc";
 import { deserializeVncViewerOptions, serializeVncViewerOptions, type VncViewerOptions } from "../../lib/vncOptions";
@@ -131,10 +131,6 @@ export default function DetachedSessionWindow({
   kind,
   id,
 }: DetachedSessionWindowProps) {
-  const t = useT();
-  const { mode, resolvedTheme } = useAppTheme();
-  const uiFontFamily = useAppStore((s) => s.uiFontFamily);
-  const uiFontSize = useAppStore((s) => s.uiFontSize);
   const addTab = useAppStore((s) => s.addTab);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
   const tabs = useAppStore((s) => s.tabs);
@@ -207,20 +203,6 @@ export default function DetachedSessionWindow({
       window.removeEventListener("storage", onStorage);
     };
   }, [kind, id, params]);
-
-  // Theme + font side-effects (mirrors App.tsx so the detached window
-  // looks consistent with the main app).
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.appTheme = resolvedTheme;
-    root.dataset.appThemeMode = mode;
-    root.style.colorScheme = resolvedTheme;
-  }, [mode, resolvedTheme]);
-  useEffect(() => {
-    const root = document.documentElement;
-    root.style.setProperty("--taomni-ui-font-family", uiFontFamily);
-    root.style.setProperty("--taomni-ui-font-size", `${uiFontSize}px`);
-  }, [uiFontFamily, uiFontSize]);
 
   const title = useMemo(() => {
     const titled = (params as { title?: string } | null)?.title;
@@ -431,45 +413,7 @@ export default function DetachedSessionWindow({
     && (!(params as DetachedVncParams).host || !(params as DetachedVncParams).port);
 
   if (!params || waitingForVncClaim) {
-    return (
-      <div
-        className="w-screen h-screen flex items-center justify-center p-6"
-        style={{ background: "#1e2128", color: "#e6e6e6" }}
-      >
-        <div className="max-w-md text-center text-sm leading-relaxed">
-          {handoffTimedOut ? (
-            <>
-              <div className="text-base font-semibold mb-2">
-                {t("fileBrowser.detachedTimedOutTitle")}
-              </div>
-              <p style={{ color: "#a0a0a0" }}>
-                {t("fileBrowser.detachedTimedOutBody", { sessionId: id })}
-              </p>
-              <p className="mt-3" style={{ color: "#a0a0a0" }}>
-                {t("fileBrowser.detachedTimedOutHint")}
-              </p>
-              <button
-                type="button"
-                className="mt-4 px-3 py-1.5 text-xs rounded"
-                style={{ background: "#3a3f4a", color: "#e6e6e6" }}
-                onClick={() => window.close()}
-              >
-                {t("fileBrowser.detachedCloseWindow")}
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="text-base font-semibold mb-2">
-                {t("fileBrowser.detachedLoadingTitle")}
-              </div>
-              <p style={{ color: "#a0a0a0" }}>
-                {t("fileBrowser.detachedLoadingBody")}
-              </p>
-            </>
-          )}
-        </div>
-      </div>
-    );
+    return <DetachedHandoffStatus key={id} sessionId={id} failed={handoffTimedOut} />;
   }
 
   const detachedWindowControls = {
@@ -510,11 +454,13 @@ export default function DetachedSessionWindow({
   return (
     <TabActionSlotProvider slot={actionSlot}>
       <div
+        role="region"
+        aria-label={title}
         data-testid="detached-session-window"
         data-detached-kind={kind}
         data-detached-id={id}
         className="w-screen h-screen relative flex flex-col"
-        style={{ background: "#000", color: "var(--taomni-text)" }}
+        style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}
       >
         <div
           className="h-8 shrink-0 flex items-center justify-end px-1"
@@ -676,7 +622,7 @@ function LoadingScreen({ label }: { label: string }) {
   return (
     <div
       className="w-screen h-screen flex items-center justify-center"
-      style={{ background: "#000", color: "#aaa" }}
+      style={{ background: "var(--taomni-bg)", color: "var(--taomni-text-muted)" }}
     >
       {label}
     </div>

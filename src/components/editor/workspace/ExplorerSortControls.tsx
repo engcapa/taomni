@@ -33,7 +33,7 @@ export function ExplorerListColumns({ sort, onChange }: { sort: ExplorerSort; on
       {selected && <Direction className="h-3 w-3 shrink-0" />}
     </button>;
   };
-  return <div data-testid="code-workspace-list-columns" className="taomni-explorer-list-columns sticky top-0 z-10 flex h-7 gap-2 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 text-[var(--taomni-code-muted)]">
+  return <div data-testid="code-workspace-list-columns" className="taomni-explorer-list-columns sticky top-0 z-[var(--taomni-z-sticky)] flex h-7 gap-2 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 text-[var(--taomni-code-muted)]">
     <span className="taomni-explorer-list-name flex min-w-0">{column("name")}</span>
     <span className="taomni-explorer-list-metadata">{FIELDS.slice(1).map(column)}</span>
   </div>;

@@ -1,0 +1,64 @@
+id: TC-UIC-021-settings-switches
+title: Keyboard changes to AI settings expose their saved state and update the Chat rail
+covers: [F-AI-2.1]
+tags: [ui-contract, ai, settings]
+modes: [browser, native]
+fixtures: [reset_db]
+ui_standard: [UI-CHK-03, UI-FOC-01, UI-FND-03a]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-settings-switches
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- wait_for: '[data-testid="ai-master-switch"][role="switch"][aria-checked="false"]'
+- press: {selector: '[data-testid="ai-master-switch"]', key: Space}
+- wait_for: '[data-testid="ai-master-switch"][aria-checked="true"]'
+- assert_focus_on: '[data-testid="ai-master-switch"]'
+- assert_not_visible: '[data-testid="rail-chat-button"]'
+- press: Enter
+- wait_for: '[data-testid="ai-master-switch"][aria-checked="false"]'
+- assert_visible: '[data-testid="rail-chat-button"]'
+- press: Tab
+- assert_focus_on: '[data-testid="ai-full-local-toggle"]'
+- press: Space
+- wait_for: '[data-testid="ai-full-local-toggle"][role="switch"][aria-checked="true"]'
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: light}
+- assert_solid_text_contrast: {selector: '[data-testid="ai-full-local-toggle"]', minimum: 4.5, composite_ancestors: true}
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: dark}
+- assert_solid_text_contrast: {selector: '[data-testid="ai-full-local-toggle"]', minimum: 4.5, composite_ancestors: true}
+- press: {selector: '[data-testid="ai-full-local-toggle"]', key: Enter}
+- wait_for: '[data-testid="ai-full-local-toggle"][aria-checked="false"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: switch-state
+    ui_standard: [UI-CHK-03, UI-FOC-01]
+    requirement: Space and Enter save the AI preference once and focus can advance directly to the privacy control.
+    actions: [6, 10, 13, 15, 23]
+    checkpoints:
+    - {step: 7, expectation: Disable AI reports its persisted on state.}
+    - {step: 8, expectation: The original switch retains keyboard focus.}
+    - {step: 9, expectation: Chat disappears after disabling AI.}
+    - {step: 11, expectation: Enter restores the off state.}
+    - {step: 12, expectation: Chat is available again.}
+    - {step: 14, expectation: Tab reaches the local processing switch.}
+    - {step: 16, expectation: The privacy switch reports its new state.}
+    - {step: 24, expectation: The privacy switch can be reset.}
+    results: [7, 8, 9, 11, 12, 14, 16, 24]
+  - id: switch-contrast
+    ui_standard: [UI-FND-03a]
+    requirement: A selected privacy switch keeps readable text in both explicitly selected appearances.
+    actions: [17, 20]
+    checkpoints:
+    - {step: 18, expectation: The application applied Light.}
+    - {step: 19, expectation: The selected light switch clears 4.5 to 1.}
+    - {step: 21, expectation: The application applied Dark.}
+    - {step: 22, expectation: The selected dark switch clears 4.5 to 1.}
+    results: [18, 19, 21, 22]
+  visual:
+  - {check: Selected switch text, method: automated, reason: Measures the resolved foreground against the rendered background.}
+  native:
+  - {check: Saved AI policy, method: automated, reason: Exercises the native preferences service and observes the Chat rail in the packaged app.}

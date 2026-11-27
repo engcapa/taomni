@@ -94,11 +94,11 @@ export function FeishuAdapterSettings({ mobileEnabled }: { mobileEnabled: boolea
       {draft.proxy_mode === "custom" && <div data-testid="feishu-custom-proxy"><AppProxyPanel value={draft.custom_proxy} onSave={async custom_proxy => patch({ custom_proxy })} testHost="open.feishu.cn" /></div>}
     </fieldset>
     <div className="flex gap-2 flex-wrap">
-      <button data-testid="feishu-save" className="border rounded px-3 py-1.5" disabled={busy || running || !dirty} onClick={() => void act(async () => {
+      <button type="button" data-testid="feishu-save" className="border rounded px-3 py-1.5" disabled={busy || running || !dirty} onClick={() => void act(async () => {
         const next = await invoke<View>("mobile_feishu_save", { config, secret: secret || null });
         setView(next); setDraft(next.config); setSecret(""); setBindings(next.config.bindings.map(b => `${b.open_id} ${b.chat_id}`).join("\n")); setSaved(true);
       })}>{t("feishuSettings.save")}</button>
-      <button data-testid="feishu-toggle" className="border rounded px-3 py-1.5" disabled={busy || (!running && (!mobileEnabled || dirty || !view.secret_configured || !draft.app_id || !config.bindings.length))} onClick={() => void act(async () => {
+      <button type="button" data-testid="feishu-toggle" className="border rounded px-3 py-1.5" disabled={busy || (!running && (!mobileEnabled || dirty || !view.secret_configured || !draft.app_id || !config.bindings.length))} onClick={() => void act(async () => {
         const status = await invoke<Status>(running ? "mobile_feishu_stop" : "mobile_feishu_start");
         setView({ ...view, status });
       })}>{t(running ? "feishuSettings.stop" : "feishuSettings.start")}</button>

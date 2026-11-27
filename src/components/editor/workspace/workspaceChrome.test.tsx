@@ -259,7 +259,7 @@ describe("LspStatusPill", () => {
     expect(pill).toHaveAttribute("data-active", "true");
     expect(pill?.className).toContain("text-[var(--taomni-code-text)]");
     expect(pill?.className).not.toContain("text-[var(--taomni-code-muted)]");
-    expect(pill?.className).toContain("text-[11px]");
+    expect(pill?.className).toContain("text-ui-small");
     expect(pill?.className).toContain("data-[active=true]:bg-[var(--taomni-selected)]");
     expect(pill?.className).toContain("data-[active=true]:border-[var(--taomni-selected-border)]");
   });

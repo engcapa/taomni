@@ -26,6 +26,22 @@ describe("ModuleOfflineInstall", () => {
   });
   afterEach(cleanup);
 
+  it("associates the missing signature with the validation message and preserves the package path", () => {
+    render(<ModuleOfflineInstall />);
+    const archive = screen.getByTestId("module-offline-archive");
+    const signature = screen.getByTestId("module-offline-signature");
+    fireEvent.change(archive, { target: { value: "/test/draft.taomni-plugin" } });
+    fireEvent.click(screen.getByTestId("module-offline-submit"));
+    expect(archive).not.toHaveAttribute("aria-invalid");
+    expect(archive).toHaveValue("/test/draft.taomni-plugin");
+    expect(signature).toHaveAttribute("aria-invalid", "true");
+    expect(signature).toHaveAccessibleDescription(screen.getByRole("alert").textContent!);
+    expect(mocks.install).not.toHaveBeenCalled();
+    fireEvent.change(signature, { target: { value: "editing" } });
+    expect(signature).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("shows required validation and a native rejection without inventing an installed record", async () => {
     mocks.install.mockRejectedValueOnce(new Error("untrusted signature"));
     render(<ModuleOfflineInstall />);

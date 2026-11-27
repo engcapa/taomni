@@ -11,7 +11,14 @@ use windows::Win32::System::JobObjects::{
     JobObjectBasicAccountingInformation, JobObjectExtendedLimitInformation,
     QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
 };
-use windows::Win32::System::Threading::CREATE_SUSPENDED;
+use windows::Win32::System::Threading::{CREATE_NO_WINDOW, CREATE_SUSPENDED};
+
+fn host_creation_flags() -> u32 {
+    // Plugin hosts use the Console subsystem by default while release Core is a
+    // Windows GUI subsystem binary without an attached console; CREATE_NO_WINDOW
+    // prevents Windows from allocating a visible terminal window on host spawn.
+    (CREATE_SUSPENDED | CREATE_NO_WINDOW).0
+}
 
 #[link(name = "ntdll")]
 unsafe extern "system" {
@@ -44,7 +51,7 @@ impl ProcessContainment {
             )
         }
         .map_err(io::Error::other)?;
-        command.creation_flags(CREATE_SUSPENDED.0);
+        command.creation_flags(host_creation_flags());
         Ok(containment)
     }
 
@@ -117,5 +124,17 @@ impl Drop for ProcessContainment {
             }
             self.job = HANDLE::default();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CREATE_NO_WINDOW, CREATE_SUSPENDED, host_creation_flags};
+
+    #[test]
+    fn host_creation_flags_suspend_without_console_window() {
+        let flags = host_creation_flags();
+        assert_ne!(flags & CREATE_SUSPENDED.0, 0);
+        assert_ne!(flags & CREATE_NO_WINDOW.0, 0);
     }
 }

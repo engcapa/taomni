@@ -79,9 +79,6 @@ export function KeymapSettingsDialog({
   capturedStrokesRef.current = capturedStrokes;
   const secondStrokeEnabledRef = useRef(false);
   secondStrokeEnabledRef.current = secondStrokeEnabled;
-  const overlayStateRef = useRef({ mouse: false, menu: false, findField: false });
-  overlayStateRef.current.mouse = mouseCapture !== null;
-  overlayStateRef.current.menu = rowMenu !== null;
   const recorderFieldRef = useRef<HTMLDivElement | null>(null);
   const shortcutFilterFieldRef = useRef<HTMLDivElement | null>(null);
 
@@ -176,10 +173,6 @@ export function KeymapSettingsDialog({
     baseBindings,
     open,
     captureRef,
-    overlayStateRef,
-    shortcutFilterFieldRef,
-    setRowMenu,
-    setMouseCapture,
     capturedStrokesRef,
     secondStrokeEnabledRef,
   });
@@ -239,7 +232,6 @@ export function KeymapSettingsDialog({
   const toggleShortcutFilter = () => {
     if (shortcutFilter) {
       setShortcutFilter(null);
-      overlayStateRef.current.findField = false;
       return;
     }
     setShortcutFilter([]);
@@ -328,7 +320,7 @@ export function KeymapSettingsDialog({
       >
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm">{item.title}</div>
-          <div className="truncate text-[11px] opacity-60">
+          <div className="truncate text-ui-small opacity-60">
             {item.category} · {item.id}
             {row?.source === "user" ? " · modified" : ""}
             {item.state.availability !== "available" && !disabled
@@ -339,19 +331,19 @@ export function KeymapSettingsDialog({
         </div>
         <div className="flex items-center gap-1">
           {shortcuts.length === 0 && (
-            <span data-testid={`keymap-no-shortcut-${item.id}`} className="text-[11px] opacity-50">no shortcut</span>
+            <span data-testid={`keymap-no-shortcut-${item.id}`} className="text-ui-small opacity-50">no shortcut</span>
           )}
           {shortcuts.map((shortcut, index) => renderChip(item, shortcut, index, conflicts, capturing))}
           <button
             type="button"
             data-testid={`keymap-add-${item.id}`}
             aria-label={capturing ? `Recording shortcut for ${item.title}` : `Add shortcut to ${item.title}`}
-            className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[11px] hover:bg-[var(--taomni-code-hover)]"
+            className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={() => startKeyboardCapture(item.id, null)}
           >
             {capturing ? "recording…" : "+ Add"}
           </button>
-          <label className="ml-1 flex items-center gap-1 text-[11px]">
+          <label className="ml-1 flex items-center gap-1 text-ui-small">
             <input
               type="checkbox"
               aria-label={`Action ${item.title} enabled`}
@@ -383,7 +375,7 @@ export function KeymapSettingsDialog({
     return (
       <span
         key={`${item.id}-${label}-${index}`}
-        className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1 py-0.5 text-[11px]"
+        className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1 py-0.5 text-ui-small"
         title={conflicts.length
           ? `Also used by: ${conflicts.map((entry) => `${entry.title} (${entry.actionId})`).join(", ")}`
           : undefined}
@@ -398,7 +390,7 @@ export function KeymapSettingsDialog({
           : {})}
       >
         <ShortcutKeyCaps shortcut={shortcut} platform={displayPlatform === "mac" ? "mac" : undefined} />
-        {conflicts.length ? <span aria-label="conflict" className="text-amber-500">⚠</span> : null}
+        {conflicts.length ? <span aria-label="conflict" className="text-ui-warning">⚠</span> : null}
         <button
           type="button"
           aria-label={`Remove shortcut ${label} from ${item.title}`}
@@ -429,7 +421,6 @@ export function KeymapSettingsDialog({
     corruptDiagnostic={corruptDiagnostic}
     shortcutFilter={shortcutFilter}
     shortcutFilterFieldRef={shortcutFilterFieldRef}
-    overlayStateRef={overlayStateRef}
     handleShortcutFilterKeyDown={handleShortcutFilterKeyDown}
     filter={filter}
     setFilter={setFilter}

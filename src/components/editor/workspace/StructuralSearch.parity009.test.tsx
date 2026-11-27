@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   StructuralMatch,
@@ -9,6 +9,7 @@ import type {
   StructuralSearchBuffer,
 } from "../../../lib/editor/structuralSearch";
 import { StructuralSearchDialog } from "./StructuralSearchDialog";
+import { useWorkspaceCommandFocus } from "./hooks/useWorkspaceCommandFocus";
 import { StructuralSearchPanel } from "./panels/StructuralSearchPanel";
 import { useStructuralSearchSession } from "./useStructuralSearchSession";
 
@@ -160,10 +161,15 @@ describe("Structural Search session ED-PARITY-009", () => {
     expect(screen.getAllByTestId("structural-search-match").map((row) => row.dataset.line)).toEqual(["3", "4", "5"]);
     expect(screen.getByTestId("structural-search-backend")).toHaveTextContent("tree-sitter-java 0.23.5");
 
-    fireEvent.click(screen.getAllByTestId("structural-search-match")[1]!);
+    const [first, second, third] = screen.getAllByTestId("structural-search-match");
+    await waitFor(() => expect(first).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(second!);
+    await waitFor(() => expect(second).toHaveAttribute("aria-selected", "true"));
     expect(onOpenMatch).toHaveBeenLastCalledWith(THREE[1], { preview: true });
     const results = screen.getByTestId("structural-search-results");
+    results.focus();
     fireEvent.keyDown(results, { key: "ArrowDown" });
+    await waitFor(() => expect(third).toHaveAttribute("aria-selected", "true"));
     expect(onOpenMatch).toHaveBeenLastCalledWith(THREE[2], { preview: true });
     fireEvent.keyDown(results, { key: "Enter" });
     expect(onOpenMatch).toHaveBeenLastCalledWith(THREE[2], { preview: false });
@@ -235,15 +241,26 @@ describe("Structural Search session ED-PARITY-009", () => {
     const late = deferred<StructuralSearchResponse>();
     ipc.structuralSearchRun.mockImplementationOnce(() => late.promise);
     render(<Harness />);
+    const { result } = renderHook(() => useWorkspaceCommandFocus({
+      treePaneRef: { current: null },
+      editorPaneRef: { current: null },
+    }));
     await openDialog();
-    fireEvent.click(screen.getByTestId("structural-search-find"));
+    const find = screen.getByTestId("structural-search-find");
+    find.focus();
+    fireEvent.click(find);
     await waitFor(() => expect(screen.getByTestId("structural-search-running")).toBeInTheDocument());
     const { requestId } = lastRequest();
 
-    // Find is disabled while running, so focus is no longer inside the dialog.
-    (document.activeElement as HTMLElement | null)?.blur();
+    expect(find).toBeDisabled();
+    const template = screen.getByTestId("structural-search-template");
+    expect(template).toHaveFocus();
+    template.blur();
+    expect(document.activeElement).toBe(document.body);
+    expect(result.current.isSurfaceOwnedKeyEvent(document.body)).toBe(true);
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(screen.queryByTestId("structural-search-dialog")).toBeNull();
+    expect(result.current.isSurfaceOwnedKeyEvent(document.body)).toBe(false);
     await waitFor(() => expect(ipc.structuralSearchCancel).toHaveBeenCalledWith(requestId));
     expect(onStatus).toHaveBeenLastCalledWith("Structural search cancelled");
 

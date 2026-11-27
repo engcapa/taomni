@@ -36,8 +36,8 @@ export function WorkspaceGitPanel({ workspace, visible, focusPath, onOpenFile }:
   if (roots.length === 0) {
     return (
       <div data-testid="workspace-git-panel" data-empty="true" className="flex h-full flex-col items-center justify-center gap-3 p-6">
-        <div className="text-[13px] font-semibold">{t("platform.gitRepo")}</div>
-        <div className="text-[11.5px]" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.noWorkspaceRoot")}</div>
+        <div className="text-ui-body font-semibold">{t("platform.gitRepo")}</div>
+        <div className="text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.noWorkspaceRoot")}</div>
         <button
           type="button"
           data-testid="workspace-git-add-folder"

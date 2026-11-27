@@ -88,7 +88,9 @@ it("supports keyboard menu dismissal and never generates or writes an image afte
   vi.mocked(saveExportBlob).mockResolvedValue(null);
   render(<Harness />); diagram().focus(); fireEvent.keyDown(diagram(), { key: "F10", shiftKey: true });
   fireEvent.keyDown(screen.getByTestId("markdown-diagram-menu"), { key: "End" });
-  expect(document.activeElement).toBe(screen.getByTestId("markdown-diagram-menu-copy-source"));
+  const copySource = screen.getByTestId("markdown-diagram-menu-copy-source");
+  expect(copySource).toHaveAttribute("data-active", "true");
+  expect(screen.getByTestId("markdown-diagram-menu")).toHaveAttribute("aria-activedescendant", copySource.id);
   fireEvent.keyDown(document.activeElement!, { key: "Escape" }); expect(screen.queryByRole("menu")).toBeNull(); expect(document.activeElement).toBe(diagram());
   fireEvent.contextMenu(diagram()); fireEvent.click(screen.getByTestId("markdown-diagram-menu-save-png"));
   await waitFor(() => expect(screen.getByTestId("markdown-diagram-status")).toHaveTextContent("Save cancelled"));

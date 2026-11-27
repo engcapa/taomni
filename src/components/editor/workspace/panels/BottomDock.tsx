@@ -1,3 +1,4 @@
+import { AnchoredMenu } from "../../../ui/AnchoredMenu";
 import {
   memo,
   useCallback,
@@ -149,7 +150,7 @@ export function BottomDock({
   const [containerWidth, setContainerWidth] = useState<number | null>(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const overflowButtonRef = useRef<HTMLButtonElement>(null);
-  const overflowMenuRef = useRef<HTMLDivElement>(null);
+  const optionsButtonRef = useRef<HTMLButtonElement>(null);
 
   useLayoutEffect(() => {
     const el = headerRef.current;
@@ -177,22 +178,6 @@ export function BottomDock({
     if (controlledHeight != null) return;
     writeStoredHeight(uncontrolledHeight);
   }, [controlledHeight, uncontrolledHeight]);
-
-  // Close overflow menu on outside click
-  useEffect(() => {
-    if (!overflowOpen) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (
-        overflowMenuRef.current?.contains(e.target as Node)
-        || overflowButtonRef.current?.contains(e.target as Node)
-      ) {
-        return;
-      }
-      setOverflowOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [overflowOpen]);
 
   const selectTab = (tabId: string) => {
     if (open && tabId === active?.id) {
@@ -446,9 +431,9 @@ export function BottomDock({
                     onClick={() => selectTab(tab.id)}
                   >
                     {tab.icon}
-                    {showNames && <span className="w-full truncate px-0.5 text-center text-[9px] leading-3">{tab.label}</span>}
+                    {showNames && <span className="w-full truncate px-0.5 text-center text-ui-caption leading-3">{tab.label}</span>}
                     {showBadge && (
-                      <span className="absolute right-0 top-0 rounded bg-[var(--taomni-code-active-line-bg)] px-0.5 text-[8px] leading-3 tabular-nums text-[var(--taomni-code-text)]">
+                      <span className="absolute right-0 top-0 rounded bg-[var(--taomni-code-active-line-bg)] px-0.5 text-ui-caption leading-3 tabular-nums text-[var(--taomni-code-text)]">
                         {tab.badge}
                       </span>
                     )}
@@ -465,36 +450,20 @@ export function BottomDock({
                   aria-expanded={overflowOpen}
                   title="More tool windows"
                   className={toolWindowRailButtonClass}
-                  onClick={() => setOverflowOpen((prev) => !prev)}
+                  onClick={(event) => {
+                  event.currentTarget.focus({ preventScroll: true });
+                  setOverflowOpen((prev) => !prev);
+                }}
                 >
                   <MoreHorizontal className="h-3.5 w-3.5" />
                 </button>
-                {overflowOpen && (
-                  <div
-                    ref={overflowMenuRef}
-                    role="menu"
-                    data-testid="code-workspace-bottom-tab-overflow-menu"
-                    className="absolute bottom-0 left-9 z-50 min-w-44 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 shadow-lg"
-                  >
-                    {tabs.map((tab) => (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        role="menuitem"
-                        data-testid={`code-workspace-bottom-tab-overflow-${tab.id}`}
-                        aria-selected={tab.id === active?.id}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
-                        onClick={() => {
-                          selectTab(tab.id);
-                          setOverflowOpen(false);
-                        }}
-                      >
-                        <span className="shrink-0">{tab.icon}</span>
-                        <span className="flex-1 truncate text-left">{tab.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {overflowOpen && <AnchoredMenu anchor={overflowButtonRef} side="right"
+                  testId="code-workspace-bottom-tab-overflow-menu" ariaLabel="More tabs"
+                  onClose={() => setOverflowOpen(false)} items={tabs.map((tab) => ({
+                    label: tab.label, testId: `code-workspace-bottom-tab-overflow-${tab.id}`,
+                    icon: tab.icon, checked: tab.id === active?.id, role: "menuitemradio",
+                    onClick: () => selectTab(tab.id),
+                  }))} />}
               </div>
             </>,
             railHost,
@@ -505,38 +474,33 @@ export function BottomDock({
               data-testid="code-workspace-tool-window-header"
               className="flex h-8 shrink-0 items-center gap-1 border-b border-[var(--taomni-code-border)]/50 px-2"
             >
-              <span data-testid="code-workspace-tool-window-title" className="text-[12px] font-medium text-[var(--taomni-code-text)]">
+              <span data-testid="code-workspace-tool-window-title" className="text-ui-body font-medium text-[var(--taomni-code-text)]">
                 {active.label}
               </span>
               <span className="flex-1" />
               <div className="relative">
                 <button
                   type="button"
+                  ref={optionsButtonRef}
                   data-testid="code-workspace-tool-window-options"
                   aria-label={`${active.label} options`}
                   aria-haspopup="menu"
                   aria-expanded={optionsOpen}
                   title="Options"
                   className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
-                  onClick={() => setOptionsOpen((prev) => !prev)}
+                  onClick={(event) => {
+                    event.currentTarget.focus({ preventScroll: true });
+                    setOptionsOpen((prev) => !prev);
+                  }}
                 >
                   <MoreVertical className="h-3.5 w-3.5" />
                 </button>
-                {optionsOpen && (
-                  <div role="menu" data-testid="code-workspace-tool-window-options-menu"
-                    className="absolute right-0 top-7 z-50 min-w-48 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 text-xs shadow-lg">
-                    <button type="button" role="menuitem" className="flex w-full px-3 py-1.5 hover:bg-[var(--taomni-code-active-line-bg)]"
-                      onClick={() => { setOptionsOpen(false); onOpenChange(false); onEscape?.(); }}>
-                      Hide<span className="ml-auto pl-4 opacity-60">Shift+Esc</span>
-                    </button>
-                    {onRestoreLayout && (
-                      <button type="button" role="menuitem" className="flex w-full px-3 py-1.5 hover:bg-[var(--taomni-code-active-line-bg)]"
-                        onClick={() => { setOptionsOpen(false); onRestoreLayout(); }}>
-                        Restore Default Layout<span className="ml-auto pl-4 opacity-60">Shift+F12</span>
-                      </button>
-                    )}
-                  </div>
-                )}
+                {optionsOpen && <AnchoredMenu anchor={optionsButtonRef}
+                  testId="code-workspace-tool-window-options-menu" ariaLabel={`${active.label} options`}
+                  onClose={() => setOptionsOpen(false)} items={[
+                    { label: "Hide", shortcut: "Shift+Esc", onClick: () => { onOpenChange(false); onEscape?.(); } },
+                    ...(onRestoreLayout ? [{ label: "Restore Default Layout", shortcut: "Shift+F12", onClick: onRestoreLayout }] : []),
+                  ]} />}
               </div>
               <button
                 type="button"
@@ -571,13 +535,13 @@ export function BottomDock({
                 data-testid={`code-workspace-bottom-tab-${tab.id}`}
                 aria-selected={selected && open}
                 data-active={(selected && open) || undefined}
-                className="h-8 shrink-0 inline-flex items-center gap-1.5 rounded px-2.5 text-[12px] font-medium text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
+                className="h-8 shrink-0 inline-flex items-center gap-1.5 rounded px-2.5 text-ui-body font-medium text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
                 onClick={() => selectTab(tab.id)}
               >
                 {tab.icon}
                 <span className="truncate max-w-[120px]">{tab.label}</span>
                 {(typeof tab.badge === "number" ? tab.badge > 0 : !!tab.badge) && (
-                  <span className="min-w-4 rounded bg-[var(--taomni-code-active-line-bg)] px-1 text-center text-[10px] tabular-nums text-[var(--taomni-code-text)]">
+                  <span className="min-w-4 rounded bg-[var(--taomni-code-active-line-bg)] px-1 text-center text-ui-caption tabular-nums text-[var(--taomni-code-text)]">
                     {tab.badge}
                   </span>
                 )}
@@ -596,42 +560,21 @@ export function BottomDock({
                 aria-expanded={overflowOpen}
                 title="More tabs"
                 className="h-8 w-8 inline-flex items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
-                onClick={() => setOverflowOpen((prev) => !prev)}
+                onClick={(event) => {
+                  event.currentTarget.focus({ preventScroll: true });
+                  setOverflowOpen((prev) => !prev);
+                }}
               >
                 <ChevronDown className="h-4 w-4" />
               </button>
 
-              {overflowOpen && (
-                <div
-                  ref={overflowMenuRef}
-                  role="menu"
-                  data-testid="code-workspace-bottom-tab-overflow-menu"
-                  className="absolute left-0 top-9 z-50 min-w-44 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 shadow-lg"
-                >
-                  {overflowTabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      role="menuitem"
-                      data-testid={`code-workspace-bottom-tab-overflow-${tab.id}`}
-                      aria-selected={tab.id === active?.id}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
-                      onClick={() => {
-                        selectTab(tab.id);
-                        setOverflowOpen(false);
-                      }}
-                    >
-                      <span className="shrink-0">{tab.icon}</span>
-                      <span className="flex-1 text-left truncate">{tab.label}</span>
-                      {tab.badge && (
-                        <span className="rounded bg-[var(--taomni-code-active-line-bg)] px-1 text-[10px] tabular-nums">
-                          {tab.badge}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {overflowOpen && <AnchoredMenu anchor={overflowButtonRef}
+                testId="code-workspace-bottom-tab-overflow-menu" ariaLabel="More tabs"
+                onClose={() => setOverflowOpen(false)} items={overflowTabs.map((tab) => ({
+                  label: tab.label, testId: `code-workspace-bottom-tab-overflow-${tab.id}`,
+                  icon: tab.icon, detail: tab.badge, checked: tab.id === active?.id, role: "menuitemradio",
+                  onClick: () => selectTab(tab.id),
+                }))} />}
             </div>
           )}
         </div>

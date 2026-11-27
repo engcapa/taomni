@@ -26,7 +26,7 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
     <button
       type="button"
       data-testid="sockscap-domains-toggle"
-      className="w-full px-3 py-2 text-left text-[11px] font-semibold flex items-center justify-between hover:bg-[var(--taomni-hover)] transition-colors"
+      className="w-full px-3 py-2 text-left text-ui-small font-semibold flex items-center justify-between hover:bg-[var(--taomni-hover)] transition-colors"
       aria-expanded={viewProps.domainsExpanded}
       aria-controls="sockscap-domains-content"
       onClick={() => viewProps.setDomainsExpanded(!viewProps.domainsExpanded)}
@@ -34,11 +34,11 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
       <div className="flex items-center gap-2">
         {viewProps.domainsExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         <span>Captured Domains & Flow History</span>
-        <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-[var(--taomni-hover)] font-normal text-[var(--taomni-text-muted)]">
+        <span className="px-1.5 py-0.5 rounded-full text-ui-caption bg-[var(--taomni-hover)] font-normal text-[var(--taomni-text-muted)]">
           {viewProps.domainRecords.length} entries
         </span>
       </div>
-      <span className="text-[10px] font-normal text-[var(--taomni-text-muted)]">
+      <span className="text-ui-caption font-normal text-[var(--taomni-text-muted)]">
         {viewProps.domainsExpanded ? "Click to collapse" : "Click to expand"}
       </span>
     </button>
@@ -51,7 +51,7 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
             <div className="relative flex-1">
               <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-[var(--taomni-text-muted)]" />
               <input
-                className="w-full text-[11px] pl-7 pr-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]"
+                className="w-full text-ui-small pl-7 pr-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]"
                 placeholder="Search domain, IP, profile or process..."
                 value={viewProps.domainFilter}
                 onChange={(e) => viewProps.setDomainFilter(e.target.value)}
@@ -60,7 +60,7 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex rounded border border-[var(--taomni-divider)] p-0.5 text-[10px]">
+            <div className="flex rounded border border-[var(--taomni-divider)] p-0.5 text-ui-caption">
               {(["all", "proxy", "direct", "block"] as const).map((mode) => (
                 <button
                   key={mode}
@@ -77,7 +77,7 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
             </div>
 
             <select
-              className="text-[10px] px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]"
+              className="text-ui-caption px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]"
               value={viewProps.topNLimit}
               onChange={(e) => viewProps.setTopNLimit(Number(e.target.value))}
             >
@@ -88,7 +88,7 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
 
             <button
               type="button"
-              className="px-2 py-1 rounded text-[10px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] flex items-center gap-1 text-[var(--taomni-text-muted)]"
+              className="px-2 py-1 rounded text-ui-caption border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] flex items-center gap-1 text-[var(--taomni-text-muted)]"
               onClick={() => {
                 void sockscapClearDomainRecords();
                 viewProps.setDomainRecords([]);
@@ -102,8 +102,8 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
 
         {/* Table */}
         <div className="max-h-[280px] overflow-auto rounded border border-[var(--taomni-divider)]">
-          <table className="w-full text-[11px] text-left border-collapse">
-            <thead className="sticky top-0 bg-[var(--taomni-panel-bg)] border-b border-[var(--taomni-divider)] text-[10px] text-[var(--taomni-text-muted)] uppercase">
+          <table className="w-full text-ui-small text-left border-collapse">
+            <thead className="sticky top-0 bg-[var(--taomni-panel-bg)] border-b border-[var(--taomni-divider)] text-ui-caption text-[var(--taomni-text-muted)] uppercase">
               <tr>
                 <th className="py-1.5 px-2">Domain / IP</th>
                 <th className="py-1.5 px-2">Decision</th>
@@ -119,7 +119,7 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
             <tbody className="divide-y divide-[var(--taomni-divider)]">
               {viewProps.filteredDomainRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-4 text-center text-[10px] text-[var(--taomni-text-muted)]">
+                  <td colSpan={9} className="py-4 text-center text-ui-caption text-[var(--taomni-text-muted)]">
                     No domain records captured yet. Start SocksCap and browse network to inspect live domain traffic.
                   </td>
                 </tr>
@@ -131,17 +131,17 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
                     </td>
                     <td className="py-1.5 px-2">
                       {rec.decision === "proxy" && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                        <span className="px-1.5 py-0.5 rounded text-ui-caption font-semibold bg-ui-info-surface text-ui-info  border border-ui-info-border">
                           PROXY
                         </span>
                       )}
                       {rec.decision === "direct" && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">
+                        <span className="px-1.5 py-0.5 rounded text-ui-caption font-semibold bg-[var(--taomni-panel-bg)] text-[var(--taomni-text-muted)] border border-[var(--taomni-divider)]">
                           DIRECT
                         </span>
                       )}
                       {rec.decision === "block" && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                        <span className="px-1.5 py-0.5 rounded text-ui-caption font-semibold bg-ui-danger-surface text-ui-danger  border border-ui-danger-border">
                           BLOCK
                         </span>
                       )}
@@ -169,7 +169,7 @@ export function TrafficSection(viewProps: TrafficSectionProps) {
                     <td className="py-1.5 px-2 text-right">
                       <button
                         type="button"
-                        className="px-1.5 py-0.5 rounded text-[9px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-1.5 py-0.5 rounded text-ui-caption border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         disabled={viewProps.locked}
                         title={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
                         onClick={() => {

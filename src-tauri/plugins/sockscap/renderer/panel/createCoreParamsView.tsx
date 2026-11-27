@@ -26,7 +26,7 @@ export function createCoreParamsView(context: CreateCoreParamsViewContext) {
     if (!upstreamRequiresCore(kind)) return null;
     const p: UpstreamParams = selectedProf.upstream.params || {};
     const cls =
-      "w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]";
+      "w-full text-ui-body px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]";
     const net = p.network || "tcp";
     const tls = p.tls || (kind === "trojan" ? "tls" : "none");
     const hasTransport = kind === "trojan" || kind === "vmess" || kind === "vless";
@@ -46,7 +46,7 @@ export function createCoreParamsView(context: CreateCoreParamsViewContext) {
           <button
             type="button"
             data-testid="sockscap-upstream-uuid-store"
-            className="px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0"
+            className="px-2 py-1.5 rounded text-ui-small border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0"
             onClick={() => void storeUuid()}
             disabled={busy || !uuidInput}
           >
@@ -151,7 +151,7 @@ export function createCoreParamsView(context: CreateCoreParamsViewContext) {
             />
             <button
               type="button"
-              className="px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0"
+              className="px-2 py-1.5 rounded text-ui-small border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0"
               onClick={() => void storeWgKey()}
               disabled={busy || !wgKeyInput}
             >

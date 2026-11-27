@@ -65,7 +65,7 @@ export function BreakpointPopup({
       role="dialog"
       aria-label={`Breakpoint ${breakpointDisplayName(path, breakpoint.line)}`}
       data-testid="debug-breakpoint-popup"
-      className="fixed z-[80] w-[340px] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-2.5 shadow-lg"
+      className="fixed z-[var(--taomni-z-popover)] w-[340px] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-2.5 shadow-lg"
       style={{ left: position.left, top: position.top }}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
@@ -75,7 +75,7 @@ export function BreakpointPopup({
         }
       }}
     >
-      <div data-testid="debug-breakpoint-popup-title" className="mb-2 truncate font-semibold text-[11px]">
+      <div data-testid="debug-breakpoint-popup-title" className="mb-2 truncate font-semibold text-ui-small">
         {breakpointDisplayName(path, breakpoint.line)}
       </div>
       <BreakpointPropertiesPanel
@@ -92,7 +92,7 @@ export function BreakpointPopup({
         <button
           type="button"
           data-testid="debug-breakpoint-popup-more"
-          className="text-[11px] text-[var(--taomni-accent)] hover:underline"
+          className="text-ui-small text-[var(--taomni-accent)] hover:underline"
           onClick={onMore}
         >
           More (Ctrl+Shift+F8)
@@ -100,7 +100,7 @@ export function BreakpointPopup({
         <button
           type="button"
           data-testid="debug-breakpoint-popup-done"
-          className="h-6 rounded border border-[var(--taomni-code-border)] px-3 text-[11px] hover:bg-[var(--taomni-hover-bg)]"
+          className="h-6 rounded border border-[var(--taomni-code-border)] px-3 text-ui-small hover:bg-[var(--taomni-hover)]"
           onClick={onClose}
         >
           Done

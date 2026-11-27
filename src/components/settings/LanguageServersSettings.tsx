@@ -237,15 +237,15 @@ export function LanguageServersSettings() {
       <div className="mb-3 flex items-start gap-3">
         <Server className="mt-0.5 h-4 w-4 shrink-0 text-[var(--taomni-accent)]" />
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-semibold">{t("settings.languageServersTitle")}</div>
-          <div className="text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-title font-semibold">{t("settings.languageServersTitle")}</div>
+          <div className="text-ui-body text-[var(--taomni-text-muted)]">
             {t("settings.languageServersSubtitle")}
           </div>
         </div>
         <button
           type="button"
           data-testid="language-servers-refresh"
-          className="taomni-btn h-7 px-2.5 inline-flex items-center gap-1 text-[11px]"
+          className="taomni-btn h-7 px-2.5 inline-flex items-center gap-1 text-ui-small"
           onClick={() => void refresh()}
           disabled={loading}
         >
@@ -255,12 +255,12 @@ export function LanguageServersSettings() {
       </div>
 
       {error && (
-        <div className="mb-2 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[12px] text-red-500">
+        <div className="mb-2 rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1.5 text-ui-body text-ui-danger">
           {error}
         </div>
       )}
 
-      <div className="mb-2 flex items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
+      <div className="mb-2 flex items-center gap-2 text-ui-small text-[var(--taomni-text-muted)]">
         <span>
           {loading
             ? t("settings.languageServersDetecting")
@@ -270,7 +270,7 @@ export function LanguageServersSettings() {
             })}
         </span>
         {missingCount > 0 && (
-          <span className="text-amber-500">
+          <span className="text-ui-warning">
             {t("settings.languageServersMissing", { count: missingCount })}
           </span>
         )}
@@ -304,11 +304,11 @@ export function LanguageServersSettings() {
                   : ""
                 }`}
             >
-              <div className="flex items-center gap-2 text-[12px]">
+              <div className="flex items-center gap-2 text-ui-body">
                 <span
                   data-available={status.available || undefined}
                   data-runtime-error={!!status.error || undefined}
-                  className="h-2 w-2 shrink-0 rounded-full bg-amber-500 data-[available=true]:bg-[var(--taomni-accent)] data-[runtime-error=true]:bg-amber-500"
+                  className="h-2 w-2 shrink-0 rounded-full bg-[var(--taomni-warning-icon)] data-[available=true]:bg-[var(--taomni-accent)] data-[runtime-error=true]:bg-[var(--taomni-warning-icon)]"
                   title={
                     status.available
                       ? t("settings.languageServersRuntimeOk")
@@ -320,17 +320,17 @@ export function LanguageServersSettings() {
                 <span className="min-w-0 flex-1 font-medium text-[var(--taomni-text)]">
                   {status.displayName}
                 </span>
-                <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-text-muted)]">
+                <span className="shrink-0 font-mono text-ui-caption text-[var(--taomni-text-muted)]">
                   {status.documentLanguageIds.slice(0, 3).join(", ")}
                   {status.documentLanguageIds.length > 3 ? "…" : ""}
                 </span>
               </div>
 
-              <label className="mt-1.5 block text-[11px] text-[var(--taomni-text-muted)]">
+              <label className="mt-1.5 block text-ui-small text-[var(--taomni-text-muted)]">
                 {t("settings.languageServersCommand")}
                 <select
                   value={selected}
-                  className="mt-0.5 h-7 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-[12px] text-[var(--taomni-text)] outline-none"
+                  className="mt-0.5 h-7 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-ui-body text-[var(--taomni-text)] focus-visible:keyboard-outline"
                   onChange={(event) => updateCommand(status.presetId, event.target.value)}
                   aria-label={`${status.displayName} language server command`}
                 >
@@ -350,14 +350,14 @@ export function LanguageServersSettings() {
                 <div className="mt-1.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                   <input
                     value={custom.command}
-                    className="h-7 min-w-0 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-[11px] text-[var(--taomni-text)] outline-none"
+                    className="h-7 min-w-0 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                     placeholder={t("settings.languageServersCommandPlaceholder")}
                     aria-label={`${status.displayName} custom command`}
                     onChange={(event) => updateCustom(status.presetId, { command: event.target.value })}
                   />
                   <input
                     value={custom.args}
-                    className="h-7 min-w-0 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-[11px] text-[var(--taomni-text)] outline-none"
+                    className="h-7 min-w-0 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                     placeholder={t("settings.languageServersArgsPlaceholder")}
                     aria-label={`${status.displayName} custom args`}
                     onChange={(event) => updateCustom(status.presetId, { args: event.target.value })}
@@ -369,19 +369,19 @@ export function LanguageServersSettings() {
                 <div
                   data-testid={`language-server-runtime-${status.presetId}`}
                   data-ok={status.available && !status.error ? "true" : "false"}
-                  className={`mt-1.5 rounded border px-2 py-1.5 text-[11px] leading-snug ${status.available && !status.error
+                  className={`mt-1.5 rounded border px-2 py-1.5 text-ui-small leading-snug ${status.available && !status.error
                       ? "border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] text-[var(--taomni-text-muted)]"
-                      : "border-amber-500/35 bg-amber-500/10 text-[var(--taomni-text)]"
+                      : "border-ui-warning-border bg-ui-warning-surface text-[var(--taomni-text)]"
                     }`}
                 >
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-semibold text-[10px] uppercase tracking-wide text-[var(--taomni-text-muted)]">
+                    <span className="font-semibold text-ui-caption uppercase tracking-wide text-[var(--taomni-text-muted)]">
                       {t("settings.languageServersRuntime")}
                     </span>
                     <span
-                      className={`rounded px-1 text-[10px] font-medium ${status.available && !status.error
+                      className={`rounded px-1 text-ui-caption font-medium ${status.available && !status.error
                           ? "bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)]"
-                          : "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                          : "bg-ui-warning-surface text-ui-warning"
                         }`}
                     >
                       {status.available && !status.error
@@ -390,22 +390,22 @@ export function LanguageServersSettings() {
                     </span>
                   </div>
                   {status.runtimeStatus && (
-                    <div className="mt-0.5 font-mono text-[10px] break-all">
+                    <div className="mt-0.5 font-mono text-ui-caption break-all">
                       {status.runtimeStatus}
                     </div>
                   )}
                   {status.presetId === "java" && (
                     <>
-                      <div className="mt-1 text-[10px] leading-snug text-[var(--taomni-text-muted)]">
+                      <div className="mt-1 text-ui-caption leading-snug text-[var(--taomni-text-muted)]">
                         {t("settings.languageServersJavaRequirement")}
                       </div>
-                      <label className="mt-1.5 block text-[11px] text-[var(--taomni-text-muted)]">
+                      <label className="mt-1.5 block text-ui-small text-[var(--taomni-text-muted)]">
                         {t("settings.languageServersJavaHome")}
                         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                           <input
                             data-testid="language-servers-java-home"
                             value={javaHome}
-                            className="h-7 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-[11px] text-[var(--taomni-text)] outline-none"
+                            className="h-7 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                             placeholder={t("settings.languageServersJavaHomePlaceholder")}
                             aria-label={t("settings.languageServersJavaHome")}
                             onChange={(event) => setJavaHome(event.target.value)}
@@ -423,7 +423,7 @@ export function LanguageServersSettings() {
                           <button
                             type="button"
                             data-testid="language-servers-java-home-browse"
-                            className="taomni-btn h-7 px-2 inline-flex items-center gap-1 text-[11px]"
+                            className="taomni-btn h-7 px-2 inline-flex items-center gap-1 text-ui-small"
                             onClick={() => void browseJavaHome()}
                             title={t("settings.languageServersJavaHomeBrowse")}
                           >
@@ -434,18 +434,18 @@ export function LanguageServersSettings() {
                             <button
                               type="button"
                               data-testid="language-servers-java-home-clear"
-                              className="taomni-btn h-7 px-2 text-[11px]"
+                              className="taomni-btn h-7 px-2 text-ui-small"
                               onClick={() => commitJavaHome("")}
                             >
                               {t("settings.languageServersJavaHomeClear")}
                             </button>
                           )}
                         </div>
-                        <div className="mt-1 text-[10px] leading-snug text-[var(--taomni-text-muted)]">
+                        <div className="mt-1 text-ui-caption leading-snug text-[var(--taomni-text-muted)]">
                           {t("settings.languageServersJavaHomeHint")}
                         </div>
                       </label>
-                      <label className="mt-2 block text-[11px] text-[var(--taomni-text-muted)]">
+                      <label className="mt-2 block text-ui-small text-[var(--taomni-text-muted)]">
                         {t("settings.languageServersJavaVmargs")}
                         <div className="mt-0.5 flex flex-wrap items-start gap-1.5">
                           <textarea
@@ -453,7 +453,7 @@ export function LanguageServersSettings() {
                             value={javaVmargs}
                             rows={2}
                             spellCheck={false}
-                            className="min-h-14 min-w-0 flex-1 resize-y rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-[11px] leading-snug text-[var(--taomni-text)] outline-none"
+                            className="min-h-14 min-w-0 flex-1 resize-y rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small leading-snug text-[var(--taomni-text)] focus-visible:keyboard-outline"
                             placeholder={t("settings.languageServersJavaVmargsPlaceholder")}
                             aria-label={t("settings.languageServersJavaVmargs")}
                             onChange={(event) => setJavaVmargs(event.target.value)}
@@ -472,22 +472,22 @@ export function LanguageServersSettings() {
                               <button
                                 type="button"
                                 data-testid="language-servers-java-vmargs-clear"
-                                className="taomni-btn h-7 px-2 text-[11px]"
+                                className="taomni-btn h-7 px-2 text-ui-small"
                                 onClick={() => commitJavaVmargs("")}
                               >
                                 {t("settings.languageServersJavaVmargsClear")}
                               </button>
                             )}
                         </div>
-                        <div className="mt-1 text-[10px] leading-snug text-[var(--taomni-text-muted)]">
+                        <div className="mt-1 text-ui-caption leading-snug text-[var(--taomni-text-muted)]">
                           {t("settings.languageServersJavaVmargsHint")}
                         </div>
                       </label>
-                      <div className="mt-3 border-t border-[var(--taomni-border)] pt-2">
-                        <div className="text-[11px] font-medium text-[var(--taomni-text)]">
+                      <div className="mt-3 border-t border-[var(--taomni-divider)] pt-2">
+                        <div className="text-ui-small font-medium text-[var(--taomni-text)]">
                           {t("settings.languageServersJavaSettingsTitle")}
                         </div>
-                        <label className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--taomni-text)]">
+                        <label className="mt-1.5 flex items-center gap-2 text-ui-small text-[var(--taomni-text)]">
                           <input
                             type="checkbox"
                             data-testid="language-servers-java-autobuild"
@@ -496,7 +496,7 @@ export function LanguageServersSettings() {
                           />
                           {t("settings.languageServersJavaAutobuild")}
                         </label>
-                        <label className="mt-1 flex items-center gap-2 text-[11px] text-[var(--taomni-text)]">
+                        <label className="mt-1 flex items-center gap-2 text-ui-small text-[var(--taomni-text)]">
                           <input
                             type="checkbox"
                             data-testid="language-servers-java-organize-imports"
@@ -506,7 +506,7 @@ export function LanguageServersSettings() {
                           />
                           {t("settings.languageServersJavaOrganizeImports")}
                         </label>
-                        <label className="mt-1 flex items-center gap-2 text-[11px] text-[var(--taomni-text)]">
+                        <label className="mt-1 flex items-center gap-2 text-ui-small text-[var(--taomni-text)]">
                           <input
                             type="checkbox"
                             data-testid="language-servers-java-lombok"
@@ -516,13 +516,13 @@ export function LanguageServersSettings() {
                           {t("settings.languageServersJavaLombok")}
                         </label>
                         {javaSettings.lombokEnabled && (
-                          <label className="mt-1 block text-[11px] text-[var(--taomni-text-muted)]">
+                          <label className="mt-1 block text-ui-small text-[var(--taomni-text-muted)]">
                             {t("settings.languageServersJavaLombokJar")}
                             <input
                               type="text"
                               spellCheck={false}
                               data-testid="language-servers-java-lombok-jar"
-                              className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-[11px] text-[var(--taomni-text)] outline-none"
+                              className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                               placeholder={t("settings.languageServersJavaLombokJarPlaceholder")}
                               defaultValue={javaSettings.lombokJarPath}
                               onBlur={(event) => {
@@ -531,18 +531,18 @@ export function LanguageServersSettings() {
                                 }
                               }}
                             />
-                            <span className="mt-0.5 block text-[10px] leading-snug">
+                            <span className="mt-0.5 block text-ui-caption leading-snug">
                               {t("settings.languageServersJavaLombokHint")}
                             </span>
                           </label>
                         )}
-                        <label className="mt-2 block text-[11px] text-[var(--taomni-text-muted)]">
+                        <label className="mt-2 block text-ui-small text-[var(--taomni-text-muted)]">
                           {t("settings.languageServersJavaFormatProfile")}
                           <input
                             type="text"
                             spellCheck={false}
                             data-testid="language-servers-java-format-profile"
-                            className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-[11px] text-[var(--taomni-text)] outline-none"
+                            className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                             placeholder={t("settings.languageServersJavaFormatProfilePlaceholder")}
                             defaultValue={javaSettings.formatSettingsUrl}
                             onBlur={(event) => {
@@ -552,13 +552,13 @@ export function LanguageServersSettings() {
                             }}
                           />
                         </label>
-                        <label className="mt-2 block text-[11px] text-[var(--taomni-text-muted)]">
+                        <label className="mt-2 block text-ui-small text-[var(--taomni-text-muted)]">
                           {t("settings.languageServersJavaImportOrder")}
                           <input
                             type="text"
                             spellCheck={false}
                             data-testid="language-servers-java-import-order"
-                            className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-[11px] text-[var(--taomni-text)] outline-none"
+                            className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                             placeholder="java, javax, jakarta, com, org"
                             defaultValue={javaSettings.completionImportOrder.join(", ")}
                             onBlur={(event) => {
@@ -571,16 +571,16 @@ export function LanguageServersSettings() {
                               }
                             }}
                           />
-                          <span className="mt-0.5 block text-[10px] leading-snug">
+                          <span className="mt-0.5 block text-ui-caption leading-snug">
                             {t("settings.languageServersJavaImportOrderHint")}
                           </span>
                         </label>
                       </div>
-                      <div className="mt-3 border-t border-[var(--taomni-border)] pt-2">
-                        <div className="text-[11px] font-medium text-[var(--taomni-text)]">
+                      <div className="mt-3 border-t border-[var(--taomni-divider)] pt-2">
+                        <div className="text-ui-small font-medium text-[var(--taomni-text)]">
                           {t("settings.languageServersJavaBundlesTitle")}
                         </div>
-                        <div className="mt-0.5 text-[10px] leading-snug text-[var(--taomni-text-muted)]">
+                        <div className="mt-0.5 text-ui-caption leading-snug text-[var(--taomni-text-muted)]">
                           {t("settings.languageServersJavaBundlesHint")}
                         </div>
                         {([
@@ -592,13 +592,13 @@ export function LanguageServersSettings() {
                           // Only offer adoption when the current path is not already this jar.
                           const adoptable = found.filter((entry) => entry.path !== javaBundles[field].trim());
                           return (
-                            <label key={id} className="mt-1.5 block text-[11px] text-[var(--taomni-text-muted)]">
+                            <label key={id} className="mt-1.5 block text-ui-small text-[var(--taomni-text-muted)]">
                               <span className="flex items-center gap-1.5">
                                 {t(labelKey)}
                                 {probe && (
                                   <span
                                     data-testid={`language-servers-bundle-status-${id}`}
-                                    className={probe.available ? "text-emerald-500" : "text-[var(--taomni-text-muted)]"}
+                                    className={probe.available ? "text-ui-success" : "text-[var(--taomni-text-muted)]"}
                                     title={probe.path ?? undefined}
                                   >
                                     {probe.available ? "● detected" : "○ not found"}
@@ -612,7 +612,7 @@ export function LanguageServersSettings() {
                                 type="text"
                                 spellCheck={false}
                                 data-testid={`language-servers-bundle-${id}`}
-                                className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-[11px] text-[var(--taomni-text)] outline-none"
+                                className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                                 placeholder={t("settings.languageServersJavaBundlePlaceholder")}
                                 defaultValue={javaBundles[field]}
                                 onBlur={(event) => {
@@ -626,7 +626,7 @@ export function LanguageServersSettings() {
                                   key={`${entry.source}:${entry.path}`}
                                   type="button"
                                   data-testid={`language-servers-bundle-use-${id}`}
-                                  className="taomni-btn mt-1 inline-flex h-6 items-center gap-1 px-2 text-[10px]"
+                                  className="taomni-btn mt-1 inline-flex h-6 items-center gap-1 px-2 text-ui-caption"
                                   title={entry.path}
                                   onClick={() => commitJavaBundles({ [field]: entry.path })}
                                 >
@@ -658,7 +658,7 @@ export function LanguageServersSettings() {
               {status.error && (
                 <div
                   data-testid={`language-server-error-${status.presetId}`}
-                  className="mt-1 text-[11px] text-red-500"
+                  className="mt-1 text-ui-small text-ui-danger"
                 >
                   {status.error}
                 </div>
@@ -667,7 +667,7 @@ export function LanguageServersSettings() {
           );
         })}
         {!loading && statuses.length === 0 && (
-          <div className="py-4 text-center text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="py-4 text-center text-ui-body text-[var(--taomni-text-muted)]">
             {t("settings.languageServersEmpty")}
           </div>
         )}

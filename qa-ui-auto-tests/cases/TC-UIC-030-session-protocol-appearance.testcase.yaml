@@ -1,0 +1,63 @@
+id: TC-UIC-030-session-protocol-appearance
+title: A saved shell's protocol stays legible in the Sessions tree and active terminal tab
+covers: [F6.2, F2.2]
+tags: [ui-contract, sessions, theme]
+modes: [browser, native]
+fixtures: [reset_db]
+ui_standard: [UI-FND-03a, UI-FND-03c]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-session-protocol
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- click: '[data-testid="session-section-bookmark"]'
+- click: '[data-testid="session-proto-shell"]'
+- fill: {selector: '[data-testid="session-name"]', value: QA protocol theme}
+- click: '[data-testid="session-save"]'
+- click: '[data-testid="session-tree-item"][data-session-name="QA protocol theme"]'
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: light}
+- assert_text: {selector: '[data-testid="session-tree-item"][data-selected="true"] [data-testid="session-protocol-label"]', contains: LocalShell}
+- assert_solid_text_contrast: {selector: '[data-testid="session-tree-item"][data-selected="true"] [data-testid="session-protocol-label"]', minimum: 4.5, composite_ancestors: true}
+- assert_solid_text_contrast: {selector: '[data-testid="session-tree-item"][data-selected="true"] [data-session-protocol="LocalShell"]', minimum: 4.5, composite_ancestors: true}
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: dark}
+- assert_solid_text_contrast: {selector: '[data-testid="session-tree-item"][data-session-name="QA protocol theme"] [data-testid="session-protocol-label"]', minimum: 4.5, composite_ancestors: true}
+- assert_solid_text_contrast: {selector: '[data-testid="session-tree-item"][data-session-name="QA protocol theme"] [data-session-protocol="LocalShell"]', minimum: 4.5, composite_ancestors: true}
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA protocol theme"]'
+- eval_readonly:
+    expression: >-
+      '${cfg.app.mode}' === 'native'
+      ? document.querySelector('[data-terminal-active]')?.getAttribute('data-terminal-ready') === 'true'
+      : document.querySelector('[data-terminal-active]')?.getAttribute('data-terminal-text')?.includes('Local terminal is not available in browser preview')
+    expect_truthy: true
+    timeout_sec: 45
+- assert_solid_text_contrast: {selector: '[data-testid="tab-item"][data-active="true"] [data-session-protocol="LocalShell"]', minimum: 4.5, composite_ancestors: true}
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: light}
+- assert_solid_text_contrast: {selector: '[data-testid="tab-item"][data-active="true"] [data-session-protocol="LocalShell"]', minimum: 4.5, composite_ancestors: true}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: protocol-colors
+    ui_standard: [UI-FND-03a, UI-FND-03c]
+    requirement: A selected saved shell has a readable type and icon in Light. Its type and glyph remain readable in Dark, and the matching terminal tab meets contrast in both themes after opening the session.
+    actions: [8, 9, 10, 15, 19, 22]
+    checkpoints:
+    - {step: 11, expectation: The application uses Light.}
+    - {step: 12, expectation: The selected row names its LocalShell protocol.}
+    - {step: 13, expectation: The selected type label clears 4.5 to 1 in Light.}
+    - {step: 14, expectation: The selected row glyph clears 4.5 to 1 in Light.}
+    - {step: 16, expectation: The application uses Dark.}
+    - {step: 17, expectation: The selected type label clears 4.5 to 1 in Dark.}
+    - {step: 18, expectation: The selected row glyph clears 4.5 to 1 in Dark.}
+    - {step: 20, expectation: The native PTY becomes ready or the browser displays its local-shell availability message.}
+    - {step: 21, expectation: The active terminal tab glyph clears 4.5 to 1 in Dark.}
+    - {step: 23, expectation: Light is active again.}
+    - {step: 24, expectation: The existing tab glyph clears 4.5 to 1 in Light.}
+    results: [11, 12, 13, 14, 16, 17, 18, 20, 21, 23, 24]
+  native:
+  - {check: Native local shell, method: automated, reason: Opens the saved local-shell session and waits for a ready terminal before measuring the tab.}
+  visual:
+  - {check: Selected row and active tab glyphs, method: automated, reason: Measures their actual foreground and composited background after the theme changes.}

@@ -118,10 +118,15 @@ fn run_elevated_copy(src: &Path, dest: &Path) -> Result<(), String> {
     let script = format!(
         "$p = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-NonInteractive','-Command','{inner_escaped}') -Verb RunAs -Wait -PassThru -WindowStyle Hidden; exit $p.ExitCode"
     );
-    let output = Command::new("powershell.exe")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-        .output()
-        .map_err(|e| format!("unsupported: Unable to launch elevated PowerShell: {e}"))?;
+    let output = {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+    }
+    .map_err(|e| format!("unsupported: Unable to launch elevated PowerShell: {e}"))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if stderr.to_lowercase().contains("canceled") || stderr.to_lowercase().contains("cancelled")

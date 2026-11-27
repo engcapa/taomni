@@ -102,7 +102,12 @@ describe("MfaPanel", () => {
 
     fireEvent.change(screen.getByTestId("mfa-sort-mode"), { target: { value: "custom" } });
     const alpha = screen.getAllByTestId("mfa-account-row")[1];
-    fireEvent.click(within(alpha).getByTestId("mfa-account-menu"));
+    const reorder = within(alpha).getByRole("button", { name: /reorder alpha mail/i });
+    expect(reorder).toHaveAttribute("aria-haspopup", "menu");
+    fireEvent.click(reorder, { detail: 1 });
+    expect(screen.queryByTestId("mfa-menu-move-down")).toBeNull();
+    reorder.focus();
+    fireEvent.click(reorder, { detail: 0 });
     fireEvent.click(await screen.findByTestId("mfa-menu-move-down"));
     await waitFor(() => expect(rows()).toEqual(["Zeta Cloud", "Mid Bank", "Alpha Mail"]));
     const stored = JSON.parse(localStorage.getItem(MFA_STUB_STORAGE_KEY)!).accounts as Array<{ issuer: string; sortOrder: number }>;

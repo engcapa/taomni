@@ -147,15 +147,13 @@ public static class QaFolderDialog {
         return true;
     }
 
-    private static string EditText(IntPtr edit) {
+    private static string ReadEditText(IntPtr edit) {
         // GetWindowText cannot read another process's Edit contents. WM_GETTEXT
         // is marshalled by Windows and observes the actual native field value.
         var value = new StringBuilder(32768);
         UIntPtr result;
-        if (ReadTextMessage(edit, 0x000D, new UIntPtr((uint)value.Capacity), value, 2, 1000, out result) == IntPtr.Zero) {
-            throw new InvalidOperationException("Owned chooser folder field did not respond to WM_GETTEXT");
-        }
-        return value.ToString();
+        return ReadTextMessage(edit, 0x000D, new UIntPtr((uint)value.Capacity), value, 2, 1000, out result) == IntPtr.Zero
+            ? null : value.ToString();
     }
 
     private static void CheckReceiver(IntPtr dialog, IntPtr edit, uint expectedPid) {
@@ -169,17 +167,20 @@ public static class QaFolderDialog {
     }
 
     private static void WaitForText(IntPtr dialog, IntPtr edit, uint pid, string expected) {
-        var deadline = DateTime.UtcNow.AddSeconds(2);
+        var deadline = DateTime.UtcNow.AddSeconds(5);
         string actual;
         do {
             CheckReceiver(dialog, edit, pid);
-            actual = EditText(edit);
+            // The shell can briefly stop processing messages while populating
+            // autocomplete. Poll only the field value; never resend input.
+            actual = ReadEditText(edit);
             if (actual == expected) return;
             Thread.Sleep(10);
         } while (DateTime.UtcNow < deadline);
         // Never replay an unacknowledged keystroke: a delayed character could
         // otherwise be duplicated, or input could reach another application.
-        throw new InvalidOperationException("Chooser did not acknowledge path input. Expected: " + expected + "; actual: " + actual);
+        throw new InvalidOperationException("Chooser did not acknowledge path input. Expected: " + expected
+            + "; actual: " + (actual ?? "<WM_GETTEXT timeout>"));
     }
 
     private static void EnterPath(IntPtr dialog, IntPtr edit, string path) {
@@ -213,10 +214,8 @@ public static class QaFolderDialog {
             expected.Append(character);
             WaitForText(dialog, edit, pid, expected.ToString());
         }
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (EditText(edit) != path && DateTime.UtcNow < deadline) Thread.Sleep(50);
-        if (EditText(edit) != path) throw new InvalidOperationException("Folder path was not entered completely: " + EditText(edit));
-        Console.Error.WriteLine("Native folder field input: {0}", EditText(edit));
+        WaitForText(dialog, edit, pid, path);
+        Console.Error.WriteLine("Native folder field input: {0}", path);
     }
 
     public static Dictionary<string, object> Run(string application, string title, string action, string path) {

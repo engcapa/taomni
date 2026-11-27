@@ -18,6 +18,7 @@ skill; `qa-ui-auto` remains the canonical installed name and CLI.
 |---|---|
 | Develop/verify a feature, or tests/builds are slow | [efficient-verification.md](references/efficient-verification.md) |
 | Refactor existing behavior, shared UI/state, or investigate a regression | [regression-protection.md](references/regression-protection.md) |
+| Desktop UI and interaction changes | [ui-standard-verification.md](references/ui-standard-verification.md) |
 | Run known cases | Read their assertions and requirements, run the selected mode directly; no mandatory audit/plan/status cycle |
 | Design test cases for an implementation handoff | [authoring.md](references/authoring.md#design-to-implementation-handoff) for locations, case detail and planning/implementation responsibilities |
 | Author YAML or controls | [authoring.md](references/authoring.md) and relevant [verb-catalog.md](references/verb-catalog.md) entries |

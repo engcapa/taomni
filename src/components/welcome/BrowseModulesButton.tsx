@@ -2,7 +2,7 @@ import { Package } from "lucide-react";
 import { useT } from "../../lib/i18n";
 import { openSettingsSection } from "../../lib/settingsNavigation";
 
-export function BrowseModulesButton({ onOpenSettings, className = "taomni-btn inline-flex items-center gap-1 px-3 py-1 text-[12px]" }: {
+export function BrowseModulesButton({ onOpenSettings, className = "taomni-btn inline-flex items-center gap-1 px-3 py-1 text-ui-body" }: {
   onOpenSettings?: () => void;
   className?: string;
 }) {

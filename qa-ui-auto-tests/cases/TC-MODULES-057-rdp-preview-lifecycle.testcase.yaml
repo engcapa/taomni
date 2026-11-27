@@ -7,6 +7,7 @@ description: >-
 covers: [F-Modules-1, F9.7]
 tags: [modules, rdp, p1]
 modes: [browser]
+ui_standard: [UI-FND-03a]
 fixtures: [reset_db, module_rdp_preview]
 timeout_sec: 90
 steps:
@@ -40,6 +41,12 @@ steps:
 - click: '[data-testid="tab-item"][data-tab-type="rdp"]'
 - wait_for: '[data-testid="rdp-panel"] [data-testid="rdp-canvas"]'
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="rdp"]', equal: 1}
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: light}
+- assert_solid_text_contrast: {selector: '[data-testid="rdp-panel"] .rdp-overlay [role="status"]', minimum: 4.5}
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: dark}
+- assert_solid_text_contrast: {selector: '[data-testid="rdp-panel"] .rdp-overlay [role="status"]', minimum: 4.5}
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
 - click: '[data-testid="module-action-disable-rdp-client"]'
@@ -63,15 +70,25 @@ verification:
     - {step: 29, expectation: The existing tab mounts the RDP canvas after enabling.}
     - {step: 30, expectation: Enabling leaves exactly one RDP tab.}
     results: [21, 22, 29, 30]
+  - id: module-status-contrast
+    ui_standard: [UI-FND-03a]
+    requirement: The enabled viewer paints an opaque, readable connection message over the framebuffer in both themes.
+    actions: [31, 34]
+    checkpoints:
+    - {step: 32, expectation: Light is active.}
+    - {step: 33, expectation: The light message clears 4.5 to 1.}
+    - {step: 35, expectation: Dark is active.}
+    - {step: 36, expectation: The dark message clears 4.5 to 1.}
+    results: [32, 33, 35, 36]
   - id: R2
     requirement: Disabling the preview module retains the same saved tab and removes the viewer.
-    actions: [31, 32, 33, 35, 36, 37]
+    actions: [37, 38, 39, 41, 42, 43]
     checkpoints:
-    - {step: 38, expectation: The existing tab shows that the RDP module is disabled.}
-    - {step: 39, expectation: Disabling removes the RDP canvas.}
-    - {step: 40, expectation: The original RDP tab remains open.}
-    - {step: 41, expectation: The interaction produces no uncaught renderer errors.}
-    results: [38, 39, 40, 41]
+    - {step: 44, expectation: The existing tab shows that the RDP module is disabled.}
+    - {step: 45, expectation: Disabling removes the RDP canvas.}
+    - {step: 46, expectation: The original RDP tab remains open.}
+    - {step: 47, expectation: The interaction produces no uncaught renderer errors.}
+    results: [44, 45, 46, 47]
   - id: R3
     requirement: A saved RDP session can opt in to RD Gateway and expose its conditional controls.
     actions: [7, 8, 9, 10, 12, 13, 16]

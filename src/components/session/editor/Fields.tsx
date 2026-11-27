@@ -109,7 +109,7 @@ export function Field({
 }) {
   return (
     <>
-      <div className="col-span-3 text-[12px] text-right pt-1 text-[var(--taomni-text)]">
+      <div className="col-span-3 text-ui-body text-right pt-1 text-[var(--taomni-text)]">
         {label}
       </div>
       <div className="col-span-9 flex items-center flex-wrap gap-1">

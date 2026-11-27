@@ -27,7 +27,7 @@ export async function runTrackedSftpTransfer(opts: {
         opts.onProgress?.(payload);
         transferStore.patch(opts.transferId, {
           bytes: payload.bytes,
-          size: payload.total || undefined,
+          size: payload.total,
           rate: payload.rate,
           eta: payload.eta,
           state: "running",

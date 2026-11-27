@@ -1,3 +1,5 @@
+import userEvent from "@testing-library/user-event";
+import { AppDialogProvider } from "../../lib/appDialogs";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ViewerDocument } from "../../lib/viewer";
@@ -210,9 +212,9 @@ describe("HTML preview renderer", () => {
     expect(screen.queryByText("https://replacement.invalid/")).toBeNull();
     expect(mocks.external).not.toHaveBeenCalled();
     expect(screen.getByTestId("html-external-cancel")).toHaveFocus();
-    fireEvent.keyDown(window, { key: "Tab" });
+    await userEvent.tab();
     expect(screen.getByTestId("html-external-open")).toHaveFocus();
-    fireEvent.keyDown(window, { key: "Tab" });
+    await userEvent.tab();
     expect(screen.getByTestId("html-external-cancel")).toHaveFocus();
     fireEvent.click(screen.getByTestId("html-external-cancel"));
     expect(screen.queryByTestId("html-external-dialog")).toBeNull();
@@ -226,7 +228,7 @@ describe("HTML preview renderer", () => {
     const { rerender } = render(<HtmlPreview document={doc()} onError={vi.fn()} />);
     const frame = await readyFrame();
     bridge(frame, "session-1", { kind: "external", href: "https://example.invalid/" });
-    fireEvent.keyDown(window, { key: "Escape" });
+    await userEvent.keyboard("{Escape}");
     expect(screen.queryByTestId("html-external-dialog")).toBeNull();
     expect(mocks.external).not.toHaveBeenCalled();
     // A new renderer tab gets a fresh gate, but hidden previews cannot prompt.
@@ -279,15 +281,13 @@ describe("HTML preview renderer", () => {
 
   it("asks before one-tab network opt-in when configured and preserves saved/draft distinction", async () => {
     mocks.preferences.htmlNetwork = "ask";
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    render(<HtmlPreview document={doc({ dirty: true })} onError={vi.fn()} />);
+    render(<AppDialogProvider><HtmlPreview document={doc({ dirty: true })} onError={vi.fn()} /></AppDialogProvider>);
     await screen.findByTestId("html-frame");
     fireEvent.click(screen.getByTestId("html-network-allow"));
-    expect(confirm).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
     expect(mocks.open).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByTestId("html-save-refresh"));
     await waitFor(() => expect(mocks.save).toHaveBeenCalledWith("/docs/report.html"));
-    confirm.mockRestore();
   });
 
   it("closes stale late-created tokens and defers initially invisible preview creation", async () => {

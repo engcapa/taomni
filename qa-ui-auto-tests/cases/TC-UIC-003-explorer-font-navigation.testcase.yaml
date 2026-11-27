@@ -1,0 +1,57 @@
+id: TC-UIC-003-explorer-font-navigation
+title: Explorer virtual rows follow both ends of the Settings font scale and expose the selected file
+covers: [F-EXPLORER-1]
+tags: [ui-contract, explorer, virtualization, theme]
+fixtures: [reset_db, explorer_large_directory]
+modes: [browser, native]
+timeout_sec: 240
+ui_standard: [UI-FND-13, UI-LST-03]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-uic-explorer
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- press: {selector: '#ui-font-size-slider', key: Home}
+- assert_localstorage: {key: taomni.uiFontSize, equals: '10'}
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-file-list"]'
+- press: {selector: '[data-testid="explorer-tab"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_large}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="entry-00000.txt"]'
+- press: {selector: '[data-testid="explorer-file-list"]', key: End}
+- wait_for: '[data-testid="explorer-file-row"][aria-selected="true"][data-name="entry-09999.txt"]'
+- eval_readonly:
+    expression: document.getElementById(document.activeElement.getAttribute('aria-activedescendant')) === document.querySelector('.ex-frow.sel') && getComputedStyle(document.querySelector('.ex-frow.sel .ex-name')).fontSize === '10px' && document.querySelector('.ex-frow.sel').getBoundingClientRect().height === 28
+    expect_truthy: true
+- click: '[data-testid="ribbon-settings"]'
+- press: {selector: '#ui-font-size-slider', key: End}
+- assert_localstorage: {key: taomni.uiFontSize, equals: '18'}
+- click: '[data-testid="side-tab-explorer"]'
+- press: {selector: '[data-testid="explorer-file-list"]', key: Home}
+- wait_for: '[data-testid="explorer-file-row"][aria-selected="true"][data-name="entry-00000.txt"]'
+- press: {selector: '[data-testid="explorer-file-list"]', key: End}
+- wait_for: '[data-testid="explorer-file-row"][aria-selected="true"][data-name="entry-09999.txt"]'
+- eval_readonly:
+    expression: document.getElementById(document.activeElement.getAttribute('aria-activedescendant')) === document.querySelector('.ex-frow.sel') && getComputedStyle(document.querySelector('.ex-frow.sel .ex-name')).fontSize === '18px' && document.querySelector('.ex-frow.sel').getBoundingClientRect().height >= 36
+    expect_truthy: true
+- assert_count: {selector: '[data-testid="explorer-file-row"]', min: 1, max: 100}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-FND-13, UI-LST-03]
+    requirement: The same final file has a mounted accessible target and uses the live Settings font size at both extremes.
+    actions: [5, 13, 17, 20, 22]
+    checkpoints:
+    - {step: 15, expectation: The compact 10px setting renders a 28px detail row and identifies the selected file.}
+    - {step: 21, expectation: Keyboard Home reaches the first file after returning to Explorer.}
+    - {step: 23, expectation: Keyboard End brings the exact final file back into view.}
+    - {step: 24, expectation: The active large-font row grows to contain the 18px label.}
+    - {step: 25, expectation: Virtualization bounds the DOM even at the end of the directory.}
+    results: [15, 21, 23, 24, 25]
+  visual:
+  - {check: Rendered file label and row, method: automated, reason: Reads actual font and row height in the visible detail view.}
+  native:
+  - {check: Packaged virtual list, method: automated, reason: The native fixture lists 10000 actual files and checks WebView keyboard focus after scrolling.}

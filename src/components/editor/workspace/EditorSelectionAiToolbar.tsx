@@ -1,5 +1,7 @@
+import { AnchoredMenu } from "../../ui/AnchoredMenu";
+import { IconButton } from "../../ui/IconButton";
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, ChevronDown, GraduationCap, Languages, Sparkles, WandSparkles, X } from "lucide-react";
+import { BookOpen, ChevronDown, GraduationCap, Languages, Sparkles, WandSparkles, X } from "lucide-react";
 import { useT } from "../../../lib/i18n";
 import { AI_ANSWER_LANGUAGES, answerLanguageLabelKey } from "../../../lib/ai/answerLanguage";
 import type { AiAnswerLanguage, EditorAiAction } from "./editorAiPrompts";
@@ -23,7 +25,7 @@ interface EditorSelectionAiToolbarProps {
 }
 
 const BUTTON_CLASS =
-  "h-7 inline-flex items-center gap-1 rounded px-2 text-[11px] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40";
+  "h-7 inline-flex items-center gap-1 rounded px-2 text-ui-small text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40";
 
 export function EditorSelectionAiToolbar({
   visible,
@@ -37,21 +39,10 @@ export function EditorSelectionAiToolbar({
 }: EditorSelectionAiToolbarProps) {
   const t = useT();
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
-  const languageRef = useRef<HTMLDivElement>(null);
+  const languageRef = useRef<HTMLButtonElement>(null);
 
   // Close the picker on an outside click so it does not outlive the selection
   // it belongs to.
-  useEffect(() => {
-    if (!languageMenuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (target && languageRef.current?.contains(target)) return;
-      setLanguageMenuOpen(false);
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    return () => window.removeEventListener("pointerdown", onPointerDown);
-  }, [languageMenuOpen]);
-
   // A fresh selection should not inherit the previous one's open menu.
   useEffect(() => {
     if (!visible) setLanguageMenuOpen(false);
@@ -74,7 +65,7 @@ export function EditorSelectionAiToolbar({
   return (
     <div
       data-testid="code-workspace-ai-selection-toolbar"
-      className="fixed z-[420] flex items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] px-1 py-0.5 shadow-xl"
+      className="fixed z-[var(--taomni-z-popover)] flex items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] px-1 py-0.5 shadow-xl"
       style={{ top, left }}
       onMouseDown={(event) => event.preventDefault()}
     >
@@ -119,58 +110,45 @@ export function EditorSelectionAiToolbar({
         Ask AI
       </button>
       {onSetAnswerLanguage && (
-        <div className="relative" ref={languageRef}>
+        <div className="relative">
           <button
             type="button"
+            ref={languageRef}
             data-testid="code-workspace-ai-answer-language"
             aria-haspopup="menu"
             aria-expanded={languageMenuOpen}
-            className="h-7 inline-flex items-center gap-1 rounded border-l border-[var(--taomni-code-border)] pl-2 pr-1.5 text-[10px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
+            className="h-7 inline-flex items-center gap-1 rounded border-l border-[var(--taomni-code-border)] pl-2 pr-1.5 text-ui-caption text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
             title={t("codeWorkspaceAi.answerLanguageTooltip", { current: languageBadge })}
-            onClick={() => setLanguageMenuOpen((open) => !open)}
+            onClick={(event) => {
+              event.currentTarget.focus({ preventScroll: true });
+              setLanguageMenuOpen((open) => !open);
+            }}
           >
             <Languages className="h-3.5 w-3.5" />
             {languageBadge}
             <ChevronDown className="h-3 w-3" />
           </button>
           {languageMenuOpen && (
-            <div
-              role="menu"
-              data-testid="code-workspace-ai-answer-language-menu"
-              className="absolute right-0 top-full z-[430] mt-1 min-w-[168px] overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] py-0.5 shadow-xl"
-            >
-              {AI_ANSWER_LANGUAGES.map((language) => (
-                <button
-                  key={language}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={language === answerLanguage}
-                  data-testid={`code-workspace-ai-answer-language-${language}`}
-                  className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-[11px] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
-                  onClick={() => {
-                    setLanguageMenuOpen(false);
-                    onSetAnswerLanguage(language);
-                  }}
-                >
-                  <Check
-                    className="h-3 w-3 shrink-0"
-                    style={{ opacity: language === answerLanguage ? 1 : 0 }}
-                  />
-                  {t(answerLanguageLabelKey(language))}
-                </button>
-              ))}
-            </div>
+            <AnchoredMenu anchor={languageRef} testId="code-workspace-ai-answer-language-menu"
+              ariaLabel={t("codeWorkspaceAi.answerLanguageTooltip", { current: languageBadge })}
+              onClose={() => setLanguageMenuOpen(false)} items={AI_ANSWER_LANGUAGES.map((language) => ({
+                label: t(answerLanguageLabelKey(language)),
+                testId: `code-workspace-ai-answer-language-${language}`,
+                role: "menuitemradio",
+                checked: language === answerLanguage,
+                onClick: () => onSetAnswerLanguage(language),
+              }))} />
           )}
         </div>
       )}
-      <button
+      <IconButton
         type="button"
         className="h-7 w-7 inline-flex items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
-        title="Dismiss AI toolbar"
+        labelKey="dismissAiToolbar"
         onClick={onDismiss}
       >
         <X className="h-3.5 w-3.5" />
-      </button>
+      </IconButton>
     </div>
   );
 }

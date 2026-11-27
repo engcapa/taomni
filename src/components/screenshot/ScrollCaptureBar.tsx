@@ -76,7 +76,7 @@ export function ScrollCaptureBar() {
     catch (e) { setError(formatUnknownError(e)); }
     finally { setChangingMode(false); }
   };
-  return <div data-testid="screenshot-scroll-controller" className="fixed left-0 right-0 bottom-0 px-3 py-2 text-[12px] select-none overflow-auto"
+  return <div data-testid="screenshot-scroll-controller" className="fixed left-0 right-0 bottom-0 px-3 py-2 text-ui-body select-none overflow-auto"
     style={{ height: fullscreenSurface ? 200 : "100%", background: "var(--taomni-panel-bg)", color: "var(--taomni-text)", border: "1px solid var(--taomni-divider)" }}>
     <p data-testid="screenshot-scroll-progress" role="status" className="mb-1 font-medium">{t("screenshot.scrollProgress", { count: frames })}</p>
     <p data-testid="screenshot-scroll-mode-hint" className="text-[var(--taomni-text-muted)] mb-2">{t(finishing ? "screenshot.scrollFinishing" : needsOverlap ? "screenshot.scrollOverlapHint" : waitingForContent ? "screenshot.scrollWaitingHint" : mode === "manual" ? "screenshot.scrollManualHint" : "screenshot.scrollRunningHint")}</p>
@@ -84,8 +84,8 @@ export function ScrollCaptureBar() {
       <button data-testid="screenshot-scroll-switch-mode" type="button" disabled={finishing || changingMode} onClick={() => void changeMode()} className="px-2 py-1 rounded disabled:opacity-40">{t(mode === "auto" ? "screenshot.scrollUseManual" : "screenshot.scrollUseAuto")}</button>
       <button data-testid="screenshot-scroll-cancel" type="button" disabled={finishing} onClick={() => void finish(true)} className="px-3 py-1 rounded disabled:opacity-40">{t("screenshot.cancel")}</button>
       <button data-testid="screenshot-scroll-stop" type="button" disabled={finishing} onClick={() => void finish(false)} className="px-3 py-1 rounded disabled:opacity-40"
-        style={{ background: "var(--taomni-accent)", color: "#fff" }}>{t("screenshot.scrollFinish")}</button>
+        style={{ background: "var(--taomni-primary-bg)", color: "var(--taomni-primary-text)" }}>{t("screenshot.scrollFinish")}</button>
     </div>
-    {(error || inputError) && <p data-testid="screenshot-scroll-error" style={{ color: "#ff6b6b" }}>{error ?? inputError}</p>}
+    {(error || inputError) && <p data-testid="screenshot-scroll-error" role="alert" className="text-ui-danger">{error ?? inputError}</p>}
   </div>;
 }

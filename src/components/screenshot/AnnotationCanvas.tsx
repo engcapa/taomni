@@ -489,7 +489,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
           height: imageHeight,
           // Above the region-select layer so draw tools receive pointer
           // events; below the selection handles and the toolbar.
-          zIndex: 30,
+          zIndex: "var(--taomni-z-capture-ink)",
           pointerEvents: interactive ? "auto" : "none",
           cursor: tool === "move" ? "default" : interactive ? (tool === "text" ? "text" : "crosshair") : "default",
         }}
@@ -503,10 +503,10 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         {tool === "move" && selected && (() => {
           const bounds = shapeBounds(editedShape ?? selected);
           return <div data-testid="screenshot-annotation-selection" data-kind={selected.kind}
-            style={{ position: "absolute", left: bounds.x, top: bounds.y, width: Math.max(1, bounds.w), height: Math.max(1, bounds.h), border: "1px dashed #1677ff", pointerEvents: "none" }}>
+            style={{ position: "absolute", left: bounds.x, top: bounds.y, width: Math.max(1, bounds.w), height: Math.max(1, bounds.h), border: "1px dashed var(--taomni-capture-selection-border)", pointerEvents: "none" }}>
             {(["nw", "ne", "sw", "se"] as const).map((corner) => <div key={corner} data-testid={`screenshot-annotation-resize-${corner}`}
               onMouseDown={(e) => { e.stopPropagation(); movingRef.current = { shape: selected, start: localPos(e), bounds: shapeBounds(selected), corner }; }}
-              style={{ position: "absolute", width: 8, height: 8, background: "#fff", border: "1px solid #1677ff", pointerEvents: "auto", cursor: `${corner}-resize`, left: corner.endsWith("w") ? -4 : "calc(100% - 4px)", top: corner.startsWith("n") ? -4 : "calc(100% - 4px)" }} />)}
+              style={{ position: "absolute", width: 8, height: 8, background: "var(--taomni-capture-handle-outline)", border: "1px solid var(--taomni-capture-selection-border)", pointerEvents: "auto", cursor: `${corner}-resize`, left: corner.endsWith("w") ? -4 : "calc(100% - 4px)", top: corner.startsWith("n") ? -4 : "calc(100% - 4px)" }} />)}
           </div>;
         })()}
         {textAt && (
@@ -549,7 +549,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
               maxWidth: Math.max(40, imageWidth - textAt.x),
               maxHeight: Math.max(40, imageHeight - textAt.y),
               resize: "none",
-              background: "rgba(0, 0, 0, 0.3)",
+              background: "var(--taomni-capture-ink-editor-bg)",
               border: `1px dashed ${color}`,
               outline: "none",
               color,
@@ -558,7 +558,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
               lineHeight: TEXT_LINE_HEIGHT,
               fontFamily: editingTextRef.current?.fontFamily ?? fontFamily,
               padding: "2px 4px",
-              zIndex: 5,
+              zIndex: "var(--taomni-z-sticky)",
             }}
           />
         )}

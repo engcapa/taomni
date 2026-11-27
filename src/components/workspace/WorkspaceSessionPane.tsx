@@ -264,8 +264,8 @@ function WorkspaceProtocolPane({ workspace, tab, visible, active = visible, sess
 
   return (
     <div data-testid="workspace-session-pane" data-kind="unsupported" className="flex h-full flex-col items-center justify-center gap-2 p-6">
-      <div className="text-[13px] font-semibold">{tab.title}</div>
-      <div className="text-[11.5px]" style={{ color: "var(--taomni-text-muted)" }}>
+      <div className="text-ui-body font-semibold">{tab.title}</div>
+      <div className="text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>
         {protocol} · {session.host}
       </div>
       <button type="button" className="taomni-btn h-7 px-2" onClick={() => setActiveSideTab("sessions")}>

@@ -91,7 +91,7 @@ function CopyableText({
       onClick={() => copy(text)}
     >
       {rendered}
-      {copied && text && <Check className="w-3 h-3 shrink-0 text-emerald-500" />}
+      {copied && text && <Check className="w-3 h-3 shrink-0 text-ui-success" />}
     </span>
   );
 }
@@ -135,7 +135,7 @@ function WorkspaceNavigationBar({ segments }: { segments: readonly CodeWorkspace
             title={segment.label}
           >
             {segment.kind === "symbol" && segment.symbolKind !== undefined && SYMBOL_KIND_BADGE[segment.symbolKind] && (
-              <span className="shrink-0 rounded-full border border-current px-0.5 text-[8px] leading-3 opacity-70">
+              <span className="shrink-0 rounded-full border border-current px-0.5 text-ui-caption leading-3 opacity-70">
                 {SYMBOL_KIND_BADGE[segment.symbolKind]}
               </span>
             )}
@@ -183,14 +183,14 @@ function StatusSegment({
     return (
       <button type="button" {...common} onClick={onClick}>
         {children}
-        {copied && <Check className="w-3 h-3 shrink-0 text-emerald-500" />}
+        {copied && <Check className="w-3 h-3 shrink-0 text-ui-success" />}
       </button>
     );
   }
   return (
     <span {...common}>
       {children}
-      {copied && <Check className="w-3 h-3 shrink-0 text-emerald-500" />}
+      {copied && <Check className="w-3 h-3 shrink-0 text-ui-success" />}
     </span>
   );
 }
@@ -277,11 +277,11 @@ export function StatusBar() {
       </span>
       <span className="taomni-divider-v h-3" />
       <span className="flex items-center gap-1 min-w-0" title={online ? t("statusBar.networkOnline") : t("statusBar.networkOffline")}>
-        <Wifi className={`w-3 h-3 shrink-0 ${online ? "text-emerald-600" : "text-red-600"}`} />
+        <Wifi className={`w-3 h-3 shrink-0 ${online ? "text-ui-success" : "text-ui-danger"}`} />
         <span className="truncate min-w-0">{online ? t("statusBar.networkOnline") : t("statusBar.networkOffline")}</span>
       </span>
       <span className="flex items-center gap-1 min-w-0" title={xServerStatus?.provider ? `${xServerStatus.provider} · ${xServerStatus.endpoint}` : undefined}>
-        <Monitor className={`w-3 h-3 shrink-0 ${xServerEnabled ? "text-emerald-600" : "text-slate-500"}`} />
+        <Monitor className={`w-3 h-3 shrink-0 ${xServerEnabled ? "text-ui-success" : "text-[var(--taomni-text-muted)]"}`} />
         <span className="shrink-0">X11:</span>
         {xServerEnabled ? (
           <CopyableText text={xServerStatus?.display || xServerStatus?.endpoint || ""} className="truncate min-w-0" />
@@ -290,7 +290,7 @@ export function StatusBar() {
         )}
       </span>
       <span className="flex items-center gap-1 min-w-0" title={t("statusBar.auth")}>
-        <KeyRound className="w-3 h-3 shrink-0 text-slate-500" />
+        <KeyRound className="w-3 h-3 shrink-0 text-[var(--taomni-text-muted)]" />
         <span className="truncate min-w-0">{t("statusBar.auth")}</span>
       </span>
 
@@ -304,7 +304,7 @@ export function StatusBar() {
             title={t("statusBar.asrTooltip", { provider: activeAsr })}
           >
             <Mic className="w-3 h-3 shrink-0" />
-            {dot(aiConfig ? "bg-green-400" : "bg-gray-400")}
+            {dot(aiConfig ? "bg-[var(--taomni-success-icon)]" : "bg-[var(--taomni-text-muted)]")}
             <span className="hidden xl:inline truncate min-w-0">ASR</span>
           </span>
 
@@ -314,7 +314,7 @@ export function StatusBar() {
             title={t("statusBar.llmTooltip", { provider: activeProvider })}
           >
             <Bot className="w-3 h-3 shrink-0" />
-            {dot(aiConfig ? "bg-green-400" : "bg-gray-400")}
+            {dot(aiConfig ? "bg-[var(--taomni-success-icon)]" : "bg-[var(--taomni-text-muted)]")}
             <CopyableText
               text={aiConfig ? activeProvider : ""}
               title={t("statusBar.llmTooltip", { provider: activeProvider })}
@@ -333,7 +333,7 @@ export function StatusBar() {
             })}
           >
             <Search className="w-3 h-3 shrink-0" />
-            {dot(searchEnabled ? "bg-green-400" : "bg-gray-400")}
+            {dot(searchEnabled ? "bg-[var(--taomni-success-icon)]" : "bg-[var(--taomni-text-muted)]")}
           </span>
 
           {/* Claude Code segment */}
@@ -343,7 +343,7 @@ export function StatusBar() {
               title={t("statusBar.claudeCodeTooltip")}
             >
               <Cpu className="w-3 h-3 shrink-0" />
-              {dot("bg-green-400")}
+              {dot("bg-[var(--taomni-success-icon)]")}
               <span className="truncate min-w-0">CC</span>
             </span>
           )}
@@ -354,7 +354,7 @@ export function StatusBar() {
               title="Codex app-server enabled"
             >
               <Cpu className="w-3 h-3 shrink-0" />
-              {dot("bg-green-400")}
+              {dot("bg-[var(--taomni-success-icon)]")}
               <span className="truncate min-w-0">Codex</span>
             </span>
           )}
@@ -362,7 +362,7 @@ export function StatusBar() {
           {/* Privacy segment */}
           {fullLocal && (
             <span
-              className="flex items-center gap-1 min-w-0 text-purple-300"
+              className="flex items-center gap-1 min-w-0 text-ui-info"
               title={t("statusBar.fullLocalTooltip")}
             >
               <Shield className="w-3 h-3 shrink-0" />
@@ -376,7 +376,7 @@ export function StatusBar() {
         <>
           <span className="taomni-divider-v h-3" />
           <span
-            className="flex items-center gap-1 min-w-0 text-yellow-300"
+            className="flex items-center gap-1 min-w-0 text-ui-warning"
             title={t("statusBar.aiOffTooltip")}
           >
             <Sparkles className="w-3 h-3 shrink-0" />
@@ -403,7 +403,7 @@ export function StatusBar() {
           <Loader2 className="w-3 h-3 shrink-0 animate-spin" />
           <span className="truncate">{workspaceStatus.lspProgress.label}</span>
           {workspaceStatus.lspProgress.percentage !== null && (
-            <span className="taomni-mono shrink-0 text-[10px]">
+            <span className="taomni-mono shrink-0 text-ui-caption">
               {workspaceStatus.lspProgress.percentage}%
             </span>
           )}
@@ -479,10 +479,10 @@ export function StatusBar() {
             copyText={workspaceStatus.lspLabel ?? ""}
           >
             {dot(workspaceStatus.lspError
-              ? "bg-amber-500"
+              ? "bg-[var(--taomni-warning-icon)]"
               : workspaceStatus.lspActive
-                ? "bg-emerald-500"
-                : "bg-slate-500")}
+                ? "bg-[var(--taomni-success-icon)]"
+                : "bg-[var(--taomni-text-muted)]")}
             <span className="truncate text-[var(--taomni-text)]">
               {workspaceStatus.lspLabel ?? (workspaceStatus.lspActive ? "LSP" : "No LSP")}
             </span>
@@ -499,7 +499,7 @@ export function StatusBar() {
               <GitBranch className="w-3 h-3 shrink-0" />
               <span className="truncate">{workspaceStatus.gitBranch}</span>
               {(workspaceStatus.gitAhead > 0 || workspaceStatus.gitBehind > 0) && (
-                <span className="taomni-mono shrink-0 text-[10px] opacity-80">
+                <span className="taomni-mono shrink-0 text-ui-caption opacity-80">
                   {workspaceStatus.gitAhead > 0 ? `↑${workspaceStatus.gitAhead}` : ""}
                   {workspaceStatus.gitBehind > 0 ? `↓${workspaceStatus.gitBehind}` : ""}
                 </span>

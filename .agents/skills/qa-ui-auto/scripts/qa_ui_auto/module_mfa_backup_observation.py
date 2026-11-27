@@ -318,6 +318,7 @@ def run(ctx, phase):
                 raise StepError("Manual backup archive escaped the isolated QA profile")
             archive_info = check_mfa_v2_archive(archive_path, work, current_gen, state["account"])
             owner.values["signed_mfa_restore_job_id"] = job_id
+            owner.values["restore_archive_name"] = archive_path.name
             state.update(
                 step="archived",
                 jobId=job_id,

@@ -1,3 +1,4 @@
+import { PageZoomPanel } from "../../components/ui/PageZoomPanel";
 import { Suspense } from "react";
 import { ViewerShell } from "../../components/viewer/ViewerShell";
 import { CodeWorkspaceTab } from "../../components/editor/CodeWorkspaceTab";
@@ -137,7 +138,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     {tabs.filter((tab) => tab.type === "file-viewer" && tab.fileViewer).map((tab) => <div key={tab.id} className="absolute inset-0" style={{ display: activeTabId === tab.id ? "block" : "none" }}><ViewerShell viewer={tab.fileViewer!} active={activeTabId === tab.id} /></div>)}
     {/* Welcome stays mounted so filters, scroll, and shell
                     selections survive switching to another tab. */}
-    <div
+    <PageZoomPanel active={viewProps.showHome ?? (activeTab?.type === "welcome" || !activeTab)}
       data-testid="welcome-tab-panel"
       className="absolute inset-0"
       style={{ display: (viewProps.showHome ?? (activeTab?.type === "welcome" || !activeTab)) ? "block" : "none" }}
@@ -170,12 +171,12 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
         onOpenNewWorkspace={() => void openNewCodeWorkspaceFromWelcome()}
         onOpenSettings={openSettingsTab}
       />
-    </div>
+    </PageZoomPanel>
 
     {viewProps.showHome === false && (!activeTab || activeTab.type === "welcome") && (
-      <div data-testid={viewProps.toolsView ? "tools-empty-state" : "sessions-empty-state"} className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-[12px]">
-        <span className="text-[14px] font-semibold">{t(viewProps.toolsView ? "platform.toolsEmpty" : "platform.sessionsEmpty")}</span>
-        {!viewProps.toolsView && <button data-testid="sessions-empty-new-session" className="taomni-btn" onClick={() => handleNewSession()}>{t("menu.newSession")}</button>}
+      <div data-testid={viewProps.toolsView ? "tools-empty-state" : "sessions-empty-state"} className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-ui-body">
+        <span className="text-ui-title font-semibold">{t(viewProps.toolsView ? "platform.toolsEmpty" : "platform.sessionsEmpty")}</span>
+        {!viewProps.toolsView && <button type="button" data-testid="sessions-empty-new-session" className="taomni-btn" onClick={() => handleNewSession()}>{t("menu.newSession")}</button>}
       </div>
     )}
 
@@ -244,7 +245,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       if (!tab.sftp) return null;
       const isActive = activeTabId === tab.id;
       return (
-        <div
+        <PageZoomPanel active={isActive}
           key={tab.id}
           className="absolute inset-0"
           style={{ display: isActive ? "block" : "none" }}
@@ -263,21 +264,21 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
             detachable
             onDetach={() => openDetachedSftp(tab.sftp!, tab.title)}
           />
-        </div>
+        </PageZoomPanel>
       );
     })}
 
     {settingsTabs.map((tab) => {
       const isActive = activeTabId === tab.id;
       return (
-        <div
+        <PageZoomPanel active={isActive}
           key={tab.id}
           data-testid="settings-tab-panel"
           className="absolute inset-0"
           style={{ display: isActive ? "block" : "none" }}
         >
           <SettingsPanel />
-        </div>
+        </PageZoomPanel>
       );
     })}
 
@@ -288,7 +289,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       const isActive = activeTabId === tab.id;
       const workspaceRoots = tab.git.workspaceRoots ?? [];
       return (
-        <div
+        <PageZoomPanel active={isActive}
           key={tab.id}
           className="absolute inset-0"
           style={{ display: isActive ? "block" : "none" }}
@@ -308,7 +309,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
               onOpenWorkspace={openCodeWorkspaceTab}
             />
           )}
-        </div>
+        </PageZoomPanel>
       );
     })}
 
@@ -339,7 +340,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       if (!tab.objectStorage) return null;
       const isActive = activeTabId === tab.id;
       return (
-        <div
+        <PageZoomPanel active={isActive}
           key={tab.id}
           className="absolute inset-0"
           style={{ display: isActive ? "block" : "none" }}
@@ -349,7 +350,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
             config={tab.objectStorage.config}
             title={tab.title}
           />
-        </div>
+        </PageZoomPanel>
       );
     })}
 

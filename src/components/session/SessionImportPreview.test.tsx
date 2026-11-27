@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SessionConfig } from "../../lib/ipc";
@@ -141,5 +141,48 @@ describe("SessionImportPreview", () => {
     // a deselected → only b's password counts; standalone count unchanged.
     expect(screen.getByText(/1 saved password will be stored/)).toBeInTheDocument();
     expect(screen.getByText(/\+ 1 standalone secret/)).toBeInTheDocument();
+  });
+
+  it("traps Tab, ignores IME Escape, keeps backdrop non-dismissable, and returns focus on Escape", () => {
+    const trigger = document.createElement("button");
+    document.body.append(trigger);
+    trigger.focus();
+
+    const onCancel = vi.fn();
+    const view = render(
+      <SessionImportPreview
+        source="Tabby"
+        result={makeResult({ warnings: ["Skipped duplicate entry"] })}
+        targetFolder={null}
+        onConfirm={vi.fn()}
+        onCancel={onCancel}
+      />,
+    );
+
+    const dialog = screen.getByTestId("session-import-preview");
+    const selectAll = screen.getByTestId("session-import-preview-select-all");
+    const confirm = screen.getByTestId("session-import-preview-confirm");
+    expect(confirm).toHaveFocus();
+
+    fireEvent.keyDown(confirm, { key: "Tab" });
+    expect(selectAll).toHaveFocus();
+    fireEvent.keyDown(selectAll, { key: "Tab", shiftKey: true });
+    expect(confirm).toHaveFocus();
+
+    vi.spyOn(dialog, "getBoundingClientRect").mockReturnValue(new DOMRect(80, 80, 760, 500));
+    const outside = { pointerId: 9, button: 0, clientX: 10, clientY: 10 };
+    fireEvent.pointerDown(dialog, outside);
+    fireEvent.pointerUp(dialog, outside);
+    expect(onCancel).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(confirm, { key: "Escape", isComposing: true });
+    expect(onCancel).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(confirm, { key: "Escape" });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+
+    view.unmount();
+    expect(trigger).toHaveFocus();
+    trigger.remove();
   });
 });

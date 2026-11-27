@@ -78,7 +78,7 @@ export const MailListRow = memo(function MailListRow({ message, threadKey, depth
         {threadView && isRoot && threadSize > 1 && (
           <button
             type="button"
-            className="mt-0.5 shrink-0 inline-flex items-center gap-0.5 rounded px-1 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
+            className="mt-0.5 shrink-0 inline-flex items-center gap-0.5 rounded px-1 text-ui-small text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
             data-testid="mail-thread-expand"
             aria-expanded={expanded}
             aria-label={`${expanded ? "Collapse" : "Expand"} conversation of ${threadSize} messages`}
@@ -101,7 +101,7 @@ export const MailListRow = memo(function MailListRow({ message, threadKey, depth
                 <Ban className="w-3 h-3" />
               </span>
             )}
-            <div className={`min-w-0 text-[14px] leading-5 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "font-medium text-[var(--taomni-text-muted)]"}`}>
+            <div className={`min-w-0 text-ui-title leading-5 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "font-medium text-[var(--taomni-text-muted)]"}`}>
               {message.subject || "(no subject)"}
             </div>
             {messageTags(message).map((tag) => (
@@ -115,13 +115,13 @@ export const MailListRow = memo(function MailListRow({ message, threadKey, depth
               />
             ))}
           </div>
-          <div className="mt-1 flex items-center gap-1.5 text-[12px] leading-4">
+          <div className="mt-1 flex items-center gap-1.5 text-ui-body leading-4">
             <span className={`min-w-0 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "text-[var(--taomni-text-muted)]"}`}>
               {addressLabel(message.from) || "(unknown)"}
             </span>
             {message.folder !== selectedFolder && (
               <span
-                className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-[10px] text-[var(--taomni-text-muted)]"
+                className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-ui-caption text-[var(--taomni-text-muted)]"
                 data-testid="mail-message-folder"
               >
                 {decodeFolderLabel(message.folder, displayFolders)}
@@ -130,11 +130,11 @@ export const MailListRow = memo(function MailListRow({ message, threadKey, depth
             {message.hasAttachments && <Paperclip className="w-3 h-3 text-[var(--taomni-text-muted)] shrink-0" />}
             {message.bodyCached && <FileText className="w-3 h-3 text-[var(--taomni-accent)] shrink-0" />}
           </div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)] line-clamp-2 mt-1.5">
+          <div className="text-ui-small text-[var(--taomni-text-muted)] line-clamp-2 mt-1.5">
             {message.snippet || "No preview"}
           </div>
         </div>
-        <span className="text-[11px] text-[var(--taomni-text-muted)] shrink-0 leading-5">{formatShortDate(message.dateTs)}</span>
+        <span className="text-ui-small text-[var(--taomni-text-muted)] shrink-0 leading-5">{formatShortDate(message.dateTs)}</span>
       </div>
     </div>
   );

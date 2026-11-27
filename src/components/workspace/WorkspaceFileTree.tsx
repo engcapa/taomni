@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { ChevronDown, ChevronRight, File, FilePlus2, Folder, FolderPlus, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
@@ -248,12 +249,12 @@ export function WorkspaceFileTree({
     return (
       <>
         {state?.loading && !state.entries.length && (
-          <div className="px-2 py-1 text-[10.5px] text-[var(--taomni-text-muted)]" style={{ paddingLeft: 8 + depth * 13 }}>
+          <div className="px-2 py-1 text-ui-caption text-[var(--taomni-text-muted)]" style={{ paddingLeft: 8 + depth * 13 }}>
             Loading…
           </div>
         )}
         {state?.error && (
-          <div className="px-2 py-1 text-[10.5px] text-[var(--taomni-danger)]" style={{ paddingLeft: 8 + depth * 13 }}>
+          <div className="px-2 py-1 text-ui-caption text-[var(--taomni-danger)]" style={{ paddingLeft: 8 + depth * 13 }}>
             {state.error}
           </div>
         )}
@@ -309,7 +310,7 @@ export function WorkspaceFileTree({
   return (
     <div data-testid="workspace-file-tree" role="tree" aria-label="Workspace files" className="min-h-0 overflow-auto py-1">
       {rootList.length === 0 && (
-        <div className="px-2 py-2 text-[11px] text-[var(--taomni-text-muted)]" data-testid="workspace-file-tree-empty">
+        <div className="px-2 py-2 text-ui-small text-[var(--taomni-text-muted)]" data-testid="workspace-file-tree-empty">
           {t("platform.noWorkspaceRoot")}
         </div>
       )}
@@ -330,13 +331,13 @@ export function WorkspaceFileTree({
               onContextMenu={(event) => openEntryMenu(event, root, "", "folder")}
             >
               {isExpanded ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
-              <Folder className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--taomni-warning, #d97706)" }} />
+              <Folder className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--taomni-warning-text, #d97706)" }} />
               <span className="truncate font-semibold" style={{ fontSize: "var(--taomni-ui-font-size)" }}>{root.name}</span>
               <span className="ml-auto flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100">
-                <button
+                <IconButton
                   type="button"
                   data-testid="workspace-tree-root-new-file"
-                  title={t("platform.newFile")}
+                  label={t("platform.newFile")}
                   className="rounded p-0.5 hover:bg-[var(--taomni-hover)]"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -344,11 +345,11 @@ export function WorkspaceFileTree({
                   }}
                 >
                   <FilePlus2 className="h-3 w-3" />
-                </button>
-                <button
+                </IconButton>
+                <IconButton
                   type="button"
                   data-testid="workspace-tree-root-new-folder"
-                  title={t("platform.newFolder")}
+                  label={t("platform.newFolder")}
                   className="rounded p-0.5 hover:bg-[var(--taomni-hover)]"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -356,11 +357,11 @@ export function WorkspaceFileTree({
                   }}
                 >
                   <FolderPlus className="h-3 w-3" />
-                </button>
-                <button
+                </IconButton>
+                <IconButton
                   type="button"
                   data-testid="workspace-tree-root-remove"
-                  title={t("platform.removeRoot")}
+                  label={t("platform.removeRoot")}
                   className="rounded p-0.5 hover:bg-[var(--taomni-hover)]"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -368,11 +369,11 @@ export function WorkspaceFileTree({
                   }}
                 >
                   <Trash2 className="h-3 w-3" />
-                </button>
-                <button
+                </IconButton>
+                <IconButton
                   type="button"
                   data-testid="workspace-tree-root-refresh"
-                  title={t("platform.refreshTree")}
+                  label={t("platform.refreshTree")}
                   className="rounded p-0.5 hover:bg-[var(--taomni-hover)]"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -380,7 +381,7 @@ export function WorkspaceFileTree({
                   }}
                 >
                   <RefreshCw className="h-3 w-3" />
-                </button>
+                </IconButton>
               </span>
             </div>
             {isExpanded && renderDirectoryChildren(root, "", 1)}

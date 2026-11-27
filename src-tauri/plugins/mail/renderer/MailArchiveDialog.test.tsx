@@ -70,3 +70,25 @@ it("ignores stale search responses and prevents keyboard cleanup while typing", 
   fireEvent.keyDown(screen.getByTestId("mail-archive-entries"), { key: "f", ctrlKey: true });
   expect(screen.getByTestId("mail-archive-search")).toHaveFocus();
 });
+
+it("dismisses cleanup preview before closing the archive dialog on Escape and respects IME composition", async () => {
+  const onClose = vi.fn();
+  render(<MailArchiveDialog accountId="qa" onClose={onClose} onChanged={async () => {}} />);
+  await waitFor(() => expect(screen.getByTestId("mail-archive-results")).toHaveTextContent("of 250"));
+  const search = screen.getByTestId("mail-archive-search");
+  expect(search).toHaveFocus();
+  fireEvent.click(screen.getByLabelText("Select Invoice 1"));
+  fireEvent.click(screen.getByTestId("mail-archive-cleanup"));
+  await screen.findByTestId("mail-archive-confirm");
+
+  fireEvent.keyDown(screen.getByTestId("mail-archive-confirm-cancel"), { key: "Escape", isComposing: true });
+  expect(screen.getByTestId("mail-archive-confirm")).toBeInTheDocument();
+  expect(onClose).not.toHaveBeenCalled();
+
+  fireEvent.keyDown(screen.getByTestId("mail-archive-confirm-cancel"), { key: "Escape" });
+  expect(screen.queryByTestId("mail-archive-confirm")).not.toBeInTheDocument();
+  expect(onClose).not.toHaveBeenCalled();
+
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(onClose).toHaveBeenCalledTimes(1);
+});

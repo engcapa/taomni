@@ -387,6 +387,9 @@ export async function invokeDatabase<T>(cmd: string, args?: any): Promise<T> {
 
     case "redis_exec":
 
+    case "hbase_parse_site_xml":
+    case "hbase_parse_keytab_principal":
+      throw new Error("Reading local HBase configuration files requires the desktop application.");
     case "hbase_connect":
 
     case "hbase_ping":

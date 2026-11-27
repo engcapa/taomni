@@ -145,7 +145,7 @@ export function InlineRenamePopup({
       data-kind={kind}
       data-list-open={listOpen ? "true" : "false"}
       data-options-open={optionsOpen ? "true" : "false"}
-      className="fixed z-[70]"
+      className="fixed z-[var(--taomni-z-popover)]"
       style={{ left: anchor.left - 3, top: anchor.top - 2 }}
     >
       <input
@@ -166,7 +166,7 @@ export function InlineRenamePopup({
           setActiveIndex(-1);
         }}
         onKeyDown={onKeyDown}
-        className="rounded-[2px] border border-[var(--taomni-code-accent,#3574f0)] bg-[var(--taomni-code-bg)] px-[2px] text-[var(--taomni-code-fg)] outline-none"
+        className="rounded-[2px] border border-[var(--taomni-code-accent,#3574f0)] bg-[var(--taomni-code-bg)] px-[2px] text-[var(--taomni-code-text)] focus-visible:keyboard-outline"
         style={{
           fontFamily: anchor.fontFamily,
           fontSize: anchor.fontSize,
@@ -178,13 +178,13 @@ export function InlineRenamePopup({
         <div
           data-testid="code-workspace-inline-rename-error"
           role="alert"
-          className="mt-1 max-w-[360px] rounded border border-[var(--taomni-code-error,#e5484d)] bg-[var(--taomni-code-popup-bg,var(--taomni-code-bg))] px-2 py-1 text-[11px] text-[var(--taomni-code-fg)] shadow"
+          className="mt-1 max-w-[360px] rounded border border-[var(--taomni-code-error,#e5484d)] bg-[var(--taomni-code-popup-bg,var(--taomni-code-bg))] px-2 py-1 text-ui-small text-[var(--taomni-code-text)] shadow"
         >
           {error}
         </div>
       )}
       {(listOpen || !error) && (
-        <div className="mt-1 min-w-[200px] max-w-[360px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-popup-bg,var(--taomni-code-bg))] text-[12px] shadow-lg">
+        <div className="mt-1 min-w-[200px] max-w-[360px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-popup-bg,var(--taomni-code-bg))] text-ui-body shadow-lg">
           {listOpen && suggestions.length > 0 && (
             <ul
               id={listId}
@@ -215,7 +215,7 @@ export function InlineRenamePopup({
           )}
           <div
             data-testid="code-workspace-inline-rename-hint"
-            className="border-t border-[var(--taomni-code-border)] px-2 py-1 text-[11px] text-[var(--taomni-code-muted)]"
+            className="border-t border-[var(--taomni-code-border)] px-2 py-1 text-ui-small text-[var(--taomni-code-muted)]"
           >
             {hint}
           </div>
@@ -226,7 +226,7 @@ export function InlineRenamePopup({
           data-testid="code-workspace-inline-rename-options"
           role="group"
           aria-label="Rename options"
-          className="mt-1 w-[320px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-popup-bg,var(--taomni-code-bg))] p-2 text-[12px] shadow-lg"
+          className="mt-1 w-[320px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-popup-bg,var(--taomni-code-bg))] p-2 text-ui-body shadow-lg"
         >
           <label
             className="flex items-start gap-2 opacity-60"
@@ -243,7 +243,7 @@ export function InlineRenamePopup({
               Rename in comments and strings
               <span
                 data-testid="code-workspace-inline-rename-option-comments-reason"
-                className="block text-[11px] text-[var(--taomni-code-muted)]"
+                className="block text-ui-small text-[var(--taomni-code-muted)]"
               >
                 Not supported by the language server rename
               </span>
@@ -270,7 +270,7 @@ export function InlineRenamePopup({
             className="mt-2 flex w-full items-center justify-between rounded px-1 py-0.5 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
           >
             <span>{kind === "extract" ? "Open Extract Method Dialog…" : "Open Rename Dialog…"}</span>
-            <kbd className="text-[11px] text-[var(--taomni-code-muted)]">Shift+F6</kbd>
+            <kbd className="text-ui-small text-[var(--taomni-code-muted)]">Shift+F6</kbd>
           </button>
         </div>
       )}

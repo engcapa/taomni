@@ -9,6 +9,8 @@ tags:
 - window
 - regression
 - p1
+ui_standard:
+- UI-I18N-01
 modes:
 - browser
 fixtures:
@@ -117,13 +119,13 @@ steps:
     state: visible
 - assert_text:
     selector: '[data-testid="ai-chat-acp-permission-card"]'
-    contains: 本地 Agent 请求执行操作
+    contains: Local agent requests permission
 - assert_text:
     selector: '[data-testid="ai-chat-acp-permission-card"]'
-    contains: 仅允许这一次
+    contains: Allow once
 - assert_text:
     selector: '[data-testid="ai-chat-acp-permission-card"]'
-    contains: 拒绝这一次
+    contains: Reject once
 - assert_visible: '[data-testid="ai-chat-acp-permission-cancel"]'
 - assert_visible: '[data-testid="ai-chat-acp-permission-option-allow_once"]'
 - assert_count:
@@ -285,6 +287,8 @@ verification:
     - 42
     - 43
   - id: V8-acp-surface
+    ui_standard:
+    - UI-I18N-01
     requirement: The ACP gate shows locally trusted option labels, reports the selected option id, reports cancel separately and clears on the production dismissed broadcast.
     actions:
     - 44
@@ -301,11 +305,11 @@ verification:
     - step: 46
       expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "state": "visible"}}'
     - step: 47
-      expectation: '{"assert_text": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "contains": "本地 Agent 请求执行操作"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "contains": "Local agent requests permission"}}'
     - step: 48
-      expectation: '{"assert_text": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "contains": "仅允许这一次"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "contains": "Allow once"}}'
     - step: 49
-      expectation: '{"assert_text": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "contains": "拒绝这一次"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "contains": "Reject once"}}'
     - step: 50
       expectation: '{"assert_visible": "[data-testid=\"ai-chat-acp-permission-cancel\"]"}'
     - step: 51

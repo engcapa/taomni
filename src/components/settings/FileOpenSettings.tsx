@@ -72,11 +72,11 @@ export function FileOpenSettings() {
   };
 
   return (
-    <section data-testid="file-open-settings" className="mb-5 rounded-lg border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-4 text-[12px]">
+    <section data-testid="file-open-settings" className="mb-5 rounded-lg border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-4 text-ui-body">
       <div className="mb-3 flex items-start gap-2">
         <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[var(--taomni-accent)]" />
         <div className="min-w-0 flex-1">
-          <h2 className="text-[14px] font-semibold">{label("文件与打开方式", "Files and opening")}</h2>
+          <h2 className="text-ui-title font-semibold">{label("文件与打开方式", "Files and opening")}</h2>
           <p className="mt-1 text-[var(--taomni-text-muted)]">{label(
             "决定在 Taomni 各处（Explorer、终端链接、Workspace、邮件、AI 对话…）打开文件时的默认行为。",
             "Choose the default behavior across Explorer, terminal links, Workspace, mail and AI conversations.",
@@ -115,7 +115,7 @@ export function FileOpenSettings() {
               const showTaOffice = group.officeEligible || group.extensions.some((ext) => isOfficeExtension(ext));
               return (
                 <tr key={group.id} className="border-b border-[var(--taomni-divider)]">
-                  <td className="p-2 font-mono text-[11px]">{group.id === "source" ? label("源码文件 (.ts .rs .py …)", "Source files (.ts .rs .py …)") : group.extensions.map((ext) => `.${ext}`).join(" ")}</td>
+                  <td className="p-2 font-mono text-ui-small">{group.id === "source" ? label("源码文件 (.ts .rs .py …)", "Source files (.ts .rs .py …)") : group.extensions.map((ext) => `.${ext}`).join(" ")}</td>
                   <td className="p-2"><select aria-label={group.extensions.map((ext) => `.${ext}`).join(" ")} data-testid={`file-open-association-${group.id}`} className="taomni-input h-8 w-full min-w-48" value={value} onChange={(event) => updateAssociation(group.extensions, event.target.value)}>
                     <option value="">{inherited} · {label("默认", "Default")}</option>
                     {!uniform && <option value="mixed" disabled>{label("按扩展名分别设置", "Different extension overrides")}</option>}
@@ -147,7 +147,7 @@ export function FileOpenSettings() {
         {extensionError && <span role="alert">{label("请输入有效的文件扩展名", "Enter a valid file extension")}</span>}
       </div>
 
-      <h3 className="mb-3 mt-5 text-[13px] font-semibold">Markdown</h3>
+      <h3 className="mb-3 mt-5 text-ui-body font-semibold">Markdown</h3>
       <div className="grid grid-cols-[minmax(120px,170px)_minmax(0,1fr)] items-center gap-3">
         <label htmlFor="file-open-image-dir">{label("粘贴图片保存到", "Save pasted images to")}</label>
         <div><input id="file-open-image-dir" data-testid="file-open-image-dir" className="taomni-input h-8 w-full max-w-sm" value={imageDir} onChange={(event) => { const value = event.target.value; setImageDir(value); if (value.trim()) update({ markdownImageDir: value }); }} onBlur={() => { if (!imageDir.trim()) setImageDir(preferences.markdownImageDir); }} /><p className="mt-1 text-[var(--taomni-text-muted)]">{label("文档同级 assets/ 文件夹", "assets/ folder next to the document")}</p></div>
@@ -169,7 +169,7 @@ export function FileOpenSettings() {
         <label className="flex items-center gap-2"><input type="checkbox" data-testid="file-open-convert-tables" checked={preferences.convertTables} onChange={(event) => update({ convertTables: event.target.checked })} />{label("自动转为 Markdown 表格", "Convert to Markdown tables automatically")}</label>
       </div>
 
-      <h3 className="mb-3 mt-5 text-[13px] font-semibold">{label("HTML 预览", "HTML preview")}</h3>
+      <h3 className="mb-3 mt-5 text-ui-body font-semibold">{label("HTML 预览", "HTML preview")}</h3>
       <div className="grid grid-cols-[minmax(120px,170px)_minmax(0,1fr)] items-center gap-3">
         <label htmlFor="file-open-html-network">{label("网络请求", "Network requests")}</label>
         <select id="file-open-html-network" data-testid="file-open-html-network" className="taomni-input h-8 w-full max-w-sm" value={preferences.htmlNetwork} onChange={(event) => update({ htmlNetwork: event.target.value as "block" | "ask" })}>
@@ -183,12 +183,12 @@ export function FileOpenSettings() {
           <option value="none">{label("不使用代理（绕过系统代理）", "No proxy (bypass system/environment)")}</option>
         </select>
         {preferences.htmlProxyMode === "custom" && <div className="col-span-2" data-testid="html-preview-custom-proxy-panel"><AppProxyPanel value={preferences.htmlCustomProxy} onSave={async (config) => update({ htmlCustomProxy: config })} /></div>}
-        <span className="col-span-2 text-[11px] text-[var(--taomni-text-muted)]">{label("仅本次允许的页面资源通过受限后端通道读取；代理失败不会回落直连。页面不能直接访问网络。", "Allowed page resources use a restricted backend channel. Proxy errors never fall back to direct connections; pages cannot access the network directly.")}</span>
+        <span className="col-span-2 text-ui-small text-[var(--taomni-text-muted)]">{label("仅本次允许的页面资源通过受限后端通道读取；代理失败不会回落直连。页面不能直接访问网络。", "Allowed page resources use a restricted backend channel. Proxy errors never fall back to direct connections; pages cannot access the network directly.")}</span>
         <span>{label("运行脚本", "Run scripts")}</span>
         <label className="flex items-center gap-2"><input type="checkbox" data-testid="file-open-html-scripts" checked={preferences.htmlScripts} onChange={(event) => update({ htmlScripts: event.target.checked })} />{label("在隔离沙盒中运行", "Run in an isolated sandbox")}</label>
       </div>
 
-      <h3 className="mb-3 mt-5 text-[13px] font-semibold">{label("编辑器偏好", "Editor preferences")}</h3>
+      <h3 className="mb-3 mt-5 text-ui-body font-semibold">{label("编辑器偏好", "Editor preferences")}</h3>
       <div className="flex flex-wrap items-center gap-5">
         <label className="flex items-center gap-2"><input type="checkbox" data-testid="file-open-wrap" checked={preferences.wrap} onChange={(event) => update({ wrap: event.target.checked })} />{label("自动换行", "Word wrap")}</label>
         <label className="flex items-center gap-2">{label("字号", "Font size")}<input type="number" min={10} max={32} id="file-open-font-size" data-testid="file-open-font-size" className="taomni-input h-8 w-20" value={fontSize} onChange={(event) => { const raw = event.target.value; setFontSize(raw); const value = Number(raw); if (raw && Number.isFinite(value) && value >= 10 && value <= 32) update({ fontSize: value }); }} onBlur={() => setFontSize(String(useFileOpenPreferences.getState().fontSize))} /></label>

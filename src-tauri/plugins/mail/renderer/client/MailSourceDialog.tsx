@@ -11,7 +11,6 @@ export interface MailSourceDialogContext {
 export function MailSourceDialog(context: MailSourceDialogContext) {
   const { sourceView, setSourceView, copyText } = context;
   return sourceView && (
-    <div className="absolute inset-0 z-[140] bg-black/35 flex items-center justify-center p-5">
       <MailDraggableDialog
         title={`Source — ${sourceView.subject}`}
         icon={<Code className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
@@ -23,7 +22,7 @@ export function MailSourceDialog(context: MailSourceDialogContext) {
         headerActions={(
           <button
             type="button"
-            className="taomni-btn h-6 px-2 text-[11px]"
+            className="taomni-btn h-6 px-2 text-ui-small"
             onClick={() => copyText("message source", sourceView.content)}
           >
             Copy all
@@ -31,11 +30,10 @@ export function MailSourceDialog(context: MailSourceDialogContext) {
         )}
       >
         <div className="flex-1 min-h-0 overflow-auto bg-[var(--taomni-bg)]">
-          <pre className="p-3 text-[12px] leading-5 whitespace-pre-wrap break-words taomni-mono">
+          <pre className="p-3 text-ui-body leading-5 whitespace-pre-wrap break-words taomni-mono">
             {sourceView.content}
           </pre>
         </div>
       </MailDraggableDialog>
-    </div>
   );
 }

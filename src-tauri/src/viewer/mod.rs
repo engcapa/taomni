@@ -4,7 +4,7 @@ mod assets;
 mod chunks;
 pub(crate) mod document_access;
 pub(crate) mod document_copy;
-#[cfg(any(target_os = "macos", test))]
+#[cfg(any(target_os = "macos", target_os = "windows", test))]
 mod drawio_frame;
 mod filesystem;
 mod html;
@@ -33,10 +33,10 @@ pub(crate) use text::{normalize_eol, read_text, write_text};
 use serde::Serialize;
 
 pub(crate) fn drawio_renderer_url() -> Option<String> {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     return Some(drawio_frame::url());
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     None
 }
 

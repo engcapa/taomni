@@ -36,7 +36,7 @@ export function ModelInspectorPanel({ providerId, currentModel, blocked, onClose
     .map((key) => row.cost?.[key] == null ? unknown : String(row.cost[key])).join(" / ");
   return <div ref={panel} tabIndex={-1} role="region" aria-label={t("modelInspector.title")}
     data-testid="model-inspector-panel" data-provider={providerId}
-    className="border border-[var(--taomni-divider)] rounded p-2 space-y-2 text-[12px]"
+    className="border border-[var(--taomni-divider)] rounded p-2 space-y-2 text-ui-body"
     onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } }}>
     <div className="flex flex-wrap items-center gap-2">
       <strong>{t("modelInspector.title")}</strong>

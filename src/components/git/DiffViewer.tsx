@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import "./diff/styles";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { EditorView } from "@codemirror/view";
@@ -372,7 +373,7 @@ export function DiffViewer({
       {eolOnly && eolLabel ? (
         <div
           data-testid="git-diff-eol-only-banner"
-          className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-amber-500/40 bg-amber-500/10 text-[11px] text-amber-700 dark:text-amber-300"
+          className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-ui-warning-border bg-ui-warning-surface text-ui-small text-ui-warning"
         >
           <span className="min-w-0 flex-1">{eolLabel}</span>
           {onNormalizeLineEndings ? (
@@ -388,13 +389,13 @@ export function DiffViewer({
           ) : null}
         </div>
       ) : null}
-      <div className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] text-[12px] bg-[var(--taomni-chrome-bg)]">
+      <div className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] text-ui-body bg-[var(--taomni-chrome-bg)]">
         <div className="inline-flex rounded-md p-0.5 bg-[var(--taomni-hover)] border border-[var(--taomni-divider)]">
           <button
             type="button"
             data-testid="git-diff-mode-split"
             title="Side-by-side (Split)"
-            className={`h-6 px-2.5 rounded text-[11px] font-medium inline-flex items-center gap-1.5 transition-all duration-150 ${view === "split" ? "bg-[var(--taomni-card-bg)] text-[var(--taomni-text)] shadow-sm" : "text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"}`}
+            className={`h-6 px-2.5 rounded text-ui-small font-medium inline-flex items-center gap-1.5 transition-all duration-150 ${view === "split" ? "bg-[var(--taomni-card-bg)] text-[var(--taomni-text)] shadow-sm" : "text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"}`}
             onClick={() => setView("split")}
           >
             <Columns2 className="w-3.5 h-3.5" /> Split
@@ -403,7 +404,7 @@ export function DiffViewer({
             type="button"
             data-testid="git-diff-mode-unified"
             title="Unified"
-            className={`h-6 px-2.5 rounded text-[11px] font-medium inline-flex items-center gap-1.5 transition-all duration-150 ${view === "unified" ? "bg-[var(--taomni-card-bg)] text-[var(--taomni-text)] shadow-sm" : "text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"}`}
+            className={`h-6 px-2.5 rounded text-ui-small font-medium inline-flex items-center gap-1.5 transition-all duration-150 ${view === "unified" ? "bg-[var(--taomni-card-bg)] text-[var(--taomni-text)] shadow-sm" : "text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"}`}
             onClick={() => setView("unified")}
           >
             <Rows2 className="w-3.5 h-3.5" /> Unified
@@ -430,7 +431,7 @@ export function DiffViewer({
         )}
 
         <select
-          className="h-7 bg-[var(--taomni-input-bg)] border border-[var(--taomni-input-border)] rounded-md px-2 text-[11px] text-[var(--taomni-text)] hover:border-[var(--taomni-accent-soft)] focus:outline-none transition-all duration-150 cursor-pointer"
+          className="h-7 bg-[var(--taomni-input-bg)] border border-[var(--taomni-input-border)] rounded-md px-2 text-ui-small text-[var(--taomni-text)] hover:border-[var(--taomni-accent-soft)] focus:outline-none transition-all duration-150 cursor-pointer"
           value={whitespace}
           title="Whitespace"
           onChange={(e) => setWhitespace(e.target.value as WhitespaceMode)}
@@ -440,7 +441,7 @@ export function DiffViewer({
           <option value="all">Ignore all whitespace</option>
         </select>
 
-        <label className="inline-flex items-center gap-1.5 select-none text-[11px] font-medium text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] cursor-pointer transition-all duration-150" title="Highlight changed words">
+        <label className="inline-flex items-center gap-1.5 select-none text-ui-small font-medium text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] cursor-pointer transition-all duration-150" title="Highlight changed words">
           <input
             type="checkbox"
             className="rounded border-[var(--taomni-input-border)] text-[var(--taomni-accent)] focus:ring-[var(--taomni-accent-soft)] w-3.5 h-3.5 cursor-pointer bg-[var(--taomni-input-bg)]"
@@ -465,31 +466,31 @@ export function DiffViewer({
           </button>
         ) : null}
 
-        <span className="text-[11px] font-medium text-[var(--taomni-text-muted)] bg-[var(--taomni-hover)] px-2.5 py-0.5 rounded-full border border-[var(--taomni-divider)]">
+        <span className="text-ui-small font-medium text-[var(--taomni-text-muted)] bg-[var(--taomni-hover)] px-2.5 py-0.5 rounded-full border border-[var(--taomni-divider)]">
           {diffCount === 0 ? "No differences" : `${diffCount} difference${diffCount === 1 ? "" : "s"}`}
         </span>
 
         <div className="flex items-center gap-1">
-          <button
+          <IconButton
             className="h-7 w-7 rounded-md inline-flex items-center justify-center border border-[var(--taomni-divider)] bg-[var(--taomni-card-bg)] text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)] disabled:opacity-40 disabled:hover:bg-[var(--taomni-card-bg)] transition-all duration-150 cursor-pointer"
             type="button"
             data-testid="git-diff-prev"
-            title="Previous change"
+            labelKey="previousChange"
             disabled={!diffCount}
             onClick={goPrev}
           >
             <ChevronUp className="w-4 h-4" />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             className="h-7 w-7 rounded-md inline-flex items-center justify-center border border-[var(--taomni-divider)] bg-[var(--taomni-card-bg)] text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)] disabled:opacity-40 disabled:hover:bg-[var(--taomni-card-bg)] transition-all duration-150 cursor-pointer"
             type="button"
             data-testid="git-diff-next"
-            title="Next change"
+            labelKey="nextChange"
             disabled={!diffCount}
             onClick={goNext}
           >
             <ChevronDown className="w-4 h-4" />
-          </button>
+          </IconButton>
         </div>
       </div>
       <div ref={hostRef} className="taomni-diff-host flex-1 min-h-0 min-w-0 w-full overflow-hidden" />

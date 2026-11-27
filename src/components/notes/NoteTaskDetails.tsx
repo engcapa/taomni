@@ -24,7 +24,7 @@ export function NoteTaskDetails({ note, prefix = "note-editor" }: { note: NoteIt
     }).finally(() => setAddingTag(false));
   };
   return <div className="flex flex-col gap-2" data-testid={`${prefix}-task-details`}>
-    <div className="flex flex-wrap items-center gap-2 text-[11px]">
+    <div className="flex flex-wrap items-center gap-2 text-ui-small">
       <label className="inline-flex items-center gap-1">
         <span className="text-[var(--taomni-text-muted)]">{t("notes.priority")}</span>
         <NotesSelect className="w-[90px]" value={note.priority}
@@ -41,7 +41,7 @@ export function NoteTaskDetails({ note, prefix = "note-editor" }: { note: NoteIt
         onChange={(completed_at) => { void actions.patch(note.id, { completed_at }); }} />
     </div>
     <div className="flex items-center gap-1.5">
-      <span className="text-[11px] text-[var(--taomni-text-muted)]">{t("notes.color")}</span>
+      <span className="text-ui-small text-[var(--taomni-text-muted)]">{t("notes.color")}</span>
       <button type="button" className={`inline-flex h-4 w-4 items-center justify-center rounded-full border border-[var(--taomni-divider)] ${note.color === null ? "ring-1 ring-[var(--taomni-accent)]" : ""}`}
         onClick={() => { void actions.patch(note.id, { color: null }); }} title={t("notes.clearColor")}
         aria-label={t("notes.clearColor")} data-testid={`${prefix}-color-clear`}><X className="h-2.5 w-2.5" /></button>
@@ -53,14 +53,14 @@ export function NoteTaskDetails({ note, prefix = "note-editor" }: { note: NoteIt
     </div>
     <NoteTaskSteps note={note} prefix={prefix} />
     <div className="flex flex-col gap-1">
-      <span className="text-[11px] text-[var(--taomni-text-muted)]">{t("notes.tags")}</span>
+      <span className="text-ui-small text-[var(--taomni-text-muted)]">{t("notes.tags")}</span>
       <div className="flex flex-wrap items-center gap-1">
         {note.tags.map((tag) => <span key={tag.id} data-testid={`${prefix}-tag`}
-          className="inline-flex h-5 items-center gap-1 rounded-full border border-[var(--taomni-divider)] px-1.5 text-[10px]">
-          #{tag.name}<button type="button" className="hover:text-red-400" title={`${t("notes.delete")} ${tag.name}`}
+          className="inline-flex h-5 items-center gap-1 rounded-full border border-[var(--taomni-divider)] px-1.5 text-ui-caption">
+          #{tag.name}<button type="button" className="hover:text-ui-danger" title={`${t("notes.delete")} ${tag.name}`}
             aria-label={`${t("notes.delete")} ${tag.name}`} onClick={() => { void actions.removeTag(note.id, tag.id); }}><X className="h-2.5 w-2.5" /></button>
         </span>)}
-        <input type="text" className="taomni-input h-5 w-24 text-[10px]" placeholder={t("notes.tagPlaceholder")}
+        <input type="text" className="taomni-input h-5 w-24 text-ui-caption" placeholder={t("notes.tagPlaceholder")}
           aria-label={t("notes.tags")} value={newTag} onChange={(event) => setNewTag(event.target.value)} data-testid={`${prefix}-new-tag`}
           onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); addTag(); } }} />
       </div>

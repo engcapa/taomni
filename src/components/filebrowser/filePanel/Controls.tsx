@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { ChevronDown, File as FileIcon, Folder, HardDrive, HelpCircle, Link as LinkIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useT } from "../../../lib/i18n";
@@ -67,7 +68,7 @@ export function SortHeader({
             onResizeReset?.();
           }}
           className="absolute top-0 right-0 h-full w-[5px] cursor-col-resize hover:bg-[var(--taomni-accent)]"
-          style={{ zIndex: 1 }}
+          style={{ zIndex: "var(--taomni-z-sticky)" }}
         />
       )}
     </th>
@@ -107,19 +108,19 @@ export function DrivesPicker({ onSelect }: { onSelect: (path: string) => void; }
 
   return (
     <div ref={wrapRef} className="relative shrink-0">
-      <button
+      <IconButton
         type="button"
-        title={t("fileBrowser.drivesSwitchTitle")}
-        className="h-5 px-1 inline-flex items-center gap-0.5 rounded hover:bg-[var(--taomni-hover)] text-[11px]"
+        label={t("fileBrowser.drivesSwitchTitle")}
+        className="h-5 px-1 inline-flex items-center gap-0.5 rounded hover:bg-[var(--taomni-hover)] text-ui-small"
         onClick={() => setOpen((v) => !v)}
         style={{ color: "var(--taomni-text-muted)" }}
       >
         <HardDrive className="w-3 h-3" />
         <ChevronDown className="w-3 h-3" />
-      </button>
+      </IconButton>
       {open && (
         <div
-          className="absolute top-full left-0 mt-0.5 z-50 min-w-[160px] py-1 text-[12px] shadow-lg rounded"
+          className="absolute top-full left-0 mt-0.5 z-[var(--taomni-z-popover)] min-w-[160px] py-1 text-ui-body shadow-lg rounded"
           style={{
             background: "var(--taomni-bg)",
             border: "1px solid var(--taomni-divider)",
@@ -149,7 +150,7 @@ export function DrivesPicker({ onSelect }: { onSelect: (path: string) => void; }
                 <HardDrive className="w-3 h-3 shrink-0" />
                 <span className="truncate">{d.label}</span>
                 <span
-                  className="ml-auto text-[10px]"
+                  className="ml-auto text-ui-caption"
                   style={{ color: "var(--taomni-text-muted)" }}
                 >
                   {d.path}
@@ -163,7 +164,7 @@ export function DrivesPicker({ onSelect }: { onSelect: (path: string) => void; }
 }
 
 export function FileTypeIcon({ entry }: { entry: FileEntry; }) {
-  if (entry.fileType === "dir") return <Folder className="w-3.5 h-3.5 shrink-0" style={{ color: "#dab760" }} />;
+  if (entry.fileType === "dir") return <Folder className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--taomni-warning-icon)" }} />;
   if (entry.fileType === "symlink") return <LinkIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--taomni-accent)" }} />;
   return <FileIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--taomni-text-muted)" }} />;
 }

@@ -192,7 +192,6 @@ export function MarkdownLiveMenu({ root, enabled, onError }: {
       // Restore immediately (the menu focus may already have cleared the range)
       // and keep bounded retries for engines that clear it in a later task.
       restoreSelection(surface, ranges, text);
-      scheduleRangeRestore(surface, ranges, text);
     };
     const frame = window.requestAnimationFrame(restoreIfCleared);
     const timers = [0, 50, 150].map((delay) => window.setTimeout(restoreIfCleared, delay));

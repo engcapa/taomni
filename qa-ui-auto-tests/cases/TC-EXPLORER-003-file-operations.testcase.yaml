@@ -8,6 +8,7 @@ description: >-
   empty directory sets are compared, so DOM absence cannot hide source loss.
 modes: [browser, native]
 covers: [F-EXPLORER-1, F7.2]
+ui_standard: [UI-FRM-02]
 tags: [p0, explorer, filesystem, clipboard, trash, native-boundary, regression]
 fixtures: [reset_db, explorer_files]
 timeout_sec: 240
@@ -56,11 +57,11 @@ steps:
     expect_truthy: true
 - fill: {selector: '[data-testid="explorer-rename-input"]', value: alpha.txt}
 - press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
-- wait_for: '[data-testid="explorer-toast"].error'
+- wait_for: '[data-testid="explorer-rename-error"][role="alert"]'
 - assert_explorer_files: {state: moved}
 - fill: {selector: '[data-testid="explorer-rename-input"]', value: CON.txt}
 - press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
-- wait_for: '[data-testid="explorer-toast"].error'
+- wait_for: '[data-testid="explorer-rename-error"][role="alert"]'
 - assert_explorer_files: {state: moved}
 - fill: {selector: '[data-testid="explorer-rename-input"]', value: beta-renamed.txt}
 - press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
@@ -78,10 +79,7 @@ steps:
 - click: '[data-testid="explorer-file-row"][data-name="delete-me.txt"]'
 - press: {selector: '[data-testid="explorer-file-list"]', key: Delete}
 - click: '[data-testid="explorer-delete-trash"]'
-- eval_readonly:
-    expression: 'document.querySelectorAll(".ex-frow").length === 0 && !!document.querySelector(".ex-toast button")'
-    timeout_sec: 10
-    expect_truthy: true
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]:not(:has([data-testid="explorer-file-row"])) [data-testid="explorer-undo"]'
 - assert_explorer_files: {state: trashed}
 - click: '[data-testid="explorer-undo"]'
 - wait_for: '[data-testid="explorer-file-row"][data-name="delete-me.txt"]'
@@ -175,6 +173,7 @@ verification:
     - {step: 23, expectation: 'Exact source, existing destination and new copy bytes plus all directories match.'}
     results: [13, 14, 22, 23]
   - id: R2
+    ui_standard: [UI-FRM-02]
     requirement: Cut moves once, inline rename preselects basename, rejects existing/portable-invalid names and preserves content on successful rename.
     actions: [24, 26, 27, 29, 31, 34, 35, 38, 39, 42, 43, 46, 47]
     checkpoints:

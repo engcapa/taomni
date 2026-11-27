@@ -13,10 +13,10 @@ interface Props {
 }
 
 const DOT_COLORS: Record<ServerRunState, string> = {
-  running: "#16a34a",
-  stopped: "#94a3b8",
-  starting: "#f59e0b",
-  error: "#dc2626",
+  running: "var(--taomni-success-icon)",
+  stopped: "var(--taomni-text-muted)",
+  starting: "var(--taomni-warning-icon)",
+  error: "var(--taomni-danger-icon)",
 };
 
 /**
@@ -71,7 +71,7 @@ export function ServerRow({
           flexShrink: 0,
         }}
       />
-      <span className="flex-1 min-w-0 truncate text-[12px]" title={name}>
+      <span className="flex-1 min-w-0 truncate text-ui-body" title={name}>
         {name}
       </span>
       <div className="flex items-center gap-0.5 shrink-0">
@@ -88,7 +88,7 @@ export function ServerRow({
             onStart();
           }}
         >
-          <Play className="w-3.5 h-3.5" style={{ color: busy ? "var(--taomni-text-muted)" : "#16a34a" }} />
+          <Play className="w-3.5 h-3.5" style={{ color: busy ? "var(--taomni-text-muted)" : "var(--taomni-success-icon)" }} />
         </button>
         <button
           type="button"
@@ -103,7 +103,7 @@ export function ServerRow({
             onStop();
           }}
         >
-          <Square className="w-3.5 h-3.5" style={{ color: busy ? "#dc2626" : "var(--taomni-text-muted)" }} />
+          <Square className="w-3.5 h-3.5" style={{ color: busy ? "var(--taomni-danger-icon)" : "var(--taomni-text-muted)" }} />
         </button>
         <button
           type="button"

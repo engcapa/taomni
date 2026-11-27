@@ -1,5 +1,6 @@
+import { NotepadDialog } from "./NotepadDialog";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Change, diff, MergeView } from "@codemirror/merge";
 import { EditorState } from "@codemirror/state";
 import { EditorView, lineNumbers } from "@codemirror/view";
@@ -107,64 +108,54 @@ export function CompareOverlay({
   if (!compare || !compare.open) return null;
 
   return (
-    <div className="np-modal-backdrop" role="dialog" aria-modal="true" data-testid="notepad-compare-dialog">
-      <div className="np-modal wide" style={{ width: "min(980px, calc(100vw - 32px))" }}>
-        <div className="np-modal-header">
-          <span>
+    <NotepadDialog testId="notepad-compare-dialog" onClose={onClose} wide style={{ width: "min(980px, calc(100vw - 32px))" }} closeId="notepad-compare-close"
+      title={<span>
             {label("文档对比", "Compare Documents")} ({diffCount} {label("处差异块", "diff chunk(s)")})
-          </span>
-          <button type="button" className="np-btn" data-testid="notepad-compare-close" onClick={onClose}>
-            <X size={14} />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-4 text-[12px]">
-          <label className="inline-flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              data-testid="notepad-compare-ignore-ws"
-              checked={compare.ignoreWhitespace}
-              onChange={(e) => onPatch({ ignoreWhitespace: e.target.checked })}
-            />
-            {label("忽略空白变化", "Ignore whitespace")}
-          </label>
-          <label className="inline-flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              data-testid="notepad-compare-ignore-case"
-              checked={compare.ignoreCase}
-              onChange={(e) => onPatch({ ignoreCase: e.target.checked })}
-            />
-            {label("忽略大小写", "Ignore case")}
-          </label>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 text-[11px] font-semibold text-[var(--taomni-text-muted)]">
-          <div className="truncate">{compare.leftTitle}</div>
-          <div className="truncate">{compare.rightTitle}</div>
-        </div>
-
-        {exceedsLimit ? (
-          <div
-            className="flex items-center gap-2 p-4 rounded border border-amber-500/50 bg-amber-500/10 text-[12px]"
-            data-testid="notepad-compare-too-large"
-          >
-            <AlertTriangle size={16} className="text-amber-500 shrink-0" />
-            <span>
-              {label(
-                "文档超过 5 MB 对比上限，无法在交互界面直接展开合并差异视图。",
-                "One or both documents exceed the 5 MB interactive compare limit.",
-              )}
-            </span>
-          </div>
-        ) : (
-          <div
-            ref={hostRef}
-            data-testid="notepad-compare-merge-view"
-            className="h-96 overflow-auto border border-[var(--taomni-divider)] rounded"
+          </span>}>
+      <div className="flex items-center gap-4 text-ui-body">
+        <label className="inline-flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            data-testid="notepad-compare-ignore-ws"
+            checked={compare.ignoreWhitespace}
+            onChange={(e) => onPatch({ ignoreWhitespace: e.target.checked })}
           />
-        )}
+          {label("忽略空白变化", "Ignore whitespace")}
+        </label>
+        <label className="inline-flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            data-testid="notepad-compare-ignore-case"
+            checked={compare.ignoreCase}
+            onChange={(e) => onPatch({ ignoreCase: e.target.checked })}
+          />
+          {label("忽略大小写", "Ignore case")}
+        </label>
       </div>
-    </div>
+      <div className="grid grid-cols-2 gap-2 text-ui-small font-semibold text-[var(--taomni-text-muted)]">
+        <div className="truncate">{compare.leftTitle}</div>
+        <div className="truncate">{compare.rightTitle}</div>
+      </div>
+      {exceedsLimit ? (
+        <div
+          className="flex items-center gap-2 p-4 rounded border border-ui-warning-border bg-ui-warning-surface text-ui-body"
+          data-testid="notepad-compare-too-large"
+        >
+          <AlertTriangle size={16} className="text-ui-warning shrink-0" />
+          <span>
+            {label(
+              "文档超过 5 MB 对比上限，无法在交互界面直接展开合并差异视图。",
+              "One or both documents exceed the 5 MB interactive compare limit.",
+            )}
+          </span>
+        </div>
+      ) : (
+        <div
+          ref={hostRef}
+          data-testid="notepad-compare-merge-view"
+          className="h-96 overflow-auto border border-[var(--taomni-divider)] rounded"
+        />
+      )}
+    </NotepadDialog>
   );
 }

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import source from "../../src-tauri/src/qa_driver_keyboard.js?raw";
 
-type Activate = (el: HTMLButtonElement, type: string, key: string, event: { defaultPrevented: boolean }, modifiers: Record<string, boolean>) => void;
+type Activate = (el: HTMLElement, type: string, key: string, event: { defaultPrevented: boolean }, modifiers: Record<string, boolean>) => void;
 const createKeyboard = new Function(source + "\nreturn createQaButtonKeyboard;")() as () => Activate;
 
 describe("macOS QA button keyboard defaults", () => {
@@ -48,5 +48,36 @@ describe("macOS QA button keyboard defaults", () => {
     button.blur();
     activate(button, "keyup", " ", event, modifiers);
     expect(clicked).not.toHaveBeenCalled();
+  });
+
+  it("toggles an enabled checkbox only on unmodified Space release and ignores Enter", () => {
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    document.body.appendChild(checkbox);
+    checkbox.focus();
+
+    activate(checkbox, "keydown", "Enter", event, modifiers);
+    activate(checkbox, "keyup", "Enter", event, modifiers);
+    expect(checkbox.checked).toBe(false);
+
+    activate(checkbox, "keydown", " ", event, modifiers);
+    expect(checkbox.checked).toBe(false);
+    activate(checkbox, "keyup", " ", event, modifiers);
+    expect(checkbox.checked).toBe(true);
+
+    activate(checkbox, "keydown", " ", { defaultPrevented: true }, modifiers);
+    activate(checkbox, "keyup", " ", event, modifiers);
+    activate(checkbox, "keydown", " ", event, { ...modifiers, Control: true });
+    activate(checkbox, "keyup", " ", event, { ...modifiers, Control: true });
+    activate(checkbox, "keydown", " ", event, modifiers);
+    checkbox.blur();
+    activate(checkbox, "keyup", " ", event, modifiers);
+    checkbox.focus();
+    checkbox.disabled = true;
+    activate(checkbox, "keydown", " ", event, modifiers);
+    activate(checkbox, "keyup", " ", event, modifiers);
+    expect(checkbox.checked).toBe(true);
+
+    checkbox.remove();
   });
 });

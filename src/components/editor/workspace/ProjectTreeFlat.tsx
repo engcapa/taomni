@@ -42,7 +42,7 @@ export function matchingFlatFileRows(
   }
   if (state.error && !state.entries.length) {
     return [{ key: `${root.id}:flat-message`, render: () => (
-      <div className="m-2 rounded border border-red-500/30 bg-red-500/10 p-2 text-[12px] text-red-500">
+      <div className="m-2 rounded border border-ui-danger-border bg-ui-danger-surface p-2 text-ui-body text-ui-danger">
         {state.error}
       </div>
     ) }];
@@ -83,7 +83,7 @@ export function matchingFlatFileRows(
             >
               <Folder className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
               <span>{group}</span>
-              <span className="ml-auto text-[10px] font-normal">{groupEntries.length}</span>
+              <span className="ml-auto text-ui-caption font-normal">{groupEntries.length}</span>
             </div>
     ) });
     for (const entry of groupEntries) {
@@ -143,15 +143,15 @@ export function matchingFlatFileRows(
   }
   // Async status changes must not move already published, clickable results.
   if (state.loading) rows.push({ key: `${root.id}:searching`, render: () => (
-    <div className="flex items-center gap-2 px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]" role="status">
+    <div className="flex items-center gap-2 px-3 py-1 text-ui-small text-[var(--taomni-code-muted)]" role="status">
       <Loader2 className="w-3.5 h-3.5 animate-spin" />Searching workspace…
     </div>
   ) });
   if (state.error) rows.push({ key: `${root.id}:search-error`, render: () => (
-    <div className="px-3 py-1 text-[11px] text-red-500" role="status">Some folders could not be searched: {state.error}</div>
+    <div className="px-3 py-1 text-ui-small text-ui-danger" role="status">Some folders could not be searched: {state.error}</div>
   ) });
   if (state.truncated) rows.push({ key: `${root.id}:truncated`, render: () => (
-    <div className="px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]">{treeFilter.trim() ? "Partial results; narrow your search" : `Showing first ${FLAT_VIEW_MAX_FILES} files`}</div>
+    <div className="px-3 py-1 text-ui-small text-[var(--taomni-code-muted)]">{treeFilter.trim() ? "Partial results; narrow your search" : `Showing first ${FLAT_VIEW_MAX_FILES} files`}</div>
   ) });
   return rows;
 }

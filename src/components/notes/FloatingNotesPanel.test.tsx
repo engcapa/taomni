@@ -105,8 +105,8 @@ describe("FloatingNotesPanel", () => {
     useNotesStore.setState({ panelMode: "floating", alwaysOnTopInApp: true });
     render(<FloatingNotesPanel />);
     const panel = await screen.findByTestId("floating-notes-panel");
-    // Stays below modal dialogs (z-50) but above normal content.
-    expect(panel.className).toContain("z-40");
+    // A pinned note stays above other docked panels.
+    expect(panel.className).toContain("z-[var(--taomni-z-popover)]");
     expect(panel).toHaveAttribute("data-always-on-top", "true");
   });
 

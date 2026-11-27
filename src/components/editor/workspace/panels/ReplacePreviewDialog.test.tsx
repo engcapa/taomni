@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReplacePreviewDialog, stableUsageKey } from "./ReplacePreviewDialog";
@@ -126,13 +127,15 @@ describe("ED-PARITY-006: seeded exclusion, summary and keyboard", () => {
     expect(onCommit).not.toHaveBeenCalled();
   });
 
-  it("commits from Enter on the dialog but not from a checkbox", () => {
+  it("commits from Enter on the primary action and leaves checkboxes independent", async () => {
     const { onCommit } = renderParityDialog();
-    const dialog = screen.getByTestId("code-workspace-replace-preview");
+    const user = userEvent.setup();
     const checkbox = screen.getAllByTestId("code-workspace-replace-usage")[0]!;
-    fireEvent.keyDown(checkbox, { key: "Enter" });
+    checkbox.focus();
+    await user.keyboard("{Enter}");
     expect(onCommit).not.toHaveBeenCalled();
-    fireEvent.keyDown(dialog, { key: "Enter" });
+    screen.getByTestId("code-workspace-replace-commit").focus();
+    await user.keyboard("{Enter}");
     expect(onCommit).toHaveBeenCalledTimes(1);
   });
 
@@ -170,9 +173,10 @@ describe("ED-PARITY-006: seeded exclusion, summary and keyboard", () => {
     expect(props.onCommit).not.toHaveBeenCalled();
   });
 
-  it("Enter on Cancel cancels without committing", () => {
+  it("Enter on Cancel cancels without committing", async () => {
     const { onCommit, onCancel } = renderParityDialog();
-    fireEvent.keyDown(screen.getByTestId("code-workspace-replace-cancel"), { key: "Enter" });
+    screen.getByTestId("code-workspace-replace-cancel").focus();
+    await userEvent.keyboard("{Enter}");
     expect(onCancel).toHaveBeenCalledOnce();
     expect(onCommit).not.toHaveBeenCalled();
   });

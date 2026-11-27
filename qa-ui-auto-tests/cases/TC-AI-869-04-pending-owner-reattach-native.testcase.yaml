@@ -1,0 +1,271 @@
+id: TC-AI-869-04-pending-owner-reattach-native
+title: Pending approval follows its detached session back to the main window
+covers:
+- F-AI-2.4
+- F6.3
+fixtures:
+- reset_db
+modes:
+- native
+tags:
+- ai
+- approval
+- ui-contract
+- window
+ui_standard:
+- UI-WIN-05
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-witness
+- fill:
+    selector: input[aria-label="Keyboard shortcut"]
+    value: Ctrl+Alt+8
+- set_check:
+    checked: true
+    selector: '[data-testid="session-open-new-window"]'
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-witness"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-witness"]'
+- press: Control+Alt+8
+- switch_window:
+    selector: '[data-testid="detached-session-window"][aria-label*="qa-witness"]'
+    timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    timeout_sec: 90
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-origin
+- fill:
+    selector: input[aria-label="Keyboard shortcut"]
+    value: Ctrl+Alt+7
+- set_check:
+    checked: true
+    selector: '[data-testid="session-open-new-window"]'
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-origin"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-origin"]'
+- press: Control+Alt+7
+- switch_window:
+    selector: '[data-testid="detached-session-window"][aria-label*="qa-origin"]'
+    timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- seed_storage:
+    key: qa.agentApproval.threadId
+    value: '"qa-handoff-allow"'
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"own"'
+- press: Control+Alt+Shift+F9
+- wait_for: '[data-testid="ai-chat-safety-gate"]'
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    timeout_sec: 90
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 0
+- switch_window:
+    selector: '[data-testid="detached-session-window"][aria-label*="qa-origin"]'
+    timeout_sec: 90
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    timeout_sec: 90
+    close_with: '[data-testid="detached-reattach"]'
+- wait_for: '[data-testid="ai-chat-safety-gate"][data-source-window][data-queue-length="1"]'
+- assert_text:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    contains: qa-origin
+- switch_window:
+    selector: '[data-testid="detached-session-window"][aria-label*="qa-witness"]'
+    timeout_sec: 90
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 0
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    timeout_sec: 90
+- click: '[data-testid="ai-chat-cc-permission-allow"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: detached
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"read-result"'
+- press: Control+Alt+Shift+F9
+- eval_readonly:
+    expression: localStorage.getItem('qa.agentApproval.lastResult')||''
+    contains: '"decision":"allow"'
+- click: '[data-testid="side-tab-sessions"]'
+- press: Control+Alt+7
+- switch_window:
+    selector: '[data-testid="detached-session-window"][aria-label*="qa-origin"]'
+    timeout_sec: 90
+- seed_storage:
+    key: qa.agentApproval.threadId
+    value: '"qa-handoff-deny"'
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"own"'
+- press: Control+Alt+Shift+F9
+- wait_for: '[data-testid="ai-chat-safety-gate"]'
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    timeout_sec: 90
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 0
+- switch_window:
+    selector: '[data-testid="detached-session-window"][aria-label*="qa-origin"]'
+    timeout_sec: 90
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    timeout_sec: 90
+    close_with: '[data-testid="detached-reattach"]'
+- wait_for: '[data-testid="ai-chat-safety-gate"][data-source-window][data-queue-length="1"]'
+- assert_text:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    contains: qa-origin
+- switch_window:
+    selector: '[data-testid="detached-session-window"][aria-label*="qa-witness"]'
+    timeout_sec: 90
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 0
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    timeout_sec: 90
+- click: '[data-testid="ai-chat-cc-permission-deny"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: detached
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"read-result"'
+- press: Control+Alt+Shift+F9
+- eval_readonly:
+    expression: localStorage.getItem('qa.agentApproval.lastResult')||''
+    contains: '"decision":"deny"'
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 0
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: handoff-allow
+    ui_standard:
+    - UI-WIN-05
+    requirement: Reattach a pending request and allow it once in the main window.
+    actions:
+    - 36
+    - 38
+    - 40
+    - 41
+    - 44
+    - 46
+    - 47
+    - 50
+    checkpoints:
+    - step: 37
+      expectation: Original owner receives the pending request.
+    - step: 39
+      expectation: Main window is initially clear.
+    - step: 42
+      expectation: One transferred approval is actionable.
+    - step: 43
+      expectation: The transferred card identifies the source session.
+    - step: 45
+      expectation: The third window receives no card.
+    - step: 48
+      expectation: The resolved card disappears.
+    - step: 51
+      expectation: The original backend waiter receives allow.
+    results:
+    - 37
+    - 39
+    - 42
+    - 43
+    - 45
+    - 48
+    - 51
+  - id: handoff-deny
+    ui_standard:
+    - UI-WIN-05
+    requirement: Reattach a pending request and deny it once in the main window.
+    actions:
+    - 57
+    - 59
+    - 61
+    - 62
+    - 65
+    - 67
+    - 68
+    - 71
+    checkpoints:
+    - step: 58
+      expectation: Original owner receives the pending request.
+    - step: 60
+      expectation: Main window is initially clear.
+    - step: 63
+      expectation: One transferred approval is actionable.
+    - step: 64
+      expectation: The transferred card identifies the source session.
+    - step: 66
+      expectation: The third window receives no card.
+    - step: 69
+      expectation: The resolved card disappears.
+    - step: 72
+      expectation: The original backend waiter receives deny.
+    results:
+    - 58
+    - 60
+    - 63
+    - 64
+    - 66
+    - 69
+    - 72
+  - id: after-reload
+    ui_standard:
+    - UI-WIN-05
+    requirement: After a reload, completed requests stay dismissed.
+    actions:
+    - 73
+    checkpoints:
+    - step: 75
+      expectation: No approval card.
+    - step: 76
+      expectation: No runtime errors.
+    results:
+    - 75
+    - 76
+  visual:
+  - check: The main window shows the originating session name on the pending card.
+    method: automated
+    reason: The test reads the visible card text after each reattach.
+  native:
+  - check: The original provider waiter receives the decision after its original WebView is destroyed.
+    method: automated
+    reason: The surviving window queries the isolated backend probe after accepting or denying the original request.

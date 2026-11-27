@@ -109,7 +109,7 @@ export function RestoreLastSessionRow({
         id={statusId}
         data-testid="welcome-restore-status"
         data-state={view.state}
-        className="min-w-0 flex-1 text-[12px] text-[var(--taomni-text-muted)]"
+        className="min-w-0 flex-1 text-ui-body text-[var(--taomni-text-muted)]"
         role={view.state === "failed" ? "alert" : "status"}
       >
         <span className="block truncate" title={[statusText, summary].filter(Boolean).join(" · ")}>

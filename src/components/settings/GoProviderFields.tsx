@@ -16,11 +16,11 @@ export function GoProviderFields({ provider, onChange, blocked }: {
       onChange={(model) => onChange({ ...provider, model: model || "deepseek-v4.1-flash" })} />
     <GoCatalogStatus blocked={blocked} />
     <details data-testid="go-protocols">
-      <summary className="cursor-pointer text-[12px]">{t("opencodeGo.protocols")}</summary>
+      <summary className="cursor-pointer text-ui-body">{t("opencodeGo.protocols")}</summary>
       <div className="max-h-64 overflow-auto space-y-1">
         {models.map((model) => {
           const override = provider.protocol_overrides?.[model.id];
-          return <div key={model.id} data-testid="go-protocol-row" data-model={model.id} className="flex flex-wrap items-center gap-2 text-[11px]">
+          return <div key={model.id} data-testid="go-protocol-row" data-model={model.id} className="flex flex-wrap items-center gap-2 text-ui-small">
             <span className="flex-1 min-w-0"><GoModelLabel model={effectiveGoModels([model], provider.protocol_overrides)[0]} /></span>
             <select data-testid="go-protocol-select" aria-label={`${model.name} ${t("opencodeGo.protocols")}`}
               value={override ? (GO_PROTOCOLS.includes(override as typeof GO_PROTOCOLS[number]) ? override : "chat") : model.protocol}

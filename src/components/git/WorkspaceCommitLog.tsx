@@ -236,13 +236,13 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
             {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           </div>
           {error && (
-            <div className="shrink-0 px-3 py-1 text-[11px] text-red-500 border-b border-[var(--taomni-divider)]">
+            <div className="shrink-0 px-3 py-1 text-ui-small text-ui-danger border-b border-[var(--taomni-divider)]">
               {error}
             </div>
           )}
           <div className="flex-1 min-h-0 overflow-auto">
             {entries.length === 0 ? (
-              <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+              <div className="h-full min-h-24 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
                 {loading ? "Loading..." : "No commits"}
               </div>
             ) : entries.map((entry) => {
@@ -280,25 +280,25 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
                   <GraphCell row={graphRow} maxWidth={maxGraphWidth} />
                   <div className="min-w-0 flex-1 py-2">
                     <div className="flex items-start gap-1 min-w-0">
-                      <span className="shrink-0 mt-0.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
+                      <span className="shrink-0 mt-0.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-ui-caption text-[var(--taomni-text-muted)]">
                         {entry.repoName}
                       </span>
                       {entry.refs.slice(0, 3).map((ref) => (
                         <span
                           key={ref}
-                          className="shrink-0 mt-0.5 text-[10px] px-1 rounded bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
+                          className="shrink-0 mt-0.5 text-ui-caption px-1 rounded bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
                         >
                           {ref}
                         </span>
                       ))}
-                      <span className="min-w-0 text-[12px] leading-4 font-medium line-clamp-2">{entry.subject}</span>
+                      <span className="min-w-0 text-ui-body leading-4 font-medium line-clamp-2">{entry.subject}</span>
                     </div>
                     {commitBodyPreview(entry) && (
-                      <div className="mt-0.5 text-[11px] leading-4 text-[var(--taomni-text-muted)] line-clamp-1">
+                      <div className="mt-0.5 text-ui-small leading-4 text-[var(--taomni-text-muted)] line-clamp-1">
                         {commitBodyPreview(entry)}
                       </div>
                     )}
-                    <div className="mt-1 text-[11px] text-[var(--taomni-text-muted)] truncate">
+                    <div className="mt-1 text-ui-small text-[var(--taomni-text-muted)] truncate">
                       <span className="taomni-mono text-[var(--taomni-accent)]">{entry.shortOid}</span> · {entry.authorName} · {formatDate(entry.date)}
                     </div>
                   </div>
@@ -308,7 +308,7 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
             })}
             {entries.length >= limit && (
               <button
-                className="w-full py-2 text-[12px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)] inline-flex items-center justify-center gap-1"
+                className="w-full py-2 text-ui-body text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)] inline-flex items-center justify-center gap-1"
                 type="button"
                 disabled={loading || busy}
                 onClick={() => setLimit((current) => current + 120)}
@@ -326,10 +326,10 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
         <Panel id="workspace-log-details" defaultSize="58%" minSize="35%" className="min-w-0 min-h-0">
           <PanelGroup orientation="vertical" id="workspace-git-log-detail-layout">
             <Panel id="workspace-log-files" defaultSize="30%" minSize="15%" className="min-h-0 flex flex-col border-b border-[var(--taomni-divider)]">
-              <div className="h-8 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] text-[12px] font-semibold">
+              <div className="h-8 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] text-ui-body font-semibold">
                 {selected ? (
                   <>
-                    <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1.5 py-0.5 text-[10px] text-[var(--taomni-text-muted)]">
+                    <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1.5 py-0.5 text-ui-caption text-[var(--taomni-text-muted)]">
                       {selected.repoName}
                     </span>
                     <span className="min-w-0 truncate">{selected.shortOid} · {files.length} file(s)</span>
@@ -338,7 +338,7 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
               </div>
               <div className="flex-1 min-h-0 overflow-auto">
                 {files.length === 0 ? (
-                  <div className="h-full min-h-16 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+                  <div className="h-full min-h-16 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
                     {selected ? "No file changes" : "Select a commit"}
                   </div>
                 ) : files.map((file) => (
@@ -360,11 +360,11 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
                     <span
                       data-testid="git-log-file-status"
                       data-change-status={file.status}
-                      className={`shrink-0 w-[58px] text-center rounded px-1 py-0.5 text-[10px] uppercase ${gitChangeStatusColor(file.status)}`}
+                      className={`shrink-0 w-[58px] text-center rounded px-1 py-0.5 text-ui-caption uppercase ${gitChangeStatusColor(file.status)}`}
                     >
                       {file.status}
                     </span>
-                    <span className="truncate text-[12px]">{file.path}</span>
+                    <span className="truncate text-ui-body">{file.path}</span>
                   </button>
                 ))}
               </div>

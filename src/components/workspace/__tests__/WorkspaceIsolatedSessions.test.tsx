@@ -119,6 +119,29 @@ describe("Workspace isolated sessions (TASK-07)", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("UT-WS-07-02b picker opens as top-layer dialog, guards IME Escape, and restores opener focus", () => {
+    const opener = document.createElement("button");
+    document.body.append(opener);
+    opener.focus();
+    const onClose = vi.fn();
+
+    const view = render(<WorkspaceSessionPickerModal open workspaceId={DEFAULT_WORKSPACE_ID} onClose={onClose} />);
+    const dialog = screen.getByTestId("workspace-session-picker-modal");
+    expect(dialog.tagName).toBe("DIALOG");
+    const search = screen.getByTestId("workspace-session-picker-search");
+    expect(search).toHaveFocus();
+
+    fireEvent.keyDown(search, { key: "Escape", isComposing: true });
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(search, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    view.rerender(<WorkspaceSessionPickerModal open={false} workspaceId={DEFAULT_WORKSPACE_ID} onClose={onClose} />);
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
+
   it("UT-WS-07-03 opens a session from the rail sessions tool window", () => {
     const onOpenSession = vi.fn((sessionConfig: SessionConfig) => {
       useWorkspacePlatformStore.getState().openSessionInWorkspace(DEFAULT_WORKSPACE_ID, sessionConfig);

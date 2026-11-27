@@ -10,7 +10,18 @@ on:
       module:
         description: Stable module slug to release
         required: true
-        type: string
+        type: choice
+        options:
+          - ai-voice-local
+          - mail
+          - mfa
+          - rdp-client
+          - rdp-server
+          - screenshot
+          - servers
+          - sockscap
+          - vnc-client
+          - vnc-server
       head:
         description: Commit or ref containing the module change
         required: false

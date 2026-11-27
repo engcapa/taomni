@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../crates/taomni-plugin-api/frontend/ui/IconButton";
 import { Trash2 } from "lucide-react";
 import { type Decision, type RuleMode, type SocksCapConfig, type SocksCapProfile, type UserRule } from "../../../../../src/lib/sockscap";
 import { Field } from "./Field";
@@ -29,7 +30,7 @@ export function RulesSection(viewProps: RulesSectionProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
         <Field label={viewProps.t("sockscap.ruleMode")}>
           <select
-            className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+            className="w-full text-ui-body px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
             value={viewProps.selectedProf.ruleMode}
             onChange={(e) =>
               void viewProps.patchSelectedProfile({ ruleMode: e.target.value as RuleMode })
@@ -42,7 +43,7 @@ export function RulesSection(viewProps: RulesSectionProps) {
         </Field>
         <Field label={viewProps.t("sockscap.defaultAction")}>
           <select
-            className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+            className="w-full text-ui-body px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
             value={viewProps.selectedProf.defaultAction}
             onChange={(e) =>
               void viewProps.patchSelectedProfile({ defaultAction: e.target.value as Decision })
@@ -57,18 +58,18 @@ export function RulesSection(viewProps: RulesSectionProps) {
 
       {/* User rules table for selected profile */}
       <div className="space-y-2">
-        <div className="text-[11px] font-medium text-[var(--taomni-text-muted)]">
+        <div className="text-ui-small font-medium text-[var(--taomni-text-muted)]">
           {viewProps.t("sockscap.userRulesTitle")}
         </div>
         <div className="flex gap-2">
           <input
-            className="flex-1 text-[12px] px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+            className="flex-1 text-ui-body px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
             placeholder={viewProps.t("sockscap.patternPh")}
             value={viewProps.newRule.pattern}
             onChange={(e) => viewProps.setNewRule({ ...viewProps.newRule, pattern: e.target.value })}
           />
           <select
-            className="text-[12px] px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+            className="text-ui-body px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
             value={viewProps.newRule.action}
             onChange={(e) =>
               viewProps.setNewRule({ ...viewProps.newRule, action: e.target.value as Decision })
@@ -80,7 +81,7 @@ export function RulesSection(viewProps: RulesSectionProps) {
           </select>
           <button
             type="button"
-            className="px-3 py-1 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90"
+            className="px-3 py-1 rounded text-ui-body bg-[var(--taomni-accent)] text-white hover:opacity-90"
             onClick={() => void viewProps.addUserRule()}
           >
             {viewProps.t("common.add")}
@@ -88,21 +89,21 @@ export function RulesSection(viewProps: RulesSectionProps) {
         </div>
 
         {viewProps.selectedProf.userRules.length === 0 ? (
-          <div className="text-[11px] text-[var(--taomni-text-muted)]">{viewProps.t("sockscap.userRulesEmpty")}</div>
+          <div className="text-ui-small text-[var(--taomni-text-muted)]">{viewProps.t("sockscap.userRulesEmpty")}</div>
         ) : (
           <ul className="space-y-1 max-h-36 overflow-auto">
             {viewProps.selectedProf.userRules.map((r, idx) => (
               <li
                 key={`${r.pattern}-${idx}`}
-                className="flex items-center gap-2 text-[12px] px-2 py-1 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
+                className="flex items-center gap-2 text-ui-body px-2 py-1 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
               >
                 <span className="font-mono flex-1">{r.pattern}</span>
-                <span className="text-[11px] text-[var(--taomni-text-muted)] uppercase">
+                <span className="text-ui-small text-[var(--taomni-text-muted)] uppercase">
                   {r.action}
                 </span>
-                <button
+                <IconButton label={viewProps.t("iconActions.removeRule")}
                   type="button"
-                  className="p-1 hover:text-red-500"
+                  className="p-1 hover:text-ui-danger"
                   onClick={() =>
                     void viewProps.patchSelectedProfile({
                       userRules: viewProps.selectedProf.userRules.filter((_, i) => i !== idx),
@@ -110,7 +111,7 @@ export function RulesSection(viewProps: RulesSectionProps) {
                   }
                 >
                   <Trash2 className="w-3 h-3" />
-                </button>
+                </IconButton>
               </li>
             ))}
           </ul>

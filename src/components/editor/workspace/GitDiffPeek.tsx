@@ -47,9 +47,9 @@ export function GitDiffPeek({
           onClose();
         }
       }}
-      className="absolute left-10 top-3 z-20 max-h-[70%] w-[min(640px,calc(100%-4rem))] overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-2xl"
+      className="absolute left-10 top-3 z-[var(--taomni-z-popover)] max-h-[70%] w-[min(640px,calc(100%-4rem))] overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-2xl"
     >
-      <div className="flex h-8 items-center gap-1 border-b border-[var(--taomni-code-border)] px-2 text-[10px] text-[var(--taomni-code-muted)]">
+      <div className="flex h-8 items-center gap-1 border-b border-[var(--taomni-code-border)] px-2 text-ui-caption text-[var(--taomni-code-muted)]">
         {onPrevious && (
           <button
             type="button"
@@ -133,15 +133,15 @@ export function GitDiffPeek({
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="max-h-[360px] overflow-auto font-mono text-[11px] leading-5">
+      <div className="max-h-[360px] overflow-auto font-mono text-ui-small leading-5">
         {change.oldText && change.oldText.split("\n").map((line, lineIndex) => (
-          <div key={`old:${lineIndex}`} data-testid="git-diff-peek-old-line" className="flex bg-red-500/10 text-red-400">
+          <div key={`old:${lineIndex}`} data-testid="git-diff-peek-old-line" className="flex bg-ui-danger-surface text-ui-danger">
             <span className="w-7 shrink-0 select-none text-center opacity-60">−</span>
             <pre className="min-w-0 flex-1 whitespace-pre-wrap break-all pr-2">{line || " "}</pre>
           </div>
         ))}
         {change.newText && change.newText.split("\n").map((line, lineIndex) => (
-          <div key={`new:${lineIndex}`} data-testid="git-diff-peek-new-line" className="flex bg-green-500/10 text-green-400">
+          <div key={`new:${lineIndex}`} data-testid="git-diff-peek-new-line" className="flex bg-ui-success-surface text-ui-success">
             <span className="w-7 shrink-0 select-none text-center opacity-60">+</span>
             <pre className="min-w-0 flex-1 whitespace-pre-wrap break-all pr-2">{line || " "}</pre>
           </div>

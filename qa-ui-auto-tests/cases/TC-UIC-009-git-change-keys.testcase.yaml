@@ -1,0 +1,59 @@
+id: TC-UIC-009-git-change-keys
+title: Keyboard selection in Git Changes stays independent from the staging checkbox
+covers: [F26.2]
+modes: [browser, native]
+fixtures: [reset_db, git_change_types]
+tags: [ui-contract, git, keyboard]
+ui_standard: [UI-A11Y-01, UI-LST-03, UI-FND-03c]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-git-presentation
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace (\u9ed8\u8ba4\u5de5\u4f5c\u533a)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"repo-b","path":"${fixture.parity008_root}/repo-b","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="code-workspace-tool-rail-git"]'
+- wait_for: '[data-testid="git-panel"]'
+- wait_for: '[data-testid="git-change-row"]:has([data-change-status="added"])'
+- press: {selector: '[data-testid="git-change-row"]:has([data-change-status="added"])', key: Enter}
+- assert_attribute: {selector: '[data-testid="git-change-row"]:has([data-change-status="added"])', name: aria-pressed, equals: 'true'}
+- press: {selector: '[data-testid="git-change-row"]:has([data-change-status="modified"])', key: Space}
+- assert_attribute: {selector: '[data-testid="git-change-row"]:has([data-change-status="modified"])', name: aria-pressed, equals: 'true'}
+- assert_attribute: {selector: '[data-testid="git-change-row"]:has([data-change-status="added"])', name: aria-pressed, equals: 'false'}
+- click: 'button[aria-label="Cycle application theme"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: light}
+- assert_solid_text_contrast: {selector: '[data-testid="git-change-row"] [data-change-status="added"]', minimum: 4.5, composite_ancestors: true}
+- click: 'button[aria-label="Cycle application theme"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: dark}
+- assert_solid_text_contrast: {selector: '[data-testid="git-change-row"] [data-change-status="added"]', minimum: 4.5, composite_ancestors: true}
+- assert_solid_text_contrast: {selector: '[data-testid="git-change-row"][aria-pressed="true"] [data-change-status="modified"]', minimum: 4.5, composite_ancestors: true}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-A11Y-01, UI-LST-03]
+    requirement: Enter and Space select the target change in the active repository without keeping the prior selection.
+    actions: [12, 14]
+    checkpoints:
+    - {step: 13, expectation: The added file is selected.}
+    - {step: 15, expectation: The modified file is selected after Space.}
+    - {step: 16, expectation: The previous selection has cleared.}
+    results: [13, 15, 16]
+  - id: status-contrast
+    ui_standard: [UI-FND-03c]
+    requirement: The added file and the selected modified file retain distinct, readable status badges as the application theme changes.
+    actions: [14, 17, 20]
+    checkpoints:
+    - {step: 19, expectation: The added badge reaches 4.5 to 1 in light mode.}
+    - {step: 22, expectation: The added badge reaches 4.5 to 1 over its dark row.}
+    - {step: 23, expectation: The modified badge remains legible over the selected dark row.}
+    results: [19, 22, 23]
+  visual:
+  - {check: Selection, method: automated, reason: Observes the displayed Git change selection in the real list.}
+  native:
+  - {check: Native Git, method: automated, reason: Uses the packaged Git panel with a disposable repository.}

@@ -7,6 +7,7 @@
  *  1. SessionEditor (for persisting mappings to options_json)
  *  2. FileBrowser toolbar (for runtime view/edit of the active session's mappings)
  */
+import { IconButton } from "../ui/IconButton";
 import { useState, useCallback } from "react";
 import { Plus, Trash2, FolderOpen, AlertTriangle } from "lucide-react";
 import type { SftpPathMapping } from "../../types";
@@ -80,23 +81,23 @@ export function PathMappingsEditor({
     ? "grid grid-cols-[1fr_1fr_auto] gap-1 items-center"
     : "grid grid-cols-[1fr_1fr_auto] gap-2 items-center";
 
-  const inputCls = "taomni-input w-full text-[11px]";
+  const inputCls = "taomni-input w-full text-ui-small";
 
   return (
     <div
       data-testid="sftp-path-mappings-editor"
-      className={compact ? "text-[11px]" : "text-[12px]"}
+      className={compact ? "text-ui-small" : "text-ui-body"}
     >
       {/* Header row */}
       <div className={`${rowCls} mb-1 text-[var(--taomni-text-muted)] font-medium`}>
-        <span className="text-[11px]">{t("pathMappings.colLocalPath")}</span>
-        <span className="text-[11px]">{t("pathMappings.colRemotePath")}</span>
+        <span className="text-ui-small">{t("pathMappings.colLocalPath")}</span>
+        <span className="text-ui-small">{t("pathMappings.colRemotePath")}</span>
         <span />
       </div>
 
       {mappings.length === 0 && (
         <div
-          className="py-2 text-center text-[var(--taomni-text-muted)] text-[11px] rounded border border-dashed"
+          className="py-2 text-center text-[var(--taomni-text-muted)] text-ui-small rounded border border-dashed"
           style={{ borderColor: "var(--taomni-divider)" }}
         >
           {t("pathMappings.empty")}
@@ -117,7 +118,7 @@ export function PathMappingsEditor({
             {/* Local path */}
             <div className="flex items-center gap-1 min-w-0">
               <input
-                className={`${inputCls} ${localEmpty ? "border-amber-500" : ""}`}
+                className={`${inputCls} ${localEmpty ? "border-ui-warning-border" : ""}`}
                 value={mapping.localPath}
                 placeholder={t("pathMappings.localPlaceholder")}
                 aria-label={t("pathMappings.localPathAria", { index: String(index + 1) })}
@@ -125,16 +126,16 @@ export function PathMappingsEditor({
                 data-testid={`path-mapping-local-${index}`}
               />
               {canBrowseLocal && onBrowseLocal && (
-                <button
+                <IconButton
                   type="button"
                   className="px-1 py-0.5 hover:bg-[var(--taomni-hover)] rounded shrink-0"
-                  title={t("pathMappings.browseLocalTitle")}
+                  label={t("pathMappings.browseLocalTitle")}
                   disabled={validating[index]}
                   onClick={() => void handleBrowseLocal(index)}
                   data-testid={`path-mapping-browse-local-${index}`}
                 >
                   <FolderOpen className="w-3 h-3" />
-                </button>
+                </IconButton>
               )}
             </div>
 
@@ -143,12 +144,12 @@ export function PathMappingsEditor({
               {hasWarning && (
                 <span title={t("pathMappings.warningIncomplete")}>
                   <AlertTriangle
-                    className="w-3 h-3 shrink-0 text-amber-500"
+                    className="w-3 h-3 shrink-0 text-ui-warning"
                   />
                 </span>
               )}
               <input
-                className={`${inputCls} ${remoteEmpty ? "border-amber-500" : ""}`}
+                className={`${inputCls} ${remoteEmpty ? "border-ui-warning-border" : ""}`}
                 value={mapping.remotePath}
                 placeholder={t("pathMappings.remotePlaceholder")}
                 aria-label={t("pathMappings.remotePathAria", { index: String(index + 1) })}
@@ -158,22 +159,22 @@ export function PathMappingsEditor({
             </div>
 
             {/* Remove button */}
-            <button
+            <IconButton
               type="button"
-              className="px-1 py-0.5 hover:bg-red-100 dark:hover:bg-red-900/20 hover:text-red-600 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0"
-              title={t("pathMappings.removeTitle")}
+              className="px-1 py-0.5 hover:bg-ui-danger-surface hover:text-ui-danger rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0"
+              label={t("pathMappings.removeTitle")}
               onClick={() => handleRemove(index)}
               data-testid={`path-mapping-remove-${index}`}
             >
               <Trash2 className="w-3 h-3" />
-            </button>
+            </IconButton>
           </div>
         );
       })}
 
       <button
         type="button"
-        className="mt-1 px-2 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-accent)] text-[11px]"
+        className="mt-1 px-2 py-0.5 inline-flex items-center gap-1 rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-accent)] text-ui-small"
         onClick={handleAdd}
         data-testid="path-mapping-add"
       >

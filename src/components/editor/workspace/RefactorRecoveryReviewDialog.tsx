@@ -1,3 +1,4 @@
+import { ModalSurface } from "../../ui/ModalSurface";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import type {
@@ -92,16 +93,13 @@ export function RefactorRecoveryReviewDialog({
     setConfirmingDismiss(false);
   }, [entry.recoveryId]);
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      if (busy) return;
-      if (confirmingDismiss) {
-        setConfirmingDismiss(false);
-        return;
-      }
-      onClose();
+  const cancelReview = () => {
+    if (busy) return;
+    if (confirmingDismiss) {
+      setConfirmingDismiss(false);
+      return;
     }
+    onClose();
   };
 
   const rows = useMemo(() => {
@@ -156,176 +154,165 @@ export function RefactorRecoveryReviewDialog({
   const affectedCount = rows.length;
 
   return (
-      <div
-        className="fixed inset-0 z-[940] flex items-center justify-center bg-black/45 p-4"
-        onClick={() => {
-          if (busy) return;
-          if (confirmingDismiss) {
-            setConfirmingDismiss(false);
-            return;
-          }
-          onClose();
-        }}
-        onKeyDown={handleKeyDown}
-      >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Review refactor recovery"
+      <ModalSurface
         data-testid="refactor-recovery-review"
-        className="flex max-h-[90vh] w-[min(640px,92vw)] flex-col overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
+        initialFocus="[data-testid=refactor-recovery-keep]"
+        onCancel={cancelReview}
+        aria-label="Review refactor recovery"
+        className="taomni-modal taomni-workspace-modal"
+        data-bleed="true"
+        style={{ width: "min(640px, calc(100vw - 32px))", height: "min(660px, 86vh)" }}
       >
         <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-semibold text-[var(--taomni-code-text)]">
-              Review refactor recovery
-            </div>
-            <div className="truncate text-[10px] text-[var(--taomni-code-muted)]">
-              {entry.kind} · {affectedCount} affected file{affectedCount === 1 ? "" : "s"} · {new Date(entry.createdAt).toLocaleString()}
-            </div>
+        <AlertTriangle className="h-4 w-4 shrink-0 text-ui-warning" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-ui-body font-semibold text-[var(--taomni-code-text)]">
+            Review refactor recovery
           </div>
-          <button
-            ref={closeRef}
-            type="button"
-            aria-label="Close recovery review"
-            title="Keep pending and close"
-            disabled={busy}
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
-            onClick={() => {
-              if (confirmingDismiss) {
-                setConfirmingDismiss(false);
-                return;
-              }
-              onClose();
-            }}
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="truncate text-ui-caption text-[var(--taomni-code-muted)]">
+            {entry.kind} · {affectedCount} affected file{affectedCount === 1 ? "" : "s"} · {new Date(entry.createdAt).toLocaleString()}
+          </div>
+        </div>
+        <button
+          ref={closeRef}
+          type="button"
+          aria-label="Close recovery review"
+          title="Keep pending and close"
+          disabled={busy}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
+          onClick={() => {
+            if (confirmingDismiss) {
+              setConfirmingDismiss(false);
+              return;
+            }
+            onClose();
+          }}
+        >
+          <X className="h-4 w-4" />
+        </button>
         </header>
 
         <div className="min-h-0 flex-1 overflow-auto px-3 py-2">
-          <div className="mb-1 text-[10px] text-[var(--taomni-code-muted)]">
-            Workspace: <span className="break-all font-mono">{workspaceRoot}</span>
+        <div className="mb-1 text-ui-caption text-[var(--taomni-code-muted)]">
+          Workspace: <span className="break-all font-mono">{workspaceRoot}</span>
+        </div>
+        <div className="mb-2 text-ui-small leading-5 text-[var(--taomni-code-text)]">
+          {overall === "already-restored"
+            ? "Every affected file already matches its pre-refactor content. Closing keeps no pending reminder."
+            : overall === "restorable"
+              ? "The recorded post-state is intact. Restoring moves relocated files back and writes pre-refactor content with read-back verification."
+              : "Some files cannot be restored automatically and will not be overwritten. Keeping or abandoning changes no files."}
+        </div>
+        {loading && (
+          <div className="mb-2 text-ui-small text-[var(--taomni-code-muted)]">
+            Loading and verifying the pending entry…
           </div>
-          <div className="mb-2 text-[11px] leading-5 text-[var(--taomni-code-text)]">
-            {overall === "already-restored"
-              ? "Every affected file already matches its pre-refactor content. Closing keeps no pending reminder."
-              : overall === "restorable"
-                ? "The recorded post-state is intact. Restoring moves relocated files back and writes pre-refactor content with read-back verification."
-                : "Some files cannot be restored automatically and will not be overwritten. Keeping or abandoning changes no files."}
+        )}
+        {error && (
+          <div className="mb-2 rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1.5 text-ui-small text-ui-danger" role="alert">
+            {error}
           </div>
-          {loading && (
-            <div className="mb-2 text-[11px] text-[var(--taomni-code-muted)]">
-              Loading and verifying the pending entry…
-            </div>
-          )}
-          {error && (
-            <div className="mb-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-300" role="alert">
-              {error}
-            </div>
-          )}
-          <ul className="flex flex-col gap-1.5">
-            {rows.map((row) => (
-              <li
-                key={row.key}
-                data-testid="refactor-recovery-resource"
-                className="rounded border border-[var(--taomni-code-border)] px-2 py-1.5"
-              >
-                <div className="break-all font-mono text-[11px] text-[var(--taomni-code-text)]" title={row.full}>
-                  {row.label}
-                </div>
-                <div className="mt-0.5 break-all text-[10px] text-[var(--taomni-code-muted)]" title={row.full}>
-                  {row.state} · <span className="select-text">{row.full}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-          {rows.length === 0 && (
-            <div className="py-4 text-center text-[11px] text-[var(--taomni-code-muted)]">
-              This entry records no files.
-            </div>
-          )}
-          <div className="mt-2 text-[10px] leading-4 text-[var(--taomni-code-muted)]">
-            Abandon ends only this record&apos;s reminder and keeps files exactly as they are now.
-            It never rebuilds deleted files or edits references.
-          </div>
-          {confirmingDismiss && (
-            <div
-              className="mt-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5"
-              data-testid="refactor-recovery-dismiss-confirm"
+        )}
+        <ul className="flex flex-col gap-1.5">
+          {rows.map((row) => (
+            <li
+              key={row.key}
+              data-testid="refactor-recovery-resource"
+              className="rounded border border-[var(--taomni-code-border)] px-2 py-1.5"
             >
-              <div className="text-[11px] font-semibold text-red-200">
-                Abandon recovery for {affectedCount} file{affectedCount === 1 ? "" : "s"}?
+              <div className="break-all font-mono text-ui-small text-[var(--taomni-code-text)]" title={row.full}>
+                {row.label}
               </div>
-              <div className="mt-0.5 break-all text-[11px] leading-4 text-red-100/90">
-                This ends only this reminder and keeps the current state (files stay missing as they are now).
-                It does not restore files, edit references, or affect other pending entries.
+              <div className="mt-0.5 break-all text-ui-caption text-[var(--taomni-code-muted)]" title={row.full}>
+                {row.state} · <span className="select-text">{row.full}</span>
               </div>
+            </li>
+          ))}
+        </ul>
+        {rows.length === 0 && (
+          <div className="py-4 text-center text-ui-small text-[var(--taomni-code-muted)]">
+            This entry records no files.
+          </div>
+        )}
+        <div className="mt-2 text-ui-caption leading-4 text-[var(--taomni-code-muted)]">
+          Abandon ends only this record&apos;s reminder and keeps files exactly as they are now.
+          It never rebuilds deleted files or edits references.
+        </div>
+        {confirmingDismiss && (
+          <div
+            className="mt-2 rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1.5"
+            data-testid="refactor-recovery-dismiss-confirm"
+          >
+            <div className="text-ui-small font-semibold text-ui-danger">
+              Abandon recovery for {affectedCount} file{affectedCount === 1 ? "" : "s"}?
             </div>
-          )}
+            <div className="mt-0.5 break-all text-ui-small leading-4 text-ui-danger">
+              This ends only this reminder and keeps the current state (files stay missing as they are now).
+              It does not restore files, edit references, or affect other pending entries.
+            </div>
+          </div>
+        )}
         </div>
 
         <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-3 py-2">
-          {confirmingDismiss ? (
-            <>
-              <button
-                ref={cancelDismissRef}
-                type="button"
-                data-testid="refactor-recovery-dismiss-cancel"
-                disabled={busy}
-                className="h-8 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
-                onClick={() => setConfirmingDismiss(false)}
-              >
-                Keep pending
-              </button>
-              <button
-                type="button"
-                data-testid="refactor-recovery-dismiss-confirm-button"
-                disabled={!canDismiss}
-                className="h-8 rounded bg-red-700 px-3 text-[11px] font-medium text-white hover:brightness-110 disabled:opacity-40"
-                onClick={onDismiss}
-              >
-                Abandon recovery
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                ref={keepRef}
-                type="button"
-                data-testid="refactor-recovery-keep"
-                disabled={busy}
-                className="h-8 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
-                onClick={onKeep}
-              >
-                Keep pending
-              </button>
-              <button
-                type="button"
-                data-testid="refactor-recovery-dismiss"
-                disabled={!canDismiss}
-                title="Abandon this recovery reminder; files stay as they are"
-                className="h-8 rounded px-3 text-[11px] hover:bg-red-500/15 hover:text-red-300 disabled:opacity-40"
-                onClick={() => setConfirmingDismiss(true)}
-              >
-                Abandon recovery…
-              </button>
-              <button
-                type="button"
-                data-testid="refactor-recovery-restore"
-                disabled={!canRestore}
-                title={canRestore ? "Restore pre-refactor content" : "Restore is available only when the recorded post-state is intact"}
-                className="h-8 rounded bg-[var(--taomni-accent)] px-3 text-[11px] font-medium text-white hover:brightness-110 disabled:opacity-40"
-                onClick={onRestore}
-              >
-                Restore files
-              </button>
-            </>
-          )}
+        {confirmingDismiss ? (
+          <>
+            <button
+              ref={cancelDismissRef}
+              type="button"
+              data-testid="refactor-recovery-dismiss-cancel"
+              disabled={busy}
+              className="h-8 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
+              onClick={() => setConfirmingDismiss(false)}
+            >
+              Keep pending
+            </button>
+            <button
+              type="button"
+              data-testid="refactor-recovery-dismiss-confirm-button"
+              disabled={!canDismiss}
+              data-danger="true"
+              className="taomni-btn h-8 rounded px-3 text-ui-small font-medium disabled:opacity-40"
+              onClick={onDismiss}
+            >
+              Abandon recovery
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              ref={keepRef}
+              type="button"
+              data-testid="refactor-recovery-keep"
+              disabled={busy}
+              className="h-8 rounded px-3 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
+              onClick={onKeep}
+            >
+              Keep pending
+            </button>
+            <button
+              type="button"
+              data-testid="refactor-recovery-dismiss"
+              disabled={!canDismiss}
+              title="Abandon this recovery reminder; files stay as they are"
+              className="h-8 rounded px-3 text-ui-small hover:bg-ui-danger-surface hover:text-ui-danger disabled:opacity-40"
+              onClick={() => setConfirmingDismiss(true)}
+            >
+              Abandon recovery…
+            </button>
+            <button
+              type="button"
+              data-testid="refactor-recovery-restore"
+              disabled={!canRestore}
+              title={canRestore ? "Restore pre-refactor content" : "Restore is available only when the recorded post-state is intact"}
+              className="h-8 rounded bg-[var(--taomni-accent)] px-3 text-ui-small font-medium text-white hover:brightness-110 disabled:opacity-40"
+              onClick={onRestore}
+            >
+              Restore files
+            </button>
+          </>
+        )}
         </footer>
-      </div>
-    </div>
+      </ModalSurface>
   );
 }

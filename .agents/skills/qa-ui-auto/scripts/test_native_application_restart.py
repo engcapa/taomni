@@ -658,6 +658,11 @@ assert.deepEqual(read(), {
   count: 1, title: 'Exit', message: message.textContent, confirm_label: 'Exit',
   confirm_count: 1, confirm_visible: true, confirm_enabled: true,
 });
+const headings = { action: element('Exit'), product: element('Taomni') };
+document.getElementById = id => headings[id];
+dialog.getAttribute = key => key === 'aria-labelledby' ? 'action product' : 'Legacy name';
+assert.equal(read().title, 'Exit Taomni');
+dialog.getAttribute = key => key === 'aria-label' ? 'Exit' : null;
 dialog.style.display = 'none';
 assert.equal(read(), null);
 dialog.style.display = 'block';

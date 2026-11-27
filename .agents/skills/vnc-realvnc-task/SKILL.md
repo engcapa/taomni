@@ -61,3 +61,5 @@ $tb add VNC-AUTH-001 --title <标题> --priority P1 --size M --spec <文档>#vnc
 ## 汇报
 
 卡 ID、基线与最终 HEAD/工作区、改动文件、生产效果链、命令与结果（含失败后重跑）、与 RealVNC 的数字对照、未运行层及原因、终态与能力上限（平台/服务器/参照版本）。
+
+桌面控件与交互对齐遵循 `docs-feature/ui-standard/UI-STANDARD.md` §0.2，偏离须登记在 §9。

@@ -173,7 +173,7 @@ export function CodeBlockToolbar({
 
   return (
     <div className="rounded border border-[var(--taomni-divider)] my-2 overflow-hidden">
-      <div className="flex items-center gap-1 px-2 py-1 bg-[var(--taomni-divider)]/40 text-[10px] text-[var(--taomni-text-muted)]">
+      <div className="flex items-center gap-1 px-2 py-1 bg-[var(--taomni-divider)]/40 text-ui-caption text-[var(--taomni-text-muted)]">
         <span className="font-mono uppercase tracking-wide">{lang || t("chat.codeLangFallback")}</span>
         <span className="flex-1" />
         <button
@@ -194,7 +194,7 @@ export function CodeBlockToolbar({
           onClick={handleCopy}
           title={t("chat.codeCopyTitle")}
         >
-          {copied ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Copy className="w-2.5 h-2.5" />}
+          {copied ? <Check className="w-2.5 h-2.5 text-ui-success" /> : <Copy className="w-2.5 h-2.5" />}
           <span>{t("chat.codeCopy")}</span>
         </button>
         <SendToTerminalButton
@@ -212,7 +212,7 @@ export function CodeBlockToolbar({
           t={t}
         />
       </div>
-      <pre className="m-0 p-2 text-[11px] leading-snug overflow-x-auto bg-[var(--taomni-bg)]">
+      <pre className="m-0 p-2 text-ui-small leading-snug overflow-x-auto bg-[var(--taomni-bg)]">
         <code>
           {selecting
             ? lineMeta.map((line, i) => {
@@ -430,7 +430,7 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend, t }: SendTo
             : t("chat.codeSendNoTarget")
         }
       >
-        {sent ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Send className="w-2.5 h-2.5" />}
+        {sent ? <Check className="w-2.5 h-2.5 text-ui-success" /> : <Send className="w-2.5 h-2.5" />}
         <span>{t("chat.codeSendToTerminal")}</span>
       </button>
     );
@@ -445,19 +445,19 @@ function SendToTerminalButton({ targetEntry, disabled, sent, onSend, t }: SendTo
         disabled={disabled || allTerminals.length === 0}
         title={t("chat.codeSendPickTitle")}
       >
-        {sent ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Send className="w-2.5 h-2.5" />}
+        {sent ? <Check className="w-2.5 h-2.5 text-ui-success" /> : <Send className="w-2.5 h-2.5" />}
         <span>{t("chat.codeSendToTerminalDropdown")}</span>
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-30 min-w-[160px] rounded border border-[var(--taomni-divider)] shadow-lg"
+          className="absolute right-0 top-full mt-1 z-[var(--taomni-z-popover)] min-w-[160px] rounded border border-[var(--taomni-divider)] shadow-lg"
           style={{ background: "var(--taomni-panel-bg)" }}
         >
           {allTerminals.map((t) => (
             <button
               key={t.tabId}
               type="button"
-              className="block w-full text-left px-2 py-1 text-[11px] hover:bg-[var(--taomni-selected)]"
+              className="block w-full text-left px-2 py-1 text-ui-small hover:bg-[var(--taomni-selected)]"
               onClick={() => {
                 onSend(t);
                 setOpen(false);
@@ -514,7 +514,7 @@ function SendToQueryButton({ targetEntry, disabled, sent, onSend, t }: SendToQue
             : t("chat.codeSendQueryNoTarget")
         }
       >
-        {sent ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Database className="w-2.5 h-2.5" />}
+        {sent ? <Check className="w-2.5 h-2.5 text-ui-success" /> : <Database className="w-2.5 h-2.5" />}
         <span>{t("chat.codeSendToQuery")}</span>
       </button>
     );
@@ -529,19 +529,19 @@ function SendToQueryButton({ targetEntry, disabled, sent, onSend, t }: SendToQue
         disabled={disabled}
         title={t("chat.codeSendQueryPickTitle")}
       >
-        {sent ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Database className="w-2.5 h-2.5" />}
+        {sent ? <Check className="w-2.5 h-2.5 text-ui-success" /> : <Database className="w-2.5 h-2.5" />}
         <span>{t("chat.codeSendToQueryDropdown")}</span>
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-30 min-w-[180px] rounded border border-[var(--taomni-divider)] shadow-lg"
+          className="absolute right-0 top-full mt-1 z-[var(--taomni-z-popover)] min-w-[180px] rounded border border-[var(--taomni-divider)] shadow-lg"
           style={{ background: "var(--taomni-panel-bg)" }}
         >
           {allQueries.map((query) => (
             <button
               key={query.tabId}
               type="button"
-              className="block w-full text-left px-2 py-1 text-[11px] hover:bg-[var(--taomni-selected)]"
+              className="block w-full text-left px-2 py-1 text-ui-small hover:bg-[var(--taomni-selected)]"
               onClick={() => {
                 onSend(query);
                 setOpen(false);

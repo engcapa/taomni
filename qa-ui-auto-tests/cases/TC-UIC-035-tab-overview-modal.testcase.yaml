@@ -1,0 +1,45 @@
+id: TC-UIC-035-tab-overview-modal
+title: Tab overview opens in the top layer, wraps Tab in both directions, and restores toolbar focus
+covers: [F1.5]
+modes: [browser, native]
+fixtures: [reset_db]
+tags: [ui-contract, overview, keyboard]
+ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-07, UI-FOC-03]
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="tao-home-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- press: {selector: '[data-testid="tab-overview-trigger"]', key: Enter}
+- wait_for: '[data-testid="tab-overview"]:modal'
+- assert_focus_on: '[data-testid="tab-overview-search"]'
+- press: Shift+Tab
+- assert_focus_on: '[data-testid="tab-overview-close"]'
+- press: Shift+Tab
+- assert_focus_on: '[data-testid="tab-overview-card"]'
+- press: Tab
+- assert_focus_on: '[data-testid="tab-overview-close"]'
+- press: Escape
+- wait_for: {selector: '[data-testid="tab-overview"]', state: detached}
+- assert_focus_on: '[data-testid="tab-overview-trigger"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: tab-overview-focus-wrap
+    ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-07, UI-FOC-03]
+    requirement: Tab overview opens in the native modal top layer, focuses search, wraps Tab between the first and last controls, and restores trigger focus on Escape.
+    actions: [4, 7, 9, 11, 13]
+    checkpoints:
+    - {step: 5, expectation: Tab overview owns the modal top layer.}
+    - {step: 6, expectation: Search input receives initial focus.}
+    - {step: 8, expectation: Reverse Tab reaches the close button.}
+    - {step: 10, expectation: Reverse Tab wraps to the card grid.}
+    - {step: 12, expectation: Forward Tab wraps back to the close button.}
+    - {step: 14, expectation: Escape closes the overview modal.}
+    - {step: 15, expectation: Toolbar trigger regains keyboard focus.}
+    - {step: 16, expectation: No runtime errors occur.}
+    results: [5, 6, 8, 10, 12, 14, 15, 16]
+  visual:
+  - {check: Overview top-layer overlay and card focus ring, method: automated, reason: Verifies top-layer presentation across cards.}
+  native:
+  - {check: Packaged WebView top layer and Tab wrap, method: automated, reason: Exercises native top-layer focus trapping over an active local terminal.}

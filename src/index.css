@@ -11,6 +11,7 @@
 @import "@fontsource/inter/700.css";
 
 @import "tailwindcss";
+@import "./styles/ui-foundations.css";
 
 @import "./styles/theme.css";
 @import "./styles/base.css";
@@ -26,6 +27,7 @@
 @import "./styles/editor.css";
 @import "./styles/controls.css";
 @import "./styles/terminal.css";
+@import "./styles/screenshot.css";
 @import "./styles/compatibility.css";
 
 @source not "../src-tauri/plugins/vnc-client/renderer";

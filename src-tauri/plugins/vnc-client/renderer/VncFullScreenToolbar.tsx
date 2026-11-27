@@ -33,7 +33,7 @@ const ICON_BUTTON: React.CSSProperties = {
   borderRadius: 4,
   border: "none",
   background: "transparent",
-  color: "#eee",
+  color: "var(--taomni-text, #eee)",
   cursor: "pointer",
 };
 
@@ -71,7 +71,7 @@ export function VncFullScreenToolbar(props: VncFullScreenToolbarProps) {
       title={label}
       aria-label={label}
       style={ICON_BUTTON}
-      className="hover:bg-white/15"
+      className="hover:bg-[var(--taomni-hover)]"
       onClick={onClick}
     >
       {icon}
@@ -89,7 +89,7 @@ export function VncFullScreenToolbar(props: VncFullScreenToolbarProps) {
           left: 0,
           right: 0,
           height: VNC_TOOLBAR_EDGE_DEVICE_PX / (window.devicePixelRatio || 1),
-          zIndex: 8,
+          zIndex: "var(--taomni-z-sticky, 100)",
         }}
         onPointerEnter={() => {
           cancelHide();
@@ -116,13 +116,16 @@ export function VncFullScreenToolbar(props: VncFullScreenToolbarProps) {
           left: "50%",
           transform: `translate(-50%, ${visible ? "0" : "-100%"})`,
           transition: `transform ${VNC_TOOLBAR_SLIDE_MS}ms ease-out`,
-          zIndex: 9,
+          zIndex: "var(--taomni-z-docked-overlay, 500)",
           display: "flex",
           gap: 4,
           padding: "4px 8px",
-          background: "rgba(30, 30, 46, 0.92)",
+          background: "var(--taomni-panel-bg)",
+          color: "var(--taomni-text)",
+          border: "1px solid var(--taomni-divider)",
+          borderTop: "none",
           borderRadius: "0 0 8px 8px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+          boxShadow: "var(--taomni-shadow-md)",
         }}
       >
         {button("vnc-fs-exit", t("vnc.exitFullScreen"), <Minimize2 size={16} />, props.onExitFullScreen)}

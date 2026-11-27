@@ -2,10 +2,10 @@ import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import type { useGridSearch } from "./useGridSearch";
 
 export function GridSearchBar({ search }: { search: ReturnType<typeof useGridSearch> }) {
-  return <div className="ml-auto h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--taomni-text-muted)]" data-testid="query-result-search">
+  return <div className="ml-auto h-6 inline-flex items-center gap-1 px-1 text-ui-small text-[var(--taomni-text-muted)]" data-testid="query-result-search">
     <Search className="w-3.5 h-3.5" />
     <input ref={search.inputRef} type="search" value={search.text} onChange={(event) => search.setText(event.target.value)}
-      className="taomni-input h-6 w-[150px] text-[11px]" placeholder="Search" aria-label="Search result set"
+      className="taomni-input h-6 w-[150px] text-ui-small" placeholder="Search" aria-label="Search result set"
       title={`Search result set (${search.mac ? "⌘F" : "Ctrl+F"})`} />
     <span data-testid="query-result-search-count" className="min-w-8 text-right tabular-nums" aria-live="polite">{search.position}/{search.count}</span>
     <button type="button" data-testid="query-result-search-previous" className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40"

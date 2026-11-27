@@ -176,20 +176,20 @@ export function WorkspaceBranchesView({
         }}
       >
         <GitFork className={`w-4 h-4 shrink-0 ${row.branch.current? "text-[var(--taomni-accent)]":"text-[var(--taomni-text-muted)]"}`} />
-        <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
+        <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-ui-caption text-[var(--taomni-text-muted)]">
           {row.root.name}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[12px] truncate font-medium">{row.branch.name}</span>
-            {dateLabel? <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{dateLabel}</span>:null}
+            <span className="text-ui-body truncate font-medium">{row.branch.name}</span>
+            {dateLabel? <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">{dateLabel}</span>:null}
           </div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+          <div className="text-ui-small text-[var(--taomni-text-muted)] truncate">
             {row.branch.upstream? `tracks ${row.branch.upstream}`:row.branch.remote? "remote":"local"}
             {row.branch.subject? ` · ${row.branch.subject}`:""}
           </div>
         </div>
-        {row.branch.current&&<span className="text-[11px] text-[var(--taomni-accent)] shrink-0">current</span>}
+        {row.branch.current&&<span className="text-ui-small text-[var(--taomni-accent)] shrink-0">current</span>}
       </button>
     );
   };
@@ -208,8 +208,8 @@ export function WorkspaceBranchesView({
           {isCollapsed
             ? <ChevronRight className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
             :<ChevronDown className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">{label}</span>
-          <span className="text-[10px] text-[var(--taomni-text-muted)]">({list.length})</span>
+          <span className="text-ui-small font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">{label}</span>
+          <span className="text-ui-caption text-[var(--taomni-text-muted)]">({list.length})</span>
         </button>
         {isCollapsed? null:list.map(renderRow)}
       </section>
@@ -230,7 +230,7 @@ export function WorkspaceBranchesView({
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
-        <span className="text-[11px] text-[var(--taomni-text-muted)]">
+        <span className="text-ui-small text-[var(--taomni-text-muted)]">
           {roots.length} repositories
         </span>
       </div>

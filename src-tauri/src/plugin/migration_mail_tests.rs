@@ -93,6 +93,14 @@ fn legacy_mail_is_staged_without_opening_the_cache_and_applied_by_startup() {
     let live = ProfileRuntimeLeases::acquire(&profile, StartupMode::Desktop).unwrap();
     assert!(provision::queue(&profile, &package()).unwrap());
     assert!(provision::queued(&profile).unwrap());
+    assert!(provision::queued_pending(&profile).unwrap());
+    assert_eq!(
+        provision::queued_status(&profile).unwrap(),
+        Some(provision::QueuedPlanStatus {
+            failed: false,
+            error: None,
+        })
+    );
     assert!(!profile.join(MAIL_MIGRATION_TARGET).exists());
     assert!(active_version(&profile).is_none());
     assert!(provision::apply_before_startup(&profile).is_err());
@@ -106,9 +114,25 @@ fn legacy_mail_is_staged_without_opening_the_cache_and_applied_by_startup() {
     paths::write_json_durable(&plan_path, &tampered).unwrap();
     assert!(provision::apply_before_startup(&profile).is_err());
     assert_eq!(provision::queued_failure(&profile).unwrap(), Some(true));
+    assert!(!provision::queued_pending(&profile).unwrap());
+    let failed_status = provision::queued_status(&profile).unwrap().unwrap();
+    assert!(failed_status.failed);
+    assert!(
+        failed_status
+            .error
+            .as_deref()
+            .is_some_and(|message| message.contains("differs from the staged upgrade"))
+    );
     assert!(active_version(&profile).is_none());
     assert!(!profile.join(MAIL_MIGRATION_TARGET).exists());
-    paths::write_json_durable(&plan_path, &original).unwrap();
+
+    // A previously failed Mail upgrade does not block normal restarts or retry forever.
+    let live_after_fail = ProfileRuntimeLeases::acquire(&profile, StartupMode::Desktop).unwrap();
+    assert_eq!(provision::queued_failure(&profile).unwrap(), Some(true));
+    assert!(active_version(&profile).is_none());
+    assert!(provision::queue(&profile, &package()).unwrap());
+    assert!(provision::queued_pending(&profile).unwrap());
+    drop(live_after_fail);
 
     let _startup = ProfileRuntimeLeases::acquire(&profile, StartupMode::Desktop).unwrap();
     assert!(
@@ -172,26 +196,29 @@ fn installs_and_records_default_and_custom_mail_data_for_a_verified_package() {
     let rejected = runtime.database(&registry, "default", || panic!("do not read the old path"));
     assert!(rejected.err().unwrap().contains("Enable the Mail module"));
     registry.set_enabled(OWNER, true).unwrap();
-    for (account, source, text) in [
-        ("default", &default_path, "default cache"),
-        ("custom", &custom_path, "custom cache"),
-    ] {
-        let path = profile
-            .join(MAIL_MIGRATION_TARGET)
-            .join(source.file_name().unwrap());
+    let default_target = profile
+        .join(MAIL_MIGRATION_TARGET)
+        .join(default_path.file_name().unwrap());
+    assert_eq!(
+        taomni_mail_storage::imap_ownership::database(default_target.parent().unwrap(), "default")
+            .unwrap(),
+        Some(default_target.clone())
+    );
+    let default_handle = runtime
+        .database(&registry, "default", || panic!("do not read the old path"))
+        .unwrap();
+    {
+        let db = default_handle.lock().unwrap();
         assert_eq!(
-            taomni_mail_storage::imap_ownership::database(path.parent().unwrap(), account).unwrap(),
-            Some(path.clone())
+            Path::new(db.path().unwrap()).canonicalize().unwrap(),
+            default_target
         );
-        let handle = runtime
-            .database(&registry, account, || panic!("do not read the old path"))
+        let value = get_cached_body(&db, "default", "INBOX", 9)
+            .unwrap()
             .unwrap();
-        let db = handle.lock().unwrap();
-        assert_eq!(Path::new(db.path().unwrap()).canonicalize().unwrap(), path);
-        let value = get_cached_body(&db, account, "INBOX", 9).unwrap().unwrap();
-        assert!(value.text.unwrap().contains(text));
-        assert!(taomni_mail_storage::draft_import::is_owned(&db, account).unwrap());
-        let queued = taomni_mail_storage::drafts::get_mail_draft(&db, account, "scheduled")
+        assert!(value.text.unwrap().contains("default cache"));
+        assert!(taomni_mail_storage::draft_import::is_owned(&db, "default").unwrap());
+        let queued = taomni_mail_storage::drafts::get_mail_draft(&db, "default", "scheduled")
             .unwrap()
             .unwrap();
         assert_eq!(queued.remote_draft_uid, Some(9));
@@ -199,6 +226,35 @@ fn installs_and_records_default_and_custom_mail_data_for_a_verified_package() {
             queued.reply_context.unwrap().outbox.unwrap().send_at,
             Some(4102444800)
         );
+    }
+
+    assert!(
+        !profile
+            .join(MAIL_MIGRATION_TARGET)
+            .join(custom_path.file_name().unwrap())
+            .exists()
+    );
+    assert!(
+        taomni_mail_storage::imap_ownership::database(
+            &profile.join(MAIL_MIGRATION_TARGET),
+            "custom"
+        )
+        .unwrap()
+        .is_none()
+    );
+    let custom_handle = runtime
+        .database(&registry, "custom", || {
+            Ok(Some(json!({"mailStorageDirectory": custom}).to_string()))
+        })
+        .unwrap();
+    {
+        let db = custom_handle.lock().unwrap();
+        assert_eq!(
+            Path::new(db.path().unwrap()).canonicalize().unwrap(),
+            custom_path
+        );
+        let value = get_cached_body(&db, "custom", "INBOX", 9).unwrap().unwrap();
+        assert!(value.text.unwrap().contains("custom cache"));
     }
     let retained = [
         fs::read(default_path).unwrap(),
@@ -222,7 +278,7 @@ fn refreshes_unactivated_data_after_the_legacy_app_has_reopened() {
     let custom = tempfile::tempdir().unwrap();
     let profile = profile.path().canonicalize().unwrap();
     legacy_profile(&profile, custom.path());
-    let db = cached_mail(custom.path(), "custom", "snapshot");
+    let db = cached_mail(&profile.join("mail-cache"), "default", "snapshot");
     let module = profile.join("plugins/mail");
     let data = module.join("data");
     fs::create_dir_all(&module).unwrap();
@@ -244,7 +300,7 @@ fn refreshes_unactivated_data_after_the_legacy_app_has_reopened() {
     source
         .execute(
             "UPDATE mail_messages SET body_text=?1 WHERE account_id=?2",
-            params!["changed after snapshot", "custom"],
+            params!["changed after snapshot", "default"],
         )
         .unwrap();
     drop(source);
@@ -254,7 +310,7 @@ fn refreshes_unactivated_data_after_the_legacy_app_has_reopened() {
         MailUpgradeOutcome::Migrated
     );
     let dest = Connection::open(data.join(db.file_name().unwrap())).unwrap();
-    let body = get_cached_body(&dest, "custom", "INBOX", 9)
+    let body = get_cached_body(&dest, "default", "INBOX", 9)
         .unwrap()
         .unwrap();
     assert_eq!(body.text.as_deref(), Some("changed after snapshot"));
@@ -268,7 +324,7 @@ fn preserves_existing_module_data_and_never_activates_on_a_failed_copy() {
     let custom = tempfile::tempdir().unwrap();
     let profile = profile.path().canonicalize().unwrap();
     legacy_profile(&profile, custom.path());
-    let source = cached_mail(custom.path(), "custom", "legacy");
+    let source = cached_mail(&profile.join("mail-cache"), "default", "legacy");
     let target = profile.join(MAIL_MIGRATION_TARGET);
     fs::create_dir_all(&target).unwrap();
     let retained = target.join("existing.db");
@@ -351,7 +407,16 @@ fn a_mixed_mail_restore_retries_from_the_original_data_until_first_activation() 
         let custom = tempfile::tempdir().unwrap();
         let custom_root = custom.path().canonicalize().unwrap();
         legacy_profile(&profile, &custom_root);
-        let legacy = cached_mail(&custom_root, "custom", "legacy custom");
+        let main_db = Connection::open(profile.join("taomni.db")).unwrap();
+        main_db
+            .execute(
+                "INSERT INTO sessions VALUES ('secondary', 'Mail', '{}', 'legacy-secret')",
+                [],
+            )
+            .unwrap();
+        drop(main_db);
+        let legacy = cached_mail(&profile.join("mail-cache"), "secondary", "legacy secondary");
+        let custom_db = cached_mail(&custom_root, "custom", "legacy custom");
         let data = profile.join(MAIL_MIGRATION_TARGET);
         let restored = cached_mail(&data, "default", "restored default");
         let restored_bytes = fs::read(&restored).unwrap();
@@ -375,6 +440,7 @@ fn a_mixed_mail_restore_retries_from_the_original_data_until_first_activation() 
             fs::read(preserved.join(restored.file_name().unwrap())).unwrap(),
             restored_bytes
         );
+        assert!(!data.join(custom_db.file_name().unwrap()).exists());
         if !published {
             // Interruption after moving the restored directory aside and
             // before the replacement receives the final data path.
@@ -382,7 +448,7 @@ fn a_mixed_mail_restore_retries_from_the_original_data_until_first_activation() 
         }
         let source = Connection::open(&legacy).unwrap();
         source.execute(
-            "UPDATE mail_messages SET body_text='updated before activation' WHERE account_id='custom'",
+            "UPDATE mail_messages SET body_text='updated before activation' WHERE account_id='secondary'",
             [],
         ).unwrap();
         drop(source);
@@ -397,8 +463,9 @@ fn a_mixed_mail_restore_retries_from_the_original_data_until_first_activation() 
         assert!(!preserved.exists());
         assert_eq!(fs::read(restored).unwrap(), restored_bytes);
         assert_eq!(fs::read(&legacy).unwrap(), legacy_bytes);
+        assert!(!data.join(custom_db.file_name().unwrap()).exists());
         let dest = Connection::open(data.join(legacy.file_name().unwrap())).unwrap();
-        let body = get_cached_body(&dest, "custom", "INBOX", 9)
+        let body = get_cached_body(&dest, "secondary", "INBOX", 9)
             .unwrap()
             .unwrap();
         assert_eq!(body.text.as_deref(), Some("updated before activation"));
@@ -410,8 +477,13 @@ fn older_packages_keep_the_live_legacy_mailbox_even_with_a_migrated_copy() {
     let temp = tempfile::tempdir().unwrap();
     let profile = temp.path().canonicalize().unwrap();
     let custom = profile.join("custom");
+    fs::create_dir_all(&custom).unwrap();
     legacy_profile(&profile, &custom);
-    let old = cached_mail(&custom, "custom", "the earlier core owns this cache");
+    let old = cached_mail(
+        &profile.join("mail-cache"),
+        "default",
+        "the earlier core owns this cache",
+    );
     let mut manifest = package().manifest().clone();
     assert!(
         manifest
@@ -424,7 +496,7 @@ fn older_packages_keep_the_live_legacy_mailbox_even_with_a_migrated_copy() {
     let staged = profile.join(MAIL_MIGRATION_TARGET);
     assert!(staged.join(old.file_name().unwrap()).exists());
     assert!(
-        taomni_mail_storage::imap_ownership::database(&staged, "custom")
+        taomni_mail_storage::imap_ownership::database(&staged, "default")
             .unwrap()
             .is_none()
     );
@@ -433,11 +505,7 @@ fn older_packages_keep_the_live_legacy_mailbox_even_with_a_migrated_copy() {
     registry.scan().unwrap();
     registry.set_enabled(OWNER, true).unwrap();
     let runtime = crate::state::MailRuntime::new(&profile);
-    let handle = runtime
-        .database(&registry, "custom", || {
-            Ok(Some(json!({"mailStorageDirectory": custom}).to_string()))
-        })
-        .unwrap();
+    let handle = runtime.database(&registry, "default", || Ok(None)).unwrap();
     assert_eq!(
         Path::new(handle.lock().unwrap().path().unwrap())
             .canonicalize()
@@ -446,9 +514,73 @@ fn older_packages_keep_the_live_legacy_mailbox_even_with_a_migrated_copy() {
     );
 
     // A later owner-capable app must wait for a compatible installed module.
-    taomni_mail_storage::imap_ownership::mark_owned(&staged, "custom").unwrap();
-    let result = runtime.database(&registry, "custom", || {
+    taomni_mail_storage::imap_ownership::mark_owned(&staged, "default").unwrap();
+    let result = runtime.database(&registry, "default", || {
         panic!("do not use the cached legacy handle")
     });
     assert!(result.err().unwrap().contains("Update the Mail module"));
+}
+
+#[test]
+fn custom_only_mailbox_commits_mail_migration_without_copying_archives() {
+    let temp = tempfile::tempdir().unwrap();
+    let custom = tempfile::tempdir().unwrap();
+    let profile = temp.path().canonicalize().unwrap();
+    let custom_root = custom.path().canonicalize().unwrap();
+    let db = Connection::open(profile.join("taomni.db")).unwrap();
+    db.execute(
+        "CREATE TABLE sessions(id TEXT PRIMARY KEY, session_type TEXT, options_json TEXT, password TEXT)",
+        [],
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO sessions VALUES ('custom', 'Mail', ?1, 'legacy-secret')",
+        [json!({"mailStorageDirectory": custom_root}).to_string()],
+    )
+    .unwrap();
+    drop(db);
+    let custom_db = cached_mail(&custom_root, "custom", "custom archive cache");
+    let raw = b"Subject: Custom Archive\r\n\r\nStored outside app data\r\n";
+    let conn = Connection::open(&custom_db).unwrap();
+    taomni_mail_storage::storage::store(&conn, "custom", "INBOX", 9, 1, raw.as_slice()).unwrap();
+    drop(conn);
+
+    assert_eq!(
+        execute(&profile, &package(), &control()).unwrap(),
+        MailUpgradeOutcome::Migrated
+    );
+    assert!(active_version(&profile).is_some());
+    let journal = MigrationJournal::load(&profile.join("migration/journal.json")).unwrap();
+    let mail = journal
+        .entries
+        .iter()
+        .find(|entry| entry.item == MigrationItem::MailAccounts)
+        .unwrap();
+    assert!(valid_mail_commit(mail));
+
+    let data = profile.join(MAIL_MIGRATION_TARGET);
+    let entries: Vec<_> = fs::read_dir(&data)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(entries, [RECEIPT]);
+    retained_data::discover(&profile.join("plugins"), OWNER, 1).unwrap();
+
+    let registry = crate::plugin::PluginRegistry::new(profile.join("plugins"));
+    registry.scan().unwrap();
+    registry.set_enabled(OWNER, true).unwrap();
+    let runtime = crate::state::MailRuntime::new(&profile);
+    let handle = runtime
+        .database(&registry, "custom", || {
+            Ok(Some(
+                json!({"mailStorageDirectory": custom_root}).to_string(),
+            ))
+        })
+        .unwrap();
+    assert_eq!(
+        Path::new(handle.lock().unwrap().path().unwrap())
+            .canonicalize()
+            .unwrap(),
+        custom_db
+    );
 }

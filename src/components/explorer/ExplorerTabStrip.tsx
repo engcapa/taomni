@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { ChevronLeft, ChevronRight, FilePlus2 as NpFilePlus, Pin as NpPin, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { writeText } from "../../lib/clipboard";
@@ -184,7 +185,7 @@ export function ExplorerTabStrip() {
         data-tab-style="session"
         data-active={activeTabId === tab.id}
         title={tab.fileBrowser?.initialPath ?? tab.fileViewer?.path ?? tab.title}
-        className="taomni-tab group flex max-w-[190px] shrink-0 items-center gap-1 px-2 text-[12px]"
+        className="taomni-tab group flex max-w-[190px] shrink-0 items-center gap-1 px-2 text-ui-body"
         onClick={() => { if (editingTabId !== tab.id) activate(tab.id); }}
         onAuxClick={(event) => { if (event.button === 1) closeTab(tab.id); }}
         onContextMenu={(event) => { event.preventDefault(); setMenu({ tab, x: event.clientX, y: event.clientY }); }}
@@ -231,7 +232,7 @@ export function ExplorerTabStrip() {
               }}
               onFocus={(event) => event.currentTarget.select()}
               onBlur={commitRename}
-              className="bg-transparent border-b border-[var(--taomni-accent)] outline-none text-[12px] leading-none w-[160px] px-0"
+              className="bg-transparent border-b border-[var(--taomni-accent)] focus-visible:keyboard-outline text-ui-body leading-none w-[160px] px-0"
               style={{ color: "inherit", font: "inherit" }}
             />
           ) : tab.title}
@@ -245,7 +246,7 @@ export function ExplorerTabStrip() {
           onPointerDown={(event) => event.stopPropagation()}
         />
       </div>)}
-      {!visibleTabs.length && tabs.length > 0 && <span data-testid="explorer-tab-filter-empty" className="truncate px-2 text-[11px] text-[var(--taomni-text-muted)]">{label("没有匹配的标签", "No matching tabs")}</span>}
+      {!visibleTabs.length && tabs.length > 0 && <span data-testid="explorer-tab-filter-empty" className="truncate px-2 text-ui-small text-[var(--taomni-text-muted)]">{label("没有匹配的标签", "No matching tabs")}</span>}
     </div>
     {scroll.scrollState.overflow && <IconBtn
       testId="explorer-tab-scroll-right"
@@ -259,12 +260,12 @@ export function ExplorerTabStrip() {
       onClick={() => useExplorerUiStore.getState().clearTabFilter()}>
       <span className="truncate">{filterChipText}</span><span aria-hidden="true"> ×</span>
     </button>}
-    <button type="button" data-testid="explorer-tab-new-home" title={label("新建主目录标签", "New home tab")} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => {
+    <IconButton type="button" data-testid="explorer-tab-new-home" label={label("新建主目录标签", "New home tab")} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => {
       void openExplorer(undefined, { forceNew: true }).catch((error) => useAppStore.getState().setStatusMessage(String(error)));
-    }}><Plus className="h-3.5 w-3.5" /></button>
-    <button type="button" data-testid="explorer-tab-new-notepad" title={label("新建文本文档", "New Notepad document")} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => {
+    }}><Plus className="h-3.5 w-3.5" /></IconButton>
+    <IconButton type="button" data-testid="explorer-tab-new-notepad" label={label("新建文本文档", "New Notepad document")} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => {
       openUntitledNotepadDocument({ host: "explorer" });
-    }}><NpFilePlus className="h-3.5 w-3.5" /></button>
+    }}><NpFilePlus className="h-3.5 w-3.5" /></IconButton>
     <div className="h-full min-w-[24px] flex-1" data-window-drag />
     {menu && <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={menuItems(menu.tab)} />}
   </div>;

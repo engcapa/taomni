@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useLayoutEffect, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { forwardRef, useCallback, useLayoutEffect, useId, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { ChevronRight } from "lucide-react";
 import { useFocusReturn } from "./editor/workspace/useFocusReturn";
@@ -6,13 +6,20 @@ import { useFocusReturn } from "./editor/workspace/useFocusReturn";
 export interface MenuItem {
   label: string;
   testId?: string;
+  title?: string;
   icon?: React.ReactNode;
   shortcut?: string;
   checked?: boolean;
+  role?: "menuitemradio";
+  detail?: ReactNode;
   onClick?: () => void;
   danger?: boolean;
   separator?: boolean;
+  sectionHeader?: boolean;
+  keepOpen?: boolean;
+  preventMouseDownFocus?: boolean;
   disabled?: boolean;
+  disabledReason?: string;
   children?: MenuItem[];
   openOnClick?: boolean;
   customPanel?: React.ReactNode;
@@ -31,11 +38,36 @@ interface ContextMenuProps extends ContextMenuAppearance {
   onClose: (reason?: ContextMenuCloseReason) => void;
   /** Root test id override (popovers that are not a bare context menu). */
   testId?: string;
+  ariaLabel?: string;
+  className?: string;
+  autoFocus?: boolean;
+  handleKeyboard?: boolean;
+  closeOnTab?: boolean;
+  dismissOnFocusOut?: boolean;
+  anchorRef?: RefObject<HTMLElement | null>;
+  id?: string;
+  rovingFocus?: boolean;
 }
 
 const MENU_MARGIN = 6;
 
-export function ContextMenu({ items, x, y, onClose, appearance, testId }: ContextMenuProps) {
+export function ContextMenu({
+  items,
+  x,
+  y,
+  onClose,
+  appearance,
+  testId,
+  ariaLabel,
+  className,
+  autoFocus,
+  handleKeyboard,
+  closeOnTab,
+  dismissOnFocusOut,
+  anchorRef,
+  id,
+  rovingFocus,
+}: ContextMenuProps) {
   // ED-PARITY-021 A3 / DEC-ALIGN-11: closing (Esc, outside click, an action
   // that moves no focus) gives focus back to the element that opened the menu.
   useFocusReturn(true);
@@ -59,36 +91,75 @@ export function ContextMenu({ items, x, y, onClose, appearance, testId }: Contex
   useEffect(() => {
     // A blank press in a file list calls preventDefault() on its pointerdown to
     // start rubber-band selection; the browser then never dispatches the
-    // compatibility mousedown. Listen to both events so an outside press always
-    // dismisses the menu, and make the handler idempotent because a regular
-    // gesture dispatches both.
+    // compatibility mousedown. Listen in capture phase to both events so an
+    // outside press always dismisses even if a target widget calls stopPropagation.
     let closed = false;
+    const isInside = (target: EventTarget | null) => {
+      if (!(target instanceof Node)) return false;
+      if (target instanceof Element && target.closest("[data-taomni-context-menu]")) return true;
+      return !!anchorRef?.current?.contains(target);
+    };
     const handler = (e: Event) => {
       if (closed) return;
-      const target = e.target as HTMLElement | null;
       // Submenus and custom panels render in a portal outside `ref`, so test
       // against the shared marker attribute instead of DOM containment.
-      if (!target || !target.closest("[data-taomni-context-menu]")) {
+      if (!isInside(e.target)) {
         closed = true;
         onClose("outside");
       }
     };
-    document.addEventListener("pointerdown", handler);
-    document.addEventListener("mousedown", handler);
-    return () => {
-      document.removeEventListener("pointerdown", handler);
-      document.removeEventListener("mousedown", handler);
+    const handleFocusIn = (e: FocusEvent) => {
+      if (closed || !dismissOnFocusOut) return;
+      if (!isInside(e.target)) {
+        closed = true;
+        onClose("outside");
+      }
     };
-  }, [onClose]);
+    const handleBlur = () => {
+      if (closed || !dismissOnFocusOut) return;
+      closed = true;
+      onClose("outside");
+    };
+    document.addEventListener("pointerdown", handler, true);
+    document.addEventListener("mousedown", handler, true);
+    if (dismissOnFocusOut) {
+      document.addEventListener("focusin", handleFocusIn, true);
+      window.addEventListener("blur", handleBlur);
+    }
+    return () => {
+      document.removeEventListener("pointerdown", handler, true);
+      document.removeEventListener("mousedown", handler, true);
+      if (dismissOnFocusOut) {
+        document.removeEventListener("focusin", handleFocusIn, true);
+        window.removeEventListener("blur", handleBlur);
+      }
+    };
+  }, [anchorRef, dismissOnFocusOut, onClose]);
 
   const style: CSSProperties = {
     position: "fixed",
     left: position.left,
     top: position.top,
-    zIndex: 9999,
+    zIndex: "var(--taomni-z-menu-over-modal, 1100)",
   };
 
-  return <MenuSurface ref={ref} appearance={appearance} items={items} onClose={onClose} style={style} testId={testId} />;
+  return (
+    <MenuSurface
+      ref={ref}
+      id={id}
+      appearance={appearance}
+      items={items}
+      onClose={onClose}
+      style={style}
+      testId={testId}
+      ariaLabel={ariaLabel}
+      className={className}
+      autoFocus={autoFocus ?? !rovingFocus}
+      rovingFocus={rovingFocus}
+      handleKeyboard={handleKeyboard}
+      closeOnTab={closeOnTab}
+    />
+  );
 }
 
 export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
@@ -98,16 +169,41 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   isSubmenu?: boolean;
   onBack?: () => void;
   testId?: string;
-}>(({ items, onClose, style, isSubmenu, onBack, appearance, testId }, forwardedRef) => {
+  ariaLabel?: string;
+  className?: string;
+  autoFocus?: boolean;
+  handleKeyboard?: boolean;
+  closeOnTab?: boolean;
+  rovingFocus?: boolean;
+  id?: string;
+}>(({
+  items,
+  onClose,
+  style,
+  isSubmenu,
+  onBack,
+  appearance,
+  testId,
+  ariaLabel,
+  className,
+  autoFocus = true,
+  handleKeyboard = true,
+  closeOnTab = false,
+  rovingFocus = false,
+  id,
+}, forwardedRef) => {
   const innerRef = useRef<HTMLDivElement | null>(null);
+  const menuId = useId();
 
   const selectableIndices = useMemo(() => {
     return items
-      .map((item, idx) => (!item.separator && !item.disabled ? idx : -1))
+      .map((item, idx) => (!item.separator && !item.sectionHeader && !item.disabled ? idx : -1))
       .filter((idx) => idx !== -1);
   }, [items]);
 
-  const [activeIndex, setActiveIndex] = useState<number>(() => selectableIndices[0] ?? -1);
+  const [activeIndex, setActiveIndex] = useState<number>(() =>
+    selectableIndices.find((index) => items[index]?.role === "menuitemradio" && items[index]?.checked)
+      ?? selectableIndices[0] ?? -1);
   const [openSubmenuIndex, setOpenSubmenuIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -126,14 +222,15 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   // Move focus into the menu so navigation keys are owned by the menu rather
   // than also being interpreted by the editor as cursor movement.
   useEffect(() => {
-    innerRef.current?.focus();
-  }, []);
+    if (autoFocus) innerRef.current?.focus();
+  }, [autoFocus]);
 
   // Keyboard navigation
   useEffect(() => {
+    if (!handleKeyboard) return undefined;
     const handleKeyDown = (e: KeyboardEvent) => {
       // If a submenu is currently open, let the child submenu handle the key event
-      if (openSubmenuIndex !== null) return;
+      if (openSubmenuIndex !== null || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -166,7 +263,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
             setOpenSubmenuIndex(activeIndex);
           } else if (item.onClick) {
             item.onClick();
-            onClose("action");
+            if (!item.keepOpen) onClose("action");
           }
         }
       } else if (e.key === "ArrowRight") {
@@ -184,6 +281,10 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
           e.stopPropagation();
           onBack();
         }
+      } else if (e.key === "Tab" && closeOnTab && !isSubmenu) {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose("escape");
       } else if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
@@ -197,16 +298,20 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [activeIndex, isSubmenu, items, onBack, onClose, openSubmenuIndex, selectableIndices]);
+  }, [activeIndex, closeOnTab, handleKeyboard, isSubmenu, items, onBack, onClose, openSubmenuIndex, selectableIndices]);
 
   return (
     <div
       ref={setRef}
+      id={id}
+      role="menu"
+      aria-label={ariaLabel}
+      aria-activedescendant={activeIndex >= 0 ? `${menuId}-${activeIndex}` : undefined}
       tabIndex={-1}
       data-testid={testId ?? "context-menu"}
       data-taomni-context-menu=""
       data-appearance={appearance}
-      className={`min-w-[220px] ${appearance === "code-candidates" ? "py-0" : "py-1"} rounded shadow-lg border text-[12px] outline-none`}
+      className={`min-w-[220px] ${appearance === "code-candidates" ? "py-0" : "py-1"} rounded shadow-lg border text-ui-body outline-none${className ? ` ${className}` : ""}`}
       style={{
         background: appearance === "code-candidates" ? "var(--taomni-code-tooltip-bg)" : "var(--taomni-panel-bg)",
         borderColor: appearance === "code-candidates" ? "var(--taomni-code-border)" : "var(--taomni-divider)",
@@ -219,9 +324,11 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
       {items.map((item, i) => (
         <MenuRow
           key={i}
+          id={`${menuId}-${i}`}
           appearance={appearance}
           item={item}
           active={activeIndex === i}
+          rovingFocus={rovingFocus}
           isSubmenuOpen={openSubmenuIndex === i}
           onHover={() => setActiveIndex(i)}
           onOpenSubmenu={() => setOpenSubmenuIndex(i)}
@@ -284,28 +391,32 @@ function PortalFlyout({
         left: pos?.left ?? -9999,
         top: pos?.top ?? -9999,
         visibility: pos ? "visible" : "hidden",
-        zIndex: 9999,
+        zIndex: "var(--taomni-z-menu-over-modal, 1100)",
       }}
     >
       {children}
     </div>,
-    document.body,
+    triggerRef.current?.closest("dialog[open]") ?? document.body,
   );
 }
 
 function MenuRow({
+  id,
   appearance,
   item,
   active,
+  rovingFocus,
   isSubmenuOpen,
   onHover,
   onOpenSubmenu,
   onCloseSubmenu,
   onClose,
 }: {
+  id: string;
   appearance?: "default" | "code-candidates";
   item: MenuItem;
   active: boolean;
+  rovingFocus?: boolean;
   isSubmenuOpen: boolean;
   onHover: () => void;
   onOpenSubmenu: () => void;
@@ -348,20 +459,38 @@ function MenuRow({
   useEffect(() => {
     if (active && triggerRef.current) {
       triggerRef.current.scrollIntoView?.({ block: "nearest" });
+      if (rovingFocus) triggerRef.current.focus({ preventScroll: true });
     }
-  }, [active]);
+  }, [active, rovingFocus]);
 
   if (item.separator) {
-    return <div className="h-px mx-2 my-1" style={{ background: "var(--taomni-divider)" }} />;
+    return <div role="separator" className="h-px mx-2 my-1" style={{ background: "var(--taomni-divider)" }} />;
+  }
+
+  if (item.sectionHeader) {
+    return (
+      <div data-testid={item.testId} className="px-3 py-1 text-ui-caption font-semibold uppercase text-[var(--taomni-text-muted)]">
+        {item.label}
+      </div>
+    );
   }
 
   const hasChildren = !!item.children?.length || !!item.customPanel;
+  const semantics = {
+    id,
+    role: item.role ?? (item.checked === undefined ? "menuitem" : "menuitemcheckbox"),
+    "aria-checked": item.checked,
+    "aria-disabled": item.disabled || undefined,
+    tabIndex: -1,
+    title: item.title ?? (item.disabled ? item.disabledReason : undefined),
+  };
   const content = (
     <>
       <span className="w-4 flex-shrink-0 text-center">{item.checked ? "✓" : item.icon}</span>
       <span className="flex-1 truncate">{item.label}</span>
+      {item.detail && <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">{item.detail}</span>}
       {item.shortcut && (
-        <span className="ml-6 flex-shrink-0 text-[11px] text-[var(--taomni-text-muted)]">{item.shortcut}</span>
+        <span className="ml-6 flex-shrink-0 text-ui-small text-[var(--taomni-text-muted)]">{item.shortcut}</span>
       )}
       {hasChildren && <ChevronRight className="w-3 h-3 text-[var(--taomni-text-muted)]" />}
     </>
@@ -396,11 +525,14 @@ function MenuRow({
         onMouseLeave={scheduleClose}
       >
         <button
+          {...semantics}
+          aria-haspopup={item.children?.length ? "menu" : "dialog"}
+          aria-expanded={open}
           ref={triggerRef}
           data-testid={item.testId ?? `context-menu-item-${slugForTestId(item.label)}`}
           data-active={active ? "true" : undefined}
           className={rowClassName}
-          style={item.danger ? { color: "#b22222" } : undefined}
+          style={item.danger ? { color: "var(--taomni-danger-text)" } : undefined}
           disabled={item.disabled}
           onClick={item.openOnClick ? () => {
             if (open) {
@@ -428,6 +560,7 @@ function MenuRow({
                 onBack={() => {
                   setOpenByHover(false);
                   onCloseSubmenu();
+                  triggerRef.current?.closest<HTMLElement>('[role="menu"]')?.focus({ preventScroll: true });
                 }}
               />
             )}
@@ -439,16 +572,18 @@ function MenuRow({
 
   return (
     <button
+      {...semantics}
       ref={triggerRef}
       data-testid={item.testId ?? `context-menu-item-${slugForTestId(item.label)}`}
       data-active={active ? "true" : undefined}
       className={rowClassName}
-      style={item.danger ? { color: "#b22222" } : undefined}
+      style={item.danger ? { color: "var(--taomni-danger-text)" } : undefined}
       onMouseEnter={handleHover}
       onMouseMove={handleMouseMove}
+      onMouseDown={item.preventMouseDownFocus ? (e) => e.preventDefault() : undefined}
       onClick={() => {
         item.onClick?.();
-        onClose("action");
+        if (!item.keepOpen) onClose("action");
       }}
       disabled={item.disabled}
       type="button"

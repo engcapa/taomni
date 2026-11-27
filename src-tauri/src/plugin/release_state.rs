@@ -1,7 +1,7 @@
 //! Per-profile enrollment and notification history, outside backup restore mappings.
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::Path,
     time::{Duration, Instant},
@@ -44,6 +44,8 @@ pub(crate) struct ReleasePlan {
     pub(crate) legacy_restart_required: BTreeSet<String>,
     #[serde(skip_serializing_if = "BTreeSet::is_empty")]
     pub(crate) legacy_import_failed: BTreeSet<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) legacy_import_errors: BTreeMap<String, String>,
     pub(crate) updates: BTreeSet<String>,
     pub(crate) new_modules: BTreeSet<String>,
 }
@@ -124,14 +126,18 @@ pub(crate) fn plan(
         let legacy_pending = state.legacy_pending.clone().unwrap_or_default();
         let mut legacy_restart_required = BTreeSet::new();
         let mut legacy_import_failed = BTreeSet::new();
+        let mut legacy_import_errors = BTreeMap::new();
         let mail_id = super::migration_mail_provision::MAIL_ID;
         if legacy_pending.contains(mail_id) {
-            match super::migration_mail_provision::queued_failure(data) {
-                Ok(Some(false)) => {
+            match super::migration_mail_provision::queued_status(data) {
+                Ok(Some(status)) if !status.failed => {
                     legacy_restart_required.insert(mail_id.to_owned());
                 }
-                Ok(Some(true)) => {
+                Ok(Some(status)) => {
                     legacy_import_failed.insert(mail_id.to_owned());
+                    if let Some(detail) = status.error {
+                        legacy_import_errors.insert(mail_id.to_owned(), detail);
+                    }
                 }
                 Ok(None) => (),
                 Err(error) => tracing::warn!(%error, "Could not read pending Mail upgrade"),
@@ -142,6 +148,7 @@ pub(crate) fn plan(
             legacy_pending,
             legacy_restart_required,
             legacy_import_failed,
+            legacy_import_errors,
             updates,
             new_modules: state
                 .new_modules

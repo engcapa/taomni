@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../ui/IconButton";
 import type React from "react";
 import { useMemo, useRef, useState } from "react";
 import { ArrowUpDown, Search, X } from "lucide-react";
@@ -191,14 +192,14 @@ export function DebugVariablesPane({
   return (
     <div
       data-testid="debug-variables-pane"
-      className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)] text-[11px]"
+      className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)] text-ui-small"
     >
       <div className="h-7 shrink-0 flex items-center gap-1 border-b border-[var(--taomni-code-border)] px-1.5">
         <input
           ref={inputRef}
           data-testid="debug-watch-input"
           aria-label="Evaluate expression or add a watch"
-          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none focus:border-[var(--taomni-accent)]"
+          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline focus:border-[var(--taomni-accent)]"
           placeholder="Evaluate expression (Enter) or add a watch (Ctrl+Shift+Enter)"
           value={watchInput}
           onChange={(e) => onWatchInputChange(e.target.value)}
@@ -224,7 +225,7 @@ export function DebugVariablesPane({
               <input
                 data-testid="debug-variables-search"
                 aria-label="Filter variables"
-                className="w-16 sm:w-24 bg-transparent text-[10px] outline-none"
+                className="w-16 sm:w-24 bg-transparent text-ui-caption focus-visible:keyboard-outline"
                 placeholder="Filter..."
                 value={filterQuery}
                 autoFocus={filterOpen && !filterQuery}
@@ -248,7 +249,7 @@ export function DebugVariablesPane({
               data-testid="debug-variables-search-toggle"
               aria-label="Filter variables"
               title="Filter variables"
-              className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover-bg)]"
+              className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
               onClick={() => setFilterOpen(true)}
             >
               <Search className="h-3 w-3 text-[var(--taomni-text-muted)]" />
@@ -256,16 +257,16 @@ export function DebugVariablesPane({
           )
         )}
         {onToggleSortMode && (
-          <button
+          <IconButton
             type="button"
             data-testid="debug-variables-sort"
             aria-pressed={sortMode === "alphabetical"}
             onClick={onToggleSortMode}
-            className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover-bg)] aria-pressed:bg-[var(--taomni-accent)]/20"
-            title="Sort Variables Alphabetically"
+            className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] aria-pressed:bg-[var(--taomni-accent)]/20"
+            labelKey="sortVariables"
           >
             <ArrowUpDown className="h-3 w-3 text-[var(--taomni-text-muted)]" />
-          </button>
+          </IconButton>
         )}
       </div>
       <div
@@ -274,7 +275,7 @@ export function DebugVariablesPane({
         aria-label="Variables"
         tabIndex={0}
         data-testid="debug-variables-tree"
-        className="flex-1 min-h-0 overflow-auto py-1 outline-none"
+        className="flex-1 min-h-0 overflow-auto py-1 focus-visible:keyboard-outline"
         onKeyDown={onTreeKeyDown}
         onFocus={() => {
           if (!selectedKey && rows[0]) setSelectedKey(rows[0].key);
@@ -339,8 +340,8 @@ export function DebugVariablesPane({
           <div
             data-testid="debug-data-breakpoint-notice"
             role="status"
-            className={`px-3 py-1 text-[10px] ${
-              dataBreakpointNotice.added ? "text-emerald-500" : "text-rose-500"
+            className={`px-3 py-1 text-ui-caption ${
+              dataBreakpointNotice.added ? "text-ui-success" : "text-ui-danger"
             }`}
           >
             {dataBreakpointNotice.message}

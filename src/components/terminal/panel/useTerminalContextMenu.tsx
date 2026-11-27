@@ -156,9 +156,9 @@ export function useTerminalContextMenu(context: UseTerminalContextMenuContext) {
         ]
         : []),
       { label: "", separator: true },
-      { label: "Zoom in", shortcut: "Ctrl++ / Ctrl+WheelUp", onClick: increaseFontSize },
-      { label: "Zoom out", shortcut: "Ctrl+- / Ctrl+WheelDown", onClick: decreaseFontSize },
-      { label: "Reset zoom", shortcut: "Ctrl+0", onClick: resetFontSize },
+      { label: "Zoom in", shortcut: isMac ? "⌘+" : "Ctrl++ / Ctrl+WheelUp", onClick: increaseFontSize },
+      { label: "Zoom out", shortcut: isMac ? "⌘−" : "Ctrl+- / Ctrl+WheelDown", onClick: decreaseFontSize },
+      { label: "Reset zoom", shortcut: isMac ? "⌘0" : "Ctrl+0", onClick: resetFontSize },
       {
         label: "Appearance",
         testId: "context-menu-item-appearance",

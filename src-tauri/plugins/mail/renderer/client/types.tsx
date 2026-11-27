@@ -76,11 +76,9 @@ export interface MailDraggableDialogProps {
 }
 
 
-export type ComposePromptState = {
-  kind: "error" | "attachment";
-  title: string;
-  message: string;
-};
+export type ComposePromptState =
+  | { kind: "error"; message: string }
+  | { kind: "attachment" };
 
 
 export type AiAction = "summarize" | "reply" | "tasks";

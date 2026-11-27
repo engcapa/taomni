@@ -29,7 +29,7 @@ export function ToolbarButton({
 
 export function EmptyState({ title }: { title: string; }) {
   return (
-    <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
+    <div className="h-full min-h-24 flex items-center justify-center text-ui-body text-[var(--taomni-text-muted)]">
       {title}
     </div>
   );

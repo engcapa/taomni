@@ -30,7 +30,7 @@ export function ExceptionBreakpointsView({ debug }: ExceptionBreakpointsViewProp
     .map((breakpoint) => [breakpoint.filterId, breakpoint]));
   const supportsFilterOptions = debug.capabilities.supportsExceptionFilterOptions === true;
   const exceptionModes = breakpointModesFor(parseBreakpointModes(debug.capabilities), "exception");
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline";
   return (
     <div data-testid="debug-exception-breakpoints">
       {debug.availableExceptionFilters.map((filter, index) => {
@@ -57,7 +57,7 @@ export function ExceptionBreakpointsView({ debug }: ExceptionBreakpointsViewProp
             className="border-t border-[var(--taomni-code-border)]/40 first:border-t-0"
           >
             <label
-              className="flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover-bg)]"
+              className="flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover)]"
               title={filter.description}
             >
               <input
@@ -72,14 +72,14 @@ export function ExceptionBreakpointsView({ debug }: ExceptionBreakpointsViewProp
               <span className="min-w-0 flex-1 truncate">
                 {filter.label}
                 {setting.condition && (
-                  <span className="ml-2 text-amber-500">if {setting.condition}</span>
+                  <span className="ml-2 text-ui-warning">if {setting.condition}</span>
                 )}
                 {bindingHint && (
                   <span
                     data-testid={`debug-exception-breakpoint-binding-${index}`}
                     className={`ml-2 ${
                       bindingHint.status === "failed"
-                        ? "text-rose-500"
+                        ? "text-ui-danger"
                         : "text-[var(--taomni-text-muted)]"
                     }`}
                     title={bindingHint.message ?? undefined}
@@ -98,7 +98,7 @@ export function ExceptionBreakpointsView({ debug }: ExceptionBreakpointsViewProp
                       data-testid={`debug-exception-breakpoint-mode-${index}`}
                       aria-label={`Breakpoint mode for ${filter.label}`}
                       title={exceptionModes.find((entry) => entry.mode === mode)?.description}
-                      className="h-5 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-[11px] outline-none"
+                      className="h-5 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-ui-small focus-visible:keyboard-outline"
                       value={mode ?? exceptionModes[0].mode}
                       onChange={(event) => debug.setExceptionBreakpointOptions(
                         filter.filter,
@@ -154,7 +154,7 @@ export function ExceptionBreakpointRulesView({
     setNewRule("");
     setEditingRuleId(id);
   };
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline";
   return (
     <div data-testid="debug-exception-rules" className="border-t border-[var(--taomni-code-border)]/60 pt-1">
       {supported ? (
@@ -172,7 +172,7 @@ export function ExceptionBreakpointRulesView({
           <button
             type="button"
             data-testid="debug-exception-rule-add"
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-emerald-500/15 hover:text-emerald-500 disabled:opacity-40"
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-ui-success-surface hover:text-ui-success disabled:opacity-40"
             title="Add exception path rule"
             aria-label="Add exception path rule"
             disabled={parseExceptionPathNames(newRule).length === 0}
@@ -184,7 +184,7 @@ export function ExceptionBreakpointRulesView({
       ) : (
         <div
           data-testid="debug-exception-rule-unsupported"
-          className="px-3 py-1 text-[10px] text-[var(--taomni-text-muted)]"
+          className="px-3 py-1 text-ui-caption text-[var(--taomni-text-muted)]"
         >
           This adapter does not support class or package exception rules.
         </div>
@@ -205,7 +205,7 @@ export function ExceptionBreakpointRulesView({
             data-exception-rule={rule.id}
             className="border-t border-[var(--taomni-code-border)]/40 first:border-t-0"
           >
-            <div className="flex min-w-0 items-center gap-1 px-3 py-0.5 hover:bg-[var(--taomni-hover-bg)]">
+            <div className="flex min-w-0 items-center gap-1 px-3 py-0.5 hover:bg-[var(--taomni-hover)]">
               <input
                 type="checkbox"
                 data-testid={`debug-exception-rule-enabled-${index}`}
@@ -223,7 +223,7 @@ export function ExceptionBreakpointRulesView({
                     data-testid={`debug-exception-rule-binding-${index}`}
                     className={`ml-2 font-sans ${
                       bindingHint.status === "failed"
-                        ? "text-rose-500"
+                        ? "text-ui-danger"
                         : "text-[var(--taomni-text-muted)]"
                     }`}
                     title={bindingHint.message ?? undefined}
@@ -235,7 +235,7 @@ export function ExceptionBreakpointRulesView({
               <select
                 data-testid={`debug-exception-rule-mode-${index}`}
                 aria-label={`Break mode for ${exceptionBreakpointRuleLabel(rule)}`}
-                className="h-5 max-w-32 shrink-0 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[10px]"
+                className="h-5 max-w-32 shrink-0 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-ui-caption"
                 value={rule.breakMode}
                 onChange={(event) => debug.setExceptionBreakpointRuleOptions(rule.id, {
                   breakMode: event.target.value as DebugExceptionBreakMode,
@@ -248,7 +248,7 @@ export function ExceptionBreakpointRulesView({
               <button
                 type="button"
                 data-testid={`debug-exception-rule-edit-${index}`}
-                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)]"
+                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
                 title="Edit exception path"
                 aria-label="Edit exception path"
                 aria-expanded={editing}
@@ -259,7 +259,7 @@ export function ExceptionBreakpointRulesView({
               <button
                 type="button"
                 data-testid={`debug-exception-rule-remove-${index}`}
-                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-rose-500/15 hover:text-rose-500"
+                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-ui-danger-surface hover:text-ui-danger"
                 title="Remove exception rule"
                 aria-label="Remove exception rule"
                 onClick={() => debug.removeExceptionBreakpointRule(rule.id)}
@@ -291,7 +291,7 @@ export function ExceptionBreakpointRuleEditor({
   onChange: (options: Partial<DebugExceptionBreakpointRule>) => void;
 }) {
   const [newSegment, setNewSegment] = useState("");
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-[11px] outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline";
   const setSegment = (segmentIndex: number, names: string[]) => {
     const path = names.length > 0
       ? rule.path.map((segment, index) => (index === segmentIndex ? { ...segment, names } : segment))
@@ -320,7 +320,7 @@ export function ExceptionBreakpointRuleEditor({
             />
           </div>
           <label
-            className="inline-flex h-5 shrink-0 items-center gap-1 text-[10px] text-[var(--taomni-text-muted)]"
+            className="inline-flex h-5 shrink-0 items-center gap-1 text-ui-caption text-[var(--taomni-text-muted)]"
             title="Exclude these names from this path segment"
           >
             <input
@@ -340,7 +340,7 @@ export function ExceptionBreakpointRuleEditor({
           <button
             type="button"
             data-testid={`debug-exception-rule-path-remove-${ruleIndex}-${segmentIndex}`}
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-rose-500/15 hover:text-rose-500"
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-ui-danger-surface hover:text-ui-danger"
             title="Remove path segment"
             aria-label="Remove path segment"
             onClick={() => setSegment(segmentIndex, [])}
@@ -363,7 +363,7 @@ export function ExceptionBreakpointRuleEditor({
         <button
           type="button"
           data-testid={`debug-exception-rule-path-add-${ruleIndex}`}
-          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-emerald-500/15 hover:text-emerald-500 disabled:opacity-40"
+          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-ui-success-surface hover:text-ui-success disabled:opacity-40"
           title="Add path segment"
           aria-label="Add path segment"
           disabled={parseExceptionPathNames(newSegment).length === 0}

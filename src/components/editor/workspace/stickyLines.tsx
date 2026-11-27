@@ -64,7 +64,7 @@ export function StickyLinesOverlay({
   return (
     <div
       data-testid="code-workspace-sticky-lines"
-      className="absolute top-0 left-0 right-0 z-20 flex flex-col bg-[var(--taomni-code-bg)]/95 backdrop-blur border-b border-[var(--taomni-code-border)] shadow-sm pointer-events-auto select-none"
+      className="absolute top-0 left-0 right-0 z-[var(--taomni-z-sticky)] flex flex-col bg-[var(--taomni-code-bg)]/95 backdrop-blur border-b border-[var(--taomni-code-border)] shadow-sm pointer-events-auto select-none"
     >
       {stickyLines.map((item) => (
         <button
@@ -76,7 +76,7 @@ export function StickyLinesOverlay({
           onClick={() => onSelectLine(item.line)}
           title={`Line ${item.line + 1}: ${item.text}`}
         >
-          <span className="w-8 shrink-0 text-right pr-2 text-[10px] text-[var(--taomni-code-muted)] group-hover:text-[var(--taomni-accent)]">
+          <span className="w-8 shrink-0 text-right pr-2 text-ui-caption text-[var(--taomni-code-muted)] group-hover:text-[var(--taomni-accent)]">
             {item.line + 1}
           </span>
           <Hash className="w-3 h-3 shrink-0 mr-1.5 text-[var(--taomni-accent)] opacity-75" />

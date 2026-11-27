@@ -384,7 +384,16 @@ describe("QueryResultGrid", () => {
     fireEvent.keyDown(screen.getByTestId("query-result-grid-scroll"), { key: "Enter", ctrlKey: true });
 
     expect(screen.getByTestId("query-cell-value-dialog")).toBeInTheDocument();
-    expect(screen.getByTestId("query-cell-value-text")).toHaveValue(value);
+    const fullText = screen.getByTestId("query-cell-value-text");
+    expect(fullText).toHaveValue(value);
+    expect(fullText).toHaveFocus();
+    fireEvent.click(screen.getByTestId("query-cell-value-wrap"));
+    expect(fullText).toHaveAttribute("wrap", "off");
+    fireEvent.keyDown(fullText, { key: "Escape", isComposing: true });
+    expect(fullText).toHaveFocus();
+    fireEvent.keyDown(fullText, { key: "Escape" });
+    expect(screen.queryByTestId("query-cell-value-dialog")).toBeNull();
+    expect(screen.getByTestId("query-result-grid-scroll")).toHaveFocus();
   });
 
   it("copies the complete cell value from the full value dialog", () => {

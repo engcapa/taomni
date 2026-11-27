@@ -38,7 +38,7 @@ export function ActivityLog({
       <button
         type="button"
         data-testid="tunnel-activity-log-toggle"
-        className="h-7 px-3 flex items-center gap-2 text-[11px] hover:bg-[var(--taomni-hover)] text-left"
+        className="h-7 px-3 flex items-center gap-2 text-ui-small hover:bg-[var(--taomni-hover)] text-left"
         onClick={onToggle}
         style={{ color: "var(--taomni-text)" }}
       >
@@ -49,8 +49,8 @@ export function ActivityLog({
         </span>
         {errorCount > 0 && (
           <span
-            className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
-            style={{ background: "rgba(178,34,34,0.15)", color: "#b22222" }}
+            className="px-1.5 py-0.5 rounded text-ui-caption font-semibold"
+            style={{ background: "var(--taomni-danger-bg)", color: "var(--taomni-danger-text)" }}
           >
             {t("tunnels.logErrors", { count: errorCount })}
           </span>
@@ -62,9 +62,9 @@ export function ActivityLog({
             style={{
               color:
                 latest.level === "error"
-                  ? "#b22222"
+                  ? "var(--taomni-danger-text)"
                   : latest.level === "success"
-                    ? "#1f7a4a"
+                    ? "var(--taomni-success-text)"
                     : "var(--taomni-text-muted)",
             }}
             title={latest.text}
@@ -79,7 +79,7 @@ export function ActivityLog({
             <button
               type="button"
               data-testid="tunnel-activity-log-clear"
-              className="taomni-btn flex items-center gap-1 text-[11px]"
+              className="taomni-btn flex items-center gap-1 text-ui-small"
               onClick={onClear}
               disabled={logs.length === 0}
               title={t("tunnels.logClear")}
@@ -89,7 +89,7 @@ export function ActivityLog({
           </div>
           <div
             ref={listRef}
-            className="flex-1 overflow-auto px-3 py-1.5 taomni-mono text-[11px] leading-[1.6]"
+            className="flex-1 overflow-auto px-3 py-1.5 taomni-mono text-ui-small leading-[1.6]"
             style={{ background: "var(--taomni-bg)" }}
           >
             {logs.length === 0 ? (
@@ -109,9 +109,9 @@ export function ActivityLog({
 export function ActivityLogRow({ entry }: { entry: TunnelLogEntry; }) {
   const color =
     entry.level === "error"
-      ? "#b22222"
+      ? "var(--taomni-danger-text)"
       : entry.level === "success"
-        ? "#1f7a4a"
+        ? "var(--taomni-success-text)"
         : "var(--taomni-text)";
   return (
     <div className="flex items-start gap-2" style={{ color }}>

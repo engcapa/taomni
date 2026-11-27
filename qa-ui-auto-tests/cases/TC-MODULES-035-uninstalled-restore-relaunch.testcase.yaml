@@ -189,6 +189,7 @@ steps:
 - fill:
     selector: '[data-testid="backup-restore-vault-password"]'
     value: qa-module-restore-original
+- fill: {selector: '[data-testid="backup-restore-name"]', value: '${fixture.restore_archive_name}'}
 - click: '[data-testid="backup-restore-confirm"]'
 - assert_text_equals:
     selector: '[data-testid="backup-restore-error"]'
@@ -257,59 +258,59 @@ verification:
     actions:
     - 80
     - 82
-    - 87
+    - 88
     checkpoints:
     - step: 84
       expectation: The actual native inventory lists the MFA snapshot.
     - step: 85
       expectation: The actual native inventory lists the Vault snapshot.
-    - step: 88
-      expectation: The real confirmation reports the translated bad-current-password error.
     - step: 89
+      expectation: The real confirmation reports the translated bad-current-password error.
+    - step: 90
       expectation: Rejected verification leaves staged success absent.
-    - step: 92
+    - step: 93
       expectation: The original renderer has no runtime errors before automatic relaunch.
     results:
     - 84
     - 85
-    - 88
     - 89
-    - 92
+    - 90
+    - 93
   - id: R3
     requirement: One valid confirmation stages and performs its own normal native relaunch while retaining the exact isolated profile.
     actions:
-    - 91
-    - 93
+    - 92
+    - 94
     checkpoints:
-    - step: 93
+    - step: 94
       expectation: The observer clicks once, sees staged success/disabled confirmation, reaps the original at exit=0, validates a different
         PID/start-time and identical executable/QA environment, and attaches without spawning an app.
-    - step: 95
-      expectation: The signed native module remains uninstalled with an inactive code pointer, rejected invocation and no writer lease.
     - step: 96
+      expectation: The signed native module remains uninstalled with an inactive code pointer, rejected invocation and no writer lease.
+    - step: 97
       expectation: Independent disk/host observations prove original module values, unchanged active pointer, new generation, clean
         restore state, original lifecycle and correct writer lease; the retained flag, exact SQLite locator and full database bytes
         match the original verified snapshot.
     results:
-    - 93
-    - 95
+    - 94
     - 96
+    - 97
   - id: R4
     requirement: The restored paired Vault/MFA accepts only the original password and decrypts the original account.
     actions:
-    - 99
-    - 103
+    - 100
+    - 104
     checkpoints:
-    - step: 100
+    - step: 101
       expectation: The changed password is rejected after actual restore.
-    - step: 110
-      expectation: Exactly one restored account decrypts and displays the original HOTP 755224.
     - step: 111
+      expectation: Exactly one restored account decrypts and displays the original HOTP 755224.
+    - step: 112
       expectation: Expected password rejection and native relaunch produce no renderer runtime errors.
     results:
-    - 100
-    - 110
+    - 101
     - 111
+    - 112
   visual:
   - check: Restored original HOTP and usable MFA pane.
     method: manual

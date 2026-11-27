@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useState } from "react";
 import { Globe, Loader2, X } from "lucide-react";
 import { useT } from "../../lib/i18n";
@@ -22,9 +23,9 @@ export function SearchProgressChip({ query, provider, onCancel, done, resultCoun
   }, [done]);
 
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] px-2.5 py-1 text-[11px]">
+    <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] px-2.5 py-1 text-ui-small">
       {done ? (
-        <Globe className="w-3 h-3 text-green-400 shrink-0" />
+        <Globe className="w-3 h-3 text-ui-success shrink-0" />
       ) : (
         <Loader2 className="w-3 h-3 animate-spin text-[var(--taomni-accent)] shrink-0" />
       )}
@@ -39,14 +40,14 @@ export function SearchProgressChip({ query, provider, onCancel, done, resultCoun
         }
       </span>
       {!done && onCancel && (
-        <button
+        <IconButton
           type="button"
           className="text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] ml-0.5"
           onClick={onCancel}
-          title={t("chat.searchChipCancel")}
+          label={t("chat.searchChipCancel")}
         >
           <X className="w-3 h-3" />
-        </button>
+        </IconButton>
       )}
     </div>
   );

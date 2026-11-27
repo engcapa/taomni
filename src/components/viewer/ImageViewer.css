@@ -84,7 +84,7 @@
 .image-properties dt { color: var(--muted, var(--taomni-text-muted)); }
 .image-properties dd { margin: 0; overflow-wrap: anywhere; }
 .image-properties p { margin: 4px 0; line-height: 1.6; }
-.image-sanitized { display: inline-flex; gap: 4px; align-items: center; border: 1px solid color-mix(in srgb, #16a34a 28%, transparent); border-radius: 5px; padding: 2px 6px; font-size: 11px; color: var(--taomni-success, #16803d); background: color-mix(in srgb, #16a34a 9%, transparent); }
+.image-sanitized { display: inline-flex; gap: 4px; align-items: center; border: 1px solid color-mix(in srgb, #16a34a 28%, transparent); border-radius: 5px; padding: 2px 6px; font-size: 11px; color: var(--taomni-success-icon, #16803d); background: color-mix(in srgb, #16a34a 9%, transparent); }
 .image-sanitized svg { width: 13px; height: 13px; }
 .image-actions { display: flex; flex-direction: column; align-items: stretch; gap: 3px; }
 .image-actions .fv-button { justify-content: flex-start; border: 1px solid var(--divider, var(--taomni-divider)); }

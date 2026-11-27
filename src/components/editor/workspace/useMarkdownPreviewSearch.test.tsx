@@ -31,6 +31,10 @@ it("allows a focused preview to find before the deferred source port exists", as
   const query = await screen.findByRole("searchbox", { name: "Find in preview" });
   fireEvent.change(query, { target: { value: "needle" } });
   expect(screen.getByTestId("markdown-search-count")).toHaveTextContent("1/1");
+  const mark = screen.getByTestId("markdown-search-match");
+  expect(mark.className).toContain("var(--taomni-code-find-match-bg)");
+  expect(mark.className).toContain("var(--taomni-code-find-match-fg)");
+  expect(mark).toHaveAttribute("data-current", "true");
   let release = () => {};
   act(() => {
     sourceReady = true;
@@ -75,6 +79,10 @@ it("keeps focused split preview Find when the source editor finishes mounting la
   expect(sourceFind).not.toHaveBeenCalled();
   fireEvent.change(query, { target: { value: "needle" } });
   expect(screen.getByTestId("markdown-search-count")).toHaveTextContent("1/1");
+  const mark = screen.getByTestId("markdown-search-match");
+  expect(mark.className).toContain("var(--taomni-code-find-match-bg)");
+  expect(mark.className).toContain("var(--taomni-code-find-match-fg)");
+  expect(mark).toHaveAttribute("data-current", "true");
   fireEvent.keyDown(query, { key: "Escape" });
   expect(screen.getByTestId("preview")).toHaveFocus();
   act(() => screen.getByRole("button", { name: "Source" }).focus());

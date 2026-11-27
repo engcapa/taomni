@@ -1,3 +1,4 @@
+import { alertAppDialog } from "../../../lib/appDialogs";
 import { useState } from "react";
 import type { SessionConfig } from "../../../lib/ipc";
 import { type SessionImportResult } from "../../../lib/sessionImportExport";
@@ -34,7 +35,7 @@ export function useSessionImportPreview(context: UseSessionImportPreviewContext)
       void context.enrichTabbyResult(result)
         .then((enriched) => setPendingImport({ result: enriched, folderPath, source }))
         .catch((error) => {
-          window.alert(error instanceof Error ? error.message : String(error));
+          void alertAppDialog({ message: error instanceof Error ? error.message : String(error) });
         });
       return;
     }
@@ -42,7 +43,7 @@ export function useSessionImportPreview(context: UseSessionImportPreviewContext)
       void context.enrichSecureCrtResult(result)
         .then((enriched) => setPendingImport({ result: enriched, folderPath, source }))
         .catch((error) => {
-          window.alert(error instanceof Error ? error.message : String(error));
+          void alertAppDialog({ message: error instanceof Error ? error.message : String(error) });
         });
       return;
     }

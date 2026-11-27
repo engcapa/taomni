@@ -17,6 +17,10 @@ mod elements;
 mod actions;
 #[cfg(target_os = "macos")]
 mod appkit_drag;
+#[cfg(target_os = "macos")]
+mod appkit_tab;
+#[cfg(any(target_os = "macos", test))]
+mod tab_navigation;
 
 mod capture;
 

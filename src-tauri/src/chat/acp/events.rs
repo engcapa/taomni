@@ -49,10 +49,15 @@ pub(super) fn emit_acp_permission(
     // mounts `CcAgentBridge` too, and a broadcast rendered the same ACP gate in
     // both windows (issue #869). Resolution stays a broadcast
     // (`agent-acp-permission-dismissed`) so every window drops its card.
-    crate::windowing::thread_delivery::emit_thread_event_for_app(
+    state.core.agent.pending_approvals.publish(
         app,
+        &state.core.agent.thread_windows,
+        crate::windowing::pending_approvals::ApprovalId::Acp {
+            thread: thread_id.into(),
+            owner: permission_owner_id.into(),
+            call: permission.call_id.clone(),
+        },
         thread_id,
-        "agent-acp-permission",
         json!({
             "callId": permission.call_id,
             "threadId": thread_id,
@@ -72,6 +77,11 @@ pub(super) fn dismiss_acp_permission(
     call_id: Option<&str>,
 ) {
     let state = app.state::<crate::state::AppState>();
+    state
+        .core
+        .agent
+        .pending_approvals
+        .dismiss_acp(thread_id, permission_owner_id, call_id);
     state
         .legacy
         .mobile

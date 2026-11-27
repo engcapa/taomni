@@ -57,7 +57,6 @@ pub(super) async fn actions_script<R: Runtime>(
     Ok(format!(
         r#"const __qaActions = {encoded};
         {helper}
-        const __qaActive = document.activeElement || document.body;
         const __qaModifiers = {{Control:false,Shift:false,Alt:false,Meta:false}};
         {keyboard_script}
         const __qaButtonKey = createQaButtonKeyboard();
@@ -115,11 +114,7 @@ pub(super) async fn actions_script<R: Runtime>(
               Object.defineProperty(event, 'which', {{ get: () => keyCode }});
             }} catch (_) {{}}
           }}
-          __qaActive.dispatchEvent(event);
-          __qaButtonKey(__qaActive, domType, key, event, __qaModifiers);
-          if (domType === 'keydown') {{
-            dispatchQaKeyDefault(__qaActive, key, event, __qaModifiers);
-          }}
+          dispatchQaKeyToFocus(domType, key, event, __qaModifiers, __qaButtonKey);
         }};
         const __qaPoint = (x, y) => document.elementFromPoint(Number(x) || 0, Number(y) || 0) || document.body;
         // Pointer origins: viewport (default), the live pointer position, or
@@ -163,6 +158,13 @@ pub(super) async fn actions<R: Runtime>(
 ) -> Response {
     if !session_is_valid(&session_id) {
         return error("unknown WebDriver session");
+    }
+    #[cfg(target_os = "macos")]
+    if let Some(reverse) = super::tab_navigation::reverse_tab(&payload) {
+        return match super::appkit_tab::send(&state, reverse).await {
+            Ok(()) => ok(Value::Bool(true)),
+            Err(message) => error(message),
+        };
     }
     let key = json!(format!("__qaActions_{}", uuid::Uuid::new_v4().simple())).to_string();
     let script = match actions_script(&state, &payload, &key).await {

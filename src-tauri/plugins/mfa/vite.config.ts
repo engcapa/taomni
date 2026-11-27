@@ -17,9 +17,10 @@ function service<Key extends keyof MfaRendererHost>(key: Key, names: (keyof MfaR
 
 const modules: Record<string, { object: string; names: string[] }> = {
   react: { object: "__taomniHost.React", names: [
-    "createContext", "createElement", "forwardRef", "useCallback", "useContext", "useEffect", "useLayoutEffect",
+    "createContext", "createElement", "forwardRef", "useCallback", "useContext", "useEffect", "useId", "useLayoutEffect",
     "useMemo", "useRef", "useState",
   ] },
+  "react-dom": { object: "__taomniHost.ReactDOM", names: ["createPortal"] },
   "react/jsx-runtime": { object: "__taomniHost.jsxRuntime", names: ["Fragment", "jsx", "jsxs"] },
   "lib/i18n": { object: "__taomniHost.i18n", names: ["useT"] },
   "stores/mfaStore": service("store", ["useMfaStore"]),

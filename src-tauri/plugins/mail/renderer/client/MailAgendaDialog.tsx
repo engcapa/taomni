@@ -15,7 +15,6 @@ export interface MailAgendaDialogContext {
 export function MailAgendaDialog(context: MailAgendaDialogContext) {
   const { agendaOpen, info, setAgendaOpen, agendaRevision, setStatus, onAgendaChanged } = context;
   return agendaOpen && info.caldav && (
-    <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
       <MailDraggableDialog
         title="Agenda"
         icon={<CalendarDays className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
@@ -33,6 +32,5 @@ export function MailAgendaDialog(context: MailAgendaDialogContext) {
           onChanged={onAgendaChanged}
         />
       </MailDraggableDialog>
-    </div>
   );
 }

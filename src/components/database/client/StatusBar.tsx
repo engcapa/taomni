@@ -8,7 +8,7 @@ export function StatusBar({ panel }: { panel: PanelState }) {
   const r = sheet?.result ?? null;
   return (
     <div
-      className="h-6 shrink-0 flex items-center gap-3 px-2 text-[11px] text-[var(--taomni-text-muted)]"
+      className="h-6 shrink-0 flex items-center gap-3 px-2 text-ui-small text-[var(--taomni-text-muted)]"
       style={{ background: "var(--taomni-quick-bg)", borderTop: "1px solid var(--taomni-divider)" }}
     >
       {sheet?.running ? (

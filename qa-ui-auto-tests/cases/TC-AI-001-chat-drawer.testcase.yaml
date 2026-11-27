@@ -40,7 +40,7 @@ steps:
 - click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'
 - assert_visible: button[title="New chat"]
-- assert_visible: button[title="History"]
+- assert_visible: button[aria-label="History"]
 - assert_visible: '[data-testid="ai-chat-drawer-position"]'
 - assert_visible: '[data-testid="ai-chat-drawer-pin"]'
 - assert_visible: '[data-testid="ai-chat-drawer-hide"]'
@@ -96,7 +96,7 @@ verification:
     - step: 9
       expectation: '{"assert_visible": "button[title=\"New chat\"]"}'
     - step: 10
-      expectation: '{"assert_visible": "button[title=\"History\"]"}'
+      expectation: '{"assert_visible": "button[aria-label=\"History\"]"}'
     - step: 11
       expectation: '{"assert_visible": "[data-testid=\"ai-chat-drawer-position\"]"}'
     - step: 12

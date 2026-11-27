@@ -59,7 +59,7 @@ export function MobileHostSettings() {
       }} />
       {" "}{t("mobileSettings.allowAllHosts")}
     </label>
-    <p data-testid="mobile-settings-hosts-warning" className="text-amber-600 dark:text-amber-400">{t("mobileSettings.allHostsWarning")}</p>
+    <p data-testid="mobile-settings-hosts-warning" className="text-ui-warning">{t("mobileSettings.allHostsWarning")}</p>
     <label className="block">
       {t("mobileSettings.allowedHosts")}
       <textarea data-testid="mobile-settings-allowed-hosts" className="mt-1 block w-full border rounded px-2 py-1" rows={3} value={hosts} disabled={!loaded || busy || allowAll} placeholder={"pc.example.com\npc.example.com:8443"} onChange={e => {
@@ -68,9 +68,9 @@ export function MobileHostSettings() {
       }} />
     </label>
     <p className="text-[var(--taomni-text-muted)]">{t("mobileSettings.hostsApplyHint")}</p>
-    <button data-testid="mobile-settings-save-hosts" className="border rounded px-3 py-1.5" disabled={!loaded || busy} onClick={() => void save()}>{t("mobileSettings.saveHosts")}</button>
-    {!loaded && error && <button data-testid="mobile-settings-reload-hosts" className="ml-2 border rounded px-3 py-1.5" onClick={() => { setError(""); setReload(value => value + 1); }}>{t("mobileSettings.retryHosts")}</button>}
+    <button type="button" data-testid="mobile-settings-save-hosts" className="border rounded px-3 py-1.5" disabled={!loaded || busy} onClick={() => void save()}>{t("mobileSettings.saveHosts")}</button>
+    {!loaded && error && <button type="button" data-testid="mobile-settings-reload-hosts" className="ml-2 border rounded px-3 py-1.5" onClick={() => { setError(""); setReload(value => value + 1); }}>{t("mobileSettings.retryHosts")}</button>}
     {saved && <p role="status" data-testid="mobile-settings-hosts-saved">{t("mobileSettings.hostsSaved")}</p>}
-    {error && <p role="alert" data-testid="mobile-settings-hosts-error" className="text-red-400">{mobileSettingsError(error, t)}</p>}
+    {error && <p role="alert" data-testid="mobile-settings-hosts-error" className="text-ui-danger">{mobileSettingsError(error, t)}</p>}
   </section>;
 }

@@ -32,6 +32,7 @@
       },
       "uniqueItems": true
     },
+    "ui_standard": {"$ref": "#/$defs/ui_standard"},
     "tags": {
       "type": "array",
       "items": {
@@ -275,6 +276,7 @@
                 "type": "string",
                 "minLength": 1
               },
+              "ui_standard": {"$ref": "#/$defs/ui_standard"},
               "requirement": {
                 "type": "string",
                 "minLength": 1
@@ -388,6 +390,12 @@
     }
   },
   "$defs": {
+    "ui_standard": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^UI-[A-Z0-9]+-[0-9]{2}[a-z]?$"}
+    },
     "language_startup_counts": {
       "type": "object",
       "minProperties": 1,
@@ -1135,6 +1143,37 @@
         "eval_readonly": {
           "$ref": "#/$defs/eval_readonly_arg"
         },
+        "assert_focus_on": {"$ref": "#/$defs/selector"},
+        "assert_focus_within": {"$ref": "#/$defs/selector"},
+        "assert_labelledby_text": {
+          "type": "object",
+          "required": ["selector", "equals"],
+          "additionalProperties": false,
+          "properties": {
+            "selector": {"$ref": "#/$defs/selector"},
+            "equals": {"type": "string", "minLength": 1}
+          }
+        },
+        "assert_computed_style": {
+          "type": "object",
+          "required": ["selector", "property", "equals"],
+          "additionalProperties": false,
+          "properties": {
+            "selector": {"$ref": "#/$defs/selector"},
+            "property": {"type": "string", "minLength": 1},
+            "equals": {"type": "string"}
+          }
+        },
+        "assert_solid_text_contrast": {
+          "type": "object",
+          "required": ["selector", "minimum"],
+          "additionalProperties": false,
+          "properties": {
+            "selector": {"$ref": "#/$defs/selector"},
+            "minimum": {"type": "number", "minimum": 1, "maximum": 21},
+            "composite_ancestors": {"type": "boolean"}
+          }
+        },
         "assert_element_geometry": {
           "type": "object",
           "additionalProperties": false,
@@ -1143,6 +1182,7 @@
             "selector": {"type": "string", "minLength": 1},
             "min_width": {"type": "number", "minimum": 1},
             "min_height": {"type": "number", "minimum": 1},
+            "hit_height": {"type": "number", "minimum": 1},
             "min_count": {"type": "integer", "minimum": 1},
             "same_width": {"type": "boolean"},
             "icon_size": {"type": "number", "minimum": 1},
@@ -1388,10 +1428,12 @@
             {
               "type": "object",
               "additionalProperties": false,
-              "properties": {}
+              "properties": {
+                "ready_selector": { "type": "string", "minLength": 1 }
+              }
             }
           ],
-          "description": "Reload the webview document so store bootstraps re-read storage; waits for welcome-panel."
+          "description": "Reload the current WebView, preserve its storage, and wait for its new document. Set ready_selector when a specific route must mount."
         },
         "vault_first_run": {
           "type": "string",
@@ -2319,7 +2361,16 @@
       ]
     },
     "hover_arg": {
-      "$ref": "#/$defs/selector"
+      "oneOf": [
+        {"$ref": "#/$defs/selector"},
+        {
+          "type": "object", "required": ["selector"], "additionalProperties": false,
+          "properties": {
+            "selector": {"$ref": "#/$defs/selector"},
+            "macos_system_pointer": {"type": "boolean"}
+          }
+        }
+      ]
     },
     "drag_arg": {
       "type": "object",

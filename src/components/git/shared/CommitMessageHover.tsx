@@ -173,7 +173,7 @@ export function CommitMessageHover({
           role="dialog"
           aria-label="Commit message"
           data-testid="commit-message-hover"
-          className="fixed z-[600] rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] text-[var(--taomni-text)] shadow-xl"
+          className="fixed z-[var(--taomni-z-tooltip)] rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] text-[var(--taomni-text)] shadow-xl"
           style={{
             top: pos.top,
             left: pos.left,
@@ -189,16 +189,16 @@ export function CommitMessageHover({
             className="overflow-auto p-3 select-text cursor-text"
             style={{ maxHeight: pos.maxHeight }}
           >
-            <div className="text-[12px] leading-5 font-semibold whitespace-pre-wrap break-words">
+            <div className="text-ui-body leading-5 font-semibold whitespace-pre-wrap break-words">
               {content.subject}
             </div>
             {body ? (
-              <div className="mt-1.5 text-[11px] leading-4 text-[var(--taomni-text-muted)] whitespace-pre-wrap break-words">
+              <div className="mt-1.5 text-ui-small leading-4 text-[var(--taomni-text-muted)] whitespace-pre-wrap break-words">
                 {body}
               </div>
             ) : null}
             {content.meta ? (
-              <div className="mt-2 pt-2 border-t border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)] select-text">
+              <div className="mt-2 pt-2 border-t border-[var(--taomni-divider)] text-ui-small text-[var(--taomni-text-muted)] select-text">
                 {content.meta}
               </div>
             ) : null}

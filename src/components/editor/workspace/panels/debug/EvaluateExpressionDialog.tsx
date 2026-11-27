@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { ModalSurface } from "../../../../ui/ModalSurface";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import type { CodeDebugSession } from "../../useCodeDebugSession";
@@ -19,13 +20,8 @@ export function EvaluateExpressionDialog({ debug, initialExpression = "", onClos
   const [expression, setExpression] = useState(initialExpression);
   const [result, setResult] = useState<VarNode | null>(null);
   const [busy, setBusy] = useState(false);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const stopped = debug.state?.status === "stopped";
 
-  useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, []);
 
   const evaluate = async () => {
     const text = expression.trim();
@@ -61,80 +57,70 @@ export function EvaluateExpressionDialog({ debug, initialExpression = "", onClos
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onClose();
-    }}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Evaluate"
-        data-testid="debug-evaluate-dialog"
-        className="flex max-h-[80vh] w-[560px] max-w-[95vw] flex-col rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[11px] shadow-xl"
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            event.stopPropagation();
-            onClose();
-          }
-        }}
-      >
-        <div className="flex h-8 shrink-0 items-center justify-between border-b border-[var(--taomni-code-border)] px-3">
-          <span className="font-semibold">Evaluate</span>
-          <button type="button" aria-label="Close" className="rounded p-0.5 hover:bg-[var(--taomni-hover-bg)]" onClick={onClose}>
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        <div className="space-y-2 p-3">
-          <textarea
-            ref={inputRef}
+    <ModalSurface
+      data-testid="debug-evaluate-dialog"
+      initialFocus="[data-testid=debug-evaluate-expression]"
+      onCancel={onClose}
+      aria-label="Evaluate"
+      className="taomni-modal taomni-workspace-modal"
+      data-bleed="true"
+      style={{ width: "min(560px, calc(100vw - 32px))" }}
+    >
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-[var(--taomni-code-border)] px-3">
+        <span className="font-semibold">Evaluate</span>
+        <button type="button" aria-label="Close" className="rounded p-0.5 hover:bg-[var(--taomni-hover)]" onClick={onClose}>
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="space-y-2 p-3">
+        <textarea
             data-testid="debug-evaluate-expression"
-            aria-label="Expression"
-            rows={2}
-            className="w-full resize-y rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-2 py-1 font-mono text-[12px] outline-none focus:border-[var(--taomni-accent)]"
-            placeholder={stopped ? "Expression" : "Evaluation needs a suspended program"}
-            value={expression}
-            onChange={(event) => setExpression(event.target.value)}
-            onKeyDown={(event) => {
-              // IDEA: Enter evaluates, Shift+Enter adds a line.
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void evaluate();
-              }
-            }}
-          />
-          <div className="text-[10px] text-[var(--taomni-text-muted)]">Result:</div>
-          <div data-testid="debug-evaluate-result" className="min-h-[80px] max-h-[40vh] overflow-auto rounded border border-[var(--taomni-code-border)] py-1">
-            {result ? (
-              <VariableRow node={result} depth={0} onExpand={expand} />
-            ) : (
-              <div className="px-2 text-[var(--taomni-text-muted)]">
-                {stopped ? "Press Enter to evaluate." : "The program is not suspended."}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="flex h-10 shrink-0 items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-3">
-          <button
-            type="button"
-            data-testid="debug-evaluate-add-watch"
-            disabled={!expression.trim()}
-            className="h-6 rounded border border-[var(--taomni-code-border)] px-3 hover:bg-[var(--taomni-hover-bg)] disabled:opacity-40"
-            onClick={() => debug.addWatchExpression(expression.trim())}
-          >
-            Add to Watches
-          </button>
-          <button
-            type="button"
-            data-testid="debug-evaluate-submit"
-            disabled={!stopped || !expression.trim() || busy}
-            className="h-6 rounded bg-[var(--taomni-accent)] px-4 font-medium text-white hover:opacity-90 disabled:opacity-40"
-            onClick={() => void evaluate()}
-          >
-            Evaluate
-          </button>
+          aria-label="Expression"
+          rows={2}
+          className="w-full resize-y rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-2 py-1 font-mono text-ui-body focus-visible:keyboard-outline focus:border-[var(--taomni-accent)]"
+          placeholder={stopped ? "Expression" : "Evaluation needs a suspended program"}
+          value={expression}
+          onChange={(event) => setExpression(event.target.value)}
+          onKeyDown={(event) => {
+            // IDEA: Enter evaluates, Shift+Enter adds a line.
+            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
+              event.preventDefault();
+              void evaluate();
+            }
+          }}
+        />
+        <div className="text-ui-caption text-[var(--taomni-text-muted)]">Result:</div>
+        <div data-testid="debug-evaluate-result" className="min-h-[80px] max-h-[40vh] overflow-auto rounded border border-[var(--taomni-code-border)] py-1">
+          {result ? (
+            <VariableRow node={result} depth={0} onExpand={expand} />
+          ) : (
+            <div className="px-2 text-[var(--taomni-text-muted)]">
+              {stopped ? "Press Enter to evaluate." : "The program is not suspended."}
+            </div>
+          )}
         </div>
       </div>
-    </div>,
+      <div className="flex h-10 shrink-0 items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-3">
+        <button
+          type="button"
+          data-testid="debug-evaluate-add-watch"
+          disabled={!expression.trim()}
+          className="h-6 rounded border border-[var(--taomni-code-border)] px-3 hover:bg-[var(--taomni-hover)] disabled:opacity-40"
+          onClick={() => debug.addWatchExpression(expression.trim())}
+        >
+          Add to Watches
+        </button>
+        <button
+          type="button"
+          data-testid="debug-evaluate-submit"
+          disabled={!stopped || !expression.trim() || busy}
+          className="h-6 rounded bg-[var(--taomni-accent)] px-4 font-medium text-white hover:opacity-90 disabled:opacity-40"
+          onClick={() => void evaluate()}
+        >
+          Evaluate
+        </button>
+      </div>
+    </ModalSurface>,
     document.body,
   );
 }

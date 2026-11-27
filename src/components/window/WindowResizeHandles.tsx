@@ -72,7 +72,7 @@ const HANDLES: ResizeHandle[] = [
 ];
 
 export function WindowResizeHandles({
-  className = "fixed inset-0 z-[10000]",
+  className = "fixed inset-0 z-[var(--taomni-z-drag-ghost)]",
   edgeSize = EDGE_SIZE,
   topEdgeSize = edgeSize,
   cornerSize = CORNER_SIZE,

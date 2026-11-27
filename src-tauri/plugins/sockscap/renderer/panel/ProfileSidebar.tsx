@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../crates/taomni-plugin-api/frontend/ui/IconButton";
 import { ArrowDown, ArrowUp, Copy, PanelLeftClose, Plus, Trash2 } from "lucide-react";
 import { type SocksCapConfig, type SocksCapProfile } from "../../../../../src/lib/sockscap";
 import { MIN_PROFILE_PRIORITY, MAX_PROFILE_PRIORITY } from "./configuration";
@@ -31,7 +32,7 @@ export function ProfileSidebar(viewProps: ProfileSidebarProps) {
     data-testid="sockscap-profile-list"
   >
     <div className="flex items-center justify-between gap-1">
-      <span className="text-[12px] font-bold text-[var(--taomni-text)] truncate">
+      <span className="text-ui-body font-bold text-[var(--taomni-text)] truncate">
         {viewProps.t("sockscap.profilesTitle")}
       </span>
       <div className="flex items-center gap-1 shrink-0">
@@ -63,7 +64,7 @@ export function ProfileSidebar(viewProps: ProfileSidebarProps) {
       <button
         type="button"
         data-testid="sockscap-sub-import-toggle"
-        className="w-full text-[11px] px-2 py-1 rounded border border-[var(--taomni-divider)] text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full text-ui-small px-2 py-1 rounded border border-[var(--taomni-divider)] text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={() => viewProps.setShowSubImport((v) => !v)}
         disabled={viewProps.locked}
         title={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
@@ -74,7 +75,7 @@ export function ProfileSidebar(viewProps: ProfileSidebarProps) {
         <div className="mt-1.5 space-y-1.5">
           <textarea
             data-testid="sockscap-sub-input"
-            className="w-full text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] resize-y min-h-[48px]"
+            className="w-full text-ui-small px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] resize-y min-h-[48px]"
             placeholder={viewProps.t("sockscap.subImportPlaceholder")}
             value={viewProps.subInput}
             disabled={viewProps.locked}
@@ -84,7 +85,7 @@ export function ProfileSidebar(viewProps: ProfileSidebarProps) {
           <button
             type="button"
             data-testid="sockscap-sub-import"
-            className="w-full text-[11px] px-2 py-1 rounded border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full text-ui-small px-2 py-1 rounded border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => void viewProps.onImportSubscription()}
             disabled={viewProps.busy || viewProps.locked || !viewProps.subInput.trim()}
           >
@@ -103,7 +104,7 @@ export function ProfileSidebar(viewProps: ProfileSidebarProps) {
           <div
             key={p.id}
             data-testid={`sockscap-profile-item-${p.id}`}
-            className={`p-2 rounded-lg border text-[11px] transition-all cursor-pointer ${isSelected
+            className={`p-2 rounded-lg border text-ui-small transition-all cursor-pointer ${isSelected
               ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/10 shadow-sm"
               : "border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] bg-[var(--taomni-bg)]"
               }`}
@@ -129,35 +130,35 @@ export function ProfileSidebar(viewProps: ProfileSidebarProps) {
                         : viewProps.t("sockscap.activeTooltipInactive")
                   }
                 />
-                <span className="text-[13px]">{p.icon || "🛡️"}</span>
+                <span className="text-ui-body">{p.icon || "🛡️"}</span>
                 <span className="font-semibold truncate">{p.name}</span>
               </div>
               <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                <button
+                <IconButton
                   type="button"
                   className="p-1 text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] rounded disabled:opacity-40 disabled:cursor-not-allowed"
-                  title={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : viewProps.t("sockscap.duplicateProfileTooltip")}
+                  label={viewProps.t("sockscap.duplicateProfileTooltip")} hint={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
                   onClick={() => void viewProps.duplicateProfile(p)}
                   disabled={viewProps.locked}
                 >
                   <Copy className="w-3 h-3" />
-                </button>
+                </IconButton>
                 {viewProps.cfg.profiles.length > 1 && (
-                  <button
+                  <IconButton
                     type="button"
                     data-testid={`sockscap-delete-profile-${p.id}`}
-                    className="p-1 text-[var(--taomni-text-muted)] hover:text-red-500 rounded disabled:opacity-40 disabled:cursor-not-allowed"
-                    title={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : viewProps.t("sockscap.deleteProfileTooltip")}
+                    className="p-1 text-[var(--taomni-text-muted)] hover:text-ui-danger rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                    label={viewProps.t("sockscap.deleteProfileTooltip")} hint={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
                     onClick={() => void viewProps.deleteProfile(p.id)}
                     disabled={viewProps.locked}
                   >
                     <Trash2 className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-[10px] text-[var(--taomni-text-muted)]">
+            <div className="flex items-center justify-between text-ui-caption text-[var(--taomni-text-muted)]">
               <span>
                 {p.mode === "global"
                   ? viewProps.t("sockscap.scopeGlobal")
@@ -167,7 +168,7 @@ export function ProfileSidebar(viewProps: ProfileSidebarProps) {
                 {p.ruleMode}
               </span>
             </div>
-            <div className="mt-1.5 flex items-center gap-1 text-[10px] text-[var(--taomni-text-muted)]">
+            <div className="mt-1.5 flex items-center gap-1 text-ui-caption text-[var(--taomni-text-muted)]">
               <span title={priorityHint}>{viewProps.t("sockscap.priorityLabel")}</span>
               <button
                 type="button"

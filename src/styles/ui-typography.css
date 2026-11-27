@@ -1,0 +1,9 @@
+/* The fallbacks preserve appearance when an updated renderer is installed in
+   an earlier compatible core. The core defines the semantic scale in theme.css. */
+@theme inline {
+  --text-ui-caption: var(--taomni-fs-caption, calc(var(--taomni-ui-font-size, 12px) - 2px));
+  --text-ui-small: var(--taomni-fs-small, calc(var(--taomni-ui-font-size, 12px) - 1px));
+  --text-ui-body: var(--taomni-fs-body, var(--taomni-ui-font-size, 12px));
+  --text-ui-title: var(--taomni-fs-title, calc(var(--taomni-ui-font-size, 12px) + 2px));
+  --text-ui-heading: var(--taomni-fs-heading, calc(var(--taomni-ui-font-size, 12px) + 4px));
+}

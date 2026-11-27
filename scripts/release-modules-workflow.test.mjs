@@ -5,7 +5,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { listStableModules } from "./release-version-utils.mjs";
 
+const repoRoot = join(import.meta.dirname, "..");
 const workflow = readFileSync(new URL("../.github/workflows/release-modules.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 test("release planning accepts a renderer without Cargo and builds a declared host", (t) => {
@@ -42,6 +44,14 @@ test("release planning accepts a renderer without Cargo and builds a declared ho
   assert.match(readFileSync(output, "utf8"), /^package=reader$/m);
 });
 
+test("workflow_dispatch module input offers a dropdown matching every stable module", () => {
+  const dispatchSection = workflow.split("  workflow_call:\n")[0];
+  const moduleBlock = dispatchSection.split("      module:\n")[1].split("      head:\n")[0];
+  assert.match(moduleBlock, /^        type: choice$/m);
+  const options = [...moduleBlock.matchAll(/^          - (.+)$/gm)].map((match) => match[1]);
+  assert.deepEqual(options, listStableModules(repoRoot).map((mod) => mod.slug));
+});
+
 test("module-only release builds every declared target and never invokes the core release workflow", () => {
   for (const platform of ["linux-x86_64", "windows-x86_64", "darwin-aarch64", "darwin-x86_64"]) {
     assert.match(workflow, new RegExp(platform));
@@ -55,6 +65,10 @@ test("module-only release builds every declared target and never invokes the cor
 });
 
 test("reusable packaging keeps independent artifact names and skips standalone publication", () => {
+  const reusable = workflow.split("  workflow_call:\n")[1];
+  const moduleBlock = reusable.split("      module:\n")[1].split("      head:\n")[0];
+  assert.match(moduleBlock, /^        type: string$/m);
+  assert.doesNotMatch(moduleBlock, /^        options:/m);
   assert.match(workflow, /module-unsigned-\$\{\{ needs\.source\.outputs\.slug \}\}-/);
   assert.match(workflow, /module-signed-\$\{\{ needs\.source\.outputs\.slug \}\}-/);
   assert.match(workflow, /release-desktop-frontend-\$\{\{ needs\.source\.outputs\.slug \}\}-/);

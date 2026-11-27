@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { AlertTriangle, Eye, X } from "lucide-react";
 import { useT } from "../../../lib/i18n";
 import { formatBytes, type FileEntry } from "../../../lib/sftp";
@@ -122,14 +123,14 @@ export function FilePanelView(inputs: FilePanelViewProps) {
   return ((
     <div data-testid={`sftp-${side}-pane`} className="h-full w-full min-w-0 flex flex-col min-h-0">
       <div
-        className="h-7 flex items-center px-2 text-[11px] border-b shrink-0 gap-2"
+        className="h-7 flex items-center px-2 text-ui-small border-b shrink-0 gap-2"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
         <span
-          className="px-1.5 py-[1px] text-[10px] font-bold tracking-wider rounded shrink-0"
+          className="px-1.5 py-[1px] text-ui-caption font-bold tracking-wider rounded shrink-0"
           style={{
-            background: side === "remote" ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
-            color: "#fff",
+            background: side === "remote" ? "var(--taomni-primary-bg)" : "var(--taomni-text-muted)",
+            color: side === "remote" ? "var(--taomni-primary-text)" : "var(--taomni-bg)",
             letterSpacing: "0.08em",
           }}
         >
@@ -137,7 +138,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
         </span>
         {subtitle && (
           <span
-            className="truncate text-[11px]"
+            className="truncate text-ui-small"
             style={{ color: "var(--taomni-text-muted)" }}
             title={subtitle}
           >
@@ -152,7 +153,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
             value={filterText ?? ""}
             placeholder={t("fileBrowser.filterPlaceholder")}
             onChange={(e) => onFilterTextChange(e.target.value)}
-            className="taomni-input h-5 px-1.5 text-[11px] w-[140px] rounded shrink-0"
+            className="taomni-input h-5 px-1.5 text-ui-small w-[140px] rounded shrink-0"
             style={{
               background: "var(--taomni-input-bg)",
               border: "1px solid var(--taomni-input-border)",
@@ -273,7 +274,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
         <div
           data-testid={`sftp-${side}-listing-status`}
           role="status"
-          className="min-h-6 flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1 border-b shrink-0 text-[11px]"
+          className="min-h-6 flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1 border-b shrink-0 text-ui-small"
           style={{
             borderColor: "var(--taomni-divider)",
             background: "var(--taomni-quick-bg)",
@@ -283,7 +284,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
           {skippedEntryCount > 0 && (
             <span
               data-testid={`sftp-${side}-access-warning`}
-              className="inline-flex min-w-0 items-center gap-1 text-amber-700 dark:text-amber-400"
+              className="inline-flex min-w-0 items-center gap-1 text-ui-warning"
               title={diagnosticTitle || undefined}
             >
               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
@@ -311,15 +312,15 @@ export function FilePanelView(inputs: FilePanelViewProps) {
                   query: normalizedFilter,
                 })}
               </span>
-              <button
+              <IconButton
                 type="button"
                 data-testid={`sftp-${side}-clear-filter`}
                 className="inline-flex h-5 w-5 shrink-0 items-center justify-center hover:text-[var(--taomni-text)]"
-                title={t("fileBrowser.clearFilter")}
+                label={t("fileBrowser.clearFilter")}
                 onClick={() => onFilterTextChange?.("")}
               >
                 <X className="h-3.5 w-3.5" />
-              </button>
+              </IconButton>
             </span>
           )}
         </div>
@@ -328,7 +329,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
       <div
         ref={listRef}
         data-testid={`sftp-${side}-list`}
-        className="flex-1 overflow-auto text-[12px] relative"
+        className="flex-1 overflow-auto text-ui-body relative"
         onDragOver={interactions.handleDragOver}
         onDragLeave={interactions.handleDragLeave}
         onDrop={interactions.handleDrop}
@@ -339,8 +340,8 @@ export function FilePanelView(inputs: FilePanelViewProps) {
         {ctx.render}
         {draggingOver && (
           <div
-            className="absolute inset-0 pointer-events-none border-2 border-dashed z-10 flex items-center justify-center"
-            style={{ borderColor: "var(--taomni-accent)", background: "rgba(43,93,139,0.08)" }}
+            className="absolute inset-0 pointer-events-none border-2 border-dashed z-[var(--taomni-z-docked-overlay)] flex items-center justify-center"
+            style={{ borderColor: "var(--taomni-accent)", background: "color-mix(in srgb, var(--taomni-accent) 10%, transparent)" }}
           >
             <span className="text-xs font-semibold text-[var(--taomni-accent)]">
               {t("fileBrowser.dropToCopy")}
@@ -364,8 +365,8 @@ export function FilePanelView(inputs: FilePanelViewProps) {
             <col style={{ width: columns.colWidths.mtime }} />
             <col style={{ width: columns.colWidths.type }} />
           </colgroup>
-          <thead className="sticky top-0 z-10" style={{ background: "var(--taomni-quick-bg)" }}>
-            <tr className="text-[11px] uppercase tracking-wide" style={{ color: "var(--taomni-text-muted)" }}>
+          <thead className="sticky top-0 z-[var(--taomni-z-sticky)]" style={{ background: "var(--taomni-quick-bg)" }}>
+            <tr className="text-ui-small uppercase tracking-wide" style={{ color: "var(--taomni-text-muted)" }}>
               <SortHeader
                 label={t("fileBrowser.sortName")}
                 active={sortKey === "name"}
@@ -413,7 +414,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
           <tbody>
             {pane.error && (
               <tr>
-                <td colSpan={4} className="px-2 py-2 text-red-500 text-[11px]">
+                <td colSpan={4} className="px-2 py-2 text-ui-danger text-ui-small">
                   {pane.error}
                 </td>
               </tr>
@@ -452,7 +453,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
                     <FileTypeIcon entry={entry} />
                     <span className="truncate">{entry.name}</span>
                     {entry.symlinkTarget && (
-                      <span className="truncate text-[10px] text-[var(--taomni-text-muted)]">→ {entry.symlinkTarget}</span>
+                      <span className="truncate text-ui-caption text-[var(--taomni-text-muted)]">→ {entry.symlinkTarget}</span>
                     )}
                   </div>
                 </td>
@@ -472,7 +473,7 @@ export function FilePanelView(inputs: FilePanelViewProps) {
           </tbody>
         </table>
       </div>
-      <div className="h-5 px-2 text-[11px] flex items-center border-t shrink-0"
+      <div className="h-5 px-2 text-ui-small flex items-center border-t shrink-0"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-status-bg)", color: "var(--taomni-status-text)" }}>
         {pane.loading
           ? t("fileBrowser.statusLoading")

@@ -1,5 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { useT } from "../../lib/i18n";
+import { ConfirmDialog } from "../sidebar/ConfirmDialog";
+import { Button } from "../ui/Button";
+import { Modal } from "../ui/Modal";
+import { usePendingAction } from "../ui/usePendingAction";
 
 export interface VaultSetupDialogProps {
   onCancel: () => void;
@@ -7,145 +11,63 @@ export interface VaultSetupDialogProps {
 }
 
 export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) {
-  const [pw1, setPw1] = useState("");
-  const [pw2, setPw2] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const id = useId();
   const t = useT();
-
-  const tooShort = pw1.length > 0 && pw1.length < 8;
-  const mismatch = pw2.length > 0 && pw1 !== pw2;
-  const valid = pw1.length >= 8 && pw1 === pw2;
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  const handleSubmit = async () => {
-    if (!valid || busy) return;
-    setBusy(true);
+  const tooShort = password.length > 0 && password.length < 8;
+  const mismatch = confirmation.length > 0 && password !== confirmation;
+  const valid = password.length >= 8 && password === confirmation;
+  const { busy, run } = usePendingAction(async () => {
     setError(null);
     try {
-      await onSubmit(pw1);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
+      await onSubmit(password);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
     }
-  };
+  });
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      onCancel();
-    } else if (event.key === "Enter") {
-      const target = event.target as HTMLElement;
-      if (target.tagName !== "BUTTON") {
+  function cancel() {
+    if (busy) return;
+    if (password || confirmation) setDiscarding(true);
+    else onCancel();
+  }
+
+  return <>
+    <Modal title={t("vault.setupTitleSet")} testId="vault-setup-dialog" initialFocus="input"
+      onCancel={cancel} footer={<>
+        <Button onClick={cancel} disabled={busy} data-testid="vault-setup-cancel">{t("vault.cancel")}</Button>
+        <Button type="submit" form={id} variant="primary" busy={busy} disabled={!valid}
+          data-testid="vault-setup-confirm">{busy ? t("vault.settingUp") : t("vault.createVault")}</Button>
+      </>}>
+      <form id={id} className="grid gap-2" aria-busy={busy} onSubmit={(event) => {
         event.preventDefault();
-        void handleSubmit();
-      }
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)" }}
-      onClick={onCancel}
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        role="dialog"
-        aria-label={t("vault.setupTitleSet")}
-        aria-modal="true"
-        data-testid="vault-setup-dialog"
-        className="w-[440px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto rounded shadow-lg p-4"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="text-sm font-semibold mb-1">{t("vault.setupTitleSet")}</div>
-        <div className="text-[12px] mb-3" style={{ color: "var(--taomni-text-muted)" }}>
-          {t("vault.setupDescription")}
-        </div>
-
-        <label className="block text-[12px] mb-1" style={{ color: "var(--taomni-text-muted)" }}>
-          {t("vault.masterPasswordHint")}
-        </label>
-        <input
-          ref={inputRef}
-          data-testid="vault-setup-pw1"
-          type="password"
-          value={pw1}
-          onChange={(event) => setPw1(event.target.value)}
-          className="taomni-input w-full mb-2"
-          autoComplete="new-password"
-          aria-invalid={tooShort ? true : undefined}
-        />
-
-        <label className="block text-[12px] mb-1" style={{ color: "var(--taomni-text-muted)" }}>
-          {t("vault.confirmLabel")}
-        </label>
-        <input
-          data-testid="vault-setup-pw2"
-          type="password"
-          value={pw2}
-          onChange={(event) => setPw2(event.target.value)}
-          className="taomni-input w-full"
-          autoComplete="new-password"
-          aria-invalid={mismatch ? true : undefined}
-        />
-
-        {tooShort && (
-          <div
-            className="mt-2 text-[12px]"
-            style={{ color: "var(--taomni-error, #c33)" }}
-            data-testid="vault-setup-too-short"
-          >
-            {t("vault.tooShort")}
-          </div>
-        )}
-        {mismatch && (
-          <div
-            className="mt-2 text-[12px]"
-            style={{ color: "var(--taomni-error, #c33)" }}
-            data-testid="vault-setup-mismatch"
-          >
-            {t("vault.mismatchLong")}
-          </div>
-        )}
-        {error && (
-          <div
-            className="mt-2 text-[12px]"
-            style={{ color: "var(--taomni-error, #c33)" }}
-            data-testid="vault-setup-error"
-          >
-            {error}
-          </div>
-        )}
-
-        <div className="flex gap-2 justify-end mt-4">
-          <button
-            type="button"
-            data-testid="vault-setup-cancel"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
-            onClick={onCancel}
-            disabled={busy}
-          >
-            {t("vault.cancel")}
-          </button>
-          <button
-            type="button"
-            data-testid="vault-setup-confirm"
-            className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
-            style={{ background: "var(--taomni-accent)" }}
-            onClick={() => void handleSubmit()}
-            disabled={!valid || busy}
-          >
-            {busy ? t("vault.settingUp") : t("vault.createVault")}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+        if (valid && !discarding) void run();
+      }}>
+        <p>{t("vault.setupDescription")}</p>
+        <label htmlFor={id + "-password"}>{t("vault.masterPasswordHint")}</label>
+        <input id={id + "-password"} data-testid="vault-setup-pw1" type="password" autoComplete="new-password"
+          className="taomni-input w-full" value={password} readOnly={busy}
+          onChange={(event) => setPassword(event.target.value)} aria-invalid={tooShort || undefined}
+          aria-describedby={tooShort ? id + "-length" : undefined} />
+        {tooShort && <p id={id + "-length"} data-testid="vault-setup-too-short" className="text-[var(--taomni-danger-text)]">
+          {t("vault.tooShort")}
+        </p>}
+        <label htmlFor={id + "-confirm"}>{t("vault.confirmLabel")}</label>
+        <input id={id + "-confirm"} data-testid="vault-setup-pw2" type="password" autoComplete="new-password"
+          className="taomni-input w-full" value={confirmation} readOnly={busy}
+          onChange={(event) => setConfirmation(event.target.value)} aria-invalid={mismatch || undefined}
+          aria-describedby={mismatch ? id + "-mismatch" : undefined} />
+        {mismatch && <p id={id + "-mismatch"} data-testid="vault-setup-mismatch" className="text-[var(--taomni-danger-text)]">
+          {t("vault.mismatchLong")}
+        </p>}
+        {error && <p role="alert" data-testid="vault-setup-error" className="text-[var(--taomni-danger-text)]">{error}</p>}
+      </form>
+    </Modal>
+    {discarding && <ConfirmDialog title={t("vault.discardSetupTitle")} message={t("vault.discardSetupMessage")}
+      danger confirmLabel={t("vault.discardSetupAction")} cancelLabel={t("vault.continueSetup")}
+      onCancel={() => setDiscarding(false)} onConfirm={onCancel} />}
+  </>;
 }

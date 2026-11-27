@@ -17,7 +17,7 @@ export function RemoteImagesBanner({
   if (!visible) return null;
   return (
     <div
-      className="mx-4 mt-3 mb-0 flex flex-wrap items-center gap-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] px-3 py-2 text-[12px]"
+      className="mx-4 mt-3 mb-0 flex flex-wrap items-center gap-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] px-3 py-2 text-ui-body"
       data-testid="mail-remote-images-banner"
     >
       <ImageOff className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
@@ -29,7 +29,7 @@ export function RemoteImagesBanner({
       {allowRemoteImages ? (
         <button
           type="button"
-          className="taomni-btn h-6 px-2 text-[11px]"
+          className="taomni-btn h-6 px-2 text-ui-small"
           data-testid="mail-remote-images-toggle"
           onClick={onBlock}
         >
@@ -39,7 +39,7 @@ export function RemoteImagesBanner({
         <>
           <button
             type="button"
-            className="taomni-btn h-6 px-2 text-[11px]"
+            className="taomni-btn h-6 px-2 text-ui-small"
             data-testid="mail-remote-images-toggle"
             onClick={onAllowThisMessage}
           >
@@ -47,7 +47,7 @@ export function RemoteImagesBanner({
           </button>
           <button
             type="button"
-            className="taomni-btn h-6 px-2 text-[11px]"
+            className="taomni-btn h-6 px-2 text-ui-small"
             data-testid="mail-remote-images-allow-all"
             onClick={onAllowAllInTab}
             title="Allow remote images for all messages in this tab until closed"

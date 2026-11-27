@@ -25,7 +25,7 @@
 
 .tao-home-history-delete:hover:not(:disabled) {
   background: var(--taomni-hover);
-  color: var(--taomni-error, #c33);
+  color: var(--taomni-danger-text, #c33);
 }
 
 .tao-home-history-delete:disabled {

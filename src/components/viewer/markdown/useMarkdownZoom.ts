@@ -1,3 +1,4 @@
+import { useZoomTarget } from "../../../hooks/useZoomTarget";
 import { useCallback, useEffect, useState, type RefObject } from "react";
 import { contentZoomShortcut, type ContentZoomAction } from "../../../lib/contentZoomShortcut";
 
@@ -6,12 +7,13 @@ export function useMarkdownZoom(content: RefObject<HTMLDivElement | null>, activ
   const change = useCallback((action: ContentZoomAction) => {
     setPercent((value) => action === "reset" ? 100 : Math.min(200, Math.max(60, value + (action === "in" ? 10 : -10))));
   }, []);
+  useZoomTarget(content, active, change);
   const onKeyDown = useCallback((event: KeyboardEvent | React.KeyboardEvent) => {
     const native = "nativeEvent" in event ? event.nativeEvent : event;
-    if (!active || event.defaultPrevented || native.isComposing || event.altKey || event.metaKey) return;
+    if (!active || event.defaultPrevented) return;
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest("input,textarea,select")) return;
-    const action = contentZoomShortcut(event);
+    const action = contentZoomShortcut(native);
     if (!action) return;
     event.preventDefault();
     event.stopPropagation();

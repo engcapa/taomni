@@ -36,8 +36,10 @@ impl ProcessContainment {
         let descriptor_limit = unsafe { limit.assume_init() }.rlim_cur;
         let reader_fd = reader.as_raw_fd();
         let owner_fd = owner.as_raw_fd();
-        // Only async-signal-safe libc operations run after fork. The watchdog
-        // never returns to Rust, allocates, locks, logs, or touches ObjC.
+        let executable = super::watchdog_unix::prepare_executable();
+        // Only async-signal-safe libc operations run after fork. When watchdog
+        // re-exec is enabled, execv replaces the forked image so the watchdog
+        // drops the parent's CoW address space; otherwise the inline monitor runs.
         unsafe {
             command.pre_exec(move || {
                 libc::close(owner_fd);
@@ -51,9 +53,10 @@ impl ProcessContainment {
                     return Err(io::Error::from_raw_os_error(libc::ESRCH));
                 }
                 let group = libc::getpid();
+                let exec_ptr = executable.as_deref().map(std::ffi::CStr::as_ptr);
                 match libc::fork() {
                     -1 => return Err(io::Error::last_os_error()),
-                    0 => watchdog(reader_fd, group, descriptor_limit),
+                    0 => watchdog(reader_fd, group, descriptor_limit, exec_ptr),
                     _ => {
                         libc::close(reader_fd);
                     }
@@ -106,10 +109,37 @@ impl Drop for ProcessContainment {
     }
 }
 
-unsafe fn watchdog(reader: RawFd, group: libc::pid_t, descriptor_limit: libc::rlim_t) -> ! {
+pub(super) fn run_plugin_watchdog(mut args: impl Iterator<Item = std::ffi::OsString>) -> i32 {
+    let Some(group) = args
+        .next()
+        .and_then(|value| value.to_str().and_then(|s| s.parse::<libc::pid_t>().ok()))
+        .filter(|&pid| pid > 0)
+    else {
+        return 1;
+    };
+    unsafe {
+        libc::prctl(libc::PR_SET_NAME, c"taomni-watchdog".as_ptr(), 0, 0, 0);
+        wait_pipe_and_kill_group(group)
+    }
+}
+
+unsafe fn watchdog(
+    reader: RawFd,
+    group: libc::pid_t,
+    descriptor_limit: libc::rlim_t,
+    executable: Option<*const libc::c_char>,
+) -> ! {
     // The std::process exec-error pipe must not survive here: Command::spawn
     // waits for it to close. Do not preserve inherited stdin/stdout either.
     if reader != 3 && unsafe { libc::dup2(reader, 3) } == -1 {
+        unsafe {
+            libc::kill(-group, libc::SIGKILL);
+            libc::_exit(127);
+        }
+    }
+    // pipe2 sets O_CLOEXEC; when reader already landed on fd 3, dup2 was skipped,
+    // so clear FD_CLOEXEC explicitly before execv keeps the ownership read pipe open.
+    if unsafe { libc::fcntl(3, libc::F_SETFD, 0) } == -1 {
         unsafe {
             libc::kill(-group, libc::SIGKILL);
             libc::_exit(127);
@@ -124,6 +154,24 @@ unsafe fn watchdog(reader: RawFd, group: libc::pid_t, descriptor_limit: libc::rl
             unsafe { libc::close(descriptor as libc::c_int) };
         }
     }
+    unsafe { super::watchdog_unix::redirect_stdio_to_devnull() };
+    if let Some(path) = executable {
+        let mut group_buf = [0u8; 32];
+        let group_arg = super::watchdog_unix::format_pid_nul(group, &mut group_buf);
+        let argv = [
+            super::watchdog_unix::WATCHDOG_ARGV0.as_ptr(),
+            super::watchdog_unix::WATCHDOG_ARG.as_ptr(),
+            group_arg,
+            std::ptr::null(),
+        ];
+        unsafe {
+            libc::execv(path, argv.as_ptr());
+        }
+    }
+    unsafe { wait_pipe_and_kill_group(group) }
+}
+
+unsafe fn wait_pipe_and_kill_group(group: libc::pid_t) -> ! {
     let mut byte = 0u8;
     loop {
         let read = unsafe { libc::read(3, (&mut byte as *mut u8).cast(), 1) };

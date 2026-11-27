@@ -21,14 +21,14 @@ export function StatementDropdown({
   onAskAi: (action: EditorStatementAction) => void;
   onClose: () => void;
 }) {
-  const iconButton = "h-6 px-1.5 inline-flex items-center gap-1 rounded text-[10px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
+  const iconButton = "h-6 px-1.5 inline-flex items-center gap-1 rounded text-ui-caption hover:bg-[var(--taomni-hover)] disabled:opacity-40";
   const compactSql = action.range.sql.replace(/\s+/g, " ").trim();
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="fixed inset-0 z-[var(--taomni-z-popover)]" onClick={onClose} />
       <div
         data-testid="db-current-statement-panel"
-        className="absolute right-2 top-9 z-50 w-[560px] max-w-[calc(100vw-24px)] overflow-hidden rounded shadow-lg flex flex-col"
+        className="absolute right-2 top-9 z-[var(--taomni-z-popover)] w-[560px] max-w-[calc(100vw-24px)] overflow-hidden rounded shadow-lg flex flex-col"
         style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}
       >
         <div
@@ -36,14 +36,14 @@ export function StatementDropdown({
           style={{ borderBottom: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
         >
           <SquareDashedMousePointer className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
-          <span className="text-[12px] font-semibold">Current statement</span>
-          <span className="text-[10px] text-[var(--taomni-text-muted)]">
+          <span className="text-ui-body font-semibold">Current statement</span>
+          <span className="text-ui-caption text-[var(--taomni-text-muted)]">
             {action.range.from}-{action.range.to}
           </span>
         </div>
         <div className="px-2 py-2">
           <div
-            className="truncate font-mono text-[11px] text-[var(--taomni-text)]"
+            className="truncate font-mono text-ui-small text-[var(--taomni-text)]"
             title={action.range.sql}
           >
             {compactSql}

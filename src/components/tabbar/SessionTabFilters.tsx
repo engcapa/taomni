@@ -26,7 +26,7 @@ export function SessionTabFilters() {
     aria-label={t("tabs.categoryFilter")} className="flex flex-wrap gap-1 px-2 pb-2">
     {CATEGORIES.map((protocol) => <button key={protocol} type="button" data-testid={`session-tab-filter-${protocol}`}
       aria-pressed={category === protocol} onClick={() => select(protocol)}
-      className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[10px] hover:bg-[var(--taomni-hover)]"
+      className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-ui-caption hover:bg-[var(--taomni-hover)]"
       style={{ color: category === protocol ? "var(--taomni-accent)" : "var(--taomni-text-muted)", background: category === protocol ? "var(--taomni-selected)" : undefined }}>
       <span>{t(`tabs.category.${protocol}`)}</span>
       <span className="opacity-70">{tabs.filter((tab) => tab.type !== "welcome" && (protocol === "all" || sessionTabCategory(tab, sessions) === protocol)).length}</span>

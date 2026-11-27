@@ -166,4 +166,22 @@ describe("QueryLibraryPanel", () => {
       ),
     );
   });
+
+  it("opens query editor in top-layer dialog, guards IME Escape, and restores trigger focus", () => {
+    renderPanel();
+    const createBtn = screen.getByTestId("query-library-create");
+    createBtn.focus();
+    fireEvent.click(createBtn);
+
+    const dialog = screen.getByTestId("query-library-dialog");
+    expect(dialog.tagName).toBe("DIALOG");
+    expect(screen.getByTestId("query-library-name")).toHaveFocus();
+
+    fireEvent.keyDown(screen.getByTestId("query-library-name"), { key: "Escape", isComposing: true });
+    expect(screen.getByTestId("query-library-dialog")).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByTestId("query-library-name"), { key: "Escape" });
+    expect(screen.queryByTestId("query-library-dialog")).not.toBeInTheDocument();
+    expect(createBtn).toHaveFocus();
+  });
 });

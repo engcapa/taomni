@@ -55,7 +55,7 @@ export function createInvitationControls(context: CreateInvitationControlsContex
     if (!view || view.key !== messageKey(message)) return null;
     if (view.loading) {
       return (
-        <div className="mx-4 mt-3 flex items-center gap-2 text-[12px] text-[var(--taomni-text-muted)]" data-testid="mail-invite-loading">
+        <div className="mx-4 mt-3 flex items-center gap-2 text-ui-body text-[var(--taomni-text-muted)]" data-testid="mail-invite-loading">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading calendar invitation…
         </div>
       );
@@ -63,7 +63,7 @@ export function createInvitationControls(context: CreateInvitationControlsContex
     const invite = view.invite;
     if (!invite) {
       return view.error ? (
-        <div className="mx-4 mt-3 text-[12px] text-red-500" data-testid="mail-invite-error">{view.error}</div>
+        <div className="mx-4 mt-3 text-ui-body text-ui-danger" data-testid="mail-invite-error">{view.error}</div>
       ) : null;
     }
     const cancelled = invite.method === "CANCEL" || invite.status === "CANCELLED";
@@ -77,7 +77,7 @@ export function createInvitationControls(context: CreateInvitationControlsContex
     ];
     return (
       <div
-        className="mx-4 mt-3 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] p-3 text-[12px]"
+        className="mx-4 mt-3 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] p-3 text-ui-body"
         data-testid="mail-invite-card"
         data-method={invite.method}
         data-partstat={current ?? undefined}
@@ -119,7 +119,7 @@ export function createInvitationControls(context: CreateInvitationControlsContex
             <button
               key={reply.response}
               type="button"
-              className={`taomni-btn h-6 px-2 text-[11px] ${current === reply.partstat ? "text-[var(--taomni-accent)] border-[var(--taomni-accent)]" : ""}`}
+              className={`taomni-btn h-6 px-2 text-ui-small ${current === reply.partstat ? "text-[var(--taomni-accent)] border-[var(--taomni-accent)]" : ""}`}
               data-testid={`mail-invite-${reply.response}`}
               aria-pressed={current === reply.partstat}
               disabled={!!view.responding}
@@ -132,7 +132,7 @@ export function createInvitationControls(context: CreateInvitationControlsContex
           {calendarIndex >= 0 && (
             <button
               type="button"
-              className="taomni-btn h-6 px-2 text-[11px]"
+              className="taomni-btn h-6 px-2 text-ui-small"
               data-testid="mail-invite-export"
               title="Save the event as an .ics file"
               onClick={() => void handleDownloadAttachment(message, visibleAttachments[calendarIndex], calendarIndex)}
@@ -143,7 +143,7 @@ export function createInvitationControls(context: CreateInvitationControlsContex
           {calendarIndex >= 0 && (
             <button
               type="button"
-              className="taomni-btn h-6 px-2 text-[11px]"
+              className="taomni-btn h-6 px-2 text-ui-small"
               data-testid="mail-invite-open"
               title="Open in the system calendar app"
               onClick={() => void handleOpenAttachment(message, visibleAttachments[calendarIndex], calendarIndex)}
@@ -154,7 +154,7 @@ export function createInvitationControls(context: CreateInvitationControlsContex
           {info.caldav && invite.method === "REQUEST" && !cancelled && view.calendar !== "added" && (
             <button
               type="button"
-              className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+              className="taomni-btn h-6 px-2 text-ui-small inline-flex items-center gap-1"
               data-testid="mail-invite-add-calendar"
               disabled={view.calendar === "adding"}
               onClick={() => void addInviteToCalendar(message, view.responded)}
@@ -171,8 +171,8 @@ export function createInvitationControls(context: CreateInvitationControlsContex
             <span className="text-[var(--taomni-text-muted)]" data-testid="mail-invite-in-calendar">In your calendar</span>
           )}
         </div>
-        {view.error && <div className="mt-1 text-red-500" data-testid="mail-invite-error">{view.error}</div>}
-        {view.calendarError && <div className="mt-1 text-red-500" data-testid="mail-invite-calendar-error">{view.calendarError}</div>}
+        {view.error && <div className="mt-1 text-ui-danger" data-testid="mail-invite-error">{view.error}</div>}
+        {view.calendarError && <div className="mt-1 text-ui-danger" data-testid="mail-invite-calendar-error">{view.calendarError}</div>}
       </div>
     );
   };

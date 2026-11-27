@@ -63,10 +63,10 @@ export function ChatHistoryPanel() {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <History className="w-4 h-4 text-[var(--taomni-accent)]" />
-        <div className="text-[13px] font-semibold flex-1">{t("aiSettings.chatHistoryTitle")}</div>
+        <div className="text-ui-body font-semibold flex-1">{t("aiSettings.chatHistoryTitle")}</div>
       </div>
 
-      <div className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px] items-end">
+      <div className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-ui-body items-end">
         <label className="col-span-6">
           <span className="block mb-1 text-[var(--taomni-text-muted)]">{t("aiSettings.chatHistoryRetention")}</span>
           <input
@@ -86,7 +86,7 @@ export function ChatHistoryPanel() {
         <div className="col-span-6 flex justify-end gap-2">
           <button
             type="button"
-            className="taomni-btn h-7 px-2 text-[11px] inline-flex items-center gap-1.5"
+            className="taomni-btn h-7 px-2 text-ui-small inline-flex items-center gap-1.5"
             onClick={handlePurge}
             disabled={purging}
           >
@@ -96,7 +96,7 @@ export function ChatHistoryPanel() {
 
           <button
             type="button"
-            className="taomni-btn h-7 px-2 text-[11px] inline-flex items-center gap-1.5"
+            className="taomni-btn h-7 px-2 text-ui-small inline-flex items-center gap-1.5"
             onClick={handleExport}
             disabled={exporting}
           >
@@ -106,12 +106,12 @@ export function ChatHistoryPanel() {
         </div>
       </div>
 
-      <p className="text-[11px] text-[var(--taomni-text-muted)] leading-snug">
+      <p className="text-ui-small text-[var(--taomni-text-muted)] leading-snug">
         {t("aiSettings.chatHistoryDescription")}
       </p>
 
       {status && (
-        <div className="text-[11px] text-[var(--taomni-accent)] rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-2 py-1.5">
+        <div className="text-ui-small text-[var(--taomni-accent)] rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-2 py-1.5">
           {status}
         </div>
       )}

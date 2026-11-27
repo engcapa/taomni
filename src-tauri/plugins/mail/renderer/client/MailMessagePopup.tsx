@@ -13,7 +13,6 @@ export interface MailMessagePopupContext {
 export function MailMessagePopup(context: MailMessagePopupContext) {
   const { popupMessage, setPopupMessageKey, openMessageTab, renderReaderSurface } = context;
   return popupMessage && (
-    <div className="absolute inset-0 z-[130] bg-black/35 flex items-center justify-center p-5">
       <MailDraggableDialog
         title={popupMessage.subject || "(no subject)"}
         icon={<MailOpen className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
@@ -25,7 +24,7 @@ export function MailMessagePopup(context: MailMessagePopupContext) {
         headerActions={(
           <button
             type="button"
-            className="taomni-btn h-6 px-2 text-[11px]"
+            className="taomni-btn h-6 px-2 text-ui-small"
             onClick={() => openMessageTab(popupMessage)}
           >
             Open tab
@@ -36,6 +35,5 @@ export function MailMessagePopup(context: MailMessagePopupContext) {
           {renderReaderSurface(popupMessage, true)}
         </div>
       </MailDraggableDialog>
-    </div>
   );
 }

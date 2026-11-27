@@ -30,7 +30,7 @@ export function TaoProviderControls({ controller, state, onClose }: {
         const capabilities = next.capabilities(next.model);
         controller.setProvider(next.id, { model: next.model, ...capabilities, reasoningEffort: capabilities.efforts.includes(effort) ? effort : capabilities.efforts[0] ?? "high" });
       }} /></div>
-    <p className="text-[11px]">{tr("切换服务会移除附件引用；需要时请重新添加。")}</p>
+    <p className="text-ui-small">{tr("切换服务会移除附件引用；需要时请重新添加。")}</p>
     <button type="button" data-testid="tao-home-capability-thinking" disabled={!capabilities?.thinking}
       title={!capabilities?.thinking ? tr("该服务未提供可切换的思考能力") : undefined}
       onClick={() => { controller.setComposerOption("thinking", !state.composer.thinking); onClose(); }}>{tr("思考")} {state.composer.thinking ? "✓" : ""}</button>

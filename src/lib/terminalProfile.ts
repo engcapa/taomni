@@ -1,3 +1,4 @@
+import { isWslExecutable } from "../types/wsl";
 import type { ITheme } from "@xterm/xterm";
 import { terminalThemes } from "./themes";
 import { getCodeThemeDefinition, terminalThemeFromCodeTheme } from "./codeThemes";
@@ -104,9 +105,7 @@ export function parseSessionOptions(optionsJson: string | null | undefined): Rec
 
 export function isWslSessionOptions(optionsJson: string | null | undefined): boolean {
   const options = parseSessionOptions(optionsJson);
-  const path = typeof options.localShellPath === "string" ? options.localShellPath : "";
-  const basename = path.split(/[\\/]/).pop()?.toLowerCase() ?? "";
-  return basename === "wsl.exe";
+  return isWslExecutable(options.localShellPath);
 }
 
 export function sessionTypeLabel(

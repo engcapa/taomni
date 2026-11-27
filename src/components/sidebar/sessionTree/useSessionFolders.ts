@@ -1,3 +1,4 @@
+import { alertAppDialog } from "../../../lib/appDialogs";
 import { useState } from "react";
 import type { SessionConfig } from "../../../lib/ipc";
 import { folderOptionLabel, groupPathContains, leafGroupName, normalizeGroupPath, parentGroupPath } from "../../../lib/sessionPaths";
@@ -54,7 +55,7 @@ export function useSessionFolders(context: UseSessionFoldersContext) {
     const newNormalized = normalizeGroupPath(targetPath);
     if (!oldNormalized || !newNormalized || oldNormalized === newNormalized) return;
     if (groupPathContains(oldNormalized, newNormalized)) {
-      window.alert(t("sessionTree.folderCannotMoveInside"));
+      void alertAppDialog({ message: t("sessionTree.folderCannotMoveInside") });
       return;
     }
 

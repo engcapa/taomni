@@ -84,7 +84,7 @@ export function FontPickerSelect({
     const top = rect.bottom + estimatedHeight <= window.innerHeight - 6
       ? rect.bottom + 4
       : Math.max(6, rect.top - estimatedHeight - 4);
-    setPanelPosition({ position: "fixed", left, top, width, zIndex: 10_050 });
+    setPanelPosition({ position: "fixed", left, top, width, zIndex: "var(--taomni-z-menu-over-modal)" });
   }, [open, options.length]);
 
   const toggleOpen = () => {
@@ -114,7 +114,7 @@ export function FontPickerSelect({
         >
           {selected?.label ?? selectedValue}
         </span>
-        {loading && open && <span className="text-[10px] text-[var(--taomni-text-muted)]">…</span>}
+        {loading && open && <span className="text-ui-caption text-[var(--taomni-text-muted)]">…</span>}
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
       </button>
       {open && panelPosition && createPortal(
@@ -214,7 +214,7 @@ export function FontPickerPanel({
 
   return (
     <div
-      className="flex w-full flex-col rounded border text-[12px] shadow-lg"
+      className="flex w-full flex-col rounded border text-ui-body shadow-lg"
       style={{
         background: "var(--taomni-panel-bg)",
         borderColor: "var(--taomni-divider)",
@@ -230,7 +230,7 @@ export function FontPickerPanel({
             type="search"
             aria-label={t("fontPicker.searchPlaceholder")}
             placeholder={t("fontPicker.searchPlaceholder")}
-            className="taomni-input h-7 w-full pl-7 text-[12px] font-normal"
+            className="taomni-input h-7 w-full pl-7 text-ui-body font-normal"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
@@ -285,7 +285,7 @@ function VirtualFontRow({
     return (
       <div
         style={position}
-        className="flex items-center bg-black/5 px-3 text-[10px] font-bold uppercase tracking-wider text-[var(--taomni-text-muted)]"
+        className="flex items-center bg-black/5 px-3 text-ui-caption font-bold uppercase tracking-wider text-[var(--taomni-text-muted)]"
       >
         {row.label}
       </div>

@@ -204,8 +204,8 @@ describe("FileTreePane", () => {
     expect(screen.getByTestId("code-workspace-tree-add-folder")).toBeEnabled();
     fireEvent.keyDown(document, { key: "Escape" });
     openMenu("code-workspace-tree-toolbar-more");
-    expect(screen.getByRole("button", { name: "Rename…" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Delete…" })).toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: "Rename…" })).toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: "Delete…" })).toBeDisabled();
     // Language Servers live in Settings now — not in every workspace tree.
     expect(screen.queryByText("Language Servers")).toBeNull();
   });

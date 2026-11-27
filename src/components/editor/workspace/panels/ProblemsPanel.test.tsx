@@ -65,11 +65,11 @@ describe("ProblemsPanel", () => {
     expect(onOpenProblem).toHaveBeenCalledWith(files[0].key, files[0].diagnostics[0]);
 
     fireEvent.contextMenu(problem, { clientX: 12, clientY: 18 });
-    fireEvent.click(screen.getByRole("button", { name: "Copy Message" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy Message" }));
     expect(clipboardMocks.writeText).toHaveBeenCalledWith("Broken expression");
 
     fireEvent.contextMenu(problem, { clientX: 12, clientY: 18 });
-    expect(screen.getByRole("button", { name: "Quick Fix" })).toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: "Quick Fix" })).toBeDisabled();
   });
 
   it("states the open-file boundary when there are no diagnostics", () => {
@@ -154,11 +154,11 @@ describe("ProblemsPanel", () => {
     expect(onOpenProblem).toHaveBeenCalledWith(files[0].key, providerDiagnostic);
 
     fireEvent.contextMenu(problem, { clientX: 12, clientY: 18 });
-    fireEvent.click(screen.getByRole("button", { name: "Quick Fix" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Quick Fix" }));
     expect(onQuickFix).toHaveBeenCalledWith(files[0].key, providerDiagnostic);
 
     fireEvent.contextMenu(problem, { clientX: 12, clientY: 18 });
-    fireEvent.click(screen.getByRole("button", { name: /Show related locations/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Show related locations/ }));
     expect(onOpenRelatedInformation).toHaveBeenCalledWith(providerDiagnostic);
   });
 
@@ -175,15 +175,15 @@ describe("ProblemsPanel", () => {
     );
     const problem = screen.getByRole("button", { name: /Broken expression/ });
     fireEvent.contextMenu(problem, { clientX: 12, clientY: 18 });
-    fireEvent.click(screen.getByRole("button", { name: "Hide this diagnostic locally (line)" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Hide this diagnostic locally (line)" }));
     expect(onSuppress).toHaveBeenCalledWith(files[0].key, files[0].diagnostics[0], "line");
 
     fireEvent.contextMenu(problem, { clientX: 12, clientY: 18 });
-    fireEvent.click(screen.getByRole("button", { name: "Hide this diagnostic locally (whole file)" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Hide this diagnostic locally (whole file)" }));
     expect(onSuppress).toHaveBeenCalledWith(files[0].key, files[0].diagnostics[0], "file");
 
     fireEvent.contextMenu(problem, { clientX: 12, clientY: 18 });
-    fireEvent.click(screen.getByRole("button", { name: "Add to inspection baseline" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add to inspection baseline" }));
     expect(onAddToBaseline).toHaveBeenCalledWith(files[0].key, files[0].diagnostics[0]);
   });
 });

@@ -117,7 +117,7 @@ export function TabDetailsOverlay({
   if (!open || placements.length === 0) return null;
 
   return createPortal(
-    <div data-testid="tab-details-overlay" className="fixed inset-0 pointer-events-none z-[9990]" aria-hidden="true">
+    <div data-testid="tab-details-overlay" className="fixed inset-0 pointer-events-none z-[var(--taomni-z-tooltip)]" aria-hidden="true">
       {placements.map(({ tab, left, top, anchorLeft }) => {
         const summary = buildTabDetailSummary(tab, sessions, runtimeByTab[tab.id], cwdByTab[tab.id], t);
         const active = activeTabId === tab.id;
@@ -125,7 +125,7 @@ export function TabDetailsOverlay({
           <div
             key={tab.id}
             data-testid={`tab-details-card-${tab.id}`}
-            className="fixed rounded-md border shadow-xl px-3 py-2 text-[11px] overflow-visible"
+            className="fixed rounded-md border shadow-xl px-3 py-2 text-ui-small overflow-visible"
             style={{
               left,
               top,
@@ -156,13 +156,13 @@ export function TabDetailsOverlay({
               <span className="min-w-0 truncate" title={summary.sessionLabel}>{summary.sessionLabel}</span>
             </div>
             {summary.endpoint && (
-              <div className="truncate text-[10px] text-[var(--taomni-text-muted)]" title={summary.endpoint}>
+              <div className="truncate text-ui-caption text-[var(--taomni-text-muted)]" title={summary.endpoint}>
                 {summary.endpoint}
               </div>
             )}
             {tab.type === "terminal" && (
               <div
-                className="mt-1 truncate text-[12px] font-semibold"
+                className="mt-1 truncate text-ui-body font-semibold"
                 title={summary.cwd ?? undefined}
               >
                 {summary.cwd ?? t("tabs.detailsCwdUnknown")}

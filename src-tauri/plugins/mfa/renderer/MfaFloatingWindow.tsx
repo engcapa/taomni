@@ -160,10 +160,10 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
         bottom: floating.position.bottom,
         width: FLOATING_MFA_WIDTH,
         maxHeight: "min(70vh, 520px)",
-        zIndex: floating.pinned ? 960 : 950,
+        zIndex: floating.pinned ? "calc(var(--taomni-z-popover, 900) + 60)" : "calc(var(--taomni-z-popover, 900) + 50)",
         borderColor: "var(--taomni-card-border)",
         background: "var(--taomni-panel-bg)",
-        boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
+        boxShadow: "var(--taomni-shadow-lg)",
       }}
     >
       <div
@@ -173,7 +173,7 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
         onPointerDown={startDrag}
       >
         <KeyRound className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--taomni-accent)" }} />
-        <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold" style={{ cursor: "move" }}>
+        <span className="min-w-0 flex-1 truncate text-ui-small font-semibold" style={{ cursor: "move" }}>
           {t("platform.mfaTitle")}
         </span>
         <button
@@ -227,11 +227,11 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
 
       {vaultState !== "unlocked" ? (
         <div className="flex flex-col items-start gap-2 p-3" data-testid="mfa-floating-locked">
-          <div className="flex items-center gap-1.5 text-[12px] font-semibold">
+          <div className="flex items-center gap-1.5 text-ui-body font-semibold">
             <Lock className="h-3.5 w-3.5" />
             {t("mfa.lockedTitle")}
           </div>
-          <div className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.mfaLocked")}</div>
+          <div className="text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.mfaLocked")}</div>
           <button
             type="button"
             data-testid="mfa-floating-unlock"
@@ -281,12 +281,12 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
           </div>
           <div className="min-h-0 flex-1 overflow-auto p-2" data-testid="mfa-floating-list">
             {status === "error" && (
-              <div className="px-1 py-2 text-[11px]" style={{ color: "var(--taomni-danger)" }}>
+              <div className="px-1 py-2 text-ui-small" style={{ color: "var(--taomni-danger)" }}>
                 {errorCode === "MFA_LEGACY_MIGRATION_REQUIRED" ? t("mfa.legacyMigrationRequired") : mfaError ?? "MFA error"}
               </div>
             )}
             {status !== "error" && visibleAccounts.length === 0 && (
-              <div className="px-1 py-2 text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.mfaNoAccounts")}</div>
+              <div className="px-1 py-2 text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.mfaNoAccounts")}</div>
             )}
             {visibleAccounts.map((account) => {
               const code = codes[account.id]?.code ?? "------";
@@ -303,16 +303,16 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
                   onClick={() => void copy(account)}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[11.5px] font-semibold">{account.issuer || account.accountName}</span>
-                    <span className="block truncate text-[10px]" style={{ color: "var(--taomni-text-muted)" }}>{account.accountName}</span>
+                    <span className="block truncate text-ui-small font-semibold">{account.issuer || account.accountName}</span>
+                    <span className="block truncate text-ui-caption" style={{ color: "var(--taomni-text-muted)" }}>{account.accountName}</span>
                   </span>
                   <span className="flex shrink-0 items-center gap-1.5">
-                    <span className="font-mono text-[15px] font-bold tabular-nums" data-testid="mfa-floating-code" style={{ color: "var(--taomni-accent)" }}>
+                    <span className="font-mono text-ui-title font-bold tabular-nums" data-testid="mfa-floating-code" style={{ color: "var(--taomni-accent)" }}>
                       {code.slice(0, 3)} {code.slice(3)}
                     </span>
                     <span
                       aria-hidden="true"
-                      className="relative flex h-6 w-6 items-center justify-center rounded-full text-[9px] tabular-nums"
+                      className="relative flex h-6 w-6 items-center justify-center rounded-full text-ui-caption tabular-nums"
                       style={{
                         background: `conic-gradient(var(--taomni-accent) ${Math.round(progress(account) * 100)}%, var(--taomni-divider) 0)`,
                       }}
@@ -329,7 +329,7 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
               );
             })}
           </div>
-          <div className="shrink-0 border-t px-2 py-1 text-[10px]" style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}>
+          <div className="shrink-0 border-t px-2 py-1 text-ui-caption" style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}>
             {t("platform.mfaCopyHint")}
           </div>
         </>

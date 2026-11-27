@@ -255,7 +255,7 @@ export function RecentSessionsPanel({
         ) : null}
       </div>
 
-      <div className="mt-2 min-h-[26px] flex flex-wrap items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
+      <div className="mt-2 min-h-[26px] flex flex-wrap items-center gap-2 text-ui-small text-[var(--taomni-text-muted)]">
         <span>{t("welcome.recentSessionsSelectedCount", { count: selectedCount })}</span>
         {selectedCount > 0 ? (
           <button
@@ -273,14 +273,14 @@ export function RecentSessionsPanel({
         {sessions.length === 0 ? (
           <div
             data-testid="welcome-recent-empty"
-            className="py-4 text-[12px] text-[var(--taomni-text-muted)]"
+            className="py-4 text-ui-body text-[var(--taomni-text-muted)]"
           >
             {t("welcome.recentSessionsEmpty")}
           </div>
         ) : filteredSessions.length === 0 ? (
           <div
             data-testid="welcome-recent-no-matches"
-            className="py-4 text-[12px] text-[var(--taomni-text-muted)]"
+            className="py-4 text-ui-body text-[var(--taomni-text-muted)]"
           >
             {t("welcome.recentSessionsNoMatches")}
           </div>
@@ -337,18 +337,18 @@ export function RecentSessionsPanel({
                       <Server className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
                       <button
                         data-testid="welcome-recent-open"
-                        className="min-w-0 truncate text-left text-[12px] font-medium text-[var(--taomni-accent)] hover:underline focus-visible:underline"
+                        className="min-w-0 truncate text-left text-ui-body font-medium text-[var(--taomni-accent)] hover:underline focus-visible:underline"
                         type="button"
                         aria-label={t("welcome.recentSessionsOpenAria", { name: title })}
                         onClick={() => onOpenSession?.(session)}
                       >
                         {title}
                       </button>
-                      <span className="shrink-0 text-[10px] taomni-mono px-1.5 py-0.5 rounded border text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
+                      <span className="shrink-0 text-ui-caption taomni-mono px-1.5 py-0.5 rounded border text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
                         {typeLabel}
                       </span>
                     </div>
-                    <div data-testid="welcome-recent-details" className="mt-0.5 truncate text-[11px] text-[var(--taomni-text-muted)]">
+                    <div data-testid="welcome-recent-details" className="mt-0.5 truncate text-ui-small text-[var(--taomni-text-muted)]">
                       {recentSessionTarget(session)} · {t("welcome.recentSessionsUpdated", { time: formatRecentSessionTime(session.last_connected_at, t) })}
                     </div>
                   </div>

@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Users, X, Send, ChevronUp, ChevronDown, Maximize2, Clock, CornerDownLeft,
@@ -108,8 +109,8 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
   return (
     // True modal backdrop — pointer events blocked, no click-to-close
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
-      style={{ background: "rgba(0,0,0,0.45)", pointerEvents: "all" }}
+      className="fixed inset-0 z-[var(--taomni-z-modal)] flex items-end justify-center"
+      style={{ background: "var(--taomni-overlay)", pointerEvents: "all" }}
     >
       <div
         className="flex flex-col shadow-2xl overflow-hidden"
@@ -152,22 +153,22 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
             borderBottom: "1px solid var(--taomni-divider)",
           }}
         >
-          <Users className="w-3.5 h-3.5" style={{ color: "#7a3d9d" }} />
+          <Users className="w-3.5 h-3.5" style={{ color: "var(--taomni-protocol-violet)" }} />
           <span className="text-xs font-semibold" style={{ color: "var(--taomni-text)" }}>
             {t("multiExec.editorTitle")}
           </span>
-          <span className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
+          <span className="text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>
             {t("multiExec.editorHint")}
           </span>
           <div className="flex-1" />
-          <button
+          <IconButton
             className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
             onClick={onClose}
             type="button"
-            title={t("multiExec.closeEsc")}
+            label={t("multiExec.closeEsc")}
           >
             <X className="w-3 h-3" />
-          </button>
+          </IconButton>
         </div>
 
         {/* Body: editor + history sidebar */}
@@ -210,7 +211,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
                 <CornerDownLeft className="w-3 h-3" />
                 {t("multiExec.applyToBar")}
               </button>
-              <span className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
+              <span className="text-ui-small" style={{ color: "var(--taomni-text-muted)" }}>
                 {lineCount === 1 ? t("multiExec.lineCount", { count: lineCount }) : t("multiExec.lineCountPlural", { count: lineCount })}
               </span>
             </div>
@@ -223,7 +224,7 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
               style={{ width: 240, borderLeft: "1px solid var(--taomni-divider)" }}
             >
               <div
-                className="px-2 py-1 text-[11px] font-semibold flex-shrink-0"
+                className="px-2 py-1 text-ui-small font-semibold flex-shrink-0"
                 style={{
                   background: "var(--taomni-chrome-bg)",
                   borderBottom: "1px solid var(--taomni-divider)",
@@ -256,12 +257,12 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
                       onClick={() => handleHistoryClick(cmd, originalIdx)}
                     >
                       <span
-                        className="text-[11px] font-mono truncate block"
+                        className="text-ui-small font-mono truncate block"
                         style={{ color: "var(--taomni-text)" }}
                       >
                         {preview}
                       </span>
-                      <span className="text-[10px]" style={{ color: "var(--taomni-text-muted)" }}>
+                      <span className="text-ui-caption" style={{ color: "var(--taomni-text-muted)" }}>
                         #{originalIdx + 1}
                       </span>
                     </button>
@@ -417,7 +418,7 @@ export function MultiExecBar({
       >
         <Users
           className="w-3.5 h-3.5 flex-shrink-0 mt-1"
-          style={{ color: "#7a3d9d" }}
+          style={{ color: "var(--taomni-protocol-violet)" }}
         />
         <div className="flex-1 flex items-start gap-1 min-w-0">
           <textarea
@@ -434,37 +435,37 @@ export function MultiExecBar({
           />
           {/* History navigation arrows */}
           <div className="flex flex-col flex-shrink-0" style={{ marginTop: 1 }}>
-            <button
+            <IconButton
               type="button"
               className="w-4 h-3.5 inline-flex items-center justify-center rounded-t hover:bg-[var(--taomni-hover)] disabled:opacity-30"
               style={{ border: "1px solid var(--taomni-divider)", borderBottom: "none", background: "var(--taomni-button-to)" }}
               onClick={() => navigateHistory("up")}
               disabled={history.length === 0}
-              title={t("multiExec.historyPrev")}
+              label={t("multiExec.historyPrev")}
             >
               <ChevronUp className="w-2.5 h-2.5" />
-            </button>
-            <button
+            </IconButton>
+            <IconButton
               type="button"
               className="w-4 h-3.5 inline-flex items-center justify-center rounded-b hover:bg-[var(--taomni-hover)] disabled:opacity-30"
               style={{ border: "1px solid var(--taomni-divider)", background: "var(--taomni-button-to)" }}
               onClick={() => navigateHistory("down")}
               disabled={historyIdx === null}
-              title={t("multiExec.historyNext")}
+              label={t("multiExec.historyNext")}
             >
               <ChevronDown className="w-2.5 h-2.5" />
-            </button>
+            </IconButton>
           </div>
           {/* Expand button */}
-          <button
+          <IconButton
             type="button"
             className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] flex-shrink-0 mt-0.5"
             style={{ border: "1px solid var(--taomni-divider)" }}
             onClick={() => setExpanded(true)}
-            title={t("multiExec.expand")}
+            label={t("multiExec.expand")}
           >
             <Maximize2 className="w-3 h-3" />
-          </button>
+          </IconButton>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
           <button
@@ -480,7 +481,7 @@ export function MultiExecBar({
           </button>
           <MultiExecTargets selectedCount={selectedCount} totalCount={totalTerminalCount} />
           <button
-            className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] flex-shrink-0"
+            className="text-ui-small px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] flex-shrink-0"
             style={{ color: "var(--taomni-text-muted)" }}
             onClick={onSelectAll}
             type="button"
@@ -489,7 +490,7 @@ export function MultiExecBar({
             {t("multiExec.selectAllShort")}
           </button>
           <button
-            className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] flex-shrink-0"
+            className="text-ui-small px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] flex-shrink-0"
             style={{ color: "var(--taomni-text-muted)" }}
             onClick={onClearSelection}
             type="button"
@@ -497,14 +498,14 @@ export function MultiExecBar({
           >
             {t("multiExec.clearShort")}
           </button>
-          <button
+          <IconButton
             className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] flex-shrink-0"
             onClick={onClose}
             type="button"
-            title={t("multiExec.closeBar")}
+            label={t("multiExec.closeBar")}
           >
             <X className="w-3 h-3" />
-          </button>
+          </IconButton>
         </div>
       </div>
     </>

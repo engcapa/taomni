@@ -16,8 +16,8 @@ export function LanguageSection() {
     >
       <div className="mb-2 flex items-center gap-3">
         <div>
-          <div className="text-[14px] font-semibold">{t("settings.languageTitle")}</div>
-          <div className="text-[12px] text-[var(--taomni-text-muted)]">
+          <div className="text-ui-title font-semibold">{t("settings.languageTitle")}</div>
+          <div className="text-ui-body text-[var(--taomni-text-muted)]">
             {t("settings.languageCurrent", { label: current.nativeLabel })}
           </div>
         </div>
@@ -34,7 +34,7 @@ export function LanguageSection() {
               data-testid={`settings-language-${entry.code}`}
               data-active={active || undefined}
               onClick={() => setLocale(entry.code)}
-              className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5 text-[12px]"
+              className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5 text-ui-body"
               style={
                 active
                   ? { background: "var(--taomni-selected)", outline: "1px solid var(--taomni-accent)" }

@@ -179,3 +179,16 @@ Functional success and performance success are separate. Reproducible slowdown
 beyond measured noise fails the requirement even within an absolute budget.
 Fix and rerun the affected scenario; never reset budgets/baselines to conceal it.
 Keep collection focused and avoid permanent production hot-path instrumentation.
+
+
+### Restoring independently signed modules on Linux
+
+For a local run of TC-MODULES-033/034/035 or 104/105/106, a core-only change
+can reuse an official signed Hello or MFA package from an ancestor commit.
+Set `fixtures.retained_restore_module_sha` in the local config to the package's
+full Git commit and set `QA_SIGNED_MODULE_ROOT` or `QA_SIGNED_MFA_ROOT` to its
+downloaded artifact directory. The fixture verifies ancestry and compares the
+module, shared crates, lockfiles and packaging inputs with the checkout. Its
+receipt preserves `sourceSha` for the module and records `restoreCoreSourceSha`
+for the core. Run these cases in their own invocation. Hosted and release
+evidence uses the workflow's matching-source signed packages.

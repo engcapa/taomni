@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import {
   ChevronDown,
   ChevronLeft,
@@ -465,7 +466,7 @@ export function TabBar({
           data-testid="tab-filter-chip"
           onClick={() => setTabFilter(tabFilter.kind !== "protocol" && tabFilter.protocol && tabFilter.protocol !== "all" ? { kind: "protocol", protocol: tabFilter.protocol } : null)}
           title={t("tabs.filterClear")}
-          className="flex items-center gap-1 mb-0.5 mr-1 px-2 h-6 rounded text-[11px] max-w-[112px] shrink-0"
+          className="flex items-center gap-1 mb-0.5 mr-1 px-2 h-6 rounded text-ui-small max-w-[112px] shrink-0"
           style={{ background: "var(--taomni-hover)", color: "var(--taomni-text)" }}
         >
           {tabFilter.kind === "group" || tabFilter.kind === "multi" ? (
@@ -526,7 +527,7 @@ export function TabBar({
         {tabFilter && visibleTabs.length === 0 && (
           <div
             data-testid="tab-filter-empty"
-            className="self-center px-3 text-[12px] whitespace-nowrap"
+            className="self-center px-3 text-ui-body whitespace-nowrap"
             style={{ color: "var(--taomni-text-muted)" }}
           >
             {t("tabs.filterNoMatch")}
@@ -603,27 +604,27 @@ export function TabBar({
       )}
 
       <div className="flex shrink-0 items-end" data-testid="new-tab-split">
-        <button
+        <IconButton type="button"
           data-testid="new-local-terminal"
           className="taomni-tab"
           style={{ paddingRight: 4, borderTopRightRadius: 0 }}
           data-active={false}
           onClick={handleQuickLaunch}
-          title={t("tabs.newTab")}
+          label={t("tabs.newTab")}
         >
           <Plus className="w-3 h-3" />
-        </button>
-        <button
+        </IconButton>
+        <IconButton type="button"
           data-testid="new-tab-launch-menu"
           className="taomni-tab"
           style={{ paddingLeft: 2, paddingRight: 4, borderTopLeftRadius: 0, marginLeft: -1 }}
           data-active={false}
           onClick={handleOpenLaunchMenu}
-          title={t("tabs.newTabMenu")}
+          label={t("tabs.newTabMenu")}
           aria-haspopup="menu"
         >
           <ChevronDown className="w-3 h-3" />
-        </button>
+        </IconButton>
       </div>
 
       {/* Trailing draggable filler. The open-tabs `⋯` overflow now lives in the
