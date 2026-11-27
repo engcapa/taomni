@@ -35,7 +35,8 @@ steps:
     kind: save
     action: cancel
     trigger: '[data-testid="viewer-close-save"]'
-- assert_enabled: '[data-testid="viewer-close-save"]'
+- wait_for: '[data-testid="viewer-close-save"]:enabled'
+- assert_visible: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
 - native_file_dialog:
     kind: save
     action: choose
