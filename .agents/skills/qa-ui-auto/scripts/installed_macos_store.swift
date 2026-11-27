@@ -284,7 +284,7 @@ func observe(_ request: Request) throws -> Observation {
         guard (attribute(checkbox, kAXValueAttribute) as? NSNumber)?.boolValue == false
         else { throw CheckFailure("Expected Mobile screen capture to start disabled") }
         try press(checkbox)
-    case "permissions":
+    case "permissions", "screenshot-permissions":
         defer { NSPasteboard.general.clearContents() }
         try unlockVault()
         try openSettings("screenshot")
@@ -294,6 +294,11 @@ func observe(_ request: Request) throws -> Observation {
             contents().flatMap(labels).first {
                 $0.hasPrefix(grantedPrefix) || $0.hasPrefix(deniedPrefix)
             }
+        }
+        if request.phase == "screenshot-permissions" {
+            result.permissions = ["screenRecording": summary.hasPrefix(grantedPrefix) ? "granted" : "denied",
+                                  "screenshotSummary": summary]
+            break
         }
         try openTool("Local servers")
         guard let image = request.rdpScreenshot else { throw CheckFailure("Missing the RDP screenshot path") }

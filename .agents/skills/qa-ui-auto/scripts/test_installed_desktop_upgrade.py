@@ -96,10 +96,20 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
         crash.assert_called_once_with(
             "app", profile, None, "source", "evidence", "work", macos_hardened_mfa=False, first_release=roster,
         )
-        permission_probe.assert_called_once_with("app", "evidence", "candidate", work="work")
+        permission_probe.assert_called_once_with("app", "evidence", "candidate", work="work", screenshot_only=False)
         screen.assert_called_once_with("app", "evidence", recovered, work="work")
         mobile.assert_called_once_with("app", "work", "evidence", "source")
         self.assertTrue(stages["permissionContinuity"]["retainedBothGrants"])
+
+    def test_standalone_screen_recording_receipt_reports_unobserved_accessibility(self):
+        legacy = {"screenRecording": "granted", "accessibility": "granted", "requirement": "fixed"}
+        candidate = {"screenRecording": "granted", "requirement": "fixed"}
+        receipt = compare_permissions(legacy, candidate)
+        self.assertTrue(receipt["sameDesignatedRequirement"])
+        self.assertEqual(receipt["unverifiedCandidateGrants"], ["accessibility"])
+        self.assertFalse(receipt["retainedBothGrants"])
+        self.assertEqual(compare_permissions(legacy, {**candidate, "screenRecording": "denied"})["lostGrants"],
+                         ["screenRecording"])
 
     def test_windows_retries_inspection_after_timeout_with_one_msi_install(self):
         with TemporaryDirectory() as directory:

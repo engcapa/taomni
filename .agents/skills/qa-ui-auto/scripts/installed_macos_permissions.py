@@ -49,7 +49,7 @@ def read_core_permissions(session):
     return observed
 
 
-def observe_permissions(executable, evidence, phase, *, work=None):
+def observe_permissions(executable, evidence, phase, *, work=None, screenshot_only=False):
     app = executable.parents[2]
     info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
     if info.get("CFBundleIdentifier") != "com.taomni.app":
@@ -70,12 +70,12 @@ def observe_permissions(executable, evidence, phase, *, work=None):
     else:
         folder = evidence / label
         with installed_macos_desktop(executable, work, folder) as owner:
-            receipt = controls(compile_driver(work), owner, executable, "permissions", folder, password=PASSWORD)
+            action = "screenshot-permissions" if screenshot_only else "permissions"
+            receipt = controls(compile_driver(work), owner, executable, action, folder, password=PASSWORD)
             observations = receipt["permissions"]
-            if (observations.get("screenRecording") not in {"granted", "denied"}
-                    or observations.get("accessibility") not in {"granted", "denied"}
-                    or owner.poll() is not None):
-                raise RuntimeError("Installed macOS permission controls did not report both statuses")
+            fields = ("screenRecording",) if screenshot_only else ("screenRecording", "accessibility")
+            if any(observations.get(name) not in {"granted", "denied"} for name in fields) or owner.poll() is not None:
+                raise RuntimeError("Installed macOS permission controls omitted a required status")
             pid = owner.pid
     record = {
         **observations, "pid": pid, "bundleIdentifier": info["CFBundleIdentifier"],
@@ -90,13 +90,17 @@ def compare_permissions(previous, candidate):
     fields = ("screenRecording", "accessibility")
     same_requirement = previous["requirement"] == candidate["requirement"]
     missing = [name for name in fields if previous[name] != "granted"]
-    lost = [name for name in fields if previous[name] == "granted" and candidate[name] != "granted"]
-    return {
+    unverified = [name for name in fields if name not in candidate]
+    lost = [name for name in fields if previous[name] == "granted" and candidate.get(name) == "denied"]
+    result = {
         "sameDesignatedRequirement": same_requirement,
         "missingBaselineGrants": missing,
         "lostGrants": lost,
-        "retainedBothGrants": same_requirement and not missing and not lost,
+        "retainedBothGrants": same_requirement and not missing and not lost and not unverified,
     }
+    if unverified:
+        result["unverifiedCandidateGrants"] = unverified
+    return result
 
 
 def observe_appkit_screen_scan(executable, evidence, recovery, work, result):

@@ -15,7 +15,7 @@ from installed_windows_host_security import mark_download, observe_downloaded_ho
 from installed_windows_mfa import installed_windows_desktop, verify_mfa_controls
 from modular_bundle_inventory import digest, write_json
 from qa_ui_auto.fixtures.module_legacy_mfa import (
-    ISSUER, PASSWORD, commit_mfa_upgrade, create_account, desktop_action, element, installed_desktop, open_unlocked_mfa,
+    ISSUER, PASSWORD, commit_mfa_upgrade, desktop_action, element, installed_desktop, open_unlocked_mfa,
 )
 from qa_ui_auto.fixtures.module_marketplace import ORIGIN
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key
@@ -136,13 +136,10 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
     }
     ctx = SimpleNamespace(cfg={"webdriver": {"startup_timeout": 60}})
     system = platform.system()
-    appkit = first_release is not None and system == "Darwin"
+    appkit = system == "Darwin"
     try:
         downloaded_pointer = None
-        if first_release is None and system == "Darwin":
-            with open_desktop(ctx, executable, work, evidence, "mfa-legacy-seed") as (_, session):
-                create_account(session, ctx, evidence)
-        elif first_release is not None:
+        if first_release is not None:
             downloaded_pointer, _ = installed_mfa(profile, receipt)
         result["legacyDatabaseSha256"] = digest(profile / "mfa.db")
         commit_mfa_upgrade(executable, profile, archive, signature, evidence)
@@ -150,7 +147,7 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
         if downloaded_pointer is not None and installed != downloaded_pointer:
             raise RuntimeError("Migrating MFA changed the downloaded module's active pointer")
         zone = None
-        if system == "Darwin" and (macos_hardened_mfa or first_release is not None):
+        if system == "Darwin":
             result["macosHostExecution"] = observe_installed_host(
                 executable, module, evidence, os.environ.get("MACOS_SIGNING_CERT_SHA1", "").upper(),
                 require_hardened_core=macos_hardened_mfa,
