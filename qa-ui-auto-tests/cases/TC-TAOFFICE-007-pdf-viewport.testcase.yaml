@@ -55,14 +55,31 @@ steps:
 - fill: {selector: '[data-testid="taoffice-pdf-search-input"]', value: report}
 - press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Enter}
 - wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"] [data-search-hit]'
-- click: '[data-testid="taoffice-pdf-search-next"]'
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: ArrowDown}
 - wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-ready="true"] [data-search-hit]'
+- eval_readonly:
+    expression: document.activeElement.dataset.testid === "taoffice-pdf-search-input"
+    expect_truthy: true
 - click: '[data-testid="taoffice-pdf-search-previous"]'
 - wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"] [data-search-hit]'
+- click: '[data-testid="taoffice-pdf-search-next"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-ready="true"] [data-search-hit]'
 - press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Escape}
 - assert_attribute: {selector: '[data-testid="taoffice-pdf-find"]', name: aria-expanded, equals: 'false'}
 - eval_readonly:
     expression: document.activeElement.dataset.testid === "taoffice-pdf-find"
+    expect_truthy: true
+- press: {selector: '[data-testid="taoffice-pdf-viewport"]', key: Control+f, macos_key: Meta+f}
+- eval_readonly:
+    expression: document.activeElement.dataset.testid === "taoffice-pdf-search-input"
+    expect_truthy: true
+- fill: {selector: '[data-testid="taoffice-pdf-search-input"]', value: absent phrase}
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-pdf-search-status"]', contains: No text found}
+- assert_disabled: '[data-testid="taoffice-pdf-search-next"]'
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Escape}
+- eval_readonly:
+    expression: document.activeElement.dataset.testid === "taoffice-pdf-viewport"
     expect_truthy: true
 - click: '[data-testid="taoffice-pdf-outline-toggle"]'
 - assert_text: {selector: '[data-testid="taoffice-pdf-outline"]', contains: Revenue appendix}

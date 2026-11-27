@@ -3,7 +3,7 @@
   "slug": "taoffice-pdf",
   "name": "TaOffice PDF",
   "description": "View PDF files offline with outlines, text search, page navigation, zoom and rotation.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "coreApiVersion": "1",
   "kind": "media",
   "status": "provisional",

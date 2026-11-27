@@ -23,7 +23,8 @@ export default function PdfViewer({ document: source, active }) {
   const [navigation, setNavigation] = useState(null);
   const [highlight, setHighlight] = useState("");
   const viewport = useRef(null);
-  const findButton = useRef(null);
+  const searchInput = useRef(null);
+  const searchReturnFocus = useRef(null);
   const outlineButton = useRef(null);
   const isMac = source.platform === "macos";
   const modifier = isMac ? "⌘" : "Ctrl";
@@ -68,12 +69,23 @@ export default function PdfViewer({ document: source, active }) {
     setHighlight("");
     setNavigation(next === navigation ? null : next);
   }
+  function openSearch(origin) {
+    searchReturnFocus.current = origin;
+    if (navigation === "search") searchInput.current?.focus();
+    else changeNavigation("search");
+  }
+  function closeSearch() {
+    changeNavigation(null);
+    searchReturnFocus.current?.focus();
+  }
   function onViewportKey(event) {
-    if (!active || !pdf || !scale || event.defaultPrevented || event.nativeEvent.isComposing
+    if (!active || !pdf || event.defaultPrevented || event.nativeEvent.isComposing
       || event.altKey || event.getModifierState("AltGraph")) return;
     const mod = isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
     if (!mod) return;
-    if (event.key === "+" || event.key === "=" || event.code === "NumpadAdd") changeZoom(1);
+    if (event.key === "f" && !event.shiftKey) openSearch(event.currentTarget);
+    else if (!scale) return;
+    else if (event.key === "+" || event.key === "=" || event.code === "NumpadAdd") changeZoom(1);
     else if (event.key === "-" || event.code === "NumpadSubtract") changeZoom(-1);
     else if (event.key === "0" || event.code === "Numpad0") setZoom(null);
     else return;
@@ -118,8 +130,10 @@ export default function PdfViewer({ document: source, active }) {
         disabled={!pdf} aria-pressed={zoom === null} onClick={() => setZoom(null)}>{label("适应宽度", "Fit width")}</button>
       <button type="button" className="taomni-btn" data-testid="taoffice-pdf-rotate"
         disabled={!pdf} onClick={() => setRotation((value) => (value + 90) % 360)}>{label("向右旋转", "Rotate right")}</button>
-      <button ref={findButton} type="button" className="taomni-btn" data-testid="taoffice-pdf-find"
-        disabled={!pdf} aria-expanded={navigation === "search"} onClick={() => changeNavigation("search")}>
+      <button type="button" className="taomni-btn" data-testid="taoffice-pdf-find"
+        title={`${label("查找文字", "Find text")} (${modifier}+F)`}
+        disabled={!pdf} aria-expanded={navigation === "search"}
+        onClick={(event) => navigation === "search" ? closeSearch() : openSearch(event.currentTarget)}>
         {label("查找文字", "Find text")}
       </button>
       <button ref={outlineButton} type="button" className="taomni-btn" data-testid="taoffice-pdf-outline-toggle"
@@ -129,9 +143,9 @@ export default function PdfViewer({ document: source, active }) {
     </div>
     {pageError && <p role="alert" data-testid="taoffice-pdf-page-error">
       {label("请输入文档范围内的页码。", "Enter a page number within the document.")}</p>}
-    {pdf && navigation === "search" && <PdfSearch pdf={pdf} label={label}
+    {pdf && navigation === "search" && <PdfSearch pdf={pdf} label={label} input={searchInput}
       onMatch={(number, query) => { setHighlight(query); if (number) go(number); }}
-      onClose={() => { changeNavigation(null); findButton.current?.focus(); }} />}
+      onClose={closeSearch} />}
     {pdf && navigation === "outline" && <PdfOutline pdf={pdf} label={label} onGo={go}
       onClose={() => { changeNavigation(null); outlineButton.current?.focus(); }} />}
     <div className="taoffice-pdf-viewport" ref={viewport} tabIndex={0} aria-label={source.name}

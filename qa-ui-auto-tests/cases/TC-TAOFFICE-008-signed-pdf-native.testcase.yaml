@@ -32,6 +32,16 @@ steps:
 - wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-ready="true"]'
 - assert_text: {selector: '[data-testid="taoffice-pdf-text"]', contains: Revenue by region}
 - press: {selector: '[data-testid="taoffice-pdf-outline-item"]', key: Escape}
+- press: {selector: '[data-testid="taoffice-pdf-viewport"]', key: Control+f, macos_key: Meta+f}
+- fill: {selector: '[data-testid="taoffice-pdf-search-input"]', value: report}
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Enter}
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"] [data-search-hit]'
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: ArrowDown}
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-ready="true"] [data-search-hit]'
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Escape}
+- eval_readonly:
+    expression: document.activeElement.dataset.testid === "taoffice-pdf-viewport"
+    expect_truthy: true
 - press: {selector: '[data-testid="taoffice-pdf-viewport"]', key: Control+=, macos_key: Meta+=}
 - assert_attribute: {selector: '[data-testid="taoffice-pdf-fit"]', name: aria-pressed, equals: 'false'}
 - press: {selector: '[data-testid="taoffice-pdf-viewport"]', key: Control+0, macos_key: Meta+0}

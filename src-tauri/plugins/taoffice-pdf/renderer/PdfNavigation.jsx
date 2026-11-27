@@ -3,15 +3,14 @@ import { findPdfPages, normalizePdfText, outlineEntries, outlinePage } from "./p
 const { React } = globalThis.__taomniHost;
 const { useEffect, useRef, useState } = React;
 
-export function PdfSearch({ pdf, label, onMatch, onClose }) {
+export function PdfSearch({ pdf, label, input, onMatch, onClose }) {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState(null);
   const [notice, setNotice] = useState("");
   const [result, setResult] = useState(null);
-  const field = useRef(null);
   const onMatchRef = useRef(onMatch);
   onMatchRef.current = onMatch;
-  useEffect(() => { field.current?.focus(); }, []);
+  useEffect(() => { input.current?.focus(); }, [input]);
   useEffect(() => {
     if (!search) return;
     const controller = new AbortController();
@@ -47,9 +46,15 @@ export function PdfSearch({ pdf, label, onMatch, onClose }) {
         onClose();
       }
     }}>
-    <input ref={field} className="taomni-input" type="search" data-testid="taoffice-pdf-search-input"
+    <input ref={input} className="taomni-input" type="search" data-testid="taoffice-pdf-search-input"
       aria-label={label("查找文字", "Find text")} value={query} onChange={(event) => {
         setQuery(event.target.value); setSearch(null); setResult(null); setNotice(""); onMatch(null, "");
+      }} onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+          || (result?.pages.length ?? 0) < 2 || !["ArrowDown", "ArrowUp"].includes(event.key)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        move(event.key === "ArrowDown" ? 1 : -1);
       }} />
     <button className="taomni-btn" type="submit" data-testid="taoffice-pdf-search-submit" disabled={!query.trim()}>
       {label("查找", "Find")}
