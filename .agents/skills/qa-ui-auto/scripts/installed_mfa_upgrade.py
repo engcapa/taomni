@@ -244,7 +244,9 @@ def execute(args):
                 def seed_mail(session):
                     installed_mail_upgrade.seed_original(ctx, session, legacy_install, server)
             else:
-                receipt, archive, _, _ = load_artifact(args.signed, target["producerSource"], "linux-x86_64", "mfa")
+                receipt, archive, _, _ = load_artifact(
+                    args.signed, target["producerSource"], "linux-x86_64", "mfa", version=None,
+                )
             signature = archive.with_name(receipt["signature"])
             write_json(report, "signed-mfa-input.json", receipt)
             legacy_install = report / "original-install"
