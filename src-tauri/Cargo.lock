@@ -11565,10 +11565,11 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-taoffice-excel"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.22.1",
  "calamine",
+ "quick-xml 0.42.0",
  "serde",
  "serde_json",
  "taomni-plugin-api",

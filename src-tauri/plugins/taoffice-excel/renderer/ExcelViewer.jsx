@@ -1,5 +1,6 @@
 import { openWorkbook, ROWS, COLUMNS } from "./workbook.js";
 import { Worksheet } from "./Worksheet.jsx";
+import { useWorkbookEdits } from "./useWorkbookEdits.js";
 import styles from "./workbook.css?inline";
 
 const { React, i18n } = globalThis.__taomniHost;
@@ -18,6 +19,7 @@ export default function ExcelViewer({ document: source, active, api }) {
   const [cursor, setCursor] = useState(ORIGIN);
   const [range, setRange] = useState(null);
   const [failure, setFailure] = useState("");
+  const editor = useWorkbookEdits(book, source, api);
 
   useEffect(() => {
     const id = crypto.randomUUID();
@@ -78,7 +80,15 @@ export default function ExcelViewer({ document: source, active, api }) {
 
   const visibleRange = range?.sheet === sheet ? range : null;
   const pending = !visibleRange || visibleRange.start.row !== row || visibleRange.start.column !== column;
-  return <div className="taoffice-excel" data-testid="taoffice-excel">
+  return <div className="taoffice-excel" data-testid="taoffice-excel" onKeyDown={(event) => {
+    if (!active || !editor.dirty || event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229) return;
+    const mod = source.platform === "macos" ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+    if (mod && event.key === "s" && !event.altKey && !event.shiftKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      void editor.save().catch(() => {});
+    }
+  }}>
     <style>{styles}</style>
     {failure ? <div className="taoffice-excel-feedback" role="alert" data-testid="taoffice-excel-error">
       <p>{label("无法打开工作簿。", "Could not open the workbook.")} {failure}</p>
@@ -97,8 +107,18 @@ export default function ExcelViewer({ document: source, active, api }) {
       {pending && <p className="taoffice-excel-feedback" role="status">{label("正在读取工作表…", "Reading worksheet…")}</p>}
       {book && <section id={`${prefix}-worksheet`} aria-labelledby={`${prefix}-sheet-${sheetIndex}`} role="tabpanel" className="taoffice-excel-panel">
         {visibleRange && <Worksheet key={sheet} range={visibleRange} cursor={cursor}
-          move={setCursor} active={active} pending={pending} label={label} platform={source.platform} />}
+          move={setCursor} active={active} pending={pending} label={label} platform={source.platform} editor={editor} />}
       </section>}
+      {editor.permitted && <div className="taoffice-excel-copy">
+        <button type="button" className="taomni-btn" data-testid="taoffice-excel-save-copy"
+          disabled={!editor.dirty || editor.saving} onClick={() => { void editor.save().catch(() => {}); }}>
+          {label("保存副本…", "Save a copy…")}
+        </button>
+        {editor.saving ? <span role="status">{label("正在保存副本…", "Saving workbook copy…")}</span>
+          : editor.edits.size > 0 && <span>{label("公式仍显示原工作簿的缓存结果。", "Formulas display cached results from the original workbook.")}</span>}
+        {editor.output && <span role="status" data-testid="taoffice-excel-copy-output">{label("已保存副本", "Saved copy")} {editor.output}</span>}
+        {editor.error && <span role="alert" data-testid="taoffice-excel-copy-error">{label("无法保存副本。", "Could not save the copy.")} {editor.error}</span>}
+      </div>}
     </>}
   </div>;
 }

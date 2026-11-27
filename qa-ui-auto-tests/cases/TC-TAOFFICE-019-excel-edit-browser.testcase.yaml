@@ -1,0 +1,53 @@
+id: TC-TAOFFICE-019
+title: Edit XLSX cells with keyboard commit, cancellation and dirty close
+description: Protect formulas, reject invalid numeric input, commit and advance to the next cell with Tab, and retain edits when cancelling the shared close dialog.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-excel]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 140
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-excel.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- seed_storage:
+    key: taomni.preview.taoffice-excel.workbook.v1
+    value: '${fixture.taoffice_workbook_model}'
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="quarterly.xlsx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="quarterly.xlsx"]'
+- wait_for: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
+- click: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
+- assert_disabled: '[data-testid="taoffice-excel-edit-cell"]'
+- click: '[data-testid="taoffice-excel-cell"][data-address="B2"]'
+- press: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', key: F2}
+- wait_for: '[data-testid="taoffice-excel-input"]:focus'
+- fill: {selector: '[data-testid="taoffice-excel-input"]', value: letters}
+- press: {selector: '[data-testid="taoffice-excel-input"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-excel-input-error"]', contains: Enter a valid number}
+- press: {selector: '[data-testid="taoffice-excel-input"]', key: Escape}
+- wait_for: '[data-testid="taoffice-excel-cell"][data-address="B2"]:focus'
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', contains: '12'}
+- click: '[data-testid="taoffice-excel-edit-cell"]'
+- fill: {selector: '[data-testid="taoffice-excel-input"]', value: '15.5'}
+- press: {selector: '[data-testid="taoffice-excel-input"]', key: Tab}
+- wait_for: '[data-testid="taoffice-excel-cell"][data-address="C2"]:focus'
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', contains: '15.5'}
+- assert_attribute: {selector: '[data-testid="taoffice-excel-formula"]', name: value, equals: '=B2*2'}
+- assert_enabled: '[data-testid="taoffice-excel-save-copy"]'
+- wait_for: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="viewer-close-dialog"]'
+- click: '[data-testid="viewer-close-cancel"]'
+- wait_for: {selector: '[data-testid="viewer-close-dialog"]', state: detached}
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', contains: '15.5'}
+- screenshot: taoffice-edit-worksheet.png
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/quarterly.xlsx', sha256: '${fixture.taoffice_workbook_sha}'}
+- assert_no_runtime_errors: null

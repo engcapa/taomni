@@ -1,7 +1,7 @@
 use calamine::{Data, DataRef, Reader, SheetType, SheetVisible, Xlsx, open_workbook_from_rs};
 use serde::Serialize;
 use std::collections::HashSet;
-use std::io::Cursor;
+use std::{io::Cursor, sync::Arc};
 use taomni_plugin_api::{ErrorCode, RpcError};
 use zip::ZipArchive;
 
@@ -17,8 +17,9 @@ const MAX_SHEETS: usize = 256;
 const MAX_CELL_CHARS: usize = 960;
 
 pub struct Workbook {
-    file: Xlsx<Cursor<Vec<u8>>>,
+    file: Xlsx<Cursor<Arc<[u8]>>>,
     sheets: Vec<String>,
+    bytes: Arc<[u8]>,
 }
 
 #[derive(Debug, Serialize)]
@@ -30,6 +31,7 @@ pub struct SheetWindow {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Cell {
     row: u32,
     column: u32,
@@ -38,6 +40,8 @@ struct Cell {
     formula: Option<String>,
     #[serde(skip_serializing_if = "is_false")]
     truncated: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    edit_type: Option<&'static str>,
 }
 
 pub fn invalid(message: impl std::fmt::Display) -> RpcError {
@@ -105,7 +109,8 @@ fn value_text(value: DataRef<'_>) -> (String, bool) {
 impl Workbook {
     pub fn open(bytes: Vec<u8>) -> Result<Self, RpcError> {
         check_package(&bytes)?;
-        let file: Xlsx<_> = open_workbook_from_rs(Cursor::new(bytes)).map_err(invalid)?;
+        let bytes: Arc<[u8]> = bytes.into();
+        let file: Xlsx<_> = open_workbook_from_rs(Cursor::new(bytes.clone())).map_err(invalid)?;
         let sheets: Vec<String> = file
             .sheets_metadata()
             .iter()
@@ -120,11 +125,19 @@ impl Workbook {
         {
             return Err(invalid("The workbook has no supported visible worksheets"));
         }
-        Ok(Self { file, sheets })
+        Ok(Self {
+            file,
+            sheets,
+            bytes,
+        })
     }
 
     pub fn sheets(&self) -> &[String] {
         &self.sheets
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
     }
 
     pub fn sheet(
@@ -162,7 +175,13 @@ impl Workbook {
             if (start_row..start_row + WINDOW_ROWS).contains(&row)
                 && (start_column..start_column + WINDOW_COLUMNS).contains(&column)
             {
+                let edit_type = match &cell.value {
+                    DataRef::String(_) | DataRef::SharedString(_) => Some("text"),
+                    DataRef::Int(_) | DataRef::Float(_) => Some("number"),
+                    _ => None,
+                };
                 let (value, value_truncated) = value_text(cell.value);
+                let edit_type = edit_type.filter(|_| !value_truncated && cell.formula.is_none());
                 let (formula, formula_truncated) = match cell.formula {
                     Some(formula) => {
                         let (formula, truncated) = excerpt(&formula);
@@ -177,6 +196,7 @@ impl Workbook {
                         value,
                         formula,
                         truncated: value_truncated || formula_truncated,
+                        edit_type,
                     });
                 }
             }

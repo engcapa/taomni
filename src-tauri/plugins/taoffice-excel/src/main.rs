@@ -3,14 +3,18 @@ use taomni_plugin_sdk::{HostConfig, serve_stdio_with};
 
 mod sessions;
 mod workbook;
+mod workbook_copy;
 
 const ID: &str = "taomni-plugin-taoffice-excel";
-const COMMANDS: [&str; 5] = [
+const COMMANDS: [&str; 8] = [
     "workbook/begin",
     "workbook/append",
     "workbook/open",
     "workbook/sheet",
     "workbook/close",
+    "workbook/copy",
+    "workbook/copyChunk",
+    "workbook/releaseCopy",
 ];
 
 fn main() -> io::Result<()> {

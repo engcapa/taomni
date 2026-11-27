@@ -119,7 +119,7 @@ def setup(ctx: Any) -> None:
         files["damaged.pdf"] = b"This is not a PDF."
         ctx.values["taoffice_pdf_sha"] = hashlib.sha256(files["report.pdf"]).hexdigest()
         ctx.values["taoffice_locked_pdf_sha"] = hashlib.sha256(files["locked.pdf"]).hexdigest()
-    if ctx.case_id in {"TC-TAOFFICE-015", "TC-TAOFFICE-016"}:
+    if ctx.case_id in {"TC-TAOFFICE-015", "TC-TAOFFICE-016", "TC-TAOFFICE-019", "TC-TAOFFICE-020"}:
         files.update(workbook_fixtures(TAOFFICE_ASSETS, ctx.values))
     if ctx.case_id in {"TC-TAOFFICE-017", "TC-TAOFFICE-018"}:
         files["order-form.pdf"] = (TAOFFICE_ASSETS / "order-form.pdf").read_bytes()

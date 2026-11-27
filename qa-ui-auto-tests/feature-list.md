@@ -16763,6 +16763,7 @@ TC-TAOFFICE-011 验证原生 7z 固实压缩包的预览和解压，TC-TAOFFICE-
 TC-TAOFFICE-013 覆盖原生固实 RAR4/RAR5 解码、只读预览、准确解压和加密包提示。TC-TAOFFICE-014 覆盖浏览器桌面打开提示。
 TC-TAOFFICE-015/016 覆盖独立 Excel 模块的工作表导航、选中单元格恢复、缓存值与原公式、隐藏工作表、输入文件散列以及原生签名安装和停用。
 TC-TAOFFICE-017/018 覆盖 PDF 表单填写、关闭守卫、保存副本和原生文件重新打开。
+TC-TAOFFICE-019/020 覆盖已有 XLSX 文字和数字单元格编辑、输入校验、取消、保存副本、公式保留和原始文件摘要。
 
 <!-- feature
 id: F-FILEOPEN-1
@@ -16947,6 +16948,21 @@ controls:
     kind: display
   - id: taoffice-excel-error
     selector: '[data-testid="taoffice-excel-error"]'
+    kind: display
+  - id: taoffice-excel-edit-cell
+    selector: '[data-testid="taoffice-excel-edit-cell"]'
+    kind: interactive
+  - id: taoffice-excel-input
+    selector: '[data-testid="taoffice-excel-input"]'
+    kind: interactive
+  - id: taoffice-excel-input-error
+    selector: '[data-testid="taoffice-excel-input-error"]'
+    kind: display
+  - id: taoffice-excel-save-copy
+    selector: '[data-testid="taoffice-excel-save-copy"]'
+    kind: interactive
+  - id: taoffice-excel-copy-output
+    selector: '[data-testid="taoffice-excel-copy-output"]'
     kind: display
   - id: taoffice-pdf-page
     selector: '[data-testid="taoffice-pdf-page"]'

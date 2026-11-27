@@ -1,4 +1,5 @@
 use crate::workbook::{MAX_INPUT_BYTES, Workbook, invalid};
+use crate::workbook_copy::{self, Edit};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
@@ -25,6 +26,12 @@ pub struct Workbooks {
 struct Session {
     touched: Instant,
     state: State,
+    copy: Option<CopyResult>,
+}
+
+struct CopyResult {
+    id: Uuid,
+    bytes: Vec<u8>,
 }
 
 enum State {
@@ -58,6 +65,29 @@ struct View {
     column: u32,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CopyRequest {
+    id: Uuid,
+    copy_id: Uuid,
+    edits: Vec<Edit>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CopyChunk {
+    id: Uuid,
+    copy_id: Uuid,
+    offset: usize,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CopyIdentity {
+    id: Uuid,
+    copy_id: Uuid,
+}
+
 fn request<T: DeserializeOwned>(params: Option<Value>) -> Result<T, RpcError> {
     serde_json::from_value(params.unwrap_or(Value::Null)).map_err(invalid)
 }
@@ -66,10 +96,10 @@ fn expired() -> RpcError {
     invalid("This workbook session expired. Reopen the workbook to continue.")
 }
 
-fn active(sessions: &mut HashMap<Uuid, Session>, id: Uuid) -> Result<&mut State, RpcError> {
+fn active(sessions: &mut HashMap<Uuid, Session>, id: Uuid) -> Result<&mut Session, RpcError> {
     let session = sessions.get_mut(&id).ok_or_else(expired)?;
     session.touched = Instant::now();
-    Ok(&mut session.state)
+    Ok(session)
 }
 
 fn append(state: &mut State, request: Append) -> Result<(), RpcError> {
@@ -147,11 +177,12 @@ impl PluginHandler for Workbooks {
                         expected: size,
                         bytes: Vec::new(),
                     },
+                    copy: None,
                 });
             }
             "workbook/append" => {
                 let upload: Append = request(params)?;
-                append(active(&mut sessions, upload.id)?, upload)?;
+                append(&mut active(&mut sessions, upload.id)?.state, upload)?;
             }
             "workbook/open" => {
                 let Identity { id } = request(params)?;
@@ -171,6 +202,7 @@ impl PluginHandler for Workbooks {
                     Session {
                         touched: Instant::now(),
                         state: State::Open(Box::new(workbook)),
+                        copy: None,
                     },
                 );
                 return Ok(result);
@@ -182,11 +214,45 @@ impl PluginHandler for Workbooks {
                     row,
                     column,
                 } = request(params)?;
-                let State::Open(workbook) = active(&mut sessions, id)? else {
+                let State::Open(workbook) = &mut active(&mut sessions, id)?.state else {
                     return Err(invalid("Workbook transfer is incomplete"));
                 };
                 let window = workbook.sheet(&sheet, row, column, || operation.check_current())?;
                 return serde_json::to_value(window).map_err(invalid);
+            }
+            "workbook/copy" => {
+                let CopyRequest { id, copy_id, edits } = request(params)?;
+                let session = active(&mut sessions, id)?;
+                let State::Open(workbook) = &session.state else {
+                    return Err(invalid("Workbook transfer is incomplete"));
+                };
+                session.copy = None;
+                let bytes = workbook_copy::create(workbook, edits, || operation.check_current())?;
+                let size = bytes.len();
+                session.copy = Some(CopyResult { id: copy_id, bytes });
+                return Ok(json!({ "size": size }));
+            }
+            "workbook/copyChunk" => {
+                let CopyChunk {
+                    id,
+                    copy_id,
+                    offset,
+                } = request(params)?;
+                let copy = active(&mut sessions, id)?
+                    .copy
+                    .as_ref()
+                    .filter(|copy| copy.id == copy_id && offset < copy.bytes.len())
+                    .ok_or_else(|| invalid("The workbook copy is unavailable"))?;
+                let end = copy.bytes.len().min(offset + CHUNK_BYTES);
+                return Ok(json!({ "data": STANDARD.encode(&copy.bytes[offset..end]) }));
+            }
+            "workbook/releaseCopy" => {
+                let CopyIdentity { id, copy_id } = request(params)?;
+                if let Some(session) = sessions.get_mut(&id)
+                    && session.copy.as_ref().is_some_and(|copy| copy.id == copy_id)
+                {
+                    session.copy = None;
+                }
             }
             "workbook/close" => {
                 let Identity { id } = request(params)?;

@@ -1495,6 +1495,11 @@
 - `[data-testid="taoffice-excel-cell-address"]` — display — F-FILEOPEN-1.taoffice-excel-cell-address
 - `[data-testid="taoffice-excel-formula"]` — display — F-FILEOPEN-1.taoffice-excel-formula
 - `[data-testid="taoffice-excel-error"]` — display — F-FILEOPEN-1.taoffice-excel-error
+- `[data-testid="taoffice-excel-edit-cell"]` — interactive — F-FILEOPEN-1.taoffice-excel-edit-cell
+- `[data-testid="taoffice-excel-input"]` — interactive — F-FILEOPEN-1.taoffice-excel-input
+- `[data-testid="taoffice-excel-input-error"]` — display — F-FILEOPEN-1.taoffice-excel-input-error
+- `[data-testid="taoffice-excel-save-copy"]` — interactive — F-FILEOPEN-1.taoffice-excel-save-copy
+- `[data-testid="taoffice-excel-copy-output"]` — display — F-FILEOPEN-1.taoffice-excel-copy-output
 - `[data-testid="taoffice-pdf-page"]` — display — F-FILEOPEN-1.taoffice-pdf-page
 - `[data-testid="taoffice-pdf-form-toggle"]` — interactive — F-FILEOPEN-1.taoffice-pdf-form-toggle
 - `[data-testid="taoffice-pdf-form"]` — display — F-FILEOPEN-1.taoffice-pdf-form

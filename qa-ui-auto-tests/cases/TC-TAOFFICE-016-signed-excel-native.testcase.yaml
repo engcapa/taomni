@@ -16,7 +16,8 @@ steps:
 - fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.excel_signature}'}
 - click: '[data-testid="module-offline-submit"]'
 - wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
-- click: '[data-testid="module-action-enable-taoffice-excel"]'
+- wait_for: '[data-testid="module-action-enable-taoffice-excel"]:enabled'
+- press: {selector: '[data-testid="module-action-enable-taoffice-excel"]', key: Enter}
 - wait_for: '[data-testid="module-action-disable-taoffice-excel"]'
 - click: '[data-testid="side-tab-explorer"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
@@ -33,6 +34,8 @@ steps:
 - wait_for: '[data-testid="taoffice-excel-cell"][data-address="B2"]'
 - assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="A2"]', contains: 上海}
 - assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', contains: 'TRUE'}
+- click: '[data-testid="taoffice-excel-cell"][data-address="B2"]'
+- assert_disabled: '[data-testid="taoffice-excel-edit-cell"]'
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/quarterly.xlsx', sha256: '${fixture.taoffice_workbook_sha}'}
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="broken.xlsx"]'

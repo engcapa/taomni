@@ -1,0 +1,63 @@
+id: TC-TAOFFICE-020
+title: Save edited XLSX cells through the signed Excel host and reopen the copy
+description: Install the signed module, edit text and a number, cancel the save shortcut's desktop dialog, then save and reopen with the formula intact.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, file-open, taoffice, taoffice-excel, native-boundary]
+fixtures: [reset_db, file_open_files, taoffice_signed_excel]
+timeout_sec: 260
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.excel_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.excel_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- wait_for: '[data-testid="module-action-enable-taoffice-excel"]:enabled'
+- press: {selector: '[data-testid="module-action-enable-taoffice-excel"]', key: Enter}
+- wait_for: '[data-testid="module-action-disable-taoffice-excel"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="quarterly.xlsx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="quarterly.xlsx"]'
+- wait_for: '[data-testid="taoffice-excel-cell"][data-address="A2"]'
+- click: '[data-testid="taoffice-excel-cell"][data-address="A2"]'
+- press: {selector: '[data-testid="taoffice-excel-cell"][data-address="A2"]', key: F2}
+- fill: {selector: '[data-testid="taoffice-excel-input"]', value: Mechanical Keyboard}
+- press: {selector: '[data-testid="taoffice-excel-input"]', key: Tab}
+- wait_for: '[data-testid="taoffice-excel-cell"][data-address="B2"]:focus'
+- press: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', key: Enter}
+- fill: {selector: '[data-testid="taoffice-excel-input"]', value: '15.5'}
+- press: {selector: '[data-testid="taoffice-excel-input"]', key: Control+s, macos_key: Meta+s}
+- native_file_dialog: {kind: save, action: cancel}
+- wait_for: '[data-testid="taoffice-excel-save-copy"]:enabled'
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', contains: '15.5'}
+- wait_for: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.file_open_root}/edited.xlsx
+    trigger: '[data-testid="taoffice-excel-save-copy"]'
+- wait_for: '[data-testid="taoffice-excel-copy-output"]'
+- assert_text: {selector: '[data-testid="taoffice-excel-copy-output"]', contains: edited.xlsx}
+- wait_for: {selector: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]', state: detached}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/quarterly.xlsx', sha256: '${fixture.taoffice_workbook_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="edited.xlsx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="edited.xlsx"]'
+- wait_for: '[data-testid="taoffice-excel-cell"][data-address="A2"]'
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="A2"]', contains: Mechanical Keyboard}
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', contains: '15.5'}
+- click: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
+- assert_attribute: {selector: '[data-testid="taoffice-excel-formula"]', name: value, equals: '=B2*2'}
+- assert_no_runtime_errors: null

@@ -18,7 +18,8 @@ def fixtures(assets, values):
 
     def sheet(rows, columns, items):
         return {"rows": rows, "columns": columns, "cells": [
-            {"row": row, "column": column, "value": value, **({"formula": formula[0]} if formula else {})}
+            {"row": row, "column": column, "value": value,
+             **({"formula": formula[0]} if formula else {"editType": "number" if value.isdigit() else "text"})}
             for row, column, value, *formula in items
         ]}
 
