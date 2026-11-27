@@ -250,3 +250,52 @@ fn update_rechecks_the_installed_version_and_preserves_disabled_state() {
             .is_none()
     );
 }
+
+#[test]
+fn mail_provision_failure_surfaces_error_until_requeued() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    fs::write(root.join("taomni.db"), b"legacy core database").unwrap();
+    initialize(root).unwrap();
+    let mut first = catalog(1, &[("mail", PLATFORM)]);
+    first.legacy_upgrade = Some(BTreeSet::from([id("mail")]));
+    plan(root, &first, PLATFORM).unwrap();
+
+    fs::create_dir_all(root.join("migration")).unwrap();
+    crate::backup::control::write_json(
+        &root.join("migration/mail-provision.json"),
+        &serde_json::json!({
+            "version": "1.1.0",
+            "archive_sha256": "a".repeat(64),
+            "failed": true,
+            "error": "Timed out copying archive objects",
+        }),
+    )
+    .unwrap();
+
+    let failed = plan(root, &first, PLATFORM).unwrap();
+    assert!(failed.legacy_restart_required.is_empty());
+    assert_eq!(failed.legacy_import_failed, BTreeSet::from([id("mail")]));
+    assert_eq!(
+        failed
+            .legacy_import_errors
+            .get(&id("mail"))
+            .map(String::as_str),
+        Some("Timed out copying archive objects")
+    );
+
+    crate::backup::control::write_json(
+        &root.join("migration/mail-provision.json"),
+        &serde_json::json!({
+            "version": "1.1.0",
+            "archive_sha256": "a".repeat(64),
+            "failed": false,
+        }),
+    )
+    .unwrap();
+
+    let queued = plan(root, &first, PLATFORM).unwrap();
+    assert_eq!(queued.legacy_restart_required, BTreeSet::from([id("mail")]));
+    assert!(queued.legacy_import_failed.is_empty());
+    assert!(queued.legacy_import_errors.is_empty());
+}

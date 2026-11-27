@@ -30,6 +30,14 @@ struct ProvisionPlan {
     archive_sha256: String,
     #[serde(default)]
     failed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct QueuedPlanStatus {
+    pub(crate) failed: bool,
+    pub(crate) error: Option<String>,
 }
 
 pub(crate) fn has_legacy_accounts(db: &Connection) -> Result<bool, String> {
@@ -68,6 +76,7 @@ pub(crate) fn queue(profile: &Path, package: &VerifiedPackage) -> Result<bool, S
             version: package.manifest().version.clone(),
             archive_sha256: package.archive_sha256().to_owned(),
             failed: false,
+            error: None,
         },
     )?;
     Ok(true)
@@ -77,10 +86,23 @@ pub(crate) fn queued(profile: &Path) -> Result<bool, String> {
     Ok(plan_path(profile)?.is_some())
 }
 
-pub(crate) fn queued_failure(profile: &Path) -> Result<Option<bool>, String> {
+pub(crate) fn queued_pending(profile: &Path) -> Result<bool, String> {
+    Ok(queued_status(profile)?.is_some_and(|status| !status.failed))
+}
+
+pub(crate) fn queued_status(profile: &Path) -> Result<Option<QueuedPlanStatus>, String> {
     plan_path(profile)?
-        .map(|path| paths::read_json_bounded::<ProvisionPlan>(&path).map(|plan| plan.failed))
+        .map(|path| {
+            paths::read_json_bounded::<ProvisionPlan>(&path).map(|plan| QueuedPlanStatus {
+                failed: plan.failed,
+                error: plan.error,
+            })
+        })
         .transpose()
+}
+
+pub(crate) fn queued_failure(profile: &Path) -> Result<Option<bool>, String> {
+    Ok(queued_status(profile)?.map(|status| status.failed))
 }
 
 fn plan_path(profile: &Path) -> Result<Option<PathBuf>, String> {
@@ -104,6 +126,8 @@ pub(crate) fn apply_before_startup(profile: &Path) -> Result<(), String> {
     let installer = ModuleInstaller::new(profile.join("plugins"));
     if let Err(error) = apply(&maintenance, &installer, &plan) {
         plan.failed = true;
+        plan.error = Some(error.clone());
+        eprintln!("Taomni: staged Mail upgrade failed: {error}");
         if let Err(record_error) = paths::write_json_durable(&path, &plan) {
             tracing::warn!(%record_error, "Could not record the Mail upgrade failure");
         }

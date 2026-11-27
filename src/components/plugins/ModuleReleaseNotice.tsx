@@ -4,6 +4,7 @@ import { usePluginFrontendStore } from "../../stores/pluginFrontendStore";
 import { useT } from "../../lib/i18n";
 import { isTauriRuntime } from "../../lib/runtime";
 import { openSettingsSection } from "../../lib/settingsNavigation";
+import { relaunchApp } from "../../lib/updateService";
 import { useModuleMarketplaceStore } from "../../stores/moduleMarketplaceStore";
 
 export function ModuleReleaseNotice({ openSettings }: { openSettings(): void }) {
@@ -49,9 +50,11 @@ export function ModuleReleaseNotice({ openSettings }: { openSettings(): void }) 
   const waitingForRestart = plan?.legacyRestartRequired?.length ?? 0;
   const importFailed = plan?.legacyImportFailed?.length ?? 0;
   const legacyPending = (plan?.legacyPending.length ?? 0) - waitingForRestart - importFailed;
+  const [restarting, setRestarting] = useState(false);
+  const [restartError, setRestartError] = useState<string | null>(null);
   if (!showMfaNotice && !newModules.length && !legacyPending && !waitingForRestart && !importFailed && !plan?.legacyWaiting) return null;
 
-  return <aside data-testid="module-release-notice" className="max-h-40 overflow-y-auto border-t border-[var(--taomni-divider)] px-3 py-2 text-[12px]">
+  return <aside data-testid="module-release-notice" className="max-h-40 space-y-1.5 overflow-y-auto border-t border-[var(--taomni-divider)] px-3 py-2 text-[12px]">
     {showMfaNotice && <p data-testid="module-release-mfa" role={mfaNotice instanceof Error ? "alert" : "status"}>
       {mfaNotice instanceof Error ? mfaNotice.message : t("plugins.marketMfaMigrationRequired")}
     </p>}
@@ -68,11 +71,23 @@ export function ModuleReleaseNotice({ openSettings }: { openSettings(): void }) 
       </ul>
     </div>}
     {dismissError && <p role="alert">{dismissError}</p>}
+    {restartError && <p role="alert" data-testid="module-release-restart-error" className="text-red-500">{restartError}</p>}
     <div className="mt-2 flex gap-2">
       <button type="button" data-testid="module-release-open-store" className="taomni-btn" onClick={() => {
         openSettingsSection("module-store");
         openSettings();
       }}>{t("plugins.browse")}</button>
+      {!!waitingForRestart && <button type="button" data-testid="module-release-restart" className="taomni-btn" disabled={restarting}
+        onClick={() => {
+          setRestartError(null);
+          setRestarting(true);
+          void relaunchApp().catch((reason: unknown) => {
+            setRestartError(reason instanceof Error ? reason.message : String(reason));
+            setRestarting(false);
+          });
+        }}>
+        {restarting ? t("plugins.marketWorking") : t("plugins.marketRestartNow")}
+      </button>}
       {!!newModules.length && <button type="button" data-testid="module-release-later" className="taomni-btn"
         onClick={() => void dismiss(newModules.map((entry) => entry.id))}>{t("plugins.marketLater")}</button>}
     </div>

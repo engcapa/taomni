@@ -68,7 +68,7 @@ impl ProfileRuntimeLeases {
         use crate::plugin::migration_mail_provision as mail_upgrade;
 
         let (profile, mode_lease) = Self::prepare_profile(data, mode)?;
-        let (profile, mode_lease) = match mail_upgrade::queued(data) {
+        let (profile, mode_lease) = match mail_upgrade::queued_pending(data) {
             Ok(true) => {
                 // Existing restore intents take precedence. Both live leases
                 // then yield so migration can take exclusive ownership before
