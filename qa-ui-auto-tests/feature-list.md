@@ -423,6 +423,7 @@ controls:
     - '[data-testid="module-action-enable-taoffice-video"]'
     - '[data-testid="module-action-enable-taoffice-pdf"]'
     - '[data-testid="module-action-enable-taoffice-excel"]'
+    - '[data-testid="module-action-enable-taoffice-word"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
@@ -443,6 +444,7 @@ controls:
     - '[data-testid="module-action-disable-taoffice-video"]'
     - '[data-testid="module-action-disable-taoffice-pdf"]'
     - '[data-testid="module-action-disable-taoffice-excel"]'
+    - '[data-testid="module-action-disable-taoffice-word"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
@@ -16866,6 +16868,7 @@ TC-TAOFFICE-013 覆盖原生固实 RAR4/RAR5 解码、只读预览、准确解�
 TC-TAOFFICE-015/016 覆盖独立 Excel 模块的工作表导航、选中单元格恢复、缓存值与原公式、隐藏工作表、输入文件散列以及原生签名安装和停用。
 TC-TAOFFICE-017/018 覆盖 PDF 表单填写、关闭守卫、保存副本和原生文件重新打开。
 TC-TAOFFICE-019/020 覆盖 XLSX 表格列标题只读、数据行文字与数字编辑、输入校验、取消、保存副本、公式保留和原始文件摘要。
+TC-TAOFFICE-021/022 覆盖 DOCX 页面、页眉和表格、键盘编辑、共享关闭守卫、签名安装、原生另存取消与成功，以及副本重开。
 
 <!-- feature
 id: F-FILEOPEN-1
@@ -16887,6 +16890,7 @@ files:
   - src-tauri/plugins/taoffice-pdf/renderer/PdfPage.jsx
   - src-tauri/plugins/taoffice-pdf/renderer/PdfNavigation.jsx
   - src-tauri/plugins/taoffice-pdf/renderer/PdfPassword.jsx
+  - src-tauri/plugins/taoffice-word/renderer/WordViewer.jsx
   - src/lib/openFile/documentProvider.ts
   - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts
@@ -17071,6 +17075,21 @@ controls:
     kind: display
   - id: taoffice-pdf-page
     selector: '[data-testid="taoffice-pdf-page"]'
+    kind: display
+  - id: taoffice-word-preview
+    selector: '[data-testid="taoffice-word-preview"]'
+    kind: display
+  - id: taoffice-word-edit
+    selector: '[data-testid="taoffice-word-edit"]'
+    kind: interactive
+  - id: taoffice-word-paragraph
+    selector: '[data-testid="taoffice-word-paragraph"]'
+    kind: interactive
+  - id: taoffice-word-save
+    selector: '[data-testid="taoffice-word-save"]'
+    kind: interactive
+  - id: taoffice-word-output
+    selector: '[data-testid="taoffice-word-output"]'
     kind: display
   - id: taoffice-pdf-form-toggle
     selector: '[data-testid="taoffice-pdf-form-toggle"]'

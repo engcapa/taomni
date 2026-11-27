@@ -19,6 +19,10 @@ def setup_excel(ctx):
     _setup(ctx, "taoffice-excel", "excel")
 
 
+def setup_word(ctx):
+    _setup(ctx, "taoffice-word", "word")
+
+
 def _setup(ctx, slug, name):
     if ctx.cfg["app"]["mode"] != "native":
         raise ValueError("A signed TaOffice package requires the native installer")

@@ -1,0 +1,72 @@
+id: TC-TAOFFICE-021
+title: Word previews document layout and saves an edited paragraph as a copy
+description: Verify the embedded header and table, keyboard entry into paragraph editing, dirty-close cancellation, and DOCX download.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-word]
+fixtures: [reset_db, file_open_files]
+ui_standard: [UI-DLG-04, UI-DLG-06]
+timeout_sec: 140
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-word.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="planning-notes.docx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="planning-notes.docx"]'
+- wait_for: '[data-testid="taoffice-word-preview"]'
+- eval_readonly:
+    expression: >-
+      document.querySelector('iframe.taoffice-word-preview').contentDocument?.querySelector('header')?.textContent.includes('Operations planning') &&
+      document.querySelector('iframe.taoffice-word-preview').contentDocument?.querySelector('table')?.textContent.includes('Pilot')
+- press: {selector: '[data-testid="taoffice-word-edit"]', key: Enter}
+- assert_focus_on: '[data-testid="taoffice-word-paragraph"][value="Planning notes"]'
+- assert_visible: '[data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]'
+- fill: {selector: '[data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]', value: Pilot moves to Tuesday & Wednesday}
+- press: {selector: '[data-testid="taoffice-word-paragraph"][value="Pilot moves to Tuesday & Wednesday"]', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-word-edit"]'
+- wait_for: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- assert_focus_on: '[data-testid="viewer-close-cancel"]'
+- press: Escape
+- wait_for: {selector: '[data-testid="viewer-close-dialog"]', state: detached}
+- eval_readonly:
+    expression: >-
+      document.querySelector('iframe.taoffice-word-preview').contentDocument?.body
+      ?.textContent.includes('Pilot moves to Tuesday & Wednesday')
+- assert_download:
+    trigger: '[data-testid="taoffice-word-save"]'
+    filename: planning-notes - copy.docx
+    contains: ['word/document.xml', 'word/header1.xml']
+- wait_for: '[data-testid="taoffice-word-output"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/planning-notes.docx', sha256: '${fixture.taoffice_word_sha}'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-DLG-06]
+    requirement: The document close prompt initially focuses Cancel.
+    actions: [21]
+    checkpoints:
+    - {step: 22, expectation: Cancel owns focus.}
+    results: [22]
+  - id: R2
+    ui_standard: [UI-DLG-04]
+    requirement: Escape closes the prompt and keeps the edited document visible.
+    actions: [23]
+    checkpoints:
+    - {step: 24, expectation: The prompt is detached.}
+    - {step: 25, expectation: The page preview contains the edited paragraph.}
+    results: [24, 25]
+  visual:
+  - {check: Word header and table, method: automated, reason: Browser assertions read the rendered page elements.}
+  native:
+  - {check: Native save and reopen, method: external, reason: TC-TAOFFICE-022 exercises the signed module and system dialog.}

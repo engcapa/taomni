@@ -124,6 +124,10 @@ def setup(ctx: Any) -> None:
     if ctx.case_id in {"TC-TAOFFICE-017", "TC-TAOFFICE-018"}:
         files["order-form.pdf"] = (TAOFFICE_ASSETS / "order-form.pdf").read_bytes()
         ctx.values["taoffice_pdf_form_sha"] = hashlib.sha256(files["order-form.pdf"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-021", "TC-TAOFFICE-022"}:
+        files["planning-notes.docx"] = (TAOFFICE_ASSETS / "planning-notes.docx").read_bytes()
+        files["damaged.docx"] = b"This is not a Word document."
+        ctx.values["taoffice_word_sha"] = hashlib.sha256(files["planning-notes.docx"]).hexdigest()
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative

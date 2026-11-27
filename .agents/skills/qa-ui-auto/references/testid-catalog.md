@@ -1507,6 +1507,11 @@
 - `[data-testid="taoffice-excel-save-copy"]` — interactive — F-FILEOPEN-1.taoffice-excel-save-copy
 - `[data-testid="taoffice-excel-copy-output"]` — display — F-FILEOPEN-1.taoffice-excel-copy-output
 - `[data-testid="taoffice-pdf-page"]` — display — F-FILEOPEN-1.taoffice-pdf-page
+- `[data-testid="taoffice-word-preview"]` — display — F-FILEOPEN-1.taoffice-word-preview
+- `[data-testid="taoffice-word-edit"]` — interactive — F-FILEOPEN-1.taoffice-word-edit
+- `[data-testid="taoffice-word-paragraph"]` — interactive — F-FILEOPEN-1.taoffice-word-paragraph
+- `[data-testid="taoffice-word-save"]` — interactive — F-FILEOPEN-1.taoffice-word-save
+- `[data-testid="taoffice-word-output"]` — display — F-FILEOPEN-1.taoffice-word-output
 - `[data-testid="taoffice-pdf-form-toggle"]` — interactive — F-FILEOPEN-1.taoffice-pdf-form-toggle
 - `[data-testid="taoffice-pdf-form"]` — display — F-FILEOPEN-1.taoffice-pdf-form
 - `[data-testid="taoffice-pdf-form-field"]` — interactive — F-FILEOPEN-1.taoffice-pdf-form-field
@@ -3090,6 +3095,7 @@
   ↳ `[data-testid="module-action-enable-taoffice-video"]` — alias
   ↳ `[data-testid="module-action-enable-taoffice-pdf"]` — alias
   ↳ `[data-testid="module-action-enable-taoffice-excel"]` — alias
+  ↳ `[data-testid="module-action-enable-taoffice-word"]` — alias
 - `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
 - `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
   ↳ `[data-testid="module-action-disable-mfa"]` — alias
@@ -3105,6 +3111,7 @@
   ↳ `[data-testid="module-action-disable-taoffice-video"]` — alias
   ↳ `[data-testid="module-action-disable-taoffice-pdf"]` — alias
   ↳ `[data-testid="module-action-disable-taoffice-excel"]` — alias
+  ↳ `[data-testid="module-action-disable-taoffice-word"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
   ↳ `[data-testid="module-action-uninstall-rdp-client"]:enabled` — alias
   ↳ `[data-testid="module-action-uninstall-rdp-server"]:enabled` — alias

@@ -3,6 +3,7 @@ import voiceManifest from "../../src-tauri/plugins/ai-voice-local/module.json";
 import videoManifest from "../../src-tauri/plugins/taoffice-video/module.json";
 import pdfManifest from "../../src-tauri/plugins/taoffice-pdf/module.json";
 import excelManifest from "../../src-tauri/plugins/taoffice-excel/module.json";
+import wordManifest from "../../src-tauri/plugins/taoffice-word/module.json";
 import { invokeExcelPreview } from "./excelWorkbookPreview";
 import mailManifest from "../../src-tauri/plugins/mail/module.json";
 import mfaManifest from "../../src-tauri/plugins/mfa/module.json";
@@ -30,6 +31,7 @@ const previewModules = [
   [videoManifest, "taoffice-video"],
   [pdfManifest, "taoffice-pdf"],
   [excelManifest, "taoffice-excel"],
+  [wordManifest, "taoffice-word"],
   [vncManifest, "vnc"],
   [rdpManifest, "rdp"],
   [mailManifest, "mail"],
