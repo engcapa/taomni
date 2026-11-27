@@ -33,11 +33,13 @@ export async function invokeArchive(command: string, path: string, args: Record<
   createTemp: (name: string, data: ArrayBuffer) => Promise<unknown>) {
   const stat = await vfsStat(path);
   if (stat.size > 64 * 1024 * 1024) throw new Error("Archive input exceeds 64 MiB");
-  const bytes = await vfsReadBytes(path);
   const name = basenameOf(path);
-  if (/\.7z$/i.test(name)) {
-    throw new Error(getLocale() === "zh-CN" ? "请在桌面应用中打开此 7z 压缩包。" : "Open this 7z archive in the desktop app.");
+  const desktop = name.match(/\.(7z|rar)$/i)?.[1].toLowerCase();
+  if (desktop) {
+    const format = desktop === "rar" ? "RAR" : "7z";
+    throw new Error(getLocale() === "zh-CN" ? `请在桌面应用中打开此 ${format} 压缩包。` : `Open this ${format} archive in the desktop app.`);
   }
+  const bytes = await vfsReadBytes(path);
   const suffix = tarSuffix(name);
   const compressed = suffix ? undefined : compressionSuffix(name);
   const { entries, content } = suffix ? await tarDirectory(bytes, suffix)

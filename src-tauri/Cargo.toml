@@ -202,6 +202,7 @@ tar = { version = "0.4", default-features = false }
 xz2 = { version = "0.1", features = ["static"] }
 zstd = { version = "0.13", default-features = false }
 sevenz-rust2 = { version = "=0.25.0", default-features = false, features = ["aes256", "deflate"] }
+rars = { version = "=0.13.1", default-features = false }
 # Read source files returned as jar:/kls: definition URIs without extracting
 # archives to the workspace. Keep formats narrow: SDK/source JARs use deflate.
 zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2"] }

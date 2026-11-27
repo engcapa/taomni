@@ -11,7 +11,7 @@ describe("file opening classification and identity", () => {
     ["/README", "text"], ["/LICENSE", "text"], ["/a.rs", "source"], ["/Dockerfile", "source"],
     ["/a.pdf", "pdf"], ["/a.xlsx", "document"], ["/unknown", "binary"],
     ["/a.CBZ", "archive"], ["/a.tar", "archive"], ["/a.TAR.GZ", "archive"],
-    ["/a.7Z", "archive"],
+    ["/a.7Z", "archive"], ["/a.RAR", "archive"],
     ["/a.tgz", "archive"], ["/a.tar.bz2", "archive"], ["/a.tar.xz", "archive"], ["/a.tar.zst", "archive"],
     ["/a.txt.gz", "archive"], ["/a.txt.bz2", "archive"], ["/a.txt.xz", "archive"],
     ["/a.txt.zst", "archive"], ["/a.tar.gz.txt", "text"],

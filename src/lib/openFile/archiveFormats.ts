@@ -7,7 +7,7 @@ export function tarSuffix(name: string) {
 }
 
 export function isArchiveName(name: string): boolean {
-  return Boolean(tarSuffix(name) ?? compressionSuffix(name)) || /\.(zip|cbz|7z)$/i.test(name);
+  return Boolean(tarSuffix(name) ?? compressionSuffix(name)) || /\.(zip|cbz|7z|rar)$/i.test(name);
 }
 
 export function compressionSuffix(name: string) {

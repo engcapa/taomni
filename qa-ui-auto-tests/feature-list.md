@@ -16758,6 +16758,7 @@ TC-FILE-OPEN-006 检查工作区入口去重和全局文件设置。TC-FILE-OPEN
 TC-TAOFFICE-009 验证核心查看器打开 gzip TAR、清除筛选与恢复焦点、只读预览、原始文件摘要和解压后的实际内容。
 TC-TAOFFICE-010 验证单文件 gzip 预览、直接解压成文件，以及重复解压时保留原有内容。
 TC-TAOFFICE-011 验证原生 7z 固实压缩包的预览和解压，TC-TAOFFICE-012 验证浏览器预览显示桌面打开提示。
+TC-TAOFFICE-013 覆盖原生固实 RAR4/RAR5 解码、只读预览、准确解压和加密包提示。TC-TAOFFICE-014 覆盖浏览器桌面打开提示。
 
 <!-- feature
 id: F-FILEOPEN-1

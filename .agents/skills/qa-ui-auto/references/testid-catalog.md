@@ -1485,6 +1485,9 @@
 - `[data-testid="archive-preview"]` — interactive — F-FILEOPEN-1.archive-preview
 - `[data-testid="archive-output"]` — display — F-FILEOPEN-1.archive-output
 - `[data-testid="archive-error"]` — display — F-FILEOPEN-1.archive-error
+
+TC-TAOFFICE-013/014 使用同一套归档控件验证 RAR4、RAR5 和浏览器打开提示。加密错误沿用 `archive-error`。
+
 - `[data-testid="taoffice-media-player"]` — display — F-FILEOPEN-1.taoffice-media-player
 - `[data-testid="taoffice-media-error"]` — display — F-FILEOPEN-1.taoffice-media-error
 - `[data-testid="taoffice-media-retry"]` — interactive — F-FILEOPEN-1.taoffice-media-retry

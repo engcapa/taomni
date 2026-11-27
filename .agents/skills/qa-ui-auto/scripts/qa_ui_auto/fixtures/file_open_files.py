@@ -39,6 +39,7 @@ window.addEventListener("load", function () {
 });
 </script></body></html>'''
 MAIL_TEXT = "Mail attachment read-only fixture.\nSave locally before editing.\n"
+TAOFFICE_ASSETS = Path(__file__).resolve().parents[6] / "qa-ui-auto-tests/fixtures/taoffice"
 
 
 def workspace(root: str) -> str:
@@ -91,6 +92,13 @@ def setup(ctx: Any) -> None:
     if ctx.case_id in {"TC-TAOFFICE-011", "TC-TAOFFICE-012"}:
         files["records.7Z"] = seven_zip_fixture()
         ctx.values["taoffice_7z_sha"] = hashlib.sha256(files["records.7Z"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-013", "TC-TAOFFICE-014"}:
+        files["records.RAR"] = (TAOFFICE_ASSETS / "records.RAR").read_bytes()
+        ctx.values["taoffice_rar_sha"] = hashlib.sha256(files["records.RAR"]).hexdigest()
+        ctx.values["taoffice_rar_text_sha"] = hashlib.sha256((TEXT * 32).encode()).hexdigest()
+        if native:
+            for name in ("legacy.rar", "locked.rar"):
+                files[name] = (TAOFFICE_ASSETS / name).read_bytes()
     if ctx.case_id in {"TC-TAOFFICE-003", "TC-TAOFFICE-005"}:
         wav = io.BytesIO()
         with wave.open(wav, "wb") as audio:

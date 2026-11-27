@@ -8,6 +8,7 @@ use zip::ZipArchive;
 
 mod codec;
 mod compressed_file;
+mod rar_archive;
 mod seven_zip;
 mod tar_archive;
 
@@ -122,11 +123,13 @@ fn visit(
     if let Some((format, _)) = tar_archive::suffix(path) {
         return tar_archive::visit(format, file.take(meta.len()), selection, member);
     }
-    if Path::new(path)
-        .extension()
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("7z"))
-    {
-        return seven_zip::visit(file, selection, member);
+    if let Some(extension) = Path::new(path).extension() {
+        if extension.eq_ignore_ascii_case("7z") {
+            return seven_zip::visit(file, selection, member);
+        }
+        if extension.eq_ignore_ascii_case("rar") {
+            return rar_archive::visit(file, selection, member);
+        }
     }
     if let Some(codec) = compressed_file::codec(path) {
         return compressed_file::visit(
