@@ -53,43 +53,43 @@ verification:
   requirements:
   - id: TAR-FILTER
     requirement: UI-PAT-05 and UI-PAT-15. Clear a TAR filter with Enter on the clear action or Escape inside the search field.
-    actions: [12, 15, 18, 20]
+    actions: [13, 16, 19, 21]
     checkpoints:
-    - step: 14
+    - step: 15
       expectation: An unmatched search explains the empty list.
-    - step: 17
+    - step: 18
       expectation: The clear action returns keyboard focus to the search field.
-    - step: 21
+    - step: 22
       expectation: Escape restores both entries from a filtered result.
-    results: [14, 17, 21]
+    results: [15, 18, 22]
   - id: TAR-EXTRACT
     requirement: Extract to a directory named for the archive without changing the source and open a read-only member.
-    actions: [9, 22, 28]
+    actions: [10, 23, 29]
     checkpoints:
-    - step: 24
-      expectation: A text member appears at the expected destination with its source digest.
     - step: 25
-      expectation: The extracted image has the expected digest.
+      expectation: A text member appears at the expected destination with its source digest.
     - step: 26
+      expectation: The extracted image has the expected digest.
+    - step: 27
       expectation: The original archive retains its exact digest.
-    - step: 30
+    - step: 31
       expectation: The ordinary text viewer explains the read-only member.
-    results: [24, 25, 26, 30]
+    results: [25, 26, 27, 31]
   - id: TAR-LINK
     requirement: Reject the archive containing a symbolic link and preserve the original files.
-    actions: [32]
+    actions: [33]
     checkpoints:
-    - step: 34
+    - step: 35
       expectation: The viewer explains why the TAR member is unsafe.
-    - step: 36
-      expectation: The destination has no extracted member.
     - step: 37
+      expectation: The destination has no extracted member.
+    - step: 38
       expectation: The file beside the archive keeps its exact digest.
-    results: [34, 36, 37]
+    results: [35, 37, 38]
   native:
   - check: The native command reads the physical archive and commits the extracted text and image on disk.
     method: automated
-    reason: The file assertions in steps 24 through 26, 36 and 37 read isolated native filesystem paths.
+    reason: The file assertions in steps 25 through 27, 37 and 38 read isolated native filesystem paths.
   visual:
   - check: The core archive viewer shows the members and the successful destination below the shared toolbar.
     method: manual
