@@ -59,12 +59,15 @@ export default function MediaPlayer({ document: source, active }) {
     if (!active || !ready || event.nativeEvent.isComposing || event.metaKey || event.ctrlKey
       || event.shiftKey || event.altKey) return;
     const player = event.currentTarget;
-    const seek = mediaSeekTarget(player.currentTime, player.duration, event.key);
-    if (seek === null && event.key !== " ") return;
+    const space = event.key === " " || event.code === "Space";
+    const seek = event.type === "keydown" ? mediaSeekTarget(player.currentTime, player.duration, event.key) : null;
+    if (seek === null && !space) return;
     event.preventDefault();
     event.stopPropagation();
     if (seek !== null) player.currentTime = seek;
-    else if (player.paused) {
+    // Native controls can also toggle playback when Space is released.
+    if (!space || event.type !== "keyup") return;
+    if (player.paused) {
       setPlayError("");
       void player.play().catch((error) => setPlayError(String(error)));
     } else player.pause();
@@ -91,7 +94,8 @@ export default function MediaPlayer({ document: source, active }) {
         title: zh ? "空格播放或暂停，方向键快退或快进 5 秒" : "Space to play or pause. Left and Right to seek by 5 seconds.",
         "data-ready": ready, style: { width: "100%", minHeight: 0, maxHeight: "100%", objectFit: "contain" },
         onLoadedMetadata: () => setReady(true),
-        onKeyDown: handlePlayerKey,
+        onKeyDownCapture: handlePlayerKey,
+        onKeyUpCapture: handlePlayerKey,
         onError: handleMediaError,
       })));
 }
