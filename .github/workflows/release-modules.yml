@@ -220,6 +220,11 @@ jobs:
         with:
           ref: ${{ needs.source.outputs.sha }}
           persist-credentials: false
+      - name: Set up Python for Project package source verification
+        if: needs.source.outputs.slug == 'taoffice-project'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: dtolnay/rust-toolchain@stable
         if: needs.source.outputs.package != ''
         with:
@@ -358,6 +363,11 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
+      - name: Set up Python for Project package source verification
+        if: needs.source.outputs.slug == 'taoffice-project'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: dtolnay/rust-toolchain@stable
       - name: Build and test the trusted packager
         run: |

@@ -183,6 +183,11 @@ jobs:
         with:
           ref: ${{ needs.source.outputs.sha }}
           persist-credentials: false
+      - name: Set up Python for Project package source verification
+        if: env.QA_MODULE == 'taoffice-project'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -366,6 +371,11 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
+      - name: Set up Python for Project package source verification
+        if: env.QA_MODULE == 'taoffice-project'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: dtolnay/rust-toolchain@stable
       # Never restore compiled signer/dependency executables from a cache that
       # an unsigned candidate job could populate. This graph is small enough

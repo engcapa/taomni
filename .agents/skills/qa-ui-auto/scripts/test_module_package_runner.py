@@ -28,6 +28,17 @@ class OfficialPackageRunnerTests(unittest.TestCase):
     def roster_targets(self, values, matrix):
         return {entry["platform"]: entry["legacy_roster"] for entry in json.loads(values[matrix])["include"]}
 
+    def test_project_source_verifier_uses_python_with_tomllib_in_qa_and_release(self):
+        release = yaml.safe_load((ROOT / ".github/workflows/release-modules.yml").read_text())
+        for workflow, selector in ((self.workflow, "env.QA_MODULE"), (release, "needs.source.outputs.slug")):
+            for job in ("build", "sign"):
+                steps = workflow["jobs"][job]["steps"]
+                setup = next(i for i, step in enumerate(steps) if step.get("uses", "").startswith("actions/setup-python@"))
+                verifier = next(i for i, step in enumerate(steps) if "project_source" in step.get("run", ""))
+                self.assertLess(setup, verifier)
+                self.assertEqual(steps[setup]["if"], selector + " == 'taoffice-project'")
+                self.assertEqual(steps[setup]["with"]["python-version"], "3.12")
+
     def test_available_hosted_images_emit_one_validated_output(self):
         for label in ("macos-latest", "macos-15", "macos-15-intel", "macos-26"):
             with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
