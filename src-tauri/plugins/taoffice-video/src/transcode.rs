@@ -191,7 +191,10 @@ pub(crate) fn convert(
         video.finish(&mut output, timeline, &check, &progress)?;
     }
     if let Some(audio) = audio.as_mut() {
-        audio.finish(&mut output, timeline, &check, &progress)?;
+        let has_audio = audio.finish(&mut output, timeline, &check, &progress)?;
+        if video.is_none() && !has_audio {
+            return Err("The trim range includes no audio samples.".into());
+        }
     }
     output.write_trailer().map_err(native_error)?;
     drop(output);

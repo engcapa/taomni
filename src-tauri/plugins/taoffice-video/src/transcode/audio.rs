@@ -24,6 +24,7 @@ pub(super) struct Audio {
     fifo: VecDeque<(f32, f32)>,
     fifo_pts: i64,
     next_sample: Option<i64>,
+    wrote_packets: bool,
 }
 
 impl Audio {
@@ -76,6 +77,7 @@ impl Audio {
             fifo: VecDeque::new(),
             fifo_pts: 0,
             next_sample: None,
+            wrote_packets: false,
         })
     }
 
@@ -100,7 +102,7 @@ impl Audio {
         timeline: Timeline,
         check: &impl Fn() -> Result<(), String>,
         progress: &impl Fn(Option<f64>),
-    ) -> Result<(), String> {
+    ) -> Result<bool, String> {
         if !self.past_end {
             self.decoder.send_eof().map_err(native_error)?;
             self.receive(output, timeline, check, progress)?;
@@ -124,9 +126,8 @@ impl Audio {
         }
         self.encode_pending(output, true)?;
         self.encoder.send_eof().map_err(native_error)?;
-        mux_packets(output, self.output_index, TIME, |packet| {
-            self.encoder.receive_packet(packet)
-        })
+        self.mux(output)?;
+        Ok(self.wrote_packets)
     }
 
     fn receive(
@@ -263,10 +264,16 @@ impl Audio {
                 }
             }
             self.encoder.send_frame(&pcm).map_err(native_error)?;
-            mux_packets(output, self.output_index, TIME, |packet| {
-                self.encoder.receive_packet(packet)
-            })?;
+            self.mux(output)?;
         }
         Ok(())
+    }
+
+    fn mux(&mut self, output: &mut format::context::Output) -> Result<(), String> {
+        mux_packets(output, self.output_index, TIME, |packet| {
+            self.encoder.receive_packet(packet)?;
+            self.wrote_packets = true;
+            Ok(())
+        })
     }
 }

@@ -15,6 +15,9 @@ const REALMEDIA: &[u8] =
     include_bytes!("../../../../../qa-ui-auto-tests/fixtures/taoffice/media-legacy.rm");
 const WMV: &[u8] =
     include_bytes!("../../../../../qa-ui-auto-tests/fixtures/taoffice/media-legacy.wmv");
+// A synthetic 48 kHz tone with packets only at 0 and about 10 seconds.
+const AUDIO_GAP: &[u8] =
+    include_bytes!("../../../../../qa-ui-auto-tests/fixtures/taoffice/media-gap.mka");
 
 fn init() {
     static INIT: Once = Once::new();
@@ -152,4 +155,47 @@ fn cancels_in_flight_conversion_without_publishing_a_file() {
     );
     assert!(cancelled.load(Ordering::Relaxed));
     assert!(matches!(result, Err(error) if error.contains("cancelled")));
+}
+
+#[test]
+fn rejects_an_audio_only_trim_when_no_audio_packets_are_written() {
+    init();
+    for (container, codec) in [
+        (Container::Webm, codec::Id::OPUS),
+        (Container::Mp4, codec::Id::AAC),
+    ] {
+        let result = convert(
+            AUDIO_GAP.to_vec(),
+            ConversionOptions {
+                container,
+                start_ms: 500,
+                end_ms: Some(3_000),
+                width: None,
+            },
+            Arc::new(|| false),
+            |_| {},
+        );
+        assert!(
+            matches!(result, Err(error) if error == "The trim range includes no audio samples.")
+        );
+
+        let converted = convert_sample(
+            AUDIO_GAP,
+            ConversionOptions {
+                container,
+                start_ms: 10_000,
+                end_ms: Some(10_060),
+                width: None,
+            },
+        );
+        let mut media = open(converted.bytes);
+        let audio = media.streams().best(media::Type::Audio).unwrap();
+        assert_eq!(audio.parameters().id(), codec);
+        let audio_index = audio.index();
+        assert!(
+            media
+                .packets()
+                .any(|(stream, _)| stream.index() == audio_index)
+        );
+    }
 }
