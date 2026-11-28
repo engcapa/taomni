@@ -8,7 +8,7 @@ import type { FileEntry, FileType } from "../lib/sftp";
 
 const DB_NAME = "taomni-vfs";
 const STORE = "files";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 interface VfsRecord {
   path: string;
@@ -35,9 +35,12 @@ function openDb(): Promise<IDBDatabase> {
         const store = db.createObjectStore(STORE, { keyPath: "path" });
         store.createIndex("parent", "parent", { unique: false });
       }
+      const store = req.transaction!.objectStore(STORE);
+      if (!store.indexNames.contains("type")) store.createIndex("type", "type");
     };
     req.onsuccess = async () => {
       const db = req.result;
+      db.onversionchange = () => { db.close(); dbPromise = null; };
       try {
         await ensureSeed(db);
       } catch (err) {
@@ -156,6 +159,20 @@ function recordToEntry(rec: VfsRecord): FileEntry {
     owner: null,
     group: null,
   };
+}
+
+/** Scan names and kinds through index keys, without cloning file contents. */
+export async function visitVfsNames(visit: (path: string, isDirectory: boolean) => boolean): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const request = tx(db, "readonly").index("type").openKeyCursor();
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor || !visit(String(cursor.primaryKey), cursor.key === "dir")) resolve();
+      else cursor.continue();
+    };
+  });
 }
 
 export async function vfsHome(): Promise<string> {

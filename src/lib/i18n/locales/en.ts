@@ -1,6 +1,7 @@
 // English translation dictionary. This is the authoritative shape for all
 // other locales — adding a key here surfaces type errors elsewhere via the
 // shared `Dict` type.
+import { fileSearchEn } from "./fileSearch";
 import { recoveryEn } from "./recovery";
 import { modelInspectorEn } from "./modelInspector";
 import { notesWorkspaceEn } from "./notesWorkspace";
@@ -11,6 +12,7 @@ type Dict = {
 };
 
 const dict = {
+  fileSearch: fileSearchEn,
   recovery: recoveryEn,
   plugins: moduleFrontendEn,
   backupUnified: {

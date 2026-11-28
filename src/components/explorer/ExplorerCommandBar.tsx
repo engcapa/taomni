@@ -1,5 +1,8 @@
+import { useState } from "react";
+import { useT } from "../../lib/i18n";
+import { FileSearchDialog } from "../search/FileSearchDialog";
 import { IconButton } from "../ui/IconButton";
-import { ArrowDownWideNarrow, ChevronDown, ClipboardPaste, Copy, ExternalLink, FolderPlus, LayoutGrid, List, MoreHorizontal, PanelLeftClose, PanelLeftOpen, PanelRight, Pencil, Plus, Scissors, Terminal, Trash2 } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ClipboardPaste, Copy, ExternalLink, FolderPlus, LayoutGrid, List, MoreHorizontal, PanelLeftClose, PanelLeftOpen, PanelRight, Pencil, Plus, Scissors, Search, Terminal, Trash2 } from "lucide-react";
 import type { FileEntry } from "../../lib/sftp";
 import { readExplorerRestoreEnabled, setExplorerRestoreEnabled } from "../../lib/explorer/tabRecovery";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
@@ -18,6 +21,8 @@ export function ExplorerCommandBar({ path, workspaceId, selected, operations, on
   navigationId: string; onToggleNavigation: () => void;
 }) {
   const preferences = useExplorerPreferences();
+  const t = useT();
+  const [fileSearch, setFileSearch] = useState<{ trigger: HTMLElement; path: string } | null>(null);
   const label = useExplorerLabels();
   const ctx = useContextMenu();
   const show = (event: React.MouseEvent, items: MenuItem[]) => { const rect = event.currentTarget.getBoundingClientRect(); ctx.showAt(rect.left, rect.bottom + 4, items); };
@@ -78,11 +83,14 @@ export function ExplorerCommandBar({ path, workspaceId, selected, operations, on
         <button type="button" className="ex-cbtn" data-testid="explorer-cmd-open-with" onClick={(event) => show(event, fileOpenMenu(selected[0].path, workspaceId, label, (message, error) => operations.notify(message, true, error)))}>{label("打开方式", "Open with")}<ChevronDown /></button>
       </>}
       <span className="ex-sp" />
+      <IconButton className="ex-cbtn icon" data-testid="explorer-global-file-search" label={t("fileSearch.title")}
+        onClick={(event) => setFileSearch({ trigger: event.currentTarget, path })}><Search /></IconButton>
       <IconButton type="button" className="ex-cbtn icon" data-testid="explorer-cmd-terminal" label={label("在此处打开终端", "Open terminal here")} disabled={!path} onClick={() => onOpenTerminal(path)}><Terminal /></IconButton>
       <IconButton type="button" className="ex-cbtn icon" data-testid="explorer-cmd-newtab" label={label("在新的 Explorer 标签中打开此目录", "Open current folder in new Explorer tab")} disabled={!path} onClick={() => onOpenExplorer(path, true)}><ExternalLink /></IconButton>
       <button type="button" className={`ex-cbtn ${previewVisible ? "on" : ""}`} data-testid="explorer-cmd-preview" title={label("预览窗格 (Alt+P)", "Preview pane (Alt+P)")} aria-pressed={preferences.preview} onClick={onTogglePreview}><PanelRight />{label("预览", "Preview")}</button>
       <IconButton type="button" className="ex-cbtn icon" data-testid="explorer-cmd-more" label={label("更多", "More")} onClick={(event) => show(event, moreMenu)}><MoreHorizontal /></IconButton>
     </div>
+    {fileSearch && <FileSearchDialog returnFocus={fileSearch.trigger} contextRoot={fileSearch.path} onClose={() => setFileSearch(null)} />}
     {ctx.render}
   </>;
 }

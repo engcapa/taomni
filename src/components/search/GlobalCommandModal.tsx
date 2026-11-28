@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ModalSurface } from "../ui/ModalSurface";
 import { useT } from "../../lib/i18n";
+import { Button } from "../ui/Button";
+import { FileSearchDialog } from "./FileSearchDialog";
+import { useExplorerStore } from "../../stores/explorerStore";
+import { useSftpStore } from "../../stores/sftpStore";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
@@ -48,6 +52,7 @@ function OpenGlobalCommandModal() {
   const toggleFloatingMfa = useAppStore((s) => s.toggleFloatingMfa);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
+  const [fileSearch, setFileSearch] = useState<{ trigger: HTMLElement; query: string; contextRoot?: string } | null>(null);
 
   const results = useMemo<CommandResult[]>(() => {
     const list: CommandResult[] = [];
@@ -184,7 +189,7 @@ function OpenGlobalCommandModal() {
   };
 
   return createPortal(
-    <ModalSurface
+    <><ModalSurface
       dismissOnBackdrop
       initialFocus='[data-testid="global-search-input"]'
       onCancel={close}
@@ -194,6 +199,7 @@ function OpenGlobalCommandModal() {
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-panel-bg)", color: "var(--taomni-text)" }}
       onKeyDown={(event) => {
         if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+        if ((event.target as HTMLElement).closest('[data-testid="global-search-files"]')) return;
         if (event.key === "ArrowDown") {
           event.preventDefault();
           setActiveIndex((index) => Math.min(results.length - 1, index + 1));
@@ -216,6 +222,12 @@ function OpenGlobalCommandModal() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
+        <Button data-testid="global-search-files" onClick={(event) => {
+          const { activeTabId, tabs } = useExplorerStore.getState();
+          const browser = tabs.find((tab) => tab.id === activeTabId)?.fileBrowser;
+          const contextRoot = activeTabId && browser ? useSftpStore.getState().sessions[activeTabId]?.local.path || browser.initialPath : undefined;
+          setFileSearch({ trigger: event.currentTarget, query, contextRoot });
+        }}>{t("fileSearch.paletteAction")}</Button>
         <span className="shrink-0 rounded px-1 text-ui-caption" style={{ border: "1px solid var(--taomni-divider)", color: "var(--taomni-text-muted)" }}>Ctrl+K</span>
       </div>
       <div className="min-h-0 flex-auto overflow-auto p-1.5" data-testid="global-search-results">
@@ -244,7 +256,10 @@ function OpenGlobalCommandModal() {
           </button>
         ))}
       </div>
-    </ModalSurface>,
+    </ModalSurface>
+    {fileSearch && <FileSearchDialog returnFocus={fileSearch.trigger} initialQuery={fileSearch.query} contextRoot={fileSearch.contextRoot}
+      onClose={() => setFileSearch(null)} onOpened={close} />}
+    </>,
     document.body,
   );
 }

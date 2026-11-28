@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EntryOperationResult, LocalProperties, PreviewBytes, PreviewText, TrashResult } from "../lib/explorer";
+import type { GlobalFileResults } from "../lib/explorer/globalFileSearch";
 import type { FileEntry } from "../lib/sftp";
 
 const fs = vi.hoisted(() => new Map<string, { directory: boolean; data: ArrayBuffer }>());
@@ -15,6 +16,9 @@ vi.mock("./localVfs", () => {
     basenameOf: (path: string) => path.split("/").pop(),
     vfsHome: async () => "/preview",
     vfsStat: stat,
+    visitVfsNames: async (visit: (path: string, directory: boolean) => boolean) => {
+      for (const [path, entry] of fs) if (!visit(path, entry.directory)) break;
+    },
     vfsList: async (path: string) => Promise.all([...fs.keys()].filter((key) => key.slice(0, key.lastIndexOf("/")) === path).map(stat)),
     vfsMkdir: async (path: string) => {
       if (fs.has(path)) throw new Error("Destination exists");
@@ -59,6 +63,34 @@ beforeEach(() => {
 });
 
 describe("Explorer browser command contracts", () => {
+  it("returns ranked file and directory names across the preview filesystem and skips hidden trees", async () => {
+    file("/preview/target/Butterfly");
+    directory("/preview/target/BT");
+    file("/preview/about");
+    file("/preview/BT-2026");
+    file("/preview/xbty");
+    directory("/preview/.config");
+    file("/preview/.config/bt");
+    const query = (text: string, id = "name-search") => invoke<GlobalFileResults>("explorer_global_file_search", { query: text, contextRoot: "/preview/target", operationId: id });
+    const result = await query(" BT ");
+    expect(result.provider).toBe("boundedScan");
+    expect(result.scannedRoots).toEqual(["/preview"]);
+    expect(result.entries.slice(0, 3).map((entry) => entry.name)).toEqual(["BT", "BT-2026", "xbty"]);
+    expect(result.entries).toContainEqual({ path: "/preview/target/Butterfly", name: "Butterfly", isDirectory: false });
+    expect(result.entries[0].isDirectory).toBe(true);
+    expect(result.entries.some((entry) => entry.path.includes(".config"))).toBe(false);
+    expect(result.truncated).toBe(false);
+    expect((await query("nothingzz")).entries).toEqual([]);
+    await expect(query(" x ")).rejects.toThrow("invalid_query");
+    await invoke("explorer_cancel_operation", { operationId: "cancel-search" });
+    await expect(query("BT", "cancel-search")).rejects.toThrow("cancelled:");
+    for (let i = 0; i < 120; i++) file(`/preview/BT-${i}`);
+    const clipped = await query("bt");
+    expect(clipped.truncated).toBe(true);
+    expect(clipped.entries).toHaveLength(100);
+    expect(clipped.entries[0].name).toBe("BT");
+  });
+
   it("canonicalizes dot segments and rejects nonexistent paths", async () => {
     expect(await invoke("explorer_canonical_path", { path: "/preview/./target/../target/" })).toBe("/preview/target");
     await expect(invoke("explorer_canonical_path", { path: "/preview/missing" })).rejects.toThrow("Not found");
