@@ -10,6 +10,8 @@
 | TC-WS-039 | 真实嵌套面板、编辑器内部分屏、隐藏／显示、resize、工具 tab 关闭及 reload；dirty 内容保留 | browser/native |
 | TC-MODULES-102 | 安装 MFA 时验证 Home、Tools 与 Sessions 切换后的 MFA 标签命中和设置标签关闭 | browser/native |
 | TC-TAOFFICE-001 | 缺少 Project 模块时，MPP 与 MSPDI 文件各有占位页。重复打开激活已有标签，用户可从占位页进入模块商店。 | browser/native |
+| TC-TAOFFICE-033 | PDF 批注、旋转、前后移动、移除和撤销后另存副本，保留原件 | browser |
+| TC-TAOFFICE-034 | 用签名 PDF 模块和系统保存对话框写入副本，重开后核对旋转、页数及已保存便笺 | native/release |
 | TC-TAOFFICE-009 | gzip TAR 的筛选焦点、只读预览、原始文件和解压字节，以及异常归档的错误反馈 | browser/native |
 | TC-WS-045 | 空工作区从 Tools/Home 进入；折叠／展开、Sessions 导航切换；只保留一个编辑器运行时 | browser/native |
 | TC-WS-051 | 工作区文件／终端混合布局及过滤；实际 PTY 输出、同一个终端、原生磁盘保存校验 | native |

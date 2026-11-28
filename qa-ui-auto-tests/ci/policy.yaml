@@ -34,11 +34,16 @@ smoke:
 - TC-FILE-OPEN-006
 - TC-FILE-OPEN-049
 - TC-MODULES-102
+- TC-TAOFFICE-001
 - TC-TAOFFICE-009
+- TC-TAOFFICE-033
+- TC-TAOFFICE-034
 unavailable: {}
 requires_plugin:
   TC-FILE-OPEN-049: mail
   TC-MODULES-102: mfa
+  TC-TAOFFICE-033: taoffice-pdf
+  TC-TAOFFICE-034: taoffice-pdf
 # Opt-in fixtures need a credential a hosted runner intentionally does not hold.
 # When none of the listed variables is set at plan time the fixture's cases are
 # recorded as declared capability gaps instead of running and skipping, which
