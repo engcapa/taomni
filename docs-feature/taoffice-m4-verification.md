@@ -15,6 +15,10 @@
 
 Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”重开和导出了这 42 份副本。逐文件回执记录了每个 PDF 的 SHA-256、页数以及按空白规范化后能否提取完整编辑值。Word 为 20/20，PowerPoint 为 17/22。以下 5 份演示文稿的 PDF 未检出完整编辑值：`45541_Footer.pptx`、`45541_Header.pptx`、`45545_Comment.pptx`、`highlight-test-case.pptx`、`table-with-different-font-colors.pptx`。这 5 份的文档模型读回均成功，页面显示保真度仍待对照。Project 与 Visio 的原应用重开另待有相应应用的环境验证。
 
+### Windows Microsoft PowerPoint 首页对照
+
+使用 Windows 上的 Microsoft PowerPoint 16.0 重开上述 5 份原件，以及用同一组 Apache POI 输入和本分支读写代码重新生成的 5 份副本。逐份核对输入 SHA-256。副本均只变更 `ppt/slides/slide1.xml`，PowerPoint 形状模型和导出的 PDF 首页都读到完整编辑值。直接导出原件和副本的首页 PNG 并排对照，三个标题保留了原色、对齐和两行排版。后两份表格中的较长替换文字在单元格内换行，行高随之增加，邻近内容也出现在截图中。原 Linux WPS 导出的 5 份 PDF 仍保留各自的文本提取结果。[首页对照截图](taoffice-research/pptx-powerpoint-first-page.png) · [逐文件哈希与对照区域](taoffice-research/pptx-powerpoint-first-page.csv)
+
 ## Project 交换格式语料
 
 使用 Project 0.5.0 宿主的导入代码转换了 MPXJ 固定版本中的全部 19 份 MPX。独立 XML 解析器从生成的 MSPDI 文件读到 305 项任务、23 条前置关系、16 项资源、6 项分配和 39 份日历。德语样本中任务 12 的前置 UID 为 11，滞后量为 4800 个十分之一分钟，开始日期为 2003-01-09。逐文件记录保留了原始 Git blob、输入与输出 SHA-256 和各项计数。 [语料及逐文件回执](taoffice-research/project-exchange-63cdc4e.csv)
