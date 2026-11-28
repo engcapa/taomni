@@ -1499,6 +1499,7 @@
 - `[data-testid="taoffice-excel"]` — display — F-FILEOPEN-1.taoffice-excel
 - `[data-testid="taoffice-excel-sheet"]` — interactive — F-FILEOPEN-1.taoffice-excel-sheet
 - `[data-testid="taoffice-excel-grid"]` — display — F-FILEOPEN-1.taoffice-excel-grid
+- `[data-testid="taoffice-excel-calculation"]` — display — F-FILEOPEN-1.taoffice-excel-calculation
 - `[data-testid="taoffice-excel-cell"]` — interactive — F-FILEOPEN-1.taoffice-excel-cell
 - `[data-testid="taoffice-excel-cell-address"]` — display — F-FILEOPEN-1.taoffice-excel-cell-address
 - `[data-testid="taoffice-excel-formula"]` — display — F-FILEOPEN-1.taoffice-excel-formula

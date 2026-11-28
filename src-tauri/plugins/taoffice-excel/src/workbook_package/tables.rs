@@ -5,7 +5,7 @@ use taomni_plugin_api::RpcError;
 
 const TABLE_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table";
 
-pub(super) fn position(address: &str) -> Option<(u32, u32)> {
+pub(crate) fn position(address: &str) -> Option<(u32, u32)> {
     let digits = address.find(|ch: char| ch.is_ascii_digit())?;
     let (column, row) = address.split_at(digits);
     if !(1..=3).contains(&column.len())

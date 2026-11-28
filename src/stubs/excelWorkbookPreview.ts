@@ -3,14 +3,15 @@ const FIXTURE_KEY = "taomni.preview.taoffice-excel.workbook.v1";
 interface Cell { row: number; column: number; value: string; formula?: string }
 interface Sheet { rows: number; columns: number; cells: Cell[] }
 interface Fixture { hash: string; sheets: Record<string, Sheet> }
+interface Edit { sheet: string; address: string; value: string }
 interface Transfer { bytes: Uint8Array; offset: number; sheets?: Fixture["sheets"] }
 
 const transfers = new Map<string, Transfer>();
 
 /** Serve the browser fixture's cell model only after the renderer transfers the actual fixture bytes. */
 export async function invokeExcelPreview(command: string, payload: unknown) {
-  const { id, size, offset, data, sheet, row, column } = payload as {
-    id: string; size: number; offset: number; data: string; sheet: string; row: number; column: number;
+  const { id, size, offset, data, sheet, row, column, edits = [] } = payload as {
+    id: string; size: number; offset: number; data: string; sheet: string; row: number; column: number; edits?: Edit[];
   };
   if (command === "workbook/close") {
     transfers.delete(id);
@@ -44,8 +45,20 @@ export async function invokeExcelPreview(command: string, payload: unknown) {
     case "workbook/sheet": {
       const current = transfer.sheets?.[sheet];
       if (!current) throw new Error("Worksheet is unavailable");
-      return { ...current, cells: current.cells.filter((cell) => cell.row >= row && cell.row < row + 32 &&
-        cell.column >= column && cell.column < column + 12) };
+      const cells = current.cells.filter((cell) => cell.row >= row && cell.row < row + 32 &&
+        cell.column >= column && cell.column < column + 12);
+      if (!edits.length) return { ...current, cells };
+      // Browser fixtures model the two sample workbooks. The desktop module runs IronCalc.
+      const quantity = (index: number) => Number(edits.find((edit) => edit.sheet === "Totals" &&
+        edit.address === "B" + (index + 1))?.value ??
+        transfer.sheets?.Totals.cells.find((cell) => cell.row === index && cell.column === 1)?.value);
+      const total = (quantity(1) + quantity(2)) * 2;
+      const values: Record<string, string> = {
+        "B2*2": String(quantity(1) * 2), "B3*2": String(quantity(2) * 2),
+        "SUM(Totals!C2:C3)": String(total), 'IF(D2>40,"Review","Ready")': total > 40 ? "Review" : "Ready",
+      };
+      return { ...current, recalculated: true, cells: cells.map((cell) => cell.formula && cell.formula in values
+        ? { ...cell, value: values[cell.formula] } : cell) };
     }
     default: throw new Error("Workbook command is unavailable");
   }

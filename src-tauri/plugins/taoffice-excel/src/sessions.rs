@@ -28,11 +28,45 @@ struct Session {
     touched: Instant,
     state: State,
     copy: Option<CopyResult>,
+    preview: Option<EditedWorkbook>,
 }
 
 struct CopyResult {
     id: Uuid,
-    bytes: Vec<u8>,
+    bytes: Arc<[u8]>,
+}
+
+struct EditedWorkbook {
+    edits: Vec<Edit>,
+    workbook: Workbook,
+    recalculated: bool,
+}
+
+impl Session {
+    fn edited(
+        &mut self,
+        edits: Vec<Edit>,
+        operation: &Operation,
+    ) -> Result<&mut EditedWorkbook, RpcError> {
+        if !self
+            .preview
+            .as_ref()
+            .is_some_and(|preview| preview.edits == edits)
+        {
+            let State::Open(workbook) = &self.state else {
+                return Err(invalid("Workbook transfer is incomplete"));
+            };
+            let copy = workbook_copy::create(workbook, &edits, || operation.check_current())?;
+            let preview = EditedWorkbook {
+                workbook: Workbook::open(copy.bytes)?,
+                recalculated: copy.recalculated,
+                edits,
+            };
+            operation.check_current()?;
+            self.preview = Some(preview);
+        }
+        self.preview.as_mut().ok_or_else(expired)
+    }
 }
 
 enum State {
@@ -64,6 +98,8 @@ struct View {
     sheet: String,
     row: u32,
     column: u32,
+    #[serde(default)]
+    edits: Vec<Edit>,
 }
 
 #[derive(Deserialize)]
@@ -178,6 +214,7 @@ impl PluginHandler for Workbooks {
                         expected: size,
                         bytes: Vec::new(),
                     },
+                    preview: None,
                     copy: None,
                 });
             }
@@ -203,6 +240,7 @@ impl PluginHandler for Workbooks {
                     Session {
                         touched: Instant::now(),
                         state: State::Open(Box::new(workbook)),
+                        preview: None,
                         copy: None,
                     },
                 );
@@ -214,21 +252,35 @@ impl PluginHandler for Workbooks {
                     sheet,
                     row,
                     column,
+                    edits,
                 } = request(params)?;
-                let State::Open(workbook) = &mut active(&mut sessions, id)?.state else {
+                let session = active(&mut sessions, id)?;
+                let State::Open(workbook) = &mut session.state else {
                     return Err(invalid("Workbook transfer is incomplete"));
                 };
-                let window = workbook.sheet(&sheet, row, column, || operation.check_current())?;
+                let mut window =
+                    workbook.sheet(&sheet, row, column, || operation.check_current())?;
+                if edits.is_empty() {
+                    session.preview = None;
+                } else {
+                    let preview = session.edited(edits, operation)?;
+                    window.recalculated = Some(preview.recalculated);
+                    if preview.recalculated {
+                        window.apply_formula_values(preview.workbook.sheet(
+                            &sheet,
+                            row,
+                            column,
+                            || operation.check_current(),
+                        )?);
+                    }
+                }
                 return serde_json::to_value(window).map_err(invalid);
             }
             "workbook/copy" => {
                 let CopyRequest { id, copy_id, edits } = request(params)?;
                 let session = active(&mut sessions, id)?;
-                let State::Open(workbook) = &session.state else {
-                    return Err(invalid("Workbook transfer is incomplete"));
-                };
                 session.copy = None;
-                let bytes = workbook_copy::create(workbook, edits, || operation.check_current())?;
+                let bytes = session.edited(edits, operation)?.workbook.shared_bytes();
                 let size = bytes.len();
                 session.copy = Some(CopyResult { id: copy_id, bytes });
                 return Ok(json!({ "size": size }));

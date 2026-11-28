@@ -119,6 +119,8 @@ def setup(ctx: Any) -> None:
         ctx.values["taoffice_locked_pdf_sha"] = hashlib.sha256(files["locked.pdf"]).hexdigest()
     if ctx.case_id in {"TC-TAOFFICE-015", "TC-TAOFFICE-016", "TC-TAOFFICE-019", "TC-TAOFFICE-020"}:
         files.update(workbook_fixtures(TAOFFICE_ASSETS, ctx.values))
+    if ctx.case_id in {"TC-TAOFFICE-035", "TC-TAOFFICE-036"}:
+        files.update(workbook_fixtures(TAOFFICE_ASSETS, ctx.values, forecast=True))
     if ctx.case_id in {"TC-TAOFFICE-017", "TC-TAOFFICE-018"}:
         files["order-form.pdf"] = (TAOFFICE_ASSETS / "order-form.pdf").read_bytes()
         ctx.values["taoffice_pdf_form_sha"] = hashlib.sha256(files["order-form.pdf"]).hexdigest()

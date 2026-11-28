@@ -119,7 +119,7 @@ fn replace(cell: SelectedCell) -> Result<Vec<u8>, RpcError> {
     Ok(writer.into_inner())
 }
 
-fn escape_excel_text(value: &str) -> String {
+pub(super) fn escape_excel_text(value: &str) -> String {
     let mut encoded = String::new();
     for (index, char) in value.char_indices() {
         if char == '_'

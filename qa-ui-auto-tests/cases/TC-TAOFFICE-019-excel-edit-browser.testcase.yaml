@@ -49,6 +49,7 @@ steps:
 - press: {selector: '[data-testid="taoffice-excel-input"]', key: Tab}
 - wait_for: '[data-testid="taoffice-excel-cell"][data-address="C2"]:focus'
 - assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', contains: '15.5'}
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="C2"]', contains: '31'}
 - assert_attribute: {selector: '[data-testid="taoffice-excel-formula"]', name: value, equals: '=B2*2'}
 - assert_enabled: '[data-testid="taoffice-excel-save-copy"]'
 - wait_for: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'

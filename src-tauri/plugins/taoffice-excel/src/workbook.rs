@@ -27,6 +27,8 @@ pub struct Workbook {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SheetWindow {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recalculated: Option<bool>,
     rows: u32,
     columns: u32,
     cells: Vec<Cell>,
@@ -46,6 +48,23 @@ struct Cell {
     edit_type: Option<&'static str>,
     #[serde(skip_serializing_if = "is_false")]
     table_metadata: bool,
+}
+
+impl SheetWindow {
+    pub fn apply_formula_values(&mut self, calculated: SheetWindow) {
+        let values: HashMap<_, _> = calculated
+            .cells
+            .into_iter()
+            .filter(|cell| cell.formula.is_some())
+            .map(|cell| ((cell.row, cell.column), cell))
+            .collect();
+        for cell in self.cells.iter_mut().filter(|cell| cell.formula.is_some()) {
+            if let Some(result) = values.get(&(cell.row, cell.column)) {
+                cell.value.clone_from(&result.value);
+                cell.truncated = result.truncated;
+            }
+        }
+    }
 }
 
 fn is_false(value: &bool) -> bool {
@@ -137,6 +156,10 @@ impl Workbook {
         &self.sheets
     }
 
+    pub fn shared_bytes(&self) -> Arc<[u8]> {
+        self.bytes.clone()
+    }
+
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
@@ -219,6 +242,7 @@ impl Workbook {
         }
         check_current()?;
         Ok(SheetWindow {
+            recalculated: None,
             rows,
             columns,
             cells,

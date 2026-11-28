@@ -16870,6 +16870,7 @@ TC-TAOFFICE-013 覆盖原生固实 RAR4/RAR5 解码、只读预览、准确解�
 TC-TAOFFICE-015/016 覆盖独立 Excel 模块的工作表导航、选中单元格恢复、缓存值与原公式、隐藏工作表、输入文件散列以及原生签名安装和停用。
 TC-TAOFFICE-033/034 覆盖页面批注、撤销、旋转、排序、移除，以及另存后重开核对。
 TC-TAOFFICE-017/018 覆盖 PDF 表单填写、关闭守卫、保存副本和原生文件重新打开。
+TC-TAOFFICE-035/036 覆盖跨工作表重算、撤销输入和副本重开后的公式缓存。
 TC-TAOFFICE-019/020 覆盖 XLSX 表格列标题只读、数据行文字与数字编辑、输入校验、取消、保存副本、公式保留和原始文件摘要。
 TC-TAOFFICE-021/022 覆盖 DOCX 页面、页眉、正文混合格式和表格单元格编辑，以及共享关闭守卫、签名安装、原生另存和副本重开。
 TC-TAOFFICE-023/024 覆盖 MSPDI 任务列表及甘特条、筛选、键盘重命名、原生保存和副本重开。
@@ -17058,6 +17059,9 @@ controls:
     kind: interactive
   - id: taoffice-excel-grid
     selector: '[data-testid="taoffice-excel-grid"]'
+    kind: display
+  - id: taoffice-excel-calculation
+    selector: '[data-testid="taoffice-excel-calculation"]'
     kind: display
   - id: taoffice-excel-cell
     selector: '[data-testid="taoffice-excel-cell"]'
