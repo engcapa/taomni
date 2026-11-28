@@ -40,13 +40,13 @@ class ModuleProfileSelectionTests(unittest.TestCase):
         common_mode_cases = {"TC-FILE-OPEN-049": "mail", "TC-MODULES-102": "mfa"}
         browser_cases = {"TC-TAOFFICE-033": "taoffice-pdf", "TC-TAOFFICE-039": "taoffice-ppt",
                          "TC-TAOFFICE-041": "taoffice-visio", "TC-TAOFFICE-043": "taoffice-video",
-                         "TC-TAOFFICE-044": "taoffice-video"}
+                         "TC-TAOFFICE-044": "taoffice-video", "TC-TAOFFICE-047": "taoffice-image"}
         native_cases = {"TC-TAOFFICE-034": "taoffice-pdf", "TC-TAOFFICE-040": "taoffice-ppt",
                         "TC-TAOFFICE-042": "taoffice-visio", "TC-TAOFFICE-045": "taoffice-video",
-                        "TC-TAOFFICE-046": "taoffice-video"}
+                        "TC-TAOFFICE-046": "taoffice-video", "TC-TAOFFICE-048": "taoffice-image"}
         plugin_cases = {**common_mode_cases, **browser_cases, **native_cases}
         excludes = [entry for entry in core["not_applicable"] if "requires_plugin" in entry]
-        self.assertEqual(len(excludes), 42)
+        self.assertEqual(len(excludes), 48)
         self.assertEqual({e["case"]: e["requires_plugin"] for e in excludes}, plugin_cases)
         core_modes = {(e["mode"], e["platform_key"], case) for e in core["entries"] for case in e["selected_ids"]}
         full_modes = {(e["mode"], e["platform_key"], case) for e in full["entries"] for case in e["selected_ids"]}
@@ -211,7 +211,8 @@ class SelectionTests(unittest.TestCase):
                     'TC-FILE-OPEN-007', 'TC-FILE-OPEN-008', 'TC-FILE-OPEN-009', 'TC-FILE-OPEN-010', 'TC-FILE-OPEN-011', 'TC-FILE-OPEN-012',
                     'TC-FILE-OPEN-013', 'TC-TAO-HOME-002', 'TC-EXPLORER-013', 'TC-FILE-OPEN-041',
                     'TC-FILE-OPEN-049', 'TC-MODULES-102', 'TC-TAOFFICE-001', 'TC-TAOFFICE-009',
-                    'TC-TAOFFICE-034', 'TC-TAOFFICE-040', 'TC-TAOFFICE-042', 'TC-TAOFFICE-045', 'TC-TAOFFICE-046'}
+                    'TC-TAOFFICE-034', 'TC-TAOFFICE-040', 'TC-TAOFFICE-042', 'TC-TAOFFICE-045', 'TC-TAOFFICE-046',
+                    'TC-TAOFFICE-048'}
         for entry in native:
             with self.subTest(profile=entry['linux_profile']):
                 self.assertEqual(set(entry['selected_ids']), expected)

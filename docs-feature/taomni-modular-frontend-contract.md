@@ -70,6 +70,8 @@ PowerPoint 0.1.0 通过独立前端渲染 PPTX。可在已打开的文档中替�
 
 Visio 0.1.0 使用模块内的 libvisio WebAssembly 解码器预览 VSDX、VSD 和相应模板。解码在独立 Worker 中运行，页面先清理成自包含 SVG，再用于预览和导出。查看器提供分页、缩放、查找和系统打开。TC-TAOFFICE-041/042 验证现代与旧版文件、坏文件恢复和导出的实际字节。
 
+TaOffice Image 0.1.0 接管 HEIC、HEIF、PSD、CR2、NEF、ARW 和 DNG 的只读预览。常用位图和 TIFF 仍由核心打开。模块通过 API 1 的当前文档读取授权获取文件，在内存中生成缩略图，关闭文件或停用模块时释放预览。HEIF 解码器和许可证随模块独立签名分发。模块不持久化用户数据，备份和迁移清单为空。
+
 | SDK 字段 | 当前公开内容 |
 |---|---|
 | `coreApiVersion` | 与 manifest 协商的核心 API 版本 |

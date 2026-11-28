@@ -10,6 +10,8 @@ describe("file opening classification and identity", () => {
     ["/a.htm", "html"], ["/a.log", "text"], ["/a.json", "text"], ["/.env.local", "text"],
     ["/README", "text"], ["/LICENSE", "text"], ["/a.rs", "source"], ["/Dockerfile", "source"],
     ["/a.pdf", "pdf"], ["/a.xlsx", "document"], ["/unknown", "binary"],
+    ["/a.HEIC", "document"], ["/a.heif", "document"], ["/a.PSD", "document"],
+    ["/a.CR2", "document"], ["/a.nef", "document"], ["/a.arw", "document"], ["/a.DNG", "document"],
     ["/a.CBZ", "archive"], ["/a.tar", "archive"], ["/a.TAR.GZ", "archive"],
     ["/a.7Z", "archive"], ["/a.RAR", "archive"],
     ["/a.tgz", "archive"], ["/a.tar.bz2", "archive"], ["/a.tar.xz", "archive"], ["/a.tar.zst", "archive"],

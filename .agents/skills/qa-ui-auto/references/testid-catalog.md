@@ -1538,6 +1538,14 @@
 - `[data-testid="taoffice-visio-zoom-in"]` — interactive — F-FILEOPEN-1.taoffice-visio-zoom-in
 - `[data-testid="taoffice-visio-zoom-out"]` — interactive — F-FILEOPEN-1.taoffice-visio-zoom-out
 - `[data-testid="taoffice-media-export"]` — display — F-FILEOPEN-1.taoffice-media-export
+- `[data-testid="taoffice-image-viewer"]` — display — F-FILEOPEN-1.taoffice-image-viewer
+- `[data-testid="taoffice-image-thumbnail"]` — display — F-FILEOPEN-1.taoffice-image-thumbnail
+- `[data-testid="taoffice-image-dimensions"]` — display — F-FILEOPEN-1.taoffice-image-dimensions
+- `[data-testid="taoffice-image-error"]` — display — F-FILEOPEN-1.taoffice-image-error
+- `[data-testid="taoffice-image-copy-error"]` — interactive — F-FILEOPEN-1.taoffice-image-copy-error
+- `[data-testid="taoffice-image-retry"]` — interactive — F-FILEOPEN-1.taoffice-image-retry
+- `[data-testid="taoffice-image-open-system"]` — interactive — F-FILEOPEN-1.taoffice-image-open-system
+- `[data-testid="taoffice-image-zoom"]` — interactive — F-FILEOPEN-1.taoffice-image-zoom
 - `[data-testid="taoffice-media-export-cancel"]` — interactive — F-FILEOPEN-1.taoffice-media-export-cancel
 - `[data-testid="taoffice-media-export-error"]` — display — F-FILEOPEN-1.taoffice-media-export-error
 - `[data-testid="taoffice-media-export-format"]` — interactive — F-FILEOPEN-1.taoffice-media-export-format
@@ -3211,6 +3219,7 @@
   ↳ `[data-testid="module-action-enable-taoffice-project"]` — alias
   ↳ `[data-testid="module-action-enable-taoffice-ppt"]` — alias
   ↳ `[data-testid="module-action-enable-taoffice-visio"]` — alias
+  ↳ `[data-testid="module-action-enable-taoffice-image"]` — alias
 - `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
 - `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
   ↳ `[data-testid="module-action-disable-mfa"]` — alias
@@ -3230,6 +3239,7 @@
   ↳ `[data-testid="module-action-disable-taoffice-project"]` — alias
   ↳ `[data-testid="module-action-disable-taoffice-ppt"]` — alias
   ↳ `[data-testid="module-action-disable-taoffice-visio"]` — alias
+  ↳ `[data-testid="module-action-disable-taoffice-image"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
   ↳ `[data-testid="module-action-uninstall-rdp-client"]:enabled` — alias
   ↳ `[data-testid="module-action-uninstall-rdp-server"]:enabled` — alias

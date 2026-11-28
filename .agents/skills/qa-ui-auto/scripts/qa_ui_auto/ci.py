@@ -106,6 +106,8 @@ def capabilities(cases, mode: str) -> list[str]:
             result.add("taoffice-visio")
         if mode == "browser" and "taoffice-video" in case.tags:
             result.add("taoffice-video")
+        if mode == "browser" and "taoffice-image" in case.tags:
+            result.add("taoffice-image")
         if mode == "native" and "mobile_service" in fixtures:
             result.add("mobile")
         if fixtures & {"ssh_required", "sftp_required"}:
@@ -158,6 +160,8 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.add("signed-taoffice-ppt")
             if "taoffice_signed_visio" in fixtures:
                 result.add("signed-taoffice-visio")
+            if "taoffice_signed_image" in fixtures:
+                result.add("signed-taoffice-image")
             if "module_signed_voice_archive" in fixtures:
                 result.add("signed-local-voice")
             if "module_signed_sockscap_archive" in fixtures:

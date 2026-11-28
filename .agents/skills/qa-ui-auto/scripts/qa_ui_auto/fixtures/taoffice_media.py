@@ -35,6 +35,10 @@ def setup_visio(ctx):
     _setup(ctx, "taoffice-visio", "visio")
 
 
+def setup_image(ctx):
+    _setup(ctx, "taoffice-image", "image")
+
+
 def _setup(ctx, slug, name):
     if ctx.cfg["app"]["mode"] != "native":
         raise ValueError("A signed TaOffice package requires the native installer")

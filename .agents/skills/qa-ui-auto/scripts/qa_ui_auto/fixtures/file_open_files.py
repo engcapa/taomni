@@ -173,6 +173,13 @@ def setup(ctx: Any) -> None:
             data = (TAOFFICE_ASSETS / name).read_bytes()
             files[name] = data
             ctx.values[f"taoffice_{key}_media_sha"] = hashlib.sha256(data).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-047", "TC-TAOFFICE-048"}:
+        for name, key in (("heif-quadrants.heic", "heic"), ("image-sample.psd", "psd"),
+                          ("image-sample.dng", "dng"), ("image-no-preview.dng", "no_preview")):
+            data = (TAOFFICE_ASSETS / name).read_bytes()
+            files[name] = data
+            ctx.values[f"taoffice_image_{key}_sha"] = hashlib.sha256(data).hexdigest()
+        files["image-damaged.heic"] = b"This is not a HEIC image."
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative

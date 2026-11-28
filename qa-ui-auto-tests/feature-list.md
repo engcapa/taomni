@@ -427,6 +427,7 @@ controls:
     - '[data-testid="module-action-enable-taoffice-project"]'
     - '[data-testid="module-action-enable-taoffice-ppt"]'
     - '[data-testid="module-action-enable-taoffice-visio"]'
+    - '[data-testid="module-action-enable-taoffice-image"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
@@ -451,6 +452,7 @@ controls:
     - '[data-testid="module-action-disable-taoffice-project"]'
     - '[data-testid="module-action-disable-taoffice-ppt"]'
     - '[data-testid="module-action-disable-taoffice-visio"]'
+    - '[data-testid="module-action-disable-taoffice-image"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
@@ -16906,6 +16908,7 @@ files:
   - src-tauri/plugins/taoffice-video/src/**
   - src-tauri/plugins/taoffice-ppt/renderer/**
   - src-tauri/plugins/taoffice-visio/renderer/**
+  - src-tauri/plugins/taoffice-image/renderer/**
   - src-tauri/src/viewer/document_copy.rs
   - src/lib/openFile/mediaStream.ts
   - src-tauri/plugins/taoffice-pdf/renderer/PdfViewer.jsx
@@ -17192,6 +17195,30 @@ controls:
   - id: taoffice-media-export
     selector: '[data-testid="taoffice-media-export"]'
     kind: display
+  - id: taoffice-image-viewer
+    selector: '[data-testid="taoffice-image-viewer"]'
+    kind: display
+  - id: taoffice-image-thumbnail
+    selector: '[data-testid="taoffice-image-thumbnail"]'
+    kind: display
+  - id: taoffice-image-dimensions
+    selector: '[data-testid="taoffice-image-dimensions"]'
+    kind: display
+  - id: taoffice-image-error
+    selector: '[data-testid="taoffice-image-error"]'
+    kind: display
+  - id: taoffice-image-copy-error
+    selector: '[data-testid="taoffice-image-copy-error"]'
+    kind: interactive
+  - id: taoffice-image-retry
+    selector: '[data-testid="taoffice-image-retry"]'
+    kind: interactive
+  - id: taoffice-image-open-system
+    selector: '[data-testid="taoffice-image-open-system"]'
+    kind: interactive
+  - id: taoffice-image-zoom
+    selector: '[data-testid="taoffice-image-zoom"]'
+    kind: interactive
   - id: taoffice-media-export-cancel
     selector: '[data-testid="taoffice-media-export-cancel"]'
     kind: interactive

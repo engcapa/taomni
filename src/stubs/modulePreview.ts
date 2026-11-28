@@ -4,6 +4,7 @@ import videoManifest from "../../src-tauri/plugins/taoffice-video/module.json";
 import pdfManifest from "../../src-tauri/plugins/taoffice-pdf/module.json";
 import excelManifest from "../../src-tauri/plugins/taoffice-excel/module.json";
 import wordManifest from "../../src-tauri/plugins/taoffice-word/module.json";
+import imageManifest from "../../src-tauri/plugins/taoffice-image/module.json";
 import pptManifest from "../../src-tauri/plugins/taoffice-ppt/module.json";
 import visioManifest from "../../src-tauri/plugins/taoffice-visio/module.json";
 import projectManifest from "../../src-tauri/plugins/taoffice-project/module.json";
@@ -37,6 +38,7 @@ const previewModules = [
   [excelManifest, "taoffice-excel"],
   [wordManifest, "taoffice-word"],
   [projectManifest, "taoffice-project"],
+  [imageManifest, "taoffice-image"],
   [pptManifest, "taoffice-ppt"],
   [visioManifest, "taoffice-visio"],
   [vncManifest, "vnc"],

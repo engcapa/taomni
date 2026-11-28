@@ -140,7 +140,7 @@ class BuildPipelineTests(unittest.TestCase):
                     'signed-mail', 'signed-screenshot', 'signed-vnc-server', 'signed-servers',
                     'signed-voice', 'signed-sockscap', 'signed-taoffice-video', 'signed-taoffice-pdf',
                     'signed-taoffice-excel', 'signed-taoffice-word', 'signed-taoffice-project',
-                    'signed-taoffice-ppt', 'signed-taoffice-visio', rdp_server_signer,
+                    'signed-taoffice-ppt', 'signed-taoffice-visio', 'signed-taoffice-image', rdp_server_signer,
                 ],
             )
             self.assertIn(f'execute-{platform}-native', jobs['summarize']['needs'])
@@ -169,6 +169,9 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-local-vnc')", jobs['signed-vnc-server']['if'])
         self.assertIs(jobs['signed-rdp-server-macos']['with']['native_macos_signing'], True)
         self.assertIs(jobs['signed-taoffice-video']['with']['native_macos_signing'], True)
+        self.assertEqual(jobs['signed-taoffice-image']['with']['module'], 'taoffice-image')
+        self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-taoffice-image')", jobs['signed-taoffice-image']['if'])
+        self.assertIn('signed-taoffice-image', jobs['summarize']['needs'])
         self.assertIn('APPLE_CERTIFICATE', jobs['signed-rdp-server-macos']['secrets'])
         self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-module')", jobs['signed-modular-packages']['if'])
         self.assertNotIn('Validate QA tools', [s.get('name') for s in jobs['plan']['steps']])
@@ -319,6 +322,9 @@ class NightlyAndCachePipelineTests(unittest.TestCase):
         self.assertIn("needs.plan.outputs.has_macos_browser == 'true'", macos['if'])
         self.assertIn('taoffice-visio-browser-frontend', macos['needs'])
         self.assertIn("needs.taoffice-visio-browser-frontend.result == 'success'", macos['if'])
+        for browser_job in (jobs['execute-browser'], macos):
+            self.assertIn('taoffice-image-browser-frontend', browser_job['needs'])
+            self.assertIn("needs.taoffice-image-browser-frontend.result == 'success'", browser_job['if'])
         self.assertIn('execute-macos-browser', jobs['summarize']['needs'])
 
     def test_trusted_default_branch_cargo_lookup_precedes_a_cold_build(self):

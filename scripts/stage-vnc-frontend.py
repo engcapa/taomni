@@ -35,6 +35,8 @@ def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, P
                          "JSZip-LICENSE.txt", "PptxGenJS-LICENSE.txt"})
     if slug == "taoffice-visio":
         expected.update({"visio.wasm", "visio-icu.dat", "visio-third-party-notices.txt"})
+    if slug == "taoffice-image":
+        expected.update({"heif.wasm", "heif-third-party-notices.txt"})
     if with_receipt:
         expected.add("receipt.json")
     files = {}
@@ -67,7 +69,7 @@ def frontend_receipt(files: dict[str, Path], source: str, tooling: str, slug: st
         if artifact.stat().st_size == 0:
             raise ValueError("Empty module frontend file")
     receipt = {"sourceSha": source, "toolingSha": tooling, "slug": slug, "sha256": digests["index.js"]}
-    if slug in {"screenshot", "taoffice-pdf", "taoffice-video", "taoffice-ppt", "taoffice-visio"}:
+    if slug in {"screenshot", "taoffice-pdf", "taoffice-video", "taoffice-ppt", "taoffice-visio", "taoffice-image"}:
         receipt["files"] = digests
     return receipt
 

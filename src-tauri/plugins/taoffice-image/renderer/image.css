@@ -1,0 +1,58 @@
+.taoffice-image {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  color: var(--taomni-text);
+  background: var(--taomni-panel-bg);
+}
+.taoffice-image-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .5rem 1rem;
+  padding: .5rem .75rem;
+  border-bottom: 1px solid var(--taomni-card-border);
+}
+.taoffice-image-tools label {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+}
+.taoffice-image-tools select {
+  color: inherit;
+  background: var(--taomni-panel-bg);
+  border: 1px solid var(--taomni-card-border);
+  border-radius: .25rem;
+  padding: .2rem;
+}
+.taoffice-image-tools button { margin-inline-start: auto; }
+.taoffice-image p, .taoffice-image-failure { margin: .75rem; }
+.taoffice-image-failure p { margin: 0 0 .5rem; user-select: text; overflow-wrap: anywhere; }
+.taoffice-image-failure button + button { margin-inline-start: .5rem; }
+.taoffice-image-canvas {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  padding: .75rem;
+}
+.taoffice-image-canvas img {
+  display: block;
+  flex: none;
+  margin: auto;
+  height: auto;
+  max-width: none;
+  align-self: start;
+}
+.taoffice-image-canvas[data-fit="true"] img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.taoffice-image :focus-visible {
+  outline: 2px solid var(--taomni-focus-ring);
+  outline-offset: 2px;
+}

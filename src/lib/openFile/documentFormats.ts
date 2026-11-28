@@ -4,6 +4,7 @@ const families = [
   ["taoffice-excel", "Excel", "xlsx xls xlsm xlsb ods"],
   ["taoffice-word", "Word", "docx doc odt rtf"],
   ["taoffice-ppt", "PowerPoint", "pptx ppt odp"],
+  ["taoffice-image", "TaOffice Image", "heic heif psd cr2 nef arw dng"],
   ["taoffice-visio", "Visio", "vsdx vsdm vstx vsd vss vst"],
   ["taoffice-project", "MS Project", "mpp mppx mpx"],
   ["taoffice-video", "Audio / Video", "mp4 m4v webm mov mkv avi rm rmvb flv wmv 3gp mp3 wav flac ogg m4a aac"],

@@ -1,0 +1,22 @@
+{
+  "id": "taomni-plugin-taoffice-image",
+  "slug": "taoffice-image",
+  "name": "TaOffice Image",
+  "description": "View read-only previews of HEIC photos, Photoshop files and camera RAW images.",
+  "version": "0.1.0",
+  "coreApiVersion": "1",
+  "kind": "media",
+  "status": "provisional",
+  "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
+  "entry": { "frontend": "frontend/index.js", "protocol": 1 },
+  "document": { "fileKinds": ["image"], "extensions": ["heic", "heif", "psd", "cr2", "nef", "arw", "dng"] },
+  "tabs": [],
+  "commands": [],
+  "permissions": ["fs.readUserFile"],
+  "dataDir": "plugins/taoffice-image",
+  "dataSchemaVersion": 1,
+  "backupPaths": [],
+  "legacyTables": [],
+  "vaultFixedKeys": [],
+  "snapshot": "file"
+}

@@ -40,13 +40,14 @@ jobs:
             sockscap) dependencies=(src/lib/sockscap src/lib/sockscap.ts src/lib/sessionPaths.ts src/lib/sockscapPreflight.ts) ;;
             rdp-server|vnc-server|servers) dependencies=(vite-plugins/serverSettings.ts src/lib/servers) ;;
             taoffice-pdf|taoffice-excel) dependencies=() ;;
+            taoffice-image) dependencies=(src-tauri/plugins/taoffice-image/heif-wasm) ;;
             taoffice-visio) dependencies=(src-tauri/plugins/taoffice-visio/wasm) ;;
             taoffice-video) dependencies=(src-tauri/plugins/taoffice-video/frontend) ;;
             taoffice-word|taoffice-project|taoffice-ppt) dependencies=(src-tauri/crates/taomni-plugin-api/frontend/documentDraft.js) ;;
             *) echo 'Unknown module frontend' >&2; exit 1 ;;
           esac
           case "$MODULE_SLUG" in
-            mail|mfa|rdp-client|sockscap|vnc-client|taoffice-video|taoffice-ppt|taoffice-visio) dependencies+=(src-tauri/crates/taomni-plugin-api/frontend/ui) ;;
+            mail|mfa|rdp-client|sockscap|vnc-client|taoffice-video|taoffice-ppt|taoffice-visio|taoffice-image) dependencies+=(src-tauri/crates/taomni-plugin-api/frontend/ui) ;;
           esac
           case "$MODULE_SLUG" in
             mail|mfa|sockscap|vnc-client) dependencies+=(src/styles/ui-foundations.css src/styles/ui-typography.css src/styles/modal.css) ;;
@@ -65,6 +66,12 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - name: Build the pinned HEIF WebAssembly decoder
+        if: inputs.module == 'taoffice-image'
+        run: |
+          rustup target add wasm32-unknown-unknown
+          rustup component add rust-docs
+          bash src-tauri/plugins/taoffice-image/heif-wasm/build.sh
       - name: Build the pinned libvisio WebAssembly decoder
         if: inputs.module == 'taoffice-visio'
         run: |

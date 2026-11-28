@@ -723,7 +723,7 @@ jobs:
             qa-ui-auto-report/${{ matrix.id }}/
           retention-days: 14
       - name: Identify the native platform for the official module input
-        if: inputs.operation == 'run' && matrix.mode == 'native' && (contains(matrix.capabilities, 'full-module-profile') || contains(matrix.capabilities, 'signed-module') || contains(matrix.capabilities, 'signed-mfa') || contains(matrix.capabilities, 'signed-vnc') || contains(matrix.capabilities, 'signed-rdp') || contains(matrix.capabilities, 'signed-mail') || contains(matrix.capabilities, 'signed-screenshot') || contains(matrix.capabilities, 'signed-local-vnc') || contains(matrix.capabilities, 'signed-local-rdp') || contains(matrix.capabilities, 'signed-local-servers') || contains(matrix.capabilities, 'signed-local-voice') || contains(matrix.capabilities, 'signed-sockscap') || contains(matrix.capabilities, 'signed-taoffice-video') || contains(matrix.capabilities, 'signed-taoffice-pdf') || contains(matrix.capabilities, 'signed-taoffice-excel') || contains(matrix.capabilities, 'signed-taoffice-word') || contains(matrix.capabilities, 'signed-taoffice-project') || contains(matrix.capabilities, 'signed-taoffice-ppt') || contains(matrix.capabilities, 'signed-taoffice-visio'))
+        if: inputs.operation == 'run' && matrix.mode == 'native' && (contains(matrix.capabilities, 'full-module-profile') || contains(matrix.capabilities, 'signed-module') || contains(matrix.capabilities, 'signed-mfa') || contains(matrix.capabilities, 'signed-vnc') || contains(matrix.capabilities, 'signed-rdp') || contains(matrix.capabilities, 'signed-mail') || contains(matrix.capabilities, 'signed-screenshot') || contains(matrix.capabilities, 'signed-local-vnc') || contains(matrix.capabilities, 'signed-local-rdp') || contains(matrix.capabilities, 'signed-local-servers') || contains(matrix.capabilities, 'signed-local-voice') || contains(matrix.capabilities, 'signed-sockscap') || contains(matrix.capabilities, 'signed-taoffice-video') || contains(matrix.capabilities, 'signed-taoffice-pdf') || contains(matrix.capabilities, 'signed-taoffice-excel') || contains(matrix.capabilities, 'signed-taoffice-word') || contains(matrix.capabilities, 'signed-taoffice-project') || contains(matrix.capabilities, 'signed-taoffice-ppt') || contains(matrix.capabilities, 'signed-taoffice-visio') || contains(matrix.capabilities, 'signed-taoffice-image'))
         id: module_platform
         run: |
           python - <<'PY'
@@ -750,6 +750,7 @@ jobs:
               stream.write('QA_SIGNED_TAOFFICE_PROJECT_ROOT=' + os.path.abspath('qa-ui-auto-report/official-taoffice-project-input') + '\n')
               stream.write('QA_SIGNED_TAOFFICE_PPT_ROOT=' + os.path.abspath('qa-ui-auto-report/official-taoffice-ppt-input') + '\n')
               stream.write('QA_SIGNED_TAOFFICE_VISIO_ROOT=' + os.path.abspath('qa-ui-auto-report/official-taoffice-visio-input') + '\n')
+              stream.write('QA_SIGNED_TAOFFICE_IMAGE_ROOT=' + os.path.abspath('qa-ui-auto-report/official-taoffice-image-input') + '\n')
               stream.write('QA_LOCAL_VOICE_AUDIO_ROOT=' + os.path.abspath('qa-ui-auto-report/official-voice-fixture') + '\n')
           PY
       - name: Bind the first-upgrade roster to the selected release build
@@ -892,6 +893,12 @@ jobs:
         with:
           name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-taoffice-visio
           path: qa-ui-auto-report/official-taoffice-visio-input
+      - name: Download this invocation's signed TaOffice Image module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-taoffice-image')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-taoffice-image
+          path: qa-ui-auto-report/official-taoffice-image-input
       - name: Download this invocation's signed SocksCap module
         if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-sockscap')
         uses: ./.github/actions/qa-download-artifact
@@ -943,6 +950,12 @@ jobs:
         with:
           name: taoffice-visio-browser-${{ inputs.artifact_key }}
           path: src-tauri/plugins/taoffice-visio/dist/frontend
+      - name: Download the selected TaOffice Image frontend for browser preview
+        if: inputs.operation == 'run' && matrix.mode == 'browser' && contains(matrix.capabilities, 'taoffice-image')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: taoffice-image-browser-${{ inputs.artifact_key }}
+          path: src-tauri/plugins/taoffice-image/dist/frontend
       - name: Build the TaOffice Media module for browser preview
         if: inputs.operation == 'run' && matrix.mode == 'browser' && contains(matrix.capabilities, 'taoffice-video')
         run: pnpm exec vite build --config src-tauri/plugins/taoffice-video/vite.config.ts
