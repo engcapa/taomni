@@ -43,14 +43,14 @@ steps:
 - assert_text: {selector: '[data-testid="taoffice-image-viewer"]', contains: Read-only preview}
 - assert_computed_style: {selector: '.taoffice-image-tools', property: font-size, equals: '10px'}
 - assert_solid_text_contrast: {selector: '[data-testid="taoffice-image-dimensions"]', minimum: 4.5, composite_ancestors: true}
-- press: {selector: '[data-testid="taoffice-image-zoom"][class~="taomni-input"]', key: End}
+- press: {selector: '[data-testid="taoffice-image-zoom"][class~="taomni-input"]', key: '2'}
 - assert_computed_style: {selector: '[data-testid="taoffice-image-thumbnail"]', property: width, equals: '320px'}
-- press: {selector: '[data-testid="taoffice-image-zoom"][class~="taomni-input"]', key: Home}
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="dark"]'
+- press: {selector: '[data-testid="taoffice-image-zoom"][class~="taomni-input"]', key: f}
 - eval_readonly:
     expression: document.querySelector('.taoffice-image-canvas').dataset.fit === "true"
     timeout_sec: 10
-- click: '[data-testid="theme-cycle"]'
-- wait_for: 'html[data-app-theme="dark"]'
 - click: '[data-testid="ribbon-settings"]'
 - click: '[data-testid="settings-group-toggle-general"]'
 - press: {selector: '#ui-font-size-slider', key: End}
@@ -129,11 +129,11 @@ verification:
     - {step: 31, expectation: A visible label identifies the read-only preview.}
     - {step: 32, expectation: The toolbar uses the 10 px setting.}
     - {step: 33, expectation: The dimensions have at least 4.5 to 1 contrast in light mode.}
-    - {step: 35, expectation: Keyboard End sets the thumbnail width to twice the source width.}
-    - {step: 37, expectation: Keyboard Home restores fit to window.}
+    - {step: 35, expectation: Typing 2 selects 200% and doubles the thumbnail width.}
+    - {step: 39, expectation: Typing f in the refocused zoom selector restores Fit to window.}
     - {step: 44, expectation: The toolbar uses the 18 px setting.}
     - {step: 45, expectation: The dimensions have at least 4.5 to 1 contrast in dark mode.}
-    results: [30, 31, 32, 33, 35, 37, 44, 45]
+    results: [30, 31, 32, 33, 35, 39, 44, 45]
   - id: image-lifecycle
     requirement: PSD and DNG decode through the same viewer and closing the current file releases its preview before a fresh HEIC opens.
     actions: [49, 56, 61, 64]
