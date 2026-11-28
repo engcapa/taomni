@@ -5,6 +5,7 @@ import { composing, VisioFind } from "./VisioFind.jsx";
 import { VisioShapes } from "./VisioShapes.jsx";
 import { decodeVisio } from "./visioDocument.js";
 import { saveVisioCopy } from "./visioPackage.js";
+import { exportVisioPdf } from "./visioPdf.js";
 
 const { React, formatShortcutDisplay } = globalThis.__taomniHost;
 const { useEffect, useLayoutEffect, useRef, useState } = React;
@@ -14,7 +15,7 @@ const maxZoom = 4;
 export function VisioPages({ initialPages, diagram, source, active, label, openSystem }) {
   const [previewEdits, setPreviewEdits] = useState(null);
   const [preview, setPreview] = useState(null);
-  const pages = preview?.pages ?? initialPages;
+  const pages = previewEdits?.size && preview?.pages ? preview.pages : initialPages;
   const pending = Boolean(previewEdits?.size) && preview?.edits !== previewEdits;
   useEffect(() => {
     if (!previewEdits?.size) {
@@ -48,19 +49,35 @@ export function VisioPages({ initialPages, diagram, source, active, label, openS
   const page = pages[pageIndex];
   const scale = zoom ?? fit;
   const isMac = source.platform === "macos";
-  const canExport = source.saveCopy && source.copyExtensions?.includes("svg");
+  const canExport = extension => source.saveCopy && source.copyExtensions?.includes(extension);
   const findName = label("查找文字…", "Find text…");
   const findShortcut = formatShortcutDisplay?.("Mod+F", isMac);
   const pageName = page.name || label(`第 ${pageIndex + 1} 页`, `Page ${pageIndex + 1}`);
+  const exportRequest = useRef(null);
   const exportTask = usePendingAction(async () => {
+    const { extension } = exportRequest.current;
     setExportStatus(null);
     try {
-      const path = await source.saveCopy(new TextEncoder().encode(page.svg), { extension: "svg" });
-      if (path) setExportStatus({ path });
+      const bytes = extension === "pdf" ? await exportVisioPdf(page) : new TextEncoder().encode(page.svg);
+      const path = await source.saveCopy(bytes, { extension });
+      if (path) setExportStatus({ extension, path });
     } catch (error) {
-      setExportStatus({ error: error.message ?? String(error) });
+      setExportStatus({ extension, error: error.message ?? String(error) });
     }
   });
+  const exportIneligible = Boolean(pending || (previewEdits?.size && preview?.error));
+  async function requestExport(extension, trigger) {
+    if (exportRequest.current || exportIneligible) return;
+    exportRequest.current = { extension };
+    try {
+      await exportTask.run();
+    } finally {
+      exportRequest.current = null;
+      requestAnimationFrame(() => {
+        if (trigger.isConnected && trigger.ownerDocument.activeElement === trigger.ownerDocument.body) trigger.focus();
+      });
+    }
+  }
 
   useLayoutEffect(() => {
     const view = viewport.current;
@@ -135,8 +152,12 @@ export function VisioPages({ initialPages, diagram, source, active, label, openS
         data-taomni-tooltip={findShortcut ? `${findName} (${findShortcut})` : findName}
         onClick={(event) => toggleFind(event.currentTarget)}>{findName}</Button>
       {openSystem}
-      {canExport && <Button data-testid="taoffice-visio-export" variant="primary" disabled={Boolean(pending || preview?.error)} busy={exportTask.busy}
-        onClick={() => void exportTask.run()}>{label("导出此页为 SVG…", "Export page as SVG…")}</Button>}
+      {canExport("svg") && <Button data-testid="taoffice-visio-export" variant="primary" disabled={exportIneligible || exportTask.busy}
+        busy={exportTask.busy && exportRequest.current?.extension === "svg"}
+        onClick={event => requestExport("svg", event.currentTarget)}>{label("导出此页为 SVG…", "Export page as SVG…")}</Button>}
+      {canExport("pdf") && <Button data-testid="taoffice-visio-export-pdf" disabled={exportIneligible || exportTask.busy}
+        busy={exportTask.busy && exportRequest.current?.extension === "pdf"}
+        onClick={event => requestExport("pdf", event.currentTarget)}>{label("导出此页为 PDF…", "Export page as PDF…")}</Button>}
     </div>
     <div ref={canvas}>
       {search && <VisioFind pages={pages} setPage={setPage} close={() => toggleFind(null)} label={label} />}
@@ -145,10 +166,14 @@ export function VisioPages({ initialPages, diagram, source, active, label, openS
       {label("正在导出此页。", "Exporting this page.")}
     </p>}
     {exportStatus?.path && <p className="taoffice-visio-status" role="status" data-testid="taoffice-visio-export-status">
-      {label("已导出 SVG。", "SVG exported.")} {exportStatus.path}
+      {label(`已导出 ${exportStatus.extension.toUpperCase()}。`, `${exportStatus.extension.toUpperCase()} exported.`)} {exportStatus.path}
     </p>}
     {exportStatus?.error && <p className="taoffice-visio-status" role="alert" data-testid="taoffice-visio-export-error">
-      {label("无法导出 SVG。", "Could not export the SVG.")} {exportStatus.error}
+      {label(`无法导出 ${exportStatus.extension.toUpperCase()}。`, `Could not export the ${exportStatus.extension.toUpperCase()}.`)}{" "}
+      {exportStatus.error === "pdf-limits" ? label("页面过大。可导出 SVG 保留全图。",
+        "The page exceeds the PDF size limit. Export as SVG to keep the full diagram.")
+        : exportStatus.error === "pdf-render" ? label("无法绘制此页，请重试。", "Could not render this page. Try again.")
+        : exportStatus.error}
     </p>}
     <div ref={viewport} tabIndex={0} className="taoffice-visio-viewport" data-testid="taoffice-visio-viewport"
       aria-label={label("Visio 页面", "Visio page")} onKeyDown={onViewportKey}>

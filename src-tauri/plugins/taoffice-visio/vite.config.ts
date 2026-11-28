@@ -6,6 +6,10 @@ import { defineConfig } from "vite";
 const outDir = fileURLToPath(new URL("./dist/frontend", import.meta.url));
 const wasmBuild = fileURLToPath(new URL("./wasm/.build", import.meta.url));
 const assets = ["visio.wasm", "visio-icu.dat", "visio-third-party-notices.txt"];
+const notices = [
+  ["fflate", "LICENSE"], ["@cantoo/pdf-lib", "LICENSE.md"], ["culori", "LICENSE"],
+  ["html-entities", "LICENSE"], ["node-html-better-parser", "LICENSE"], ["tslib", "LICENSE.txt"],
+];
 
 export default defineConfig({
   publicDir: false,
@@ -26,8 +30,10 @@ export default defineConfig({
     },
     writeBundle() {
       for (const asset of assets) cpSync(join(wasmBuild, asset), join(outDir, asset));
-      const license = new URL("../../../node_modules/fflate/LICENSE", import.meta.url);
-      appendFileSync(join(outDir, "visio-third-party-notices.txt"), "\nfflate\n" + readFileSync(license, "utf8"));
+      for (const [name, file] of notices) {
+        const license = new URL(`../../../node_modules/${name}/${file}`, import.meta.url);
+        appendFileSync(join(outDir, "visio-third-party-notices.txt"), `\n${name}\n${readFileSync(license, "utf8")}`);
+      }
     },
   }],
   build: {

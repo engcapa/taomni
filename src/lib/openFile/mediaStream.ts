@@ -2,12 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { isTauriRuntime } from "../runtime";
 import { viewerReadBytes, type ViewerBytes } from "../viewer";
 
-type CopyExtension = "mp4" | "webm" | "svg";
+type CopyExtension = "mp4" | "webm" | "svg" | "pdf";
 export interface ModuleSaveCopyOptions { extension?: CopyExtension }
 
 const copyExtensions: Readonly<Record<string, readonly CopyExtension[]>> = Object.freeze({
   "taoffice-video": Object.freeze(["mp4", "webm"] as const),
-  "taoffice-visio": Object.freeze(["svg"] as const),
+  "taoffice-visio": Object.freeze(["svg", "pdf"] as const),
 });
 
 export function moduleCopyExtensions(slug: string): readonly CopyExtension[] | undefined {

@@ -26,7 +26,7 @@ fn extension<'a>(
     if let Some(output) = output {
         if matches!(
             (slug, output),
-            ("taoffice-video", "mp4" | "webm") | ("taoffice-visio", "svg")
+            ("taoffice-video", "mp4" | "webm") | ("taoffice-visio", "svg" | "pdf")
         ) {
             return Ok(OsStr::new(output));
         }
@@ -283,6 +283,37 @@ mod tests {
             );
             assert_eq!(fs::read(source).unwrap(), b"original");
         }
+    }
+
+    #[test]
+    fn a_visio_export_saves_only_the_requested_pdf_or_svg_copy() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("plan.vsdx");
+        fs::write(&source, b"diagram").unwrap();
+        let slug = "taoffice-visio";
+        for ext in ["svg", "pdf"] {
+            let filename = suggested_name(&source, slug, Some(ext)).unwrap();
+            assert_eq!(filename, format!("plan - copy.{ext}"));
+            let output = root.path().join(filename);
+            let path = output.to_str().unwrap();
+            assert!(
+                write(
+                    &source,
+                    slug,
+                    source.to_str().unwrap(),
+                    &[],
+                    b"export",
+                    Some(ext)
+                )
+                .is_err()
+            );
+            write(&source, slug, path, &[], b"export", Some(ext)).unwrap();
+            assert!(write(&source, slug, path, &[], b"replacement", Some(ext)).is_err());
+            assert_eq!(fs::read(output).unwrap(), b"export");
+        }
+        assert!(suggested_name(&source, slug, Some("png")).is_err());
+        assert!(suggested_name(&source, "taoffice-video", Some("pdf")).is_err());
+        assert_eq!(fs::read(source).unwrap(), b"diagram");
     }
 
     #[test]

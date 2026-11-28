@@ -72,7 +72,7 @@ Project 0.5.1 的包内包含与 Cargo.lock 校验和一致的 mpxj-rs 源码、
 
 TaOffice Media 0.1.2 在已加载且聚焦的播放器中支持 Space 播放或暂停，使用左右方向键定位 5 秒。TC-TAOFFICE-025/026 使用由旧编码样本离线转换的 VP8/WebM，验证 WebView 实际解码、定位和离开标签暂停。
 
-文档来源增加可选 `copyExtensions` 与 `saveCopy(bytes, { extension })`。核心按模块限制输出扩展名，Media 可另存 MP4 或 WebM，Visio 可另存 SVG。模块在 `copyExtensions` 提供目标格式时开放相应操作，以兼容较早的 API 1 核心。系统对话框和原始文件保护由核心负责。
+文档来源增加可选 `copyExtensions` 与 `saveCopy(bytes, { extension })`。核心按模块限制输出扩展名，Media 可另存 MP4 或 WebM，Visio 可另存 SVG 或 PDF。模块在 `copyExtensions` 提供目标格式时开放相应操作，以兼容较早的 API 1 核心。系统对话框和原始文件保护由核心负责。
 
 Media 0.3.0 的原生宿主使用模块包内的 FFmpeg 库处理 AVI、FLV、WMV 和 RM 等旧格式。浏览器预览在支持 WebCodecs 的环境中使用 Mediabunny。转换分别限制输入和输出为 32 MiB，原生直播放继续流式读源。另存支持以毫秒为精度裁剪，按原比例缩小，并输出 VP8/Opus WebM 或 H.264/AAC MP4。处理期间可取消，转换数据随标签或宿主释放。TC-TAOFFICE-043 至 046 验证转换前预览、恢复、播放和副本重开。
 
