@@ -25,6 +25,10 @@ Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”�
 
 比较时将页面等比放入 480 × 480 白底画布。34 对页面的宽高比相对差均小于 1.5%。用任一颜色通道低于 224 判定有墨迹后，33 对有墨迹的页面中，两个渲染结果的交并比中位数为 0.3821。薄线、文字换行和图形填充可明显影响该数值。抽查中，`color-boxes.vsdx` 的色块位置吻合，`Visio11PlanWithDimensions.vsd` 的文字换行有差异，`dwg.vsdx` 的嵌入对象填充和 `tdf154379-QuickStyleFillMatrix.vsdx` 的主题填充也有差异。Microsoft Visio 的原应用外观仍待对照。 [六份样本并排截图](taoffice-research/visio-libvisio-0.1.12.png)
 
+## 核心 RAR 解压
+
+在 Linux x86_64 用提交 `51049cdb1` 的核心目录读取和解压实现验证了 35 份输入。34 份来自 rars 0.13.1 的固定上游语料，另 1 份模拟普通 RAR5 文件只下载到一半。28 份成功解压，包含 36 个文件、2,334,604 字节。与 UnRAR 7.00 独立解压的目录、文件名和每个文件的 SHA-256 逐一相符，覆盖 RAR 1.3、3.0、4.2、5.0、固实压缩、PPMd、过滤器、注释和恢复记录。3 份密码保护文件和 3 份分卷显示了对应的限制提示，截断文件提示输入不完整。7 次拒绝后目标目录均为空。 [上游样本](https://github.com/bitplane/rars/tree/b7b3ba2d1492b0c5fc68d01678a476184de1e9e1/crates/rars/tests/fixtures) · [逐文件回执](taoffice-research/archive-rar-0.13.1.csv)
+
 ## Linux 回归
 
 在上述产品提交运行 TaOffice、UI 契约和完整崩溃回归 Browser 选集，88 项中通过 86 项。所有 TaOffice 用例通过。`TC-FILE-OPEN-008` 缺少 SSH/SFTP 夹具。`TC-FILE-OPEN-004` 在第 102 步等待 Markdown HTML 下载超时，相同步骤已在基线 `8eea6ebea` 复现。Browser 回执为 `receipt-run-20261128-115028-521141847`。
