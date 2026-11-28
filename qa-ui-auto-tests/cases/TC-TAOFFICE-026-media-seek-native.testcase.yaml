@@ -15,7 +15,7 @@ steps:
 - fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.media_archive}'}
 - fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.media_signature}'}
 - click: '[data-testid="module-offline-submit"]'
-- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 60}
 - click: '[data-testid="module-action-enable-taoffice-video"]'
 - wait_for: '[data-testid="module-action-disable-taoffice-video"]'
 - click: '[data-testid="side-tab-explorer"]'
@@ -40,5 +40,6 @@ steps:
 - wait_for: 'video[data-testid="taoffice-media-player"][data-ready="true"]'
 - eval_readonly:
     expression: document.querySelector('video').paused === true
+- assert_count: {selector: 'video[data-testid="taoffice-media-player"]', equal: 1}
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/rollout-replay.webm', sha256: '${fixture.taoffice_video_sha}'}
 - assert_no_runtime_errors: null

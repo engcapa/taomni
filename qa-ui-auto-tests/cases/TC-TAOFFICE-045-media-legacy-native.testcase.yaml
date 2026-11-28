@@ -31,7 +31,7 @@ steps:
       document.querySelector('video[aria-label\u003d"media-legacy.avi"]').videoWidth === 160 &&
       document.querySelector('video[aria-label\u003d"media-legacy.avi"]').videoHeight === 90 &&
       Math.abs(document.querySelector('video[aria-label\u003d"media-legacy.avi"]').duration - 6) < 0.15
-- assert_attribute: {selector: '[data-testid="file-viewer"][data-active="true"] video', name: title, matches: Space to play or pause}
+- assert_attribute: {selector: '[data-testid="file-viewer"][data-active="true"] video', name: title, equals: Space to play or pause. Left and Right to seek by 5 seconds.}
 - press: {selector: '[data-testid="file-viewer"][data-active="true"] video', key: ArrowRight}
 - eval_readonly:
     expression: Math.abs(document.querySelector('[data-testid\u003d"file-viewer"][data-active\u003d"true"] video').currentTime - 5) < 0.2

@@ -32,7 +32,7 @@ export default function MediaPlayer({ document: source, active, api }) {
   const media = useRef(null);
   const pending = useRef(null);
   const preparing = !resource && (attempt === "compatible" || (attempt === "native" && canNative));
-  const ready = metadata?.url === resource?.url && Boolean(metadata);
+  const ready = resource?.attempt === attempt && Boolean(metadata && metadata.url === resource.url);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -142,7 +142,7 @@ export default function MediaPlayer({ document: source, active, api }) {
         : h("p", { role: "status" }, label("正在读取媒体…", "Loading media…"))),
       playError && h("p", { role: "alert" }, playError),
       resource?.attempt === attempt && h((resource.file?.type ?? mime).startsWith("audio/") ? "audio" : "video", {
-        key: resource.url, className: "taoffice-media-surface", ref: media, src: resource.url, controls: true,
+        key: "player:" + resource.url, className: "taoffice-media-surface", ref: media, src: resource.url, controls: true,
         playsInline: true, preload: "metadata", tabIndex: 0, "aria-label": source.name, "data-testid": "taoffice-media-player",
         title: label("空格播放或暂停，方向键快退或快进 5 秒", "Space to play or pause. Left and Right to seek by 5 seconds."),
         "data-ready": ready, "data-playback": attempt, onLoadedMetadata: readMetadata,
@@ -150,7 +150,7 @@ export default function MediaPlayer({ document: source, active, api }) {
       }),
       source.saveCopy && exportFormats.length > 0 && ready && metadata.width > 0
         && Number.isFinite(metadata.duration) && metadata.duration >= 0.001
-        && h(VideoExport, { key: resource.url, source, formats: exportFormats, api, canNative, label,
+        && h(VideoExport, { key: "export:" + resource.url, source, formats: exportFormats, api, canNative, label,
           // Native export can transcode the original bytes directly. Browser editing of a
           // supported Matroska also operates on its original tracks.
           makeFile: () => source.read(), duration: metadata.duration, naturalWidth: metadata.width,

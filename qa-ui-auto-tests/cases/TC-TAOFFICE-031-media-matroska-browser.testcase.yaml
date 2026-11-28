@@ -20,6 +20,7 @@ steps:
 - dblclick: '[data-testid="explorer-file-row"][data-name="rollout-compatible.mkv"]'
 - select_option: {selector: '[data-testid="taoffice-media-playback-mode"]', value: compatible}
 - wait_for: 'video[data-testid="taoffice-media-player"][data-playback="compatible"][data-ready="true"]'
+- assert_count: {selector: 'video[data-testid="taoffice-media-player"]', equal: 1}
 - eval_readonly:
     expression: document.querySelector('video').videoWidth === 160 && document.querySelector('video').videoHeight === 90 && Math.abs(document.querySelector('video').duration - 12) < 0.2
 - press: {selector: 'video[data-testid="taoffice-media-player"]', key: ArrowRight}
