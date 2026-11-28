@@ -50,6 +50,7 @@ impl ApplicationRuntime {
             self.stopped.store(false, Ordering::Release);
             return Err(error.to_string());
         }
+        crate::viewer::archive::jobs::cancel_all();
         state.plugin_downloads.shutdown_and_wait().await;
         self.tasks.shutdown().await;
         shutdown::stop_business_runtimes(state).await;

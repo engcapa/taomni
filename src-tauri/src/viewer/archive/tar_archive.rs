@@ -1,5 +1,6 @@
-use super::codec::{CheckedReader, Codec};
+use super::codec::{Cancellable, CheckedReader, Codec};
 use super::{Entry, MAX_ENTRIES, MAX_TOTAL, Selection, UNSAFE_ENTRY, invalid, validate_member};
+use rars::ReadCancellation;
 use std::io::{self, Read};
 use tar::EntryType;
 
@@ -74,10 +75,13 @@ pub(super) fn visit(
     format: Codec,
     input: impl Read + 'static,
     selection: Selection,
+    cancel: &ReadCancellation,
     mut visitor: impl FnMut(&Entry, &mut dyn Read) -> Result<(), String>,
 ) -> Result<Vec<Entry>, String> {
     let budget = MAX_TOTAL + MAX_PADDING_AND_HEADERS;
-    let reader = format.reader(input).map_err(invalid)?.take(budget + 1);
+    let decoder = format.reader(input).map_err(invalid)?;
+    let reader = Box::new(Cancellable::new(decoder, cancel)) as Box<dyn Read>;
+    let reader = reader.take(budget + 1);
     let mut tar = tar::Archive::new(reader);
     let mut entries = Vec::new();
     let mut header = ExtendedHeader::default();

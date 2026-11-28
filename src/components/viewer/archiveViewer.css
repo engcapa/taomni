@@ -12,3 +12,12 @@
 .archive-list td { overflow-wrap: anywhere; user-select: text; }
 .archive-list td:nth-child(2) { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .archive-list td button { margin: .15em; }
+
+.archive-extraction { display: grid; gap: 8px; padding: 8px 12px; border-block: 1px solid var(--taomni-divider);
+  font-size: var(--taomni-fs-body); }
+.archive-extraction-status, .archive-extraction-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.archive-extraction-status .taomni-mono, .archive-extraction p { min-width: 0; overflow-wrap: anywhere; user-select: text; }
+.archive-extraction p { padding: 0; }
+.archive-extraction progress { width: 100%; accent-color: var(--taomni-accent); }
+.archive-extraction-bytes { font-variant-numeric: tabular-nums; }
+.archive-extraction-actions:empty { display: none; }

@@ -41,6 +41,60 @@ async fn viewer_archive_extract(
 }
 
 #[tauri::command]
+async fn viewer_archive_job_status(
+    path: String,
+    state: State<'_, AppState>,
+) -> Result<Option<viewer::archive::jobs::Snapshot>, String> {
+    let profile = state.core.paths.data.clone();
+    on_worker(move || viewer::archive::jobs::status(&profile, &path)).await
+}
+
+#[tauri::command]
+async fn viewer_archive_job_start(
+    path: String,
+    destination: String,
+    entry: Option<viewer::archive::Entry>,
+    total_bytes: Option<u64>,
+    state: State<'_, AppState>,
+) -> Result<viewer::archive::jobs::Snapshot, String> {
+    let profile = state.core.paths.data.clone();
+    on_worker(move || {
+        viewer::archive::jobs::start(&profile, path, &destination, entry, total_bytes)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn viewer_archive_job_cancel(
+    path: String,
+    id: String,
+    state: State<'_, AppState>,
+) -> Result<viewer::archive::jobs::Snapshot, String> {
+    let profile = state.core.paths.data.clone();
+    on_worker(move || viewer::archive::jobs::cancel(&profile, &path, &id)).await
+}
+
+#[tauri::command]
+async fn viewer_archive_job_resume(
+    path: String,
+    id: String,
+    state: State<'_, AppState>,
+) -> Result<viewer::archive::jobs::Snapshot, String> {
+    let profile = state.core.paths.data.clone();
+    on_worker(move || viewer::archive::jobs::resume(&profile, path, &id)).await
+}
+
+#[tauri::command]
+async fn viewer_archive_job_discard(
+    path: String,
+    id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let profile = state.core.paths.data.clone();
+    on_worker(move || viewer::archive::jobs::discard(&profile, &path, &id)).await
+}
+
+#[tauri::command]
 async fn viewer_media_open(
     path: String,
     slug: String,
@@ -284,6 +338,11 @@ pub(super) fn handles(command: &str) -> bool {
             | "viewer_archive_list"
             | "viewer_archive_preview"
             | "viewer_archive_extract"
+            | "viewer_archive_job_status"
+            | "viewer_archive_job_start"
+            | "viewer_archive_job_cancel"
+            | "viewer_archive_job_resume"
+            | "viewer_archive_job_discard"
             | "viewer_media_open"
             | "viewer_document_read"
             | "viewer_document_save_copy"
@@ -312,6 +371,11 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::commands::viewer::viewer_archive_list,
         crate::commands::viewer::viewer_archive_preview,
         crate::commands::viewer::viewer_archive_extract,
+        crate::commands::viewer::viewer_archive_job_status,
+        crate::commands::viewer::viewer_archive_job_start,
+        crate::commands::viewer::viewer_archive_job_cancel,
+        crate::commands::viewer::viewer_archive_job_resume,
+        crate::commands::viewer::viewer_archive_job_discard,
         crate::commands::viewer::viewer_media_open,
         crate::commands::viewer::viewer_document_read,
         crate::commands::viewer::viewer_document_save_copy,

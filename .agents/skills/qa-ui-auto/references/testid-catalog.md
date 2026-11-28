@@ -1487,6 +1487,14 @@
 - `[data-testid="archive-filter-clear"]` — interactive — F-FILEOPEN-1.archive-filter-clear
 - `[data-testid="archive-entry"]` — display — F-FILEOPEN-1.archive-entry
 - `[data-testid="archive-extract-here"]` — interactive — F-FILEOPEN-1.archive-extract-here
+- `[data-testid="archive-extract-to"]` — interactive — F-FILEOPEN-1.archive-extract-to
+- `[data-testid="archive-extract-entry"]` — interactive — F-FILEOPEN-1.archive-extract-entry
+- `[data-testid="archive-extraction"]` — display — F-FILEOPEN-1.archive-extraction
+- `[data-testid="archive-extraction-progress"]` — display — F-FILEOPEN-1.archive-extraction-progress
+- `[data-testid="archive-extraction-bytes"]` — display — F-FILEOPEN-1.archive-extraction-bytes
+- `[data-testid="archive-extraction-cancel"]` — interactive — F-FILEOPEN-1.archive-extraction-cancel
+- `[data-testid="archive-extraction-resume"]` — interactive — F-FILEOPEN-1.archive-extraction-resume
+- `[data-testid="archive-extraction-discard"]` — interactive — F-FILEOPEN-1.archive-extraction-discard
 - `[data-testid="archive-preview"]` — interactive — F-FILEOPEN-1.archive-preview
 - `[data-testid="archive-output"]` — display — F-FILEOPEN-1.archive-output
 - `[data-testid="archive-error"]` — display — F-FILEOPEN-1.archive-error

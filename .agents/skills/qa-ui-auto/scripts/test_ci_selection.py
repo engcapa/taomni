@@ -214,7 +214,7 @@ class SelectionTests(unittest.TestCase):
                     'TC-FILE-OPEN-013', 'TC-TAO-HOME-002', 'TC-EXPLORER-013', 'TC-FILE-OPEN-041',
                     'TC-FILE-OPEN-049', 'TC-MODULES-102', 'TC-TAOFFICE-001', 'TC-TAOFFICE-009',
                     'TC-TAOFFICE-034', 'TC-TAOFFICE-040', 'TC-TAOFFICE-042', 'TC-TAOFFICE-045', 'TC-TAOFFICE-046',
-                    'TC-TAOFFICE-048', 'TC-TAOFFICE-050'}
+                    'TC-TAOFFICE-048', 'TC-TAOFFICE-050', 'TC-TAOFFICE-052'}
         for entry in native:
             with self.subTest(profile=entry['linux_profile']):
                 self.assertEqual(set(entry['selected_ids']), expected)

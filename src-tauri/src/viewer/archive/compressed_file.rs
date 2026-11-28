@@ -1,6 +1,6 @@
-use super::codec::{CheckedReader, Codec};
+use super::codec::{Cancellable, CheckedReader, Codec};
 use super::{Entry, MAX_ENTRY, Selection, invalid, validate_member};
-use std::fs::File;
+use rars::ReadCancellation;
 use std::io::{self, Read, Seek, SeekFrom};
 
 pub(super) fn codec(path: &str) -> Option<Codec> {
@@ -15,18 +15,19 @@ pub(super) fn codec(path: &str) -> Option<Codec> {
 }
 
 pub(super) fn visit(
-    mut file: File,
+    mut file: impl Read + Seek,
     input_size: u64,
     name: &str,
     codec: Codec,
     selection: Selection,
+    cancel: &ReadCancellation,
     mut visitor: impl FnMut(&Entry, &mut dyn Read) -> Result<(), String>,
 ) -> Result<Vec<Entry>, String> {
     let (size, crc) = {
         let decoder = codec
             .reader((&mut file).take(input_size))
             .map_err(invalid)?;
-        let mut checked = CheckedReader::new(decoder.take(MAX_ENTRY + 1));
+        let mut checked = CheckedReader::new(Cancellable::new(decoder, cancel).take(MAX_ENTRY + 1));
         io::copy(&mut checked, &mut io::sink()).map_err(invalid)?;
         (checked.size, checked.crc.finalize())
     };
@@ -41,7 +42,7 @@ pub(super) fn visit(
     if selection.includes(0) {
         file.seek(SeekFrom::Start(0)).map_err(invalid)?;
         let decoder = codec.reader(file.take(input_size)).map_err(invalid)?;
-        let mut checked = CheckedReader::new(decoder.take(size + 1));
+        let mut checked = CheckedReader::new(Cancellable::new(decoder, cancel).take(size + 1));
         visitor(&entry, &mut checked)?;
         if checked.size != size || checked.crc.finalize() != crc {
             return Err(invalid(

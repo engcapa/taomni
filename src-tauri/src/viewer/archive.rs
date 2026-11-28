@@ -1,5 +1,6 @@
 use super::filesystem::open_regular;
-use super::paths::{ScopedRoot, absolute, display, io_error};
+
+use rars::ReadCancellation;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{self, Read, Write};
@@ -8,8 +9,10 @@ use zip::ZipArchive;
 
 mod codec;
 mod compressed_file;
+pub(crate) mod jobs;
 mod rar_archive;
 mod seven_zip;
+mod stage;
 mod tar_archive;
 
 const MAX_ARCHIVE: u64 = 64 << 20;
@@ -57,7 +60,7 @@ fn safe_name(name: &str) -> bool {
         })
 }
 
-fn zip_catalog(file: File) -> Result<(ZipArchive<File>, Vec<Entry>), String> {
+fn zip_catalog<R: Read + io::Seek>(file: R) -> Result<(ZipArchive<R>, Vec<Entry>), String> {
     let mut zip = ZipArchive::new(file).map_err(invalid)?;
     if zip.len() > MAX_ENTRIES {
         return Err(invalid("ZIP directory exceeds 4,096 entries"));
@@ -114,30 +117,50 @@ impl Selection {
 fn visit(
     path: &str,
     selection: Selection,
-    mut member: impl FnMut(&Entry, &mut dyn Read) -> Result<(), String>,
+    member: impl FnMut(&Entry, &mut dyn Read) -> Result<(), String>,
 ) -> Result<Vec<Entry>, String> {
     let (_, file, meta) = open_regular(path)?;
-    if meta.len() > MAX_ARCHIVE {
+    visit_open(
+        path,
+        file,
+        meta.len(),
+        selection,
+        &ReadCancellation::new(),
+        member,
+    )
+}
+
+fn visit_open(
+    path: &str,
+    file: File,
+    length: u64,
+    selection: Selection,
+    cancel: &ReadCancellation,
+    mut member: impl FnMut(&Entry, &mut dyn Read) -> Result<(), String>,
+) -> Result<Vec<Entry>, String> {
+    if length > MAX_ARCHIVE {
         return Err(invalid("Archive input exceeds 64 MiB"));
     }
+    let file = codec::Cancellable::new(file, cancel);
     if let Some((format, _)) = tar_archive::suffix(path) {
-        return tar_archive::visit(format, file.take(meta.len()), selection, member);
+        return tar_archive::visit(format, file.take(length), selection, cancel, member);
     }
     if let Some(extension) = Path::new(path).extension() {
         if extension.eq_ignore_ascii_case("7z") {
-            return seven_zip::visit(file, selection, member);
+            return seven_zip::visit(file, selection, cancel, member);
         }
         if extension.eq_ignore_ascii_case("rar") {
-            return rar_archive::visit(file, selection, member);
+            return rar_archive::visit(file, selection, cancel, member);
         }
     }
     if let Some(codec) = compressed_file::codec(path) {
         return compressed_file::visit(
             file,
-            meta.len(),
+            length,
             archive_stem(path)?,
             codec,
             selection,
+            cancel,
             member,
         );
     }
@@ -151,7 +174,7 @@ fn visit(
             member(entry, &mut io::empty())?;
         } else {
             let mut contents = zip.by_index(entry.index).map_err(invalid)?;
-            member(entry, &mut contents)?;
+            member(entry, &mut codec::Cancellable::new(&mut contents, cancel))?;
         }
     }
     Ok(entries)
@@ -191,50 +214,57 @@ pub(crate) fn extract(
     destination: &str,
     selection: Option<Entry>,
 ) -> Result<String, String> {
-    let dest = absolute(destination)?;
-    let temp = tempfile::Builder::new()
-        .prefix(".taomni-extract-")
-        .tempdir_in(&dest)
-        .map_err(invalid)?;
-    let root = ScopedRoot::new(temp.path())?;
+    let cancel = ReadCancellation::new();
+    let target = stage::Target::new(destination)?;
+    let (_guard, stamp) = stage::Stage::allocate(&target)?;
+    let stage = stage::Stage::open(&target, &stamp)?;
+    let (source, input) = stage::Source::open(path, &cancel)?;
     let mode = selection
         .as_ref()
         .map_or(Selection::All, |entry| Selection::One(entry.index));
-    let entries = visit(path, mode, |entry, contents| {
-        if entry.directory {
-            root.create_directory(&entry.name)?;
-        } else {
-            let mut file = root.create(&entry.name).map_err(invalid)?;
-            copy_entry(entry, contents, &mut file)?;
-            file.sync_all().map_err(invalid)?;
-        }
-        Ok(())
-    })?;
-    drop(root);
-    let entry = selection.as_ref().or_else(|| {
+    let entries = visit_open(
+        path,
+        input,
+        source.size(),
+        mode,
+        &cancel,
+        |entry, contents| stage.write(entry, contents, |_| {}),
+    )?;
+    let (relative, output_name) = output_paths(path, selection.as_ref(), &entries)?;
+    stage.verify(
+        entries.iter().filter(|entry| mode.includes(entry.index)),
+        &cancel,
+    )?;
+    let (current, _) = stage::Source::open(path, &cancel)?;
+    if current != source {
+        return Err(invalid("The source archive changed during extraction"));
+    }
+    let publication = stage.prepare(relative, output_name)?;
+    stage.publish(&target, &stamp, relative, &publication)
+}
+
+fn output_paths<'a>(
+    path: &'a str,
+    selected: Option<&'a Entry>,
+    entries: &'a [Entry],
+) -> Result<(&'a str, &'a str), String> {
+    let entry = selected.or_else(|| {
         if is_single_compressed_file(path) {
             entries.first()
         } else {
             None
         }
     });
-    let (source, output) = if let Some(entry) = entry {
+    if let Some(entry) = entry {
         if entry.directory || entries.get(entry.index) != Some(entry) {
             return Err(invalid(
                 "Archive changed. Reload before extracting the entry",
             ));
         }
-        (
-            temp.path().join(&entry.name),
-            dest.join(entry.name.rsplit('/').next().unwrap_or("")),
-        )
+        Ok((&entry.name, entry.name.rsplit('/').next().unwrap_or("")))
     } else {
-        let stem = archive_stem(path)?;
-        (temp.path().to_owned(), dest.join(stem))
-    };
-    crate::filebrowser::local_ops::rename_no_replace(&source, &output)
-        .map_err(|error| io_error("publish archive output", error))?;
-    Ok(display(&output))
+        Ok(("", archive_stem(path)?))
+    }
 }
 
 fn archive_stem(path: &str) -> Result<&str, String> {

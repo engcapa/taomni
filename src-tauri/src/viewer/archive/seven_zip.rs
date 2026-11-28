@@ -1,5 +1,6 @@
-use super::codec::CheckedReader;
+use super::codec::{Cancellable, CheckedReader};
 use super::{Entry, MAX_ENTRIES, Selection, UNSAFE_ENTRY, invalid, validate_member};
+use rars::ReadCancellation;
 use sevenz_rust2::{ArchiveReader, EntryDecision, Error, Password};
 use std::collections::HashMap;
 use std::io::{self, Read, Seek};
@@ -20,6 +21,7 @@ fn archive_error(error: Error) -> String {
 pub(super) fn visit(
     file: impl Read + Seek,
     selection: Selection,
+    cancel: &ReadCancellation,
     mut visitor: impl FnMut(&Entry, &mut dyn Read) -> Result<(), String>,
 ) -> Result<Vec<Entry>, String> {
     let mut reader =
@@ -72,7 +74,8 @@ pub(super) fn visit(
         .for_each_entries_with_decision_allowing_surplus(|item, contents| {
             let index = indices[&item.name];
             let entry = &mut entries[index];
-            let mut checked = CheckedReader::new(contents.take(entry.size + 1));
+            let mut checked =
+                CheckedReader::new(Cancellable::new(contents, cancel).take(entry.size + 1));
             if selection.includes(index)
                 && let Err(reason) = visitor(entry, &mut checked)
             {

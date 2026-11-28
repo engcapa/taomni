@@ -16873,6 +16873,7 @@ TC-TAOFFICE-009 验证核心查看器打开 gzip TAR、清除筛选与恢复焦�
 TC-TAOFFICE-010 验证单文件 gzip 预览、直接解压成文件，以及重复解压时保留原有内容。
 TC-TAOFFICE-011 验证原生 7z 固实压缩包的预览和解压，TC-TAOFFICE-012 验证浏览器预览显示桌面打开提示。
 TC-TAOFFICE-013 覆盖原生固实 RAR4/RAR5 解码、只读预览、准确解压和加密包提示。TC-TAOFFICE-014 覆盖浏览器桌面打开提示。
+TC-TAOFFICE-051/052 覆盖提取进度、键盘取消、查看器重开、原生应用重启后恢复以及最终文件和源压缩包的字节校验。
 TC-TAOFFICE-015/016 覆盖独立 Excel 模块的工作表导航、选中单元格恢复、缓存值与原公式、隐藏工作表、输入文件散列以及原生签名安装和停用。
 TC-TAOFFICE-033/034 覆盖页面批注、撤销、旋转、排序、移除，以及另存后重开核对。
 TC-TAOFFICE-017/018 覆盖 PDF 表单填写、关闭守卫、保存副本和原生文件重新打开。
@@ -17042,6 +17043,30 @@ controls:
     kind: display
   - id: archive-extract-here
     selector: '[data-testid="archive-extract-here"]'
+    kind: interactive
+  - id: archive-extract-to
+    selector: '[data-testid="archive-extract-to"]'
+    kind: interactive
+  - id: archive-extract-entry
+    selector: '[data-testid="archive-extract-entry"]'
+    kind: interactive
+  - id: archive-extraction
+    selector: '[data-testid="archive-extraction"]'
+    kind: display
+  - id: archive-extraction-progress
+    selector: '[data-testid="archive-extraction-progress"]'
+    kind: display
+  - id: archive-extraction-bytes
+    selector: '[data-testid="archive-extraction-bytes"]'
+    kind: display
+  - id: archive-extraction-cancel
+    selector: '[data-testid="archive-extraction-cancel"]'
+    kind: interactive
+  - id: archive-extraction-resume
+    selector: '[data-testid="archive-extraction-resume"]'
+    kind: interactive
+  - id: archive-extraction-discard
+    selector: '[data-testid="archive-extraction-discard"]'
     kind: interactive
   - id: archive-preview
     selector: '[data-testid="archive-preview"]'

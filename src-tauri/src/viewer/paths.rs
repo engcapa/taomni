@@ -161,6 +161,41 @@ impl ScopedRoot {
         }
     }
 
+    /// Publish a staged path exclusively while each platform pins its parents.
+    pub fn rename_into(&self, source: &str, destination: &Self, target: &str) -> io::Result<()> {
+        let source = safe_relative(source).map_err(io::Error::other)?;
+        let target = safe_relative(target).map_err(io::Error::other)?;
+        #[cfg(unix)]
+        {
+            use std::os::fd::AsRawFd;
+            let (source_parent, source_name) =
+                self.parent(&source, false).map_err(io::Error::other)?;
+            let (target_parent, target_name) = destination
+                .parent(&target, false)
+                .map_err(io::Error::other)?;
+            crate::filebrowser::local_ops::rename_no_replace_at(
+                source_parent.as_raw_fd(),
+                &source_name,
+                target_parent.as_raw_fd(),
+                &target_name,
+            )
+        }
+        #[cfg(windows)]
+        {
+            let _source = self
+                .pin_windows_parents(&source, false)
+                .map_err(io::Error::other)?;
+            let _target = destination
+                .pin_windows_parents(&target, false)
+                .map_err(io::Error::other)?;
+            let source = self.checked(&source).map_err(io::Error::other)?;
+            crate::filebrowser::local_ops::rename_no_replace(
+                &source,
+                &destination.path.join(target),
+            )
+        }
+    }
+
     pub fn remove_created(&self, relative: &str) {
         #[cfg(unix)]
         if let Ok(relative) = safe_relative(relative) {

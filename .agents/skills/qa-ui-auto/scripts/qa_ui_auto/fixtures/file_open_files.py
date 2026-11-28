@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from . import platform_workspace_root, mail_server
 from .taoffice_7z import archive as seven_zip_fixture
+from .taoffice_archive_extraction import archive as resumable_zip_fixture
 from .taoffice_locked_pdf import document as locked_pdf_fixture
 from .taoffice_pdf import document as pdf_fixture
 from .taoffice_tar import archives as tar_fixtures, compressed_text
@@ -73,6 +74,11 @@ def setup(ctx: Any) -> None:
             "SUkqABoAAACAB0opCBQSBwWEQeFQaGQlIQEKAAABAwABAAAABAAAAAEBAwABAAAAAwAAAAIBAwADAAAAmAAAAAMBAwAB"
             "AAAABQAAAAYBAwABAAAAAgAAABEBBAABAAAACAAAABUBAwABAAAAAwAAABYBAwABAAAAAwAAABcBBAABAAAAEgAAABwBAwABAAAAAQAAAAAAAAAIAAgACAA="
         )
+    if ctx.case_id in {"TC-TAOFFICE-051", "TC-TAOFFICE-052"}:
+        archive, large_sha = resumable_zip_fixture(TEXT.encode())
+        files["transfer.zip"] = archive
+        ctx.values["taoffice_extraction_archive_sha"] = hashlib.sha256(archive).hexdigest()
+        ctx.values["taoffice_extraction_large_sha"] = large_sha
     if ctx.case_id == "TC-TAOFFICE-006":
         archive = io.BytesIO()
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:

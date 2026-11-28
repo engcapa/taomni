@@ -1,0 +1,81 @@
+id: TC-TAOFFICE-051
+title: Cancel and resume an archive extraction after reopening the viewer
+description: Exercise keyboard controls, determinate progress, retained files, and publication in the browser VFS.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, archive, core-only, crash-regression]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 180
+ui_standard: [UI-BTN-03, UI-FBK-04, UI-A11Y-03, UI-PAT-09]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="transfer.zip"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="transfer.zip"]'
+- wait_for: '[data-testid="archive-entry"][data-name="notes/readme.txt"]'
+- press: {selector: '[data-testid="archive-extract-here"]', key: Enter}
+- wait_for: '[data-testid="archive-extraction"][data-phase="extracting"]:not([data-retained-bytes="0"])'
+- assert_visible: '[data-testid="archive-extraction-progress"][value]'
+- assert_disabled: '[data-testid="archive-extract-here"]'
+- press: {selector: '[data-testid="archive-extraction-cancel"]', key: Enter}
+- wait_for: '[data-testid="archive-extraction"][data-phase="cancelled"]:not([data-retained-bytes="0"])'
+- assert_text: {selector: '[data-testid="archive-extraction"] [role="status"]', contains: Extraction cancelled}
+- assert_focus_on: '[data-testid="archive-extraction-resume"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/transfer/notes/readme.txt', absent: true}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- assert_not_visible: '[data-testid="archive-extraction"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="transfer.zip"]'
+- wait_for: '[data-testid="archive-extraction"][data-phase="cancelled"]:not([data-retained-bytes="0"])'
+- assert_solid_text_contrast: {selector: '[data-testid="archive-extraction-resume"]', minimum: 4.5}
+- press: {selector: '[data-testid="archive-extraction-resume"]', key: Enter}
+- wait_for: {selector: '[data-testid="archive-output"]', timeout_sec: 60}
+- assert_text: {selector: '[data-testid="archive-output"]', contains: /transfer}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/transfer/notes/readme.txt', sha256: '${fixture.file_open_original_sha}'}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/transfer/payload/chunk-04.bin', sha256: '${fixture.taoffice_extraction_large_sha}'}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/transfer.zip', sha256: '${fixture.taoffice_extraction_archive_sha}'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: ARCHIVE-CANCEL
+    ui_standard: [UI-BTN-03, UI-FBK-04, UI-A11Y-03]
+    requirement: UI-BTN-03, UI-FBK-04 and UI-A11Y-03. Show byte progress, prevent duplicate starts, and acknowledge cancellation with a keyboard-accessible Resume action.
+    actions: [12, 16]
+    checkpoints:
+    - step: 14
+      expectation: The extraction shows a determinate progress bar.
+    - step: 15
+      expectation: Extraction to the same destination cannot be started twice.
+    - step: 18
+      expectation: The live status acknowledges cancellation.
+    - step: 19
+      expectation: The newly available Resume control owns focus.
+    results: [14, 15, 18, 19]
+  - id: ARCHIVE-REOPEN
+    ui_standard: [UI-PAT-09]
+    requirement: UI-PAT-09. Closing the viewer keeps the extraction checkpoint, and resuming only publishes after the remaining members are ready.
+    actions: [21, 23, 26]
+    checkpoints:
+    - step: 20
+      expectation: The final destination has no extracted member while paused.
+    - step: 24
+      expectation: The reopened viewer observes the cancelled task with retained bytes.
+    - step: 30
+      expectation: The final member has its original digest.
+    - step: 31
+      expectation: The source archive retains its original digest.
+    results: [20, 24, 30, 31]
+  native:
+  - check: Checkpoint recovery after the application process exits.
+    method: external
+    reason: TC-TAOFFICE-052 restarts the native application and checks exact file output.
+  visual:
+  - check: The Resume button has readable text when the extraction is paused.
+    method: automated
+    reason: Step 25 measures painted contrast on the shared primary button.

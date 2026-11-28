@@ -19,6 +19,7 @@
 | TC-TAOFFICE-047/048 | HEIC、PSD、DNG 缩略图，坏文件重试和签名图片模块启用、关闭与重开 | browser、native/release |
 | TC-TAOFFICE-049/050 | XLS、XLSB、ODS 只读工作表、缓存公式、坏文件恢复与原始字节校验 | browser、native/release |
 | TC-TAOFFICE-009 | gzip TAR 的筛选焦点、只读预览、原始文件和解压字节，以及异常归档的错误反馈 | browser/native |
+| TC-TAOFFICE-051/052 | 提取进度、取消、查看器重开、应用重启后恢复以及完整结果原子发布 | browser/native |
 | TC-WS-045 | 空工作区从 Tools/Home 进入；折叠／展开、Sessions 导航切换；只保留一个编辑器运行时 | browser/native |
 | TC-WS-051 | 工作区文件／终端混合布局及过滤；实际 PTY 输出、同一个终端、原生磁盘保存校验 | native |
 | TC-WS-052 | 四个独立 dirty buffer；工具栏直接 Grid、Split/Grid/Single 连续切换；面板文件映射及跨模式返回 | browser/native |
