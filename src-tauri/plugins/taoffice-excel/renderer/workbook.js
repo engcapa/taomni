@@ -45,6 +45,8 @@ export function moveInSheet(event, current, dimensions) {
   let nextRow = row;
   let nextColumn = column;
   switch (event.key) {
+    case "Enter": nextRow += event.shiftKey ? -1 : 1; break;
+    case "Tab": nextColumn += event.shiftKey ? -1 : 1; break;
     case "ArrowUp": nextRow--; break;
     case "ArrowDown": nextRow++; break;
     case "ArrowLeft": nextColumn--; break;

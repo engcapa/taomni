@@ -5,6 +5,7 @@ modes: [native]
 covers: [F-FILEOPEN-1, F-Modules-1]
 tags: [p0, file-open, taoffice, taoffice-word, native-boundary]
 fixtures: [reset_db, file_open_files, taoffice_signed_word]
+ui_standard: [UI-FND-04, UI-FOC-02]
 timeout_sec: 250
 steps:
 - open: ${cfg.app.base_url}
@@ -28,9 +29,9 @@ steps:
 - dblclick: '[data-testid="explorer-file-row"][data-name="planning-notes.docx"]'
 - wait_for: '[data-testid="taoffice-word-preview"]'
 - click: '[data-testid="taoffice-word-edit"]'
-- fill: {selector: '[data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]', value: Pilot moves to Tuesday & Wednesday}
-- fill: {selector: '[data-testid="taoffice-word-paragraph"][value="Owner approval is required."]', value: Manager approval is required.}
-- fill: {selector: '[data-testid="taoffice-word-paragraph"][data-location="table"][value="Ready"]', value: Waiting for approval}
+- fill: {selector: '[data-testid="taoffice-word-paragraph"][data-index="1"]', value: Pilot moves to Tuesday & Wednesday}
+- fill: {selector: '[data-testid="taoffice-word-paragraph"][data-index="2"]', value: Manager approval is required.}
+- fill: {selector: '[data-testid="taoffice-word-paragraph"][data-location="table"][data-index="6"]', value: Waiting for approval}
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - wait_for: '[data-testid="viewer-close-dialog"]'
 - native_file_dialog:
@@ -65,4 +66,44 @@ steps:
     expression: >-
       document.querySelector('iframe.taoffice-word-preview').contentDocument?.querySelector('article p:nth-of-type(3) > span:last-child')?.style.fontWeight === 'bold' &&
       document.querySelector('iframe.taoffice-word-preview').contentDocument?.body?.textContent.includes('Manager approval is required.')
+- press: {selector: '[data-testid="taoffice-word-zoom-in"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-word-zoom-reset"]', contains: '110%'}
+- eval_readonly:
+    expression: document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.style.zoom === "1.1"
+    expect_truthy: true
+- press: {selector: '[data-testid="taoffice-word-edit"]', key: Enter}
+- eval_readonly:
+    expression: >-
+      document.querySelector('.taoffice-word-sheet')?.style.zoom === '1.1' &&
+      document.querySelectorAll('.taoffice-word-sheet').length === 2 &&
+      document.querySelector('.taoffice-word-sheet:last-child label:last-child textarea')?.value === 'Keep the next page unchanged.' &&
+      document.querySelector('.taoffice-word-sheet table tr:nth-child(2) td:nth-child(2) textarea')?.value === 'Waiting for approval'
+    expect_truthy: true
+- press: {selector: '[data-testid="taoffice-word-editor"] table tr:first-child td:first-child textarea', key: Tab}
+- assert_focus_on: '[data-testid="taoffice-word-editor"] table tr:first-child td:nth-child(2) textarea'
+- press: {selector: '[data-testid="taoffice-word-editor"] table tr:first-child td:nth-child(2) textarea', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-word-edit"]'
+- press: {selector: '[data-testid="taoffice-word-zoom-reset"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-word-zoom-reset"]', contains: '100%'}
+- press: {selector: '[data-testid="taoffice-word-zoom-out"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-word-zoom-reset"]', contains: '90%'}
 - assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: RPAGE
+    ui_standard: [UI-FND-04, UI-FOC-02]
+    requirement: The document zoom carries between reading and editing and editable table cells follow reading order.
+    actions: [43, 46, 48, 50, 52, 54]
+    checkpoints:
+    - {step: 45, expectation: The rendered document page is enlarged by ten percent.}
+    - {step: 47, expectation: Zoom is retained and the table and follow-up text remain on their respective pages.}
+    - {step: 49, expectation: Tab moves from the first table cell to the next cell in the same row.}
+    - {step: 51, expectation: Escape returns to the editing mode button.}
+    - {step: 53, expectation: Reset returns the page to its original scale.}
+    - {step: 55, expectation: Zoom out changes the status bar to ninety percent.}
+    results: [45, 47, 49, 51, 53, 55]
+  visual:
+  - {check: Word paper and table cell positions, method: automated, reason: The editing surface retains the selected zoom and the second-row cell.}
+  native:
+  - {check: Save and reopen, method: automated, reason: The system file dialog writes the copy which Explorer reopens.}

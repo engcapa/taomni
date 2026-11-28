@@ -90,3 +90,16 @@ it("offers conversion destinations only to the authorized writable document", as
   expect(attached.saveCopy).toBeUndefined();
   await expect(writable.saveCopy!(contents, { extension: "mp4" })).rejects.toMatchObject({ name: "AbortError" });
 });
+
+it("offers Visio page exports only on a writable Visio source", async () => {
+  const viewer = { path: "/tmp/plan.vsdx", kind: "document" as const };
+  install("enabled", { slug: "taoffice-visio", name: "Visio", kind: "visio", extension: "vsdx" });
+  const view = render(<ModuleDocumentPane viewer={viewer} active />);
+  expect(attached.copyExtensions).toEqual(["svg", "pdf"]);
+  const writable = attached;
+  await expect(writable.saveCopy!(new Uint8Array([1]), { extension: "mp4" })).rejects.toThrow("format is unavailable");
+  view.rerender(<ModuleDocumentPane viewer={{ ...viewer, readOnlyReason: "Archive entry" }} active />);
+  expect(attached.saveCopy).toBeUndefined();
+  expect(attached.copyExtensions).toBeUndefined();
+  await expect(writable.saveCopy!(new Uint8Array([1]), { extension: "pdf" })).rejects.toMatchObject({ name: "AbortError" });
+});

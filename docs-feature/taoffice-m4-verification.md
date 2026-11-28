@@ -1,5 +1,9 @@
 # TaOffice M4 验证记录
 
+## PowerPoint 普通视图的幻灯片导航
+
+PowerPoint 0.1.2 在左侧显示按顺序编号的真实幻灯片缩略图，右侧显示所选页或其文本编辑器。单击缩略图、在列表内按上下方向键、Home、End、Page Up 或 Page Down 会同步焦点、选中标记和当前页，输入标题前缀可定位幻灯片。预览和可见缩略图在同一个隔离渲染器中共享已加载的 PPTX，缩略图最长 192 像素、最高 144 像素。浏览器 039 和原生 040 对照 UI-LST-03、UI-LST-05 检查缩略图、焦点、画布以及原有的编辑和另存流程。[Microsoft 365 普通视图说明](https://support.microsoft.com/en-us/powerpoint/training/choose-the-right-view-for-the-task-in-powerpoint)
+
 ## Word 与 PowerPoint 语料往返
 
 在 Linux x86_64 使用产品提交 `adc72e2760a950bdeb624dbefaf4d8adda751244` 的 Word 0.2.0 和 PowerPoint 0.1.0 读写实现。样本固定于 Apache POI 的 `f63b77bb7497d950073969f9d418f2270dd87edd`。每份输入均比对了 Git blob 身份，原件、输出的 SHA-256 以及逐文件结果列于回执中。 [Word 语料](https://github.com/apache/poi/tree/f63b77bb7497d950073969f9d418f2270dd87edd/test-data/document) · [PowerPoint 语料](https://github.com/apache/poi/tree/f63b77bb7497d950073969f9d418f2270dd87edd/test-data/slideshow) · [逐文件回执](taoffice-research/office-roundtrip-f63b77b.csv)
@@ -19,6 +23,14 @@ Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”�
 
 使用 Windows 上的 Microsoft PowerPoint 16.0 重开上述 5 份原件，以及用同一组 Apache POI 输入和本分支读写代码重新生成的 5 份副本。逐份核对输入 SHA-256。副本均只变更 `ppt/slides/slide1.xml`，PowerPoint 形状模型和导出的 PDF 首页都读到完整编辑值。直接导出原件和副本的首页 PNG 并排对照，三个标题保留了原色、对齐和两行排版。后两份表格中的较长替换文字在单元格内换行，行高随之增加，邻近内容也出现在截图中。原 Linux WPS 导出的 5 份 PDF 仍保留各自的文本提取结果。[首页对照截图](taoffice-research/pptx-powerpoint-first-page.png) · [逐文件哈希与对照区域](taoffice-research/pptx-powerpoint-first-page.csv)
 
+### Windows Microsoft Word 与 PowerPoint 重开
+
+Microsoft Word 与 PowerPoint 16.0 build 20625 使用普通只读打开方式读回了 27 份副本。Windows Native 在产品提交 `1acd5cf3a216f60fe5e6f228290d1a1fd7536ee2` 的 022、040、054、060 中通过系统另存生成 4 份 DOCX、3 份 PPTX。Word 读回正文与表格，PowerPoint 读回两页幻灯片及其预期标题。另用同一批公开输入重建了 20 份 Word 语料副本，逐文件与历史 Linux 输出的 SHA-256 匹配，Word 全部读到了相应编辑标记。27 份文件在重开前后都通过 SHA-256 对比。Native 回执为 `receipt-run-20261128-145838-889896600`。[逐文件读回与摘要](taoffice-research/office-microsoft-reopen.csv)
+
+## Word 页面编辑与缩放
+
+Word 0.4.0 的编辑区按文档顺序显示正文、标题和表格，纸张宽高与页边距读取自 DOCX 的节设置。用户可在原行列输入文本，Tab 和 Shift+Tab 按正文及表格顺序切换，Escape 返回阅读视图。状态栏的缩放在阅读、编辑间保留。编辑范围为既有的单段文字和表格单元格，带域的段落保留静态值；原始打印预览仍用于检查页眉、图片及复杂版式。TC-TAOFFICE-021、022、053、054 覆盖现代与转换文档的编辑和副本保存。纸张内容遵从 UI-FND-04，键盘焦点遵从 UI-FOC-02。[Microsoft Word 视图](https://learn.microsoft.com/en-us/office/vba/api/word.wdviewtype) · [Word 文档缩放](https://learn.microsoft.com/en-us/office/vba/api/word.view.zoom)
+
 ## 旧版演示文稿导入
 
 Windows Browser 回执 `run-20261128-142945-077647600` 同时通过 039、059。059 使用 Microsoft PowerPoint 导出的两页 PPT、ODP，在 Explorer 内导入，直接下载 PPT 的转换结果，编辑 ODP 首页标题后下载。PowerPoint 16.0 build 20625 用普通打开命令重开两份下载文件，读回两页及各自首页标题，第二页均为 Delivery appendix。原件的 SHA-256 在用例中独立核对。PPT 副本的 SHA-256 为 `a0a1fd54e5d38910339a68052d4cb4bbf560e2566fc9d05c64fb7c3fb3b32407`，ODP 编辑副本为 `b7901ddd7af796693111fc8b2d1f836b535b359fd5d60a0b23044717c9b9dc61`。
@@ -36,6 +48,8 @@ Windows Browser 回执 `run-20261128-142945-077647600` 同时通过 039、059。
 比较时将页面等比放入 480 × 480 白底画布。34 对页面的宽高比相对差均小于 1.5%。用任一颜色通道低于 224 判定有墨迹后，33 对有墨迹的页面中，两个渲染结果的交并比中位数为 0.3821。薄线、文字换行和图形填充可明显影响该数值。抽查中，`color-boxes.vsdx` 的色块位置吻合，`Visio11PlanWithDimensions.vsd` 的文字换行有差异，`dwg.vsdx` 的嵌入对象填充和 `tdf154379-QuickStyleFillMatrix.vsdx` 的主题填充也有差异。Microsoft Visio 的原应用外观仍待对照。 [六份样本并排截图](taoffice-research/visio-libvisio-0.1.12.png)
 
 Visio 0.1.1 的 VSDX 副本支持修改简单形状的纯文本、PinX/PinY 及已有的字面填充色和线色。编辑器按 OPC 页面关系定位目标。带签名或受保护的文档、带公式的单元格、连接与继承的形状保留查看能力。模块通过核心的文档草稿和另存能力处理关闭、取消及权限。编辑结果保存在用户文档中，模块数据 schema 为 1。
+
+Visio 0.1.2 实现设计 §8.5 的当前页 PDF 对照导出。模块根据已完成预览的草稿生成一页白底、无损位图 PDF，页面尺寸取自原图，屏幕缩放与主题只作用于界面。栅格化的目标分辨率为 192 dpi，单边最多 4096 像素，总面积最多 4194304 像素。若 96 dpi 的完整页面已经超过上限，查看器提示使用 SVG。导出使用共享按钮和窗口所属的另存选择器，保留形状草稿。旧核心按其声明的扩展名提供对应按钮，归档预览和远程临时文件沿用只读规则。适用 UI-CTL-01、UI-PAT-15、UI-FND-04、UI-FND-07。
 
 Windows Chromium 的 TC-TAOFFICE-057 从资源管理器打开两页图纸，将第二页的形状 3 改为 Release confirmed，PinX 改为 4.25 英寸。下载的 SVG 含新文字，下载的 VSDX 重读得到两项新值。与输入逐部件比对，仅 visio/pages/page2.xml 有变化，另 7 个部件的原始内容逐字节一致。用例同时验证焦点返回、无效坐标禁用保存及输入法组词时的 Escape。TC-TAOFFICE-058 包含签名模块的系统另存取消、重试及从磁盘重开，实机回执由集成验证归档。
 

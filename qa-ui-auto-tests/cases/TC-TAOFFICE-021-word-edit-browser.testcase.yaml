@@ -5,7 +5,7 @@ modes: [browser]
 covers: [F-FILEOPEN-1]
 tags: [p0, file-open, taoffice, taoffice-word]
 fixtures: [reset_db, file_open_files]
-ui_standard: [UI-DLG-04, UI-DLG-06, UI-FOC-02]
+ui_standard: [UI-DLG-04, UI-DLG-06, UI-FOC-02, UI-FND-04]
 timeout_sec: 140
 steps:
 - open: ${cfg.app.base_url}
@@ -28,12 +28,12 @@ steps:
       document.querySelector('iframe.taoffice-word-preview').contentDocument?.querySelector('table')?.textContent.includes('Pilot')
     timeout_sec: 20
 - press: {selector: '[data-testid="taoffice-word-edit"]', key: Enter}
-- assert_focus_on: '[data-testid="taoffice-word-paragraph"][value="Planning notes"]'
-- assert_visible: '[data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]'
-- fill: {selector: '[data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]', value: Pilot moves to Tuesday & Wednesday}
-- fill: {selector: '[data-testid="taoffice-word-paragraph"][value="Owner approval is required."]', value: Manager approval is required.}
-- fill: {selector: '[data-testid="taoffice-word-paragraph"][data-location="table"][value="Ready"]', value: Waiting for approval}
-- press: {selector: '[data-testid="taoffice-word-paragraph"][value="Waiting for approval"]', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-word-paragraph"][data-index="0"]'
+- assert_visible: '[data-testid="taoffice-word-paragraph"][data-index="1"]'
+- fill: {selector: '[data-testid="taoffice-word-paragraph"][data-index="1"]', value: Pilot moves to Tuesday & Wednesday}
+- fill: {selector: '[data-testid="taoffice-word-paragraph"][data-index="2"]', value: Manager approval is required.}
+- fill: {selector: '[data-testid="taoffice-word-paragraph"][data-location="table"][data-index="6"]', value: Waiting for approval}
+- press: {selector: '[data-testid="taoffice-word-paragraph"][data-index="6"]', key: Escape}
 - assert_focus_on: '[data-testid="taoffice-word-edit"]'
 - wait_for: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
@@ -58,6 +58,27 @@ steps:
     contains: ['word/document.xml', 'word/header1.xml']
 - wait_for: '[data-testid="taoffice-word-output"]'
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/planning-notes.docx', sha256: '${fixture.taoffice_word_sha}'}
+- press: {selector: '[data-testid="taoffice-word-zoom-in"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-word-zoom-reset"]', contains: '110%'}
+- eval_readonly:
+    expression: document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.style.zoom === "1.1"
+    expect_truthy: true
+- press: {selector: '[data-testid="taoffice-word-edit"]', key: Enter}
+- eval_readonly:
+    expression: >-
+      document.querySelector('.taoffice-word-sheet')?.style.zoom === '1.1' &&
+      document.querySelectorAll('.taoffice-word-sheet').length === 2 &&
+      document.querySelector('.taoffice-word-sheet:last-child label:last-child textarea')?.value === 'Keep the next page unchanged.' &&
+      document.querySelector('.taoffice-word-sheet table tr:nth-child(2) td:nth-child(2) textarea')?.value === 'Waiting for approval'
+    expect_truthy: true
+- press: {selector: '[data-testid="taoffice-word-editor"] table tr:first-child td:first-child textarea', key: Tab}
+- assert_focus_on: '[data-testid="taoffice-word-editor"] table tr:first-child td:nth-child(2) textarea'
+- press: {selector: '[data-testid="taoffice-word-editor"] table tr:first-child td:nth-child(2) textarea', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-word-edit"]'
+- press: {selector: '[data-testid="taoffice-word-zoom-reset"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-word-zoom-reset"]', contains: '100%'}
+- press: {selector: '[data-testid="taoffice-word-zoom-out"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-word-zoom-reset"]', contains: '90%'}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -87,6 +108,18 @@ verification:
     - {step: 15, expectation: The first body paragraph owns focus.}
     - {step: 21, expectation: The Edit paragraphs button owns focus.}
     results: [15, 21]
+  - id: RPAGE
+    ui_standard: [UI-FND-04, UI-FOC-02]
+    requirement: The document zoom carries between reading and editing and editable table cells follow reading order.
+    actions: [33, 36, 38, 40, 42, 44]
+    checkpoints:
+    - {step: 35, expectation: The rendered document page is enlarged by ten percent.}
+    - {step: 37, expectation: Zoom is retained and the table and follow-up text remain on their respective pages.}
+    - {step: 39, expectation: Tab moves from the first table cell to the next cell in the same row.}
+    - {step: 41, expectation: Escape returns to the editing mode button.}
+    - {step: 43, expectation: Reset returns the page to its original scale.}
+    - {step: 45, expectation: Zoom out changes the status bar to ninety percent.}
+    results: [35, 37, 39, 41, 43, 45]
   visual:
   - {check: Word header and table, method: automated, reason: Browser assertions read the rendered page elements.}
   native:

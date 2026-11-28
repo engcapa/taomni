@@ -16884,7 +16884,7 @@ TC-TAOFFICE-023/024 覆盖 MSPDI 任务列表及甘特条、筛选、键盘重�
 TC-TAOFFICE-025/026 覆盖 WebM 解码、键盘定位、真实播放、离开标签暂停及原始媒体摘要。
 TC-TAOFFICE-037/038 覆盖新增任务、日期和进度编辑、依赖重算、资源分配、任务删除和保存重开。
 TC-TAOFFICE-027/028 覆盖改工期、避开日历例外、更新后续任务及关键路径，并检查另存和原文件。
-TC-TAOFFICE-039/040 覆盖 PPTX 幻灯片预览、文本编辑、关闭焦点、创建演示文稿与原生另存重开。
+TC-TAOFFICE-039/040 覆盖 PPTX 幻灯片缩略图键盘导航、预览、文本编辑、关闭焦点、创建演示文稿与原生另存重开。
 TC-TAOFFICE-041/042 覆盖 VSDX 和 VSD 渲染、跨页查找、缩放、恢复与 SVG 导出。
 TC-TAOFFICE-043/044 覆盖视频裁剪、缩放、WebM 下载及旧编码播放器的恢复操作。
 TC-TAOFFICE-045/046 验证已签名模块的旧格式播放和 MP4 副本裁剪、另存及重开。
@@ -17156,6 +17156,12 @@ controls:
   - id: taoffice-ppt-save-hint
     selector: '[data-testid="taoffice-ppt-save-hint"]'
     kind: display
+  - id: taoffice-ppt-thumbnail
+    selector: '[data-testid="taoffice-ppt-thumbnail"]'
+    kind: interactive
+  - id: taoffice-ppt-thumbnails
+    selector: '[data-testid="taoffice-ppt-thumbnails"]'
+    kind: display
   - id: taoffice-visio
     selector: '[data-testid="taoffice-visio"]'
     kind: display
@@ -17188,6 +17194,9 @@ controls:
     kind: display
   - id: taoffice-visio-export
     selector: '[data-testid="taoffice-visio-export"]'
+    kind: interactive
+  - id: taoffice-visio-export-pdf
+    selector: '[data-testid="taoffice-visio-export-pdf"]'
     kind: interactive
   - id: taoffice-visio-export-error
     selector: '[data-testid="taoffice-visio-export-error"]'
@@ -17351,6 +17360,9 @@ controls:
   - id: taoffice-excel-edit-cell
     selector: '[data-testid="taoffice-excel-edit-cell"]'
     kind: interactive
+  - id: taoffice-excel-cell-editor
+    selector: '[data-testid="taoffice-excel-cell-editor"]'
+    kind: display
   - id: taoffice-excel-input
     selector: '[data-testid="taoffice-excel-input"]'
     kind: interactive
@@ -17386,6 +17398,18 @@ controls:
     kind: display
   - id: taoffice-word-edit
     selector: '[data-testid="taoffice-word-edit"]'
+    kind: interactive
+  - id: taoffice-word-editor
+    selector: '[data-testid="taoffice-word-editor"]'
+    kind: display
+  - id: taoffice-word-zoom-in
+    selector: '[data-testid="taoffice-word-zoom-in"]'
+    kind: interactive
+  - id: taoffice-word-zoom-out
+    selector: '[data-testid="taoffice-word-zoom-out"]'
+    kind: interactive
+  - id: taoffice-word-zoom-reset
+    selector: '[data-testid="taoffice-word-zoom-reset"]'
     kind: interactive
   - id: taoffice-word-paragraph
     selector: '[data-testid="taoffice-word-paragraph"]'

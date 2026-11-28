@@ -91,14 +91,20 @@ function Presentation({ source, presentation, active, label, legacy }) {
     if (target && !target.disabled) target.focus();
   }, [mode]);
 
+  const [settledEdits, setSettledEdits] = useState(draft.edits);
+  useEffect(() => {
+    if (mode !== "edit") return;
+    const timer = setTimeout(() => setSettledEdits(draft.edits), 400);
+    return () => clearTimeout(timer);
+  }, [mode, draft.edits]);
+  const renderEdits = mode === "edit" ? settledEdits : draft.edits;
   const preview = useMemo(() => {
-    if (mode !== "preview") return null;
     try {
-      return presentationPreviewBytes(presentation, draft.edits);
+      return presentationPreviewBytes(presentation, renderEdits);
     } catch {
       return null;
     }
-  }, [presentation, draft.edits, mode]);
+  }, [presentation, renderEdits]);
 
   function save() {
     void draft.save({ allowUnedited: legacy }).catch(() => {});
@@ -111,8 +117,17 @@ function Presentation({ source, presentation, active, label, legacy }) {
 
   const editReason = !presentation.editable ? label("此演示文稿受保护。", "This presentation is protected.")
     : !page.paragraphs.length ? label("此幻灯片没有可编辑的文本。", "This slide has no editable text.") : "";
-  const slideTitle = draft.edits.get(page.paragraphs[0]?.id) ?? page.visible[0] ?? "";
+  const titles = presentation.slides.map(item => draft.edits.get(item.paragraphs[0]?.id) ?? item.visible[0] ?? "");
+  const slideTitle = titles[slide];
   const description = slideTitle ? pageStatus + " · " + slideTitle : pageStatus;
+  const editor = mode === "edit" && <div className="taoffice-ppt-editor" aria-label={label("幻灯片文本", "Slide text")}>
+    {page.paragraphs.map((paragraph, index) => <label key={paragraph.id}>
+      <span>{label("段落", "Paragraph")} {index + 1}</span>
+      <input ref={index === 0 ? editField : undefined} className="taomni-input" type="text" value={draft.edits.get(paragraph.id) ?? paragraph.text}
+        data-testid="taoffice-ppt-paragraph" disabled={draft.saving} maxLength={MAX_SLIDE_TEXT}
+        onChange={(event) => draft.edit(paragraph.id, event.target.value, paragraph.text)} />
+    </label>)}
+  </div>;
 
   return <div className="taoffice-ppt-content" onKeyDown={(event) => {
     if (!active || event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -167,18 +182,13 @@ function Presentation({ source, presentation, active, label, legacy }) {
     {draft.error && <p className="taoffice-ppt-feedback" role="alert">{label("无法保存演示文稿副本。", "Could not save the presentation copy.")}</p>}
     {draft.output && <p className="taoffice-ppt-feedback" role="status" data-testid="taoffice-ppt-output">{draft.output}</p>}
     {mode === "new" ? <NewPresentation source={source} active={active} label={label}
-      restoreFocus={() => returnToPreview(newButton)} /> : mode === "edit" ? <div className="taoffice-ppt-editor"
-      aria-label={label("幻灯片文本", "Slide text")}>
-      {page.paragraphs.map((paragraph, index) => <label key={paragraph.id}>
-        <span>{label("段落", "Paragraph")} {index + 1}</span>
-        <input ref={index === 0 ? editField : undefined} className="taomni-input" type="text" value={draft.edits.get(paragraph.id) ?? paragraph.text}
-          data-testid="taoffice-ppt-paragraph" disabled={draft.saving} maxLength={MAX_SLIDE_TEXT}
-          onChange={(event) => draft.edit(paragraph.id, event.target.value, paragraph.text)} />
-      </label>)}
-    </div> : preview ? <>
-      <SlidePreview bytes={preview} slide={slide} width={presentation.width} height={presentation.height} description={description} label={label} />
-      <p className="taoffice-ppt-feedback">{label("静态预览。动画和部分嵌入对象请在 PowerPoint 中查看。",
-        "Static preview. Open in PowerPoint for animations and some embedded objects.")}</p>
-    </> : <p className="taoffice-ppt-feedback" role="alert">{label("无法准备演示文稿预览。", "Could not prepare the presentation preview.")}</p>}
+      restoreFocus={() => returnToPreview(newButton)} /> : preview ? <>
+      <SlidePreview bytes={preview} slide={slide} width={presentation.width} height={presentation.height} description={description}
+        label={label} titles={titles} active={active} select={setSlide}>
+        {editor}
+      </SlidePreview>
+      {mode === "preview" && <p className="taoffice-ppt-feedback">{label("静态预览。动画和部分嵌入对象请在 PowerPoint 中查看。",
+        "Static preview. Open in PowerPoint for animations and some embedded objects.")}</p>}
+    </> : editor || <p className="taoffice-ppt-feedback" role="alert">{label("无法准备演示文稿预览。", "Could not prepare the presentation preview.")}</p>}
   </div>;
 }

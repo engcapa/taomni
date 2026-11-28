@@ -1524,6 +1524,8 @@
 - `[data-testid="taoffice-ppt-preview"]` — display — F-FILEOPEN-1.taoffice-ppt-preview
 - `[data-testid="taoffice-ppt-save"]` — interactive — F-FILEOPEN-1.taoffice-ppt-save
 - `[data-testid="taoffice-ppt-save-hint"]` — display — F-FILEOPEN-1.taoffice-ppt-save-hint
+- `[data-testid="taoffice-ppt-thumbnail"]` — interactive — F-FILEOPEN-1.taoffice-ppt-thumbnail
+- `[data-testid="taoffice-ppt-thumbnails"]` — display — F-FILEOPEN-1.taoffice-ppt-thumbnails
 - `[data-testid="taoffice-visio"]` — display — F-FILEOPEN-1.taoffice-visio
 - `[data-testid="taoffice-visio-copy-output"]` — display — F-FILEOPEN-1.taoffice-visio-copy-output
 - `[data-testid="taoffice-visio-edit-shapes"]` — interactive — F-FILEOPEN-1.taoffice-visio-edit-shapes
@@ -1535,6 +1537,7 @@
 - `[data-testid="taoffice-visio-shape-text"]` — interactive — F-FILEOPEN-1.taoffice-visio-shape-text
 - `[data-testid="taoffice-visio-error"]` — display — F-FILEOPEN-1.taoffice-visio-error
 - `[data-testid="taoffice-visio-export"]` — interactive — F-FILEOPEN-1.taoffice-visio-export
+- `[data-testid="taoffice-visio-export-pdf"]` — interactive — F-FILEOPEN-1.taoffice-visio-export-pdf
 - `[data-testid="taoffice-visio-export-error"]` — display — F-FILEOPEN-1.taoffice-visio-export-error
 - `[data-testid="taoffice-visio-export-pending"]` — display — F-FILEOPEN-1.taoffice-visio-export-pending
 - `[data-testid="taoffice-visio-export-status"]` — display — F-FILEOPEN-1.taoffice-visio-export-status
@@ -1589,6 +1592,7 @@
 - `[data-testid="taoffice-excel-error"]` — display — F-FILEOPEN-1.taoffice-excel-error
 - `[data-testid="taoffice-excel-readonly"]` — display — F-FILEOPEN-1.taoffice-excel-readonly
 - `[data-testid="taoffice-excel-edit-cell"]` — interactive — F-FILEOPEN-1.taoffice-excel-edit-cell
+- `[data-testid="taoffice-excel-cell-editor"]` — display — F-FILEOPEN-1.taoffice-excel-cell-editor
 - `[data-testid="taoffice-excel-input"]` — interactive — F-FILEOPEN-1.taoffice-excel-input
 - `[data-testid="taoffice-excel-input-error"]` — display — F-FILEOPEN-1.taoffice-excel-input-error
 - `[data-testid="taoffice-excel-table-readonly"]` — display — F-FILEOPEN-1.taoffice-excel-table-readonly
@@ -1601,6 +1605,10 @@
 - `[data-testid="taoffice-word-retry"]` — interactive — F-FILEOPEN-1.taoffice-word-retry
 - `[data-testid="taoffice-word-preview"]` — display — F-FILEOPEN-1.taoffice-word-preview
 - `[data-testid="taoffice-word-edit"]` — interactive — F-FILEOPEN-1.taoffice-word-edit
+- `[data-testid="taoffice-word-editor"]` — display — F-FILEOPEN-1.taoffice-word-editor
+- `[data-testid="taoffice-word-zoom-in"]` — interactive — F-FILEOPEN-1.taoffice-word-zoom-in
+- `[data-testid="taoffice-word-zoom-out"]` — interactive — F-FILEOPEN-1.taoffice-word-zoom-out
+- `[data-testid="taoffice-word-zoom-reset"]` — interactive — F-FILEOPEN-1.taoffice-word-zoom-reset
 - `[data-testid="taoffice-word-paragraph"]` — interactive — F-FILEOPEN-1.taoffice-word-paragraph
 - `[data-testid="taoffice-word-save"]` — interactive — F-FILEOPEN-1.taoffice-word-save
 - `[data-testid="taoffice-word-output"]` — display — F-FILEOPEN-1.taoffice-word-output

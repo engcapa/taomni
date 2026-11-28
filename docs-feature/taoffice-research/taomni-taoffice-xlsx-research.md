@@ -67,3 +67,9 @@
 2. .xls 只读 + 转存 .xlsx 可接受；若必须写回 .xls，需另立项评估 zemse/xls（0.1，未核实）。
 3. 体积（各库对 ≤100 MB 插件包的实际占用）本次未核实——Rust 侧 calamine/umya/rust-xlsxwriter/IronCalc 均为纯 Rust 小依赖，定性判断可进 100 MB，但须在原型期实测 release 包体积；Univer bundle 与 GridCraft 整体体积同样待实测。
 4. rxls 与 craft-xlsx 写能力须以代码审计 + 真实语料（图表/透视表/宏/条件格式齐全的 .xlsx）实测为准，本报告不作采纳承诺。
+
+### 工作表选择与编辑（2026-11-28）
+
+Excel 模块 0.3.1 以 Microsoft 365 的活动单元格操作为参照。方向键逐格移动。F2 和双击进入可编辑单元格，光标位于原内容末尾，公式栏同步显示草稿。Enter 下移，Shift+Enter 上移，编辑时 Tab 右移，Shift+Tab 左移。Escape 放弃此次编辑并恢复单元格焦点。浏览状态的 Tab 可离开网格。Windows、Linux 和 macOS 在工作表拥有焦点时处理这些局部按键。[Microsoft Excel 键盘快捷方式](https://support.microsoft.com/en-us/office/keyboard-shortcuts-in-excel-1798d9d5-842a-42b8-9c99-9b7213f0040f)
+
+公式、表头和汇总行支持选择及读取。无效数字保留输入草稿和就近错误提示，输入法组词期间保持编辑焦点。UI-INP-06、UI-INP-07、UI-KEY-04、UI-FOC-02 对应的操作与断言见 TC-TAOFFICE-019 和 TC-TAOFFICE-020。原生用例通过系统保存对话框生成副本并重新打开。

@@ -110,10 +110,15 @@ def blocked_entries(entries: dict[str, dict], jobs: list[dict]) -> set[str]:
     """
     blocked = set()
     for identifier, entry in entries.items():
-        group = "execute-browser" if entry["mode"] == "browser" else f"execute-{entry['platform_key']}-native"
+        group = f"execute-{entry['platform_key']}-{entry['mode']}"
+        if entry["mode"] == "browser" and entry["platform_key"] != "macos":
+            group = "execute-browser"
         execution = [job for job in jobs if job["name"] == group
                      or (job["name"].startswith(group + " / ")
                          and job["name"].endswith(" / " + identifier))]
+        if not execution and group == "execute-macos-browser":
+            # Older runs published individual macOS shards in the shared group.
+            execution = [job for job in jobs if job["name"] == "execute-browser / " + identifier]
         if execution:
             if all(job["status"] == "completed" for job in execution):
                 blocked.add(identifier)

@@ -5,6 +5,7 @@ modes: [native]
 covers: [F-FILEOPEN-1, F-Modules-1]
 tags: [p0, file-open, taoffice, taoffice-excel, native-boundary]
 fixtures: [reset_db, file_open_files, taoffice_signed_excel]
+ui_standard: [UI-INP-07, UI-FOC-02, UI-KEY-04]
 timeout_sec: 260
 steps:
 - open: ${cfg.app.base_url}
@@ -38,7 +39,7 @@ steps:
 - fill: {selector: '[data-testid="taoffice-excel-input"]', value: Mechanical Keyboard}
 - press: {selector: '[data-testid="taoffice-excel-input"]', key: Tab}
 - wait_for: '[data-testid="taoffice-excel-cell"][data-address="B2"]:focus'
-- press: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', key: Enter}
+- dblclick: '[data-testid="taoffice-excel-cell"][data-address="B2"]'
 - fill: {selector: '[data-testid="taoffice-excel-input"]', value: '15.5'}
 - press: {selector: '[data-testid="taoffice-excel-input"]', key: Control+s, macos_key: Meta+s}
 - native_file_dialog: {kind: save, action: cancel}
@@ -69,4 +70,33 @@ steps:
 - click: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
 - assert_attribute: {selector: '[data-testid="taoffice-excel-formula"]', name: value, equals: '=B2*2'}
 - assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="C2"]', contains: '31'}
+- press: {selector: '[data-testid="taoffice-excel-cell"][data-address="C2"]', key: ArrowLeft}
+- assert_focus_on: '[data-testid="taoffice-excel-cell"][data-address="B2"]'
+- dblclick: '[data-testid="taoffice-excel-cell"][data-address="B2"]'
+- assert_focus_on: '[data-testid="taoffice-excel-cell"][data-address="B2"] [data-testid="taoffice-excel-cell-editor"] [data-testid="taoffice-excel-input"]'
+- fill: {selector: '[data-testid="taoffice-excel-input"]', value: '99'}
+- press: {selector: '[data-testid="taoffice-excel-input"]', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-excel-cell"][data-address="B2"]'
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', contains: '15.5'}
+- press: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', key: F2}
+- press: {selector: '[data-testid="taoffice-excel-input"]', key: Shift+Enter}
+- assert_focus_on: '[data-testid="taoffice-excel-cell"][data-address="B1"]'
 - assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+    - id: R1
+      ui_standard: [UI-INP-07, UI-FOC-02, UI-KEY-04]
+      requirement: Cell editing owns keyboard input until a commit moves the selection or Escape restores the selected cell.
+      actions: [59, 61, 63, 64, 67, 68]
+      checkpoints:
+        - {step: 60, expectation: Left Arrow selects the reopened B2.}
+        - {step: 62, expectation: The native WebView focuses the editor inside B2.}
+        - {step: 65, expectation: Escape restores B2 focus.}
+        - {step: 66, expectation: Cancelling preserves the saved number.}
+        - {step: 69, expectation: Shift+Enter selects the row above.}
+      results: [60, 62, 65, 66, 69]
+  visual:
+    - {check: Active worksheet cell, method: automated, reason: The editor belongs to the selected gridcell and keyboard navigation restores visible focus.}
+  native:
+    - {check: Reopen the saved XLSX, method: automated, reason: The signed module saves and reopens edited cells through the native chooser.}

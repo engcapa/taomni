@@ -3,7 +3,7 @@
   "slug": "taoffice-excel",
   "name": "TaOffice Excel",
   "description": "Browse XLSX, XLSM, XLS, XLSB and ODS worksheets, recalculate formulas, and save XLSX edits to a new copy.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "coreApiVersion": "1",
   "kind": "media",
   "status": "provisional",

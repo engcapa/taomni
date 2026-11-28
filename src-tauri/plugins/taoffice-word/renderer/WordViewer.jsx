@@ -1,5 +1,5 @@
 import { docxPreviewBytes, saveDocxCopy } from "./docxPackage.js";
-import { MAX_PARAGRAPH_LENGTH } from "./wordXml.js";
+import { WordEditingPage } from "./WordEditingPage.jsx";
 import { renderWordPreview } from "./wordPreview.js";
 import { useDocumentDraft } from "../../../crates/taomni-plugin-api/frontend/documentDraft.js";
 import { Button } from "../../../crates/taomni-plugin-api/frontend/ui/Button";
@@ -72,9 +72,17 @@ function LoadedWord({ source, document, preview: initialPreview, active, label, 
   const [previewing, setPreviewing] = useState(false);
   const toggle = useRef(null);
   const editor = useRef(null);
+  const previewFrame = useRef(null);
+  const [zoom, setZoom] = useState(100);
   const conversionNote = useId();
   const draft = useDocumentDraft(source, (edits) => saveDocxCopy(document, edits));
   const canEdit = !!source.saveCopy && document.paragraphs.length > 0;
+
+  function applyPreviewZoom() {
+    const page = previewFrame.current?.contentDocument?.body;
+    if (page) page.style.zoom = String(zoom / 100);
+  }
+  useEffect(applyPreviewZoom, [zoom]);
 
   useEffect(() => {
     if (editMode) editor.current?.focus();
@@ -121,8 +129,9 @@ function LoadedWord({ source, document, preview: initialPreview, active, label, 
       <span className="taoffice-word-name">{source.name}</span>
       {canEdit && <>
         <Button ref={toggle} data-testid="taoffice-word-edit"
+          aria-pressed={editMode}
           onClick={() => editMode ? showPreview() : setEditMode(true)}>
-          {editMode ? label("页面预览", "Page preview") : label("编辑段落", "Edit paragraphs")}
+          {editMode ? label("返回阅读视图", "Return to reading view") : label("编辑文档", "Edit document")}
         </Button>
         <Button variant="primary" data-testid="taoffice-word-save" disabled={!draft.dirty}
           busy={draft.saving} aria-describedby={legacy ? conversionNote : undefined} onClick={save}>
@@ -139,19 +148,21 @@ function LoadedWord({ source, document, preview: initialPreview, active, label, 
     {!canEdit && !source.readOnly && <p className="taoffice-word-feedback" role="status">
       {label("此文档没有可编辑的段落。", "This document has no editable paragraphs.")}
     </p>}
-    {editMode ? <div className="taoffice-word-paragraphs" aria-label={label("可编辑段落", "Editable paragraphs")}>
-      {document.paragraphs.map((paragraph, index) => <label key={paragraph.id}>
-        <span>{paragraph.tableDepth ? label("表格单元格段落", "Table cell paragraph") : label("正文段落", "Body paragraph")} {index + 1}</span>
-        <input type="text" ref={index === 0 ? editor : undefined} data-testid="taoffice-word-paragraph"
-          data-location={paragraph.tableDepth ? "table" : "body"}
-          className="taomni-input" maxLength={MAX_PARAGRAPH_LENGTH} disabled={draft.saving}
-          value={draft.edits.get(paragraph.id) ?? paragraph.text}
-          onChange={(event) => draft.edit(paragraph.id, event.target.value, paragraph.text)} />
-      </label>)}
-    </div> : <>
+    {editMode ? <WordEditingPage document={document} draft={draft} editor={editor} label={label} zoom={zoom / 100} /> : <>
       {previewing && <p className="taoffice-word-feedback" role="status">{label("正在更新预览…", "Updating preview…")}</p>}
-      <iframe className="taoffice-word-preview" data-testid="taoffice-word-preview" sandbox="allow-same-origin"
+      <iframe ref={previewFrame} onLoad={applyPreviewZoom} className="taoffice-word-preview" data-testid="taoffice-word-preview" sandbox="allow-same-origin"
         title={label("Word 页面预览", "Word page preview")} srcDoc={preview} />
     </>}
+    <footer className="taoffice-word-statusbar">
+      <span>{editMode ? label("编辑", "Editing") : label("阅读", "Reading")}</span>
+      <div role="group" aria-label={label("文档缩放", "Document zoom")}>
+        <Button data-testid="taoffice-word-zoom-out" aria-label={label("缩小", "Zoom out")}
+          disabled={zoom <= 50} onClick={() => setZoom(value => Math.max(50, value - 10))}>−</Button>
+        <Button data-testid="taoffice-word-zoom-reset" aria-label={label("重置缩放至 100%", "Reset zoom to 100%")}
+          onClick={() => setZoom(100)}>{zoom}%</Button>
+        <Button data-testid="taoffice-word-zoom-in" aria-label={label("放大", "Zoom in")}
+          disabled={zoom >= 200} onClick={() => setZoom(value => Math.min(200, value + 10))}>+</Button>
+      </div>
+    </footer>
   </div>;
 }

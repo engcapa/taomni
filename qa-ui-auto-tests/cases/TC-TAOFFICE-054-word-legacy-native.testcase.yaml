@@ -36,10 +36,10 @@ steps:
 - assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]', contains: Save DOCX copy}
 - assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]'
 - press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]', key: Enter}
-- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Planning notes"]'
-- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]', value: Converted DOC review}
-- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-location="table"][value="Ready"]', value: Reviewed}
-- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Reviewed"]', key: Escape}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-index="0"]'
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-index="1"]', value: Converted DOC review}
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-location="table"][data-index="6"]', value: Reviewed}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-index="6"]', key: Escape}
 - assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]'
 - eval_readonly:
     expression: >-
@@ -85,10 +85,10 @@ steps:
 - assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]', contains: Save DOCX copy}
 - assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]'
 - press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]', key: Enter}
-- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Planning notes"]'
-- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]', value: Converted ODT review}
-- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-location="table"][value="Ready"]', value: Reviewed}
-- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Reviewed"]', key: Escape}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-index="0"]'
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-index="1"]', value: Converted ODT review}
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-location="table"][data-index="6"]', value: Reviewed}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-index="6"]', key: Escape}
 - assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]'
 - eval_readonly:
     expression: >-
@@ -128,10 +128,10 @@ steps:
 - assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]', contains: Save DOCX copy}
 - assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]'
 - press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]', key: Enter}
-- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Planning notes"]'
-- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]', value: Converted RTF review}
-- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-location="table"][value="Ready"]', value: Reviewed}
-- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Reviewed"]', key: Escape}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-index="0"]'
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-index="1"]', value: Converted RTF review}
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-location="table"][data-index="6"]', value: Reviewed}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-index="6"]', key: Escape}
 - assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]'
 - eval_readonly:
     expression: >-

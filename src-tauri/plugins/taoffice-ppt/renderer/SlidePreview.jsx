@@ -1,7 +1,8 @@
 import { Button } from "../../../crates/taomni-plugin-api/frontend/ui/Button.tsx";
+import { SlideNavigation } from "./SlideNavigation.jsx";
 
 const { React } = globalThis.__taomniHost;
-const { useEffect, useRef, useState } = React;
+const { useEffect, useMemo, useRef, useState } = React;
 
 function sandboxDocument() {
   const script = new URL(/* @vite-ignore */ "./slide-engine.js", import.meta.url).href;
@@ -19,10 +20,17 @@ function isSameSlide(previous, next) {
     && previous.width === next.width && previous.height === next.height;
 }
 
-export function SlidePreview({ bytes, slide, width, height, description, label }) {
+export function SlidePreview({ bytes, slide, width, height, description, label, titles, active, select, children }) {
   const frame = useRef(null);
+  const thumbnails = useMemo(() => new Map(), [bytes]);
+  const [visible, setVisible] = useState([]);
+  const [, updateThumbnails] = useState(0);
+  useEffect(() => () => {
+    for (const url of thumbnails.values()) if (url) URL.revokeObjectURL(url);
+    thumbnails.clear();
+  }, [thumbnails]);
   const request = useRef({});
-  request.current = { bytes, slide, width, height };
+  request.current = { bytes, slide, width, height, thumbnails, visible };
   const connection = useRef(null);
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState(null);
@@ -34,6 +42,7 @@ export function SlidePreview({ bytes, slide, width, height, description, label }
     let closed = false;
     let pending;
     let completed;
+    let loadedBytes;
     let sequence = 0;
     let timeout;
     let url;
@@ -44,18 +53,25 @@ export function SlidePreview({ bytes, slide, width, height, description, label }
     function fail(target) {
       if (closed) return;
       close();
+      if (target.thumbnailOnly) {
+        if (target.thumbnails === request.current.thumbnails) target.thumbnails.set(target.slide, null);
+        setAttempt(value => value + 1);
+        return;
+      }
       setResult({ ...target, failed: true });
     }
     function pump() {
       if (!ready || closed || pending) return;
       const desired = request.current;
-      if (isSameSlide(completed, desired)) return;
-      pending = { ...desired, id: ++sequence };
-      const changedSource = completed?.bytes !== desired.bytes;
+      const thumbnailOnly = isSameSlide(completed, desired);
+      const index = thumbnailOnly ? desired.visible.find(index => !desired.thumbnails.has(index)) : desired.slide;
+      if (index === undefined) return;
+      pending = { ...desired, slide: index, thumbnailOnly, id: ++sequence };
+      const changedSource = loadedBytes !== desired.bytes;
       const buffer = changedSource ? desired.bytes.slice().buffer : undefined;
       resetTimeout(pending);
       channel.port1.postMessage(
-        { id: sequence, index: desired.slide, width: desired.width, height: desired.height, bytes: buffer },
+        { id: sequence, index, width: desired.width, height: desired.height, bytes: buffer, thumbnailOnly },
         buffer ? [buffer] : [],
       );
     }
@@ -76,8 +92,19 @@ export function SlidePreview({ bytes, slide, width, height, description, label }
       }
       if (!pending || data.id !== pending.id) return;
       clearTimeout(timeout);
-      completed = pending;
+      const rendered = pending;
       pending = undefined;
+      loadedBytes = rendered.bytes;
+      if (request.current.thumbnails === rendered.thumbnails && !rendered.thumbnails.has(rendered.slide)
+        && (data.thumb instanceof Blob || rendered.thumbnailOnly)) {
+        rendered.thumbnails.set(rendered.slide, data.thumb instanceof Blob ? URL.createObjectURL(data.thumb) : null);
+        updateThumbnails(value => value + 1);
+      }
+      if (rendered.thumbnailOnly) {
+        pump();
+        return;
+      }
+      completed = rendered;
       if (!(data.image instanceof Blob)) {
         fail(completed);
         return;
@@ -116,16 +143,20 @@ export function SlidePreview({ bytes, slide, width, height, description, label }
       return;
     }
     connection.current?.();
-  }, [bytes, slide, width, height, result]);
+  }, [bytes, slide, width, height, result, visible]);
 
   const current = isSameSlide(result, request.current) ? result : null;
-  return <div className="taoffice-ppt-slide" aria-busy={!current || (Boolean(current.url) && decoded !== current.url)} aria-label={description}>
+  return <div className="taoffice-ppt-normal">
+    {titles && <SlideNavigation titles={titles} selected={slide} active={active} thumbnails={thumbnails}
+      width={width} height={height} select={select} observe={setVisible} label={label} />}
     <iframe key={attempt} ref={frame} title={label("幻灯片渲染引擎", "Slide rendering engine")}
       sandbox="allow-scripts" hidden />
+    {children || <div className="taoffice-ppt-slide" aria-busy={!current || (Boolean(current.url) && decoded !== current.url)} aria-label={description}>
     {current?.url ? <img key={current.url} src={current.url} alt={description} data-testid="taoffice-ppt-preview"
       data-image-ready={decoded === current.url} onLoad={() => setDecoded(current.url)} /> : current?.failed ? <>
       <p role="alert" className="taoffice-ppt-feedback">{label("无法显示幻灯片。", "Could not display the slide.")}</p>
       <Button onClick={retry}>{label("重试", "Retry")}</Button>
     </> : <p role="status" className="taoffice-ppt-feedback">{label("正在渲染幻灯片…", "Rendering slide…")}</p>}
+    </div>}
   </div>;
 }

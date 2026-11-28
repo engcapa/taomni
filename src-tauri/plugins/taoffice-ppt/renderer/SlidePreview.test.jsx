@@ -97,3 +97,37 @@ it("allows the user to retry the failed slide without leaving it", () => {
   const replacement = channels[1];
   assertRendered(replacement, renderSlide(replacement, 0), "Slide 1");
 });
+
+it("loads the deck once and prioritizes the new canvas over queued visible thumbnails", () => {
+  let observe;
+  vi.stubGlobal("IntersectionObserver", class {
+    constructor(callback) { observe = callback; }
+    observe() {} disconnect() {}
+  });
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  try {
+    const titles = ["First", "Second", "Third"];
+    const view = index => <SlidePreview bytes={bytes} slide={index} width={1440} height={810}
+      titles={titles} active select={vi.fn()} description={titles[index]} label={(_zh, en) => en}/>;
+    const { rerender } = render(view(0));
+    const channel = channels[0];
+    const rows = screen.getAllByRole("option");
+    act(() => observe(rows.map(target => ({ target, isIntersecting: true }))));
+    const id = renderSlide(channel, 0);
+    receive(channel, { id, image: new Blob(["first slide"]), thumb: new Blob(["first miniature"]) });
+    const [background, transfers] = channel.port1.postMessage.mock.lastCall;
+    expect(background).toMatchObject({ index: 1, thumbnailOnly: true, bytes: undefined });
+    expect(transfers).toEqual([]);
+    rerender(view(2));
+    receive(channel, { id: background.id, thumb: new Blob(["second miniature"]) });
+    const [foreground] = channel.port1.postMessage.mock.lastCall;
+    expect(foreground).toMatchObject({ index: 2, thumbnailOnly: false, bytes: undefined });
+    expect(rows[1].querySelector("img")).toBeTruthy();
+    expect(screen.queryByRole("img", { name: titles[1] })).toBeNull();
+    receive(channel, { id: foreground.id, image: new Blob(["third slide"]), thumb: new Blob(["third miniature"]) });
+    expect(screen.getByRole("img", { name: titles[2] })).toBeTruthy();
+    expect(channel.port1.postMessage).toHaveBeenCalledTimes(3);
+  } finally {
+    delete HTMLElement.prototype.scrollIntoView;
+  }
+});

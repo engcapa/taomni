@@ -3,7 +3,7 @@
   "slug": "taoffice-word",
   "name": "TaOffice Word",
   "description": "Preview DOCX and convert DOC, ODT, and RTF offline. Edit body and table cell text and save a DOCX copy.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "coreApiVersion": "1",
   "kind": "media",
   "status": "provisional",

@@ -9,3 +9,4 @@ numpy==2.4.4
 Pillow==12.1.1
 psutil==7.2.2
 pypdf==6.9.1
+PyMuPDF==1.27.2.3
