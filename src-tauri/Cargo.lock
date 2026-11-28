@@ -11279,6 +11279,7 @@ dependencies = [
  "taomni",
  "taomni-asr-models",
  "taomni-capture",
+ "taomni-file-search",
  "taomni-file-uri",
  "taomni-local-servers-engine",
  "taomni-local-voice-api",
@@ -11415,6 +11416,19 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.26.5",
  "tokio-util 0.7.19",
+]
+
+[[package]]
+name = "taomni-file-search"
+version = "0.1.0"
+dependencies = [
+ "dirs 6.0.0",
+ "libc",
+ "serde",
+ "tempfile",
+ "tokio",
+ "windows 0.62.2",
+ "windows-future 0.3.2",
 ]
 
 [[package]]

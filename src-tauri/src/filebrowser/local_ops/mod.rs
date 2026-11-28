@@ -122,6 +122,21 @@ pub async fn explorer_search_entries(
 }
 
 #[tauri::command]
+pub async fn explorer_global_file_search(
+    query: String,
+    operation_id: String,
+    context_root: Option<String>,
+) -> Result<taomni_file_search::SearchResults, String> {
+    let operation = Operation::register(Some(operation_id), None).map_err(|e| e.to_string())?;
+    taomni_file_search::search(
+        &query,
+        context_root.map(Into::into),
+        operation.cancellation_flag(),
+    )
+    .await
+}
+
+#[tauri::command]
 pub fn explorer_cancel_operation(operation_id: String) -> Result<(), String> {
     operation::cancel(&operation_id).map_err(|e| e.to_string())
 }

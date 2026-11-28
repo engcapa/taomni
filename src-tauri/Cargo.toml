@@ -25,6 +25,7 @@ members = [
     "crates/taomni-rdp-probe",
     "crates/taomni-rdp-server-engine",
     "crates/taomni-file-uri",
+    "crates/taomni-file-search",
     "crates/taomni-mail-api",
     "crates/taomni-mail-engine",
     "crates/taomni-mail-storage",
@@ -127,6 +128,7 @@ taomni-local-servers-engine = { path = "crates/taomni-local-servers-engine", opt
 taomni-rdp-server-engine = { path = "crates/taomni-rdp-server-engine", optional = true }
 taomni-rdp-client-api = { path = "crates/taomni-rdp-client-api" }
 taomni-rdp-client-engine = { path = "crates/taomni-rdp-client-engine", optional = true }
+taomni-file-search = { path = "crates/taomni-file-search" }
 taomni-file-uri = { path = "crates/taomni-file-uri" }
 taomni-mfa-api = { path = "crates/taomni-mfa-api", features = ["legacy-snapshot"] }
 taomni-mfa-engine = { path = "crates/taomni-mfa-engine", optional = true }

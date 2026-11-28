@@ -61,6 +61,10 @@ impl Operation {
         })
     }
 
+    pub fn cancellation_flag(&self) -> Arc<AtomicBool> {
+        self.cancelled.clone()
+    }
+
     pub fn check(&self) -> OpResult<()> {
         if self.cancelled.load(Ordering::Relaxed) {
             Err(OpError::new(
