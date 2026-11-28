@@ -7,7 +7,7 @@ import zipfile
 
 from .steps import StepError
 
-EXPORT_KINDS = {"pdf", "docx", "png-doc", "drawio", "drawio-png", "testing-pdf", "testing-docx"}
+EXPORT_KINDS = {"pdf", "docx", "png-doc", "drawio", "drawio-png", "testing-pdf", "testing-docx", "visio-review-pdf"}
 
 
 def inspect_png_document(path):
@@ -70,6 +70,9 @@ def raster_grid_pixels(image):
 
 
 def inspect_quality(path, kind):
+    if kind == "visio-review-pdf":
+        from .visio_review_quality import inspect_visio_review
+        return inspect_visio_review(path)
     if kind == "drawio-png":
         return inspect_swimlane_png(path)
     if kind == "png-doc":

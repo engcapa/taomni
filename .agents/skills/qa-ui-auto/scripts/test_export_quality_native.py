@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from qa_ui_auto.export_quality import inspect_png_document, native, raster_grid_pixels
+from qa_ui_auto.export_quality import inspect_png_document, inspect_quality, native, raster_grid_pixels
 from qa_ui_auto.native_steps import NativeStepContext
 from qa_ui_auto.steps import StepError
 
@@ -82,6 +82,64 @@ class NativeExportQualityTest(unittest.TestCase):
         with patch("qa_ui_auto.export_quality.inspect_quality") as inspect:
             self.assertIn("dry-run", native(SimpleNamespace(dry_run=True), {"path": "/missing.pdf", "kind": "pdf"}))
             inspect.assert_not_called()
+
+
+class VisioReviewPdfTest(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.path = Path(directory.name) / "review.pdf"
+
+    def draw_review(self, *, approval_color="#dfeddb", delivery_x=234, label="Release confirmed",
+                    page_size=(576, 288), blank=False, extra_page=False, flatten=False):
+        import pymupdf
+        from PIL import ImageColor
+
+        def color(value):
+            return tuple(channel / 255 for channel in ImageColor.getrgb(value))
+
+        with pymupdf.open() as doc:
+            page = doc.new_page(width=page_size[0], height=page_size[1])
+            if not blank:
+                for left, fill, text in ((72, approval_color, "Routing approval"),
+                                         (delivery_x, "#f2efd7", label)):
+                    page.draw_rect((left, 115.2, left + 144, 172.8), color=color("#1e3a5f"),
+                                   fill=color(fill), width=1.44)
+                    page.insert_text((left, 144), text, fontsize=13)
+            if extra_page:
+                doc.new_page()
+            if flatten:
+                with pymupdf.open() as bitmap_pdf:
+                    target = bitmap_pdf.new_page(width=page_size[0], height=page_size[1])
+                    target.insert_image(target.rect, pixmap=page.get_pixmap(dpi=144))
+                    bitmap_pdf.save(self.path)
+            else:
+                doc.save(self.path)
+
+    def test_vector_and_flattened_review_have_visible_moved_label(self):
+        for flatten in (False, True):
+            with self.subTest(flatten=flatten):
+                self.draw_review(flatten=flatten)
+                result = inspect_quality(self.path, "visio-review-pdf")
+                self.assertEqual(result["pageSizePt"], [576, 288])
+                self.assertGreater(result["deliveryLabelWidthPt"], 75)
+
+    def test_wrong_page_blank_sheet_and_stale_drafts_fail(self):
+        for change, error in (({"approval_color": "#dae8fb"}, "approval node"),
+                              ({"blank": True}, "approval node"),
+                              ({"delivery_x": 360}, "delivery node"),
+                              ({"label": "Delivery"}, "edited delivery label"),
+                              ({"label": ""}, "edited delivery label")):
+            with self.subTest(change=change), self.assertRaisesRegex(StepError, error):
+                self.draw_review(**change)
+                inspect_quality(self.path, "visio-review-pdf")
+
+    def test_physical_page_size_and_count(self):
+        for change, error in (({"page_size": (768, 384)}, "8 by 4 inch"),
+                              ({"extra_page": True}, "single-page")):
+            with self.subTest(change=change), self.assertRaisesRegex(StepError, error):
+                self.draw_review(**change)
+                inspect_quality(self.path, "visio-review-pdf")
 
 
 if __name__ == "__main__":
