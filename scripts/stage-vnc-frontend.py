@@ -38,7 +38,7 @@ def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, P
     if slug == "taoffice-image":
         expected.update({"heif.wasm", "heif-third-party-notices.txt"})
     if slug == "taoffice-word":
-        expected.update({"legacy-doc.worker.js", "legacy-office.worker.js", "doc-converter_bg.wasm",
+        expected.update({"legacy-doc.worker.txt", "legacy-office.worker.txt", "doc-converter_bg.wasm",
                          "doc-converter-NOTICES.txt", "OfficeParser-LICENSE.txt"})
     if with_receipt:
         expected.add("receipt.json")

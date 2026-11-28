@@ -45,7 +45,9 @@ export default defineConfig({
   },
   worker: {
     format: "es",
-    rolldownOptions: { output: { entryFileNames: "[name].js", codeSplitting: false } },
+    // The asset is fetched as bytes before creating a Blob Worker.
+    // A static extension also keeps Vite's dev-server transforms out of those bytes.
+    rolldownOptions: { output: { entryFileNames: "[name].txt", codeSplitting: false } },
   },
   oxc: {
     jsx: { runtime: "automatic" },
