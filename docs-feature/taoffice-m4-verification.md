@@ -25,12 +25,18 @@ Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”�
 
 比较时将页面等比放入 480 × 480 白底画布。34 对页面的宽高比相对差均小于 1.5%。用任一颜色通道低于 224 判定有墨迹后，33 对有墨迹的页面中，两个渲染结果的交并比中位数为 0.3821。薄线、文字换行和图形填充可明显影响该数值。抽查中，`color-boxes.vsdx` 的色块位置吻合，`Visio11PlanWithDimensions.vsd` 的文字换行有差异，`dwg.vsdx` 的嵌入对象填充和 `tdf154379-QuickStyleFillMatrix.vsdx` 的主题填充也有差异。Microsoft Visio 的原应用外观仍待对照。 [六份样本并排截图](taoffice-research/visio-libvisio-0.1.12.png)
 
+## 图片预览语料
+
+Image 0.1.0 在 Linux Chromium 上打开了 33 份公开输入。15 份 PSD、3 份 HEIC 和 10 份相机 RAW 输出了可独立读取的 PNG。PSD 与 psd-tools 1.27.0 的内嵌预览或合成图、RAW 与 LibRaw 的内嵌缩略图、HEIC 与 libheif 的输出分别缩放至 48 × 48 后比较了 RGB 像素。平均绝对通道差在 0–255 标度上分别为 0、0–0.84 和 0.03–4.96。逐文件记录包含输入、输出摘要和两端尺寸。 [逐文件回执](taoffice-research/image-preview-corpus.csv)
+
+两份 DNG 没有可显示的内嵌预览，LibRaw 同样报告无缩略图。另一个标为 DNG 的 Samsung 输入实际以 JFIF/JPEG 开头，模块提示无法读取 RAW 目录。两份 HEIF 输入未能解码，其中一份使用非压缩 RGB；本机独立读取器也未能打开。 [PSD 来源](https://github.com/psd-tools/psd-tools/tree/b5637927626c7e577ffb5b8925901fc9d06c69f9/tests/psd_files) · [HEIF 来源](https://github.com/strukturag/libheif/tree/12a259a5882dd99d45ec5fc77e296a3b620d1e2e) · [相机来源](https://raw.pixls.us/)
+
 ## 核心 RAR 解压
 
 在 Linux x86_64 用提交 `51049cdb1` 的核心目录读取和解压实现验证了 35 份输入。34 份来自 rars 0.13.1 的固定上游语料，另 1 份模拟普通 RAR5 文件只下载到一半。28 份成功解压，包含 36 个文件、2,334,604 字节。与 UnRAR 7.00 独立解压的目录、文件名和每个文件的 SHA-256 逐一相符，覆盖 RAR 1.3、3.0、4.2、5.0、固实压缩、PPMd、过滤器、注释和恢复记录。3 份密码保护文件和 3 份分卷显示了对应的限制提示，截断文件提示输入不完整。7 次拒绝后目标目录均为空。 [上游样本](https://github.com/bitplane/rars/tree/b7b3ba2d1492b0c5fc68d01678a476184de1e9e1/crates/rars/tests/fixtures) · [逐文件回执](taoffice-research/archive-rar-0.13.1.csv)
 
 ## Linux 回归
 
-在上述产品提交运行 TaOffice、UI 契约和完整崩溃回归 Browser 选集，88 项中通过 86 项。所有 TaOffice 用例通过。`TC-FILE-OPEN-008` 缺少 SSH/SFTP 夹具。`TC-FILE-OPEN-004` 在第 102 步等待 Markdown HTML 下载超时，相同步骤已在基线 `8eea6ebea` 复现。Browser 回执为 `receipt-run-20261128-115028-521141847`。
+在产品提交 `adc72e276` 运行 TaOffice、UI 契约和完整崩溃回归 Browser 选集，88 项中通过 86 项。所有 TaOffice 用例通过。`TC-FILE-OPEN-008` 缺少 SSH/SFTP 夹具。`TC-FILE-OPEN-004` 在第 102 步等待 Markdown HTML 下载超时，相同步骤已在基线 `8eea6ebea` 复现。Browser 回执为 `receipt-run-20261128-115028-521141847`。
 
 相同产品提交的 Linux Native 使用 QA release、七份独立签名模块包和隔离的 Xvfb `:108`、D-Bus 与 XDG 目录。主选集 94 项中 91 项通过，1 项缺少 SSH/SFTP 夹具。媒体裁剪另存和 Vault 键盘解锁首轮失败，在相同二进制及原用例上各自重跑通过。媒体回执包含取消后恢复控件、原件哈希、导出尺寸与时长，以及重新打开并播放输出。主选集回执为 `receipt-run-20261128-120958-984431962`，媒体与 Vault 的复跑回执为 `receipt-run-20261128-125125-036784396` 和 `receipt-run-20261128-131503-783536615`。
