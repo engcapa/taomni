@@ -44,22 +44,46 @@ def relocate_linux(binary, libraries):
     run("patchelf", "--set-rpath", "$ORIGIN", binary)
 
 
-def relocate_macos(binary, library_names, arch):
+def macos_library_names(install_library_dir, library_names):
+    library_dir = install_library_dir.resolve(strict=True)
+    names = {}
+    install_ids = {}
+    for name in sorted(library_names):
+        source = (library_dir / name).resolve(strict=True)
+        if source.parent != library_dir or not source.is_file():
+            raise ValueError(f"{name} resolves outside the pinned Media library directory")
+        ids = output("otool", "-D", source).splitlines()[1:]
+        if len(ids) != 1 or not ids[0].strip():
+            raise ValueError(f"{source.name} does not have a single Mach-O install ID")
+        install_id = ids[0].strip()
+        install_ids[name] = install_id
+        # The major-name link and the install ID can both name the file.
+        family = re.escape(name.removesuffix(".dylib")) + r"(?:\.\d+)*\.dylib"
+        for alias in (name, source.name, Path(install_id).name):
+            if not re.fullmatch(family, alias) or names.get(alias, name) != name:
+                raise ValueError(f"Unexpected install name {alias} for pinned Media library {name}")
+            names[alias] = name
+    return names, install_ids
+
+
+def relocate_macos(binary, library_names, arch, install_id=None):
     if output("lipo", "-archs", binary).strip() != arch:
         raise ValueError(f"{binary.name} does not match the target architecture {arch}")
     deps = output("otool", "-L", binary).splitlines()[1:]
     arguments = []
     for line in deps:
         dep = line.strip().split(" (compatibility version ", 1)[0]
-        if dep.startswith(DARWIN_SYSTEM_PREFIXES):
+        if dep == install_id or dep.startswith(DARWIN_SYSTEM_PREFIXES):
             continue
-        filename = Path(dep).name
-        if filename not in library_names:
+        filename = library_names.get(Path(dep).name)
+        if filename is None:
             raise ValueError(f"{binary.name} depends on an unstaged library {dep}")
         if dep != f"@loader_path/{filename}":
             arguments.extend(["-change", dep, f"@loader_path/{filename}"])
-    if binary.suffix == ".dylib":
-        arguments.extend(["-id", f"@loader_path/{binary.name}"])
+    if install_id is not None:
+        target_id = f"@loader_path/{binary.name}"
+        if install_id != target_id:
+            arguments.extend(["-id", target_id])
     commands = output("otool", "-l", binary)
     for old in re.findall(r"cmd LC_RPATH\s+cmdsize \d+\s+path (.+?) \(offset \d+\)", commands):
         arguments.extend(["-delete_rpath", old])
@@ -87,6 +111,9 @@ def stage(platform, payload):
     host = payload / (HOST + (".exe" if windows else ""))
     if not host.is_file():
         raise ValueError(f"Stage the Media host before its runtime libraries. Missing {host}")
+    darwin = platform.startswith("darwin-")
+    if darwin:
+        macos_names, install_ids = macos_library_names(install / "lib", libraries)
     for name in sorted(libraries):
         source = install / ("bin" if windows else "lib") / name
         target = payload / name
@@ -99,9 +126,9 @@ def stage(platform, payload):
         for binary in (host, *(payload / name for name in sorted(libraries))):
             if platform.startswith("linux-"):
                 relocate_linux(binary, libraries)
-            else:
+            elif darwin:
                 arch = "arm64" if platform == "darwin-aarch64" else "x86_64"
-                relocate_macos(binary, libraries, arch)
+                relocate_macos(binary, macos_names, arch, install_ids.get(binary.name))
 
     license_root = payload / LICENSE_DIR
     license_root.mkdir(parents=True, exist_ok=True)
