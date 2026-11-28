@@ -1,0 +1,209 @@
+id: TC-TAOFFICE-054
+title: Signed Word opens three legacy formats and saves DOCX copies through the native chooser
+description: Install the signed Word module, cancel a save, retry and reopen all converted copies. Verify unchanged originals and the archive read-only boundary.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, file-open, taoffice, taoffice-word, crash-regression, native-boundary]
+fixtures: [reset_db, file_open_files, taoffice_signed_word]
+ui_standard: [UI-BTN-03, UI-BTN-04, UI-BTN-05, UI-FND-07a, UI-FOC-02]
+timeout_sec: 400
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.word_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.word_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- wait_for: '[data-testid="module-action-enable-taoffice-word"]:enabled'
+- press: {selector: '[data-testid="module-action-enable-taoffice-word"]', key: Enter}
+- wait_for: '[data-testid="module-action-disable-taoffice-word"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-notes.doc"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-preview"]'
+- eval_readonly:
+    expression: >-
+      /Baseline plan & owners[\s\S]*Keep the next page unchanged\./u.test(document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.textContent) &&
+      document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.querySelector('table tr:nth-child(2) td:nth-child(2)')?.textContent === 'Ready'
+    timeout_sec: 20
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-conversion"]', contains: complex layouts may change}
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]', contains: Save DOCX copy}
+- assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]'
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]', key: Enter}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Planning notes"]'
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]', value: Converted DOC review}
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-location="table"][value="Ready"]', value: Reviewed}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Reviewed"]', key: Escape}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]'
+- eval_readonly:
+    expression: >-
+      /Converted DOC review[\s\S]*Keep the next page unchanged\./u.test(document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.textContent) &&
+      document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.querySelector('table tr:nth-child(2) td:nth-child(2)')?.textContent === 'Reviewed'
+    timeout_sec: 20
+- native_file_dialog:
+    kind: save
+    action: cancel
+    trigger: '[data-testid="taoffice-word-save"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]:enabled'
+- assert_visible: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    trigger: '[data-testid="taoffice-word-save"]'
+    path: ${fixture.file_open_root}/accepted-doc.docx
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-output"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-notes.doc', sha256: '${fixture.taoffice_word_doc_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="accepted-doc.docx"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-preview"]'
+- eval_readonly:
+    expression: >-
+      /Converted DOC review[\s\S]*Keep the next page unchanged\./u.test(document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.textContent) &&
+      document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.querySelector('table tr:nth-child(2) td:nth-child(2)')?.textContent === 'Reviewed'
+    timeout_sec: 20
+- assert_count: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-conversion"]', equal: 0}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-notes.odt"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-preview"]'
+- eval_readonly:
+    expression: >-
+      /Baseline plan & owners[\s\S]*Keep the next page unchanged\./u.test(document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.textContent) &&
+      document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.querySelector('table tr:nth-child(2) td:nth-child(2)')?.textContent === 'Ready'
+    timeout_sec: 20
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-conversion"]', contains: complex layouts may change}
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]', contains: Save DOCX copy}
+- assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]'
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]', key: Enter}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Planning notes"]'
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]', value: Converted ODT review}
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-location="table"][value="Ready"]', value: Reviewed}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Reviewed"]', key: Escape}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]'
+- eval_readonly:
+    expression: >-
+      /Converted ODT review[\s\S]*Keep the next page unchanged\./u.test(document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.textContent) &&
+      document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.querySelector('table tr:nth-child(2) td:nth-child(2)')?.textContent === 'Reviewed'
+    timeout_sec: 20
+- native_file_dialog:
+    kind: save
+    action: choose
+    trigger: '[data-testid="taoffice-word-save"]'
+    path: ${fixture.file_open_root}/accepted-odt.docx
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-output"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-notes.odt', sha256: '${fixture.taoffice_word_odt_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="accepted-odt.docx"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-preview"]'
+- eval_readonly:
+    expression: >-
+      /Converted ODT review[\s\S]*Keep the next page unchanged\./u.test(document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.textContent) &&
+      document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.querySelector('table tr:nth-child(2) td:nth-child(2)')?.textContent === 'Reviewed'
+    timeout_sec: 20
+- assert_count: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-conversion"]', equal: 0}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-notes.rtf"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-preview"]'
+- eval_readonly:
+    expression: >-
+      /Baseline plan & owners[\s\S]*Keep the next page unchanged\./u.test(document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.textContent) &&
+      document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.querySelector('table tr:nth-child(2) td:nth-child(2)')?.textContent === 'Ready'
+    timeout_sec: 20
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-conversion"]', contains: complex layouts may change}
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]', contains: Save DOCX copy}
+- assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]'
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]', key: Enter}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Planning notes"]'
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]', value: Converted RTF review}
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][data-location="table"][value="Ready"]', value: Reviewed}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-paragraph"][value="Reviewed"]', key: Escape}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]'
+- eval_readonly:
+    expression: >-
+      /Converted RTF review[\s\S]*Keep the next page unchanged\./u.test(document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.textContent) &&
+      document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.querySelector('table tr:nth-child(2) td:nth-child(2)')?.textContent === 'Reviewed'
+    timeout_sec: 20
+- native_file_dialog:
+    kind: save
+    action: choose
+    trigger: '[data-testid="taoffice-word-save"]'
+    path: ${fixture.file_open_root}/accepted-rtf.docx
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-output"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-notes.rtf', sha256: '${fixture.taoffice_word_rtf_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="accepted-rtf.docx"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-preview"]'
+- eval_readonly:
+    expression: >-
+      /Converted RTF review[\s\S]*Keep the next page unchanged\./u.test(document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.textContent) &&
+      document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.querySelector('table tr:nth-child(2) td:nth-child(2)')?.textContent === 'Reviewed'
+    timeout_sec: 20
+- assert_count: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-conversion"]', equal: 0}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-readonly.zip"]'
+- wait_for: '[data-testid="archive-entry"][data-name="archive-notes.rtf"]'
+- press: {selector: '[data-testid="archive-preview"]', key: Enter}
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-preview"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="document-readonly"]'
+- eval_readonly:
+    expression: >-
+      /Baseline plan & owners[\s\S]*Keep the next page unchanged\./u.test(document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.textContent) &&
+      document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.querySelector('table tr:nth-child(2) td:nth-child(2)')?.textContent === 'Ready'
+    timeout_sec: 20
+- assert_count: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-edit"]', equal: 0}
+- assert_count: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-save"]', equal: 0}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-FND-07a]
+    requirement: The converted document explains its layout limits while the original content is still visible.
+    actions: [18]
+    checkpoints:
+    - {step: 19, expectation: The converted preview is visible.}
+    - {step: 20, expectation: "Original body, table and follow-up remain visible."}
+    - {step: 21, expectation: The layout limits are visible.}
+    results: [19, 20, 21]
+  - id: R2
+    ui_standard: [UI-FOC-02, UI-BTN-03, UI-BTN-05]
+    requirement: The editor manages keyboard focus and enables the explicit DOCX copy operation after an edit.
+    actions: [24, 28]
+    checkpoints:
+    - {step: 22, expectation: The button identifies the DOCX copy.}
+    - {step: 23, expectation: The save action starts disabled.}
+    - {step: 25, expectation: The first paragraph is focused.}
+    - {step: 29, expectation: Escape returns focus to Edit paragraphs.}
+    results: [22, 23, 25, 29]
+  - id: R3
+    ui_standard: [UI-BTN-04]
+    requirement: Cancelling the native chooser restores the Save DOCX copy action and keeps the draft.
+    actions: [31]
+    checkpoints:
+    - {step: 32, expectation: Save DOCX copy becomes available again.}
+    - {step: 33, expectation: The document still has the original draft.}
+    results: [32, 33]
+  visual:
+  - {check: Document preview, method: automated, reason: Assertions inspect visible layout guidance and page content.}
+  native:
+  - {check: Native chooser with signed module, method: automated, reason: Cancels and retries real save operations and reopens copies from disk.}

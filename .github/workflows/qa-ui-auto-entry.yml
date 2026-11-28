@@ -935,9 +935,12 @@ jobs:
       - name: Build the TaOffice Excel module for browser preview
         if: inputs.operation == 'run' && matrix.mode == 'browser' && contains(matrix.capabilities, 'taoffice-excel')
         run: pnpm exec vite build --config src-tauri/plugins/taoffice-excel/vite.config.ts
-      - name: Build the TaOffice Word module for browser preview
+      - name: Download the selected TaOffice Word frontend for browser preview
         if: inputs.operation == 'run' && matrix.mode == 'browser' && contains(matrix.capabilities, 'taoffice-word')
-        run: pnpm exec vite build --config src-tauri/plugins/taoffice-word/vite.config.ts
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: taoffice-word-browser-${{ inputs.artifact_key }}
+          path: src-tauri/plugins/taoffice-word/dist/frontend
       - name: Build the TaOffice Project module for browser preview
         if: inputs.operation == 'run' && matrix.mode == 'browser' && contains(matrix.capabilities, 'taoffice-project')
         run: pnpm exec vite build --config src-tauri/plugins/taoffice-project/vite.config.ts

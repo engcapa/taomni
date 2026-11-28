@@ -18,6 +18,7 @@
 | TC-TAOFFICE-045/046 | 签名模块转码旧格式并实际播放、裁剪输出 MP4 和通过系统对话框保存重开 | native/release |
 | TC-TAOFFICE-047/048 | HEIC、PSD、DNG 缩略图，坏文件重试和签名图片模块启用、关闭与重开 | browser、native/release |
 | TC-TAOFFICE-049/050 | XLS、XLSB、ODS 只读工作表、缓存公式、坏文件恢复与原始字节校验 | browser、native/release |
+| TC-TAOFFICE-053/054 | DOC、ODT、RTF 离线转换、坏文件恢复、只读预览和 DOCX 保存重开 | browser、native/release |
 | TC-TAOFFICE-009 | gzip TAR 的筛选焦点、只读预览、原始文件和解压字节，以及异常归档的错误反馈 | browser/native |
 | TC-TAOFFICE-051/052 | 提取进度、取消、查看器重开、应用重启后恢复以及完整结果原子发布 | browser/native |
 | TC-WS-045 | 空工作区从 Tools/Home 进入；折叠／展开、Sessions 导航切换；只保留一个编辑器运行时 | browser/native |

@@ -17335,6 +17335,18 @@ controls:
   - id: taoffice-pdf-page
     selector: '[data-testid="taoffice-pdf-page"]'
     kind: display
+  - id: taoffice-word-conversion
+    selector: '[data-testid="taoffice-word-conversion"]'
+    kind: display
+  - id: taoffice-word-conversion-cancel
+    selector: '[data-testid="taoffice-word-conversion-cancel"]'
+    kind: interactive
+  - id: taoffice-word-error
+    selector: '[data-testid="taoffice-word-error"]'
+    kind: display
+  - id: taoffice-word-retry
+    selector: '[data-testid="taoffice-word-retry"]'
+    kind: interactive
   - id: taoffice-word-preview
     selector: '[data-testid="taoffice-word-preview"]'
     kind: display

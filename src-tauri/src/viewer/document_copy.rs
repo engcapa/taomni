@@ -33,6 +33,13 @@ fn extension<'a>(
         return Err("permission: The requested document copy format is unavailable".into());
     }
     let extension = source.extension().ok_or("Missing document extension")?;
+    if slug == "taoffice-word"
+        && ["doc", "odt", "rtf"]
+            .iter()
+            .any(|legacy| extension.eq_ignore_ascii_case(legacy))
+    {
+        return Ok(OsStr::new("docx"));
+    }
     Ok(
         if slug == "taoffice-project"
             && ["mpp", "mpx"]
@@ -222,6 +229,28 @@ mod tests {
         write(&source, slug, valid.to_str().unwrap(), &[], b"xml", None).unwrap();
         assert_eq!(fs::read(&source).unwrap(), b"original");
         assert_eq!(fs::read(&valid).unwrap(), b"xml");
+    }
+
+    #[test]
+    fn legacy_word_copies_require_docx_and_keep_the_original() {
+        let root = tempfile::tempdir().unwrap();
+        for extension in ["DOC", "odt", "Rtf"] {
+            let source = root.path().join(format!("notes.{extension}"));
+            let target = root.path().join(format!("notes-{extension}.docx"));
+            let invalid = root.path().join(format!("duplicate.{extension}"));
+            let slug = "taoffice-word";
+            fs::write(&source, b"legacy document").unwrap();
+            assert_eq!(
+                suggested_name(&source, slug, None).unwrap(),
+                "notes - copy.docx"
+            );
+            assert!(write(&source, slug, invalid.to_str().unwrap(), &[], b"docx", None).is_err());
+            assert!(!invalid.exists());
+            assert!(suggested_name(&source, slug, Some("rtf")).is_err());
+            write(&source, slug, target.to_str().unwrap(), &[], b"docx", None).unwrap();
+            assert_eq!(fs::read(&source).unwrap(), b"legacy document");
+            assert_eq!(fs::read(&target).unwrap(), b"docx");
+        }
     }
 
     #[test]

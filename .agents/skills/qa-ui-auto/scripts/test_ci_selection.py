@@ -41,11 +41,12 @@ class ModuleProfileSelectionTests(unittest.TestCase):
         browser_cases = {"TC-TAOFFICE-033": "taoffice-pdf", "TC-TAOFFICE-039": "taoffice-ppt",
                          "TC-TAOFFICE-041": "taoffice-visio", "TC-TAOFFICE-043": "taoffice-video",
                          "TC-TAOFFICE-044": "taoffice-video", "TC-TAOFFICE-047": "taoffice-image",
-                         "TC-TAOFFICE-049": "taoffice-excel"}
+                         "TC-TAOFFICE-049": "taoffice-excel", "TC-TAOFFICE-053": "taoffice-word"}
         native_cases = {"TC-TAOFFICE-034": "taoffice-pdf", "TC-TAOFFICE-040": "taoffice-ppt",
                         "TC-TAOFFICE-042": "taoffice-visio", "TC-TAOFFICE-045": "taoffice-video",
                         "TC-TAOFFICE-046": "taoffice-video", "TC-TAOFFICE-048": "taoffice-image",
-                        "TC-TAOFFICE-050": "taoffice-excel"}
+                        "TC-TAOFFICE-050": "taoffice-excel",
+                        "TC-TAOFFICE-054": "taoffice-word"}
         plugin_cases = {**common_mode_cases, **browser_cases, **native_cases}
         excludes = [entry for entry in core["not_applicable"] if "requires_plugin" in entry]
         self.assertEqual(len(excludes), len(plugin_cases) * 3 + len(common_mode_cases) * 3)
@@ -214,7 +215,7 @@ class SelectionTests(unittest.TestCase):
                     'TC-FILE-OPEN-013', 'TC-TAO-HOME-002', 'TC-EXPLORER-013', 'TC-FILE-OPEN-041',
                     'TC-FILE-OPEN-049', 'TC-MODULES-102', 'TC-TAOFFICE-001', 'TC-TAOFFICE-009',
                     'TC-TAOFFICE-034', 'TC-TAOFFICE-040', 'TC-TAOFFICE-042', 'TC-TAOFFICE-045', 'TC-TAOFFICE-046',
-                    'TC-TAOFFICE-048', 'TC-TAOFFICE-050', 'TC-TAOFFICE-052'}
+                    'TC-TAOFFICE-048', 'TC-TAOFFICE-050', 'TC-TAOFFICE-052', 'TC-TAOFFICE-054'}
         for entry in native:
             with self.subTest(profile=entry['linux_profile']):
                 self.assertEqual(set(entry['selected_ids']), expected)

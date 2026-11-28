@@ -49,3 +49,22 @@
   margin: 8px;
   overflow-wrap: anywhere;
 }
+
+.taoffice-word-conversion {
+  margin: 8px;
+  color: var(--taomni-text);
+  font-size: var(--taomni-fs-small);
+  overflow-wrap: anywhere;
+}
+
+.taoffice-word-loading,
+.taoffice-word-loading [role="status"] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.taoffice-word > .taoffice-word-loading {
+  margin: 8px;
+}

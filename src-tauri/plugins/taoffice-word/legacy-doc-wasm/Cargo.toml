@@ -1,0 +1,19 @@
+[package]
+name = "taoffice-legacy-doc"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+office_oxide = { version = "=0.1.17", default-features = false }
+wasm-bindgen = "=0.2.130"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1

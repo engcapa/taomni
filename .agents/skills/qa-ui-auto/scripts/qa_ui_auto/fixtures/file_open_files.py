@@ -136,6 +136,16 @@ def setup(ctx: Any) -> None:
         files["planning-notes.docx"] = (TAOFFICE_ASSETS / "planning-notes.docx").read_bytes()
         files["damaged.docx"] = b"This is not a Word document."
         ctx.values["taoffice_word_sha"] = hashlib.sha256(files["planning-notes.docx"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-053", "TC-TAOFFICE-054"}:
+        for extension in ("doc", "odt", "rtf"):
+            name = f"legacy-notes.{extension}"
+            files[name] = (TAOFFICE_ASSETS / name).read_bytes()
+            ctx.values[f"taoffice_word_{extension}_sha"] = hashlib.sha256(files[name]).hexdigest()
+        files["legacy-damaged.rtf"] = b"This is not an RTF document."
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            bundle.writestr("archive-notes.rtf", files["legacy-notes.rtf"])
+        files["legacy-readonly.zip"] = archive.getvalue()
     if ctx.case_id in {"TC-TAOFFICE-023", "TC-TAOFFICE-024"}:
         schedule = (TAOFFICE_ASSETS / "rollout.mppx").read_bytes()
         files["rollout.xml" if native else "rollout.mppx"] = schedule

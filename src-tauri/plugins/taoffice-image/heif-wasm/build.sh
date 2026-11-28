@@ -16,6 +16,6 @@ cp "$build_dir/$target/release/taoffice_heif_preview.wasm" "$output/heif.wasm"
 # Include the license texts from the locked crate sources used in this build.
 cargo metadata --manifest-path "$manifest" --filter-platform "$target" \
   --format-version 1 --locked >"$output/cargo-metadata.json"
-python3 "$decoder_dir/notices.py" "$output/cargo-metadata.json" "$(rustc --print sysroot)" \
+python3 "$decoder_dir/../../../../scripts/rust-wasm-notices.py" "$output/cargo-metadata.json" "$(rustc --print sysroot)" \
   >"$output/heif-third-party-notices.txt"
 rm "$output/cargo-metadata.json"
