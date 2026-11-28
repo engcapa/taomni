@@ -10,6 +10,7 @@ description: >-
   and survive a reload, while the original on-disk bytes stay untouched. Browser
   evidence reads the IndexedDB VFS; native evidence uses real host bytes and the
   packaged WebView localStorage/app-data snapshot.
+ui_standard: [UI-FBK-01]
 modes:
 - browser
 - native
@@ -76,7 +77,7 @@ steps:
     contains: notes.txt
 # Reopen the same file: the draft must restore and the disk file must stay original.
 - dblclick: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
-- wait_for: '[data-testid="file-viewer"] [data-testid="viewer-draft-restored"]'
+- wait_for: '[data-testid="viewer-draft-restored"] [role="status"]'
 - assert_text:
     selector: '[data-testid="viewer-editor"] .cm-content'
     contains: KEEP-DRAFT-SMALL
@@ -86,7 +87,7 @@ steps:
 # A document reload drops the live store: the session restores the same dirty
 # viewport tab and the kept draft must come back from storage.
 - reload_window: null
-- wait_for: '[data-testid="file-viewer"] [data-testid="viewer-draft-restored"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"][data-dirty="true"]'
 - assert_text:
     selector: '[data-testid="viewer-editor"] .cm-content'
     contains: KEEP-DRAFT-SMALL
@@ -125,10 +126,10 @@ steps:
 - assert_file_open_bytes:
     path: ${fixture.file_open_root}/draft-large.txt
     sha256: ${fixture.file_open_draft_large_sha}
-# Reopen the oversized file: the snapshot restore banner and the captured bytes
+# Reopen the oversized file: the snapshot notification and the captured bytes
 # must come back (the editor virtualizes lines, so jump to the end first).
 - dblclick: '[data-testid="explorer-file-row"][data-name="draft-large.txt"]'
-- wait_for: '[data-testid="file-viewer"] [data-testid="viewer-draft-restored"]'
+- wait_for: '[data-testid="viewer-draft-restored"] [role="status"]'
 - click: '[data-testid="viewer-editor"] .cm-content'
 - press:
     key: Control+End
@@ -142,7 +143,7 @@ steps:
     sha256: ${fixture.file_open_draft_large_sha}
 # Reload must restore the oversized draft again from the persisted snapshot.
 - reload_window: null
-- wait_for: '[data-testid="file-viewer"] [data-testid="viewer-draft-restored"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"][data-dirty="true"]'
 - click: '[data-testid="viewer-editor"] .cm-content'
 - press:
     key: Control+End
@@ -154,6 +155,8 @@ steps:
 - assert_file_open_bytes:
     path: ${fixture.file_open_root}/draft-large.txt
     sha256: ${fixture.file_open_draft_large_sha}
+- wait_for: {selector: '[data-testid="viewer-draft-restored"]', state: detached, timeout_sec: 6}
+- assert_visible: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
 - screenshot: file-open-keep-draft-recovery.png
 - assert_no_runtime_errors: null
 verification:
@@ -164,7 +167,7 @@ verification:
     actions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
     checkpoints:
     - {step: 21, expectation: The small draft was written to the persisted localStorage drafts.}
-    - {step: 24, expectation: Reopening the file surfaced the restored-draft banner.}
+    - {step: 24, expectation: Reopening the file announced the restored changes in an accessible status.}
     - {step: 25, expectation: The restored buffer contains the kept marker.}
     - {step: 26, expectation: The original disk bytes are unchanged.}
     results: [24, 25, 26]
@@ -172,27 +175,30 @@ verification:
     requirement: The small draft survives a document reload and still hides the host file bytes until an explicit save.
     actions: [27]
     checkpoints:
-    - {step: 28, expectation: The reloaded app restored the draft banner for the session-restored tab.}
+    - {step: 28, expectation: The reloaded app marked the restored draft as unsaved.}
     - {step: 29, expectation: The reloaded buffer still contains the kept marker.}
     - {step: 30, expectation: The host file bytes stayed original after the reload.}
     results: [28, 29, 30]
   - id: R3
+    ui_standard: [UI-FBK-01]
     requirement: A 730 KB buffer above the localStorage cap is kept through a native Notepad snapshot, restores after reopen and after a reload, and never writes the host file.
     actions: [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 47, 49, 50, 53, 55, 56]
     checkpoints:
     - {step: 46, expectation: The oversized buffer was closed with the disk bytes unchanged.}
-    - {step: 48, expectation: Reopening surfaced the restored draft banner for the oversized buffer.}
+    - {step: 48, expectation: Reopening announced recovery of the oversized buffer.}
     - {step: 51, expectation: The restored oversized buffer contains the kept marker.}
     - {step: 52, expectation: The oversized host file bytes are unchanged after reopen.}
-    - {step: 54, expectation: The reloaded app surfaced the restored draft banner again.}
+    - {step: 54, expectation: The restored oversized document is still marked unsaved after reload.}
     - {step: 57, expectation: The reloaded oversized buffer still contains the kept marker.}
     - {step: 58, expectation: The oversized host file bytes are unchanged after reload.}
-    - {step: 60, expectation: The workflow raised no uncaught runtime errors.}
-    results: [46, 48, 51, 52, 54, 57, 58, 60]
+    - {step: 59, expectation: The informational notice expires while the editor stays open.}
+    - {step: 60, expectation: The active tab still displays its unsaved marker.}
+    - {step: 62, expectation: The workflow raised no uncaught runtime errors.}
+    results: [46, 48, 51, 52, 54, 57, 58, 59, 60, 62]
   visual:
-  - check: Restored-draft banners and the reopened editor state are retained as a screenshot.
+  - check: Reopened editor and dirty tab after the recovery notification expires.
     method: manual
-    reason: Assertions cover the banner, content and bytes; the screenshot supports human review of the recovery surface.
+    reason: Assertions cover the notification, content and bytes; the screenshot supports human review of the recovery surface.
   native:
   - check: Real host file bytes, packaged WebView localStorage and the native app-data Notepad snapshot.
     method: automated

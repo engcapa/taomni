@@ -1703,7 +1703,7 @@
 - `[data-testid="viewer-operation-error"]` — display — F-FILEOPEN-1.viewer-operation-error
 - `[data-testid="viewer-cursor"]` — display — F-FILEOPEN-1.viewer-cursor
 - `[data-testid="viewer-status"]` — display — F-FILEOPEN-1.viewer-status
-- `[data-testid="viewer-draft-restored"]` — display — F-FILEOPEN-1.viewer-draft-restored
+- `[data-testid="viewer-draft-restored"]` — display [optional] — F-FILEOPEN-1.viewer-draft-restored
 - `[data-testid="viewer-large-file"]` — display — F-FILEOPEN-1.viewer-large-file
 - `[data-testid="viewer-enable-edit"]` — interactive — F-FILEOPEN-1.viewer-enable-edit
 - `[data-testid="viewer-chunk-next"]` — interactive — F-FILEOPEN-1.viewer-chunk-next

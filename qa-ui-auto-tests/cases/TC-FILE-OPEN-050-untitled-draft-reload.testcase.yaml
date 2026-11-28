@@ -1,0 +1,47 @@
+id: TC-FILE-OPEN-050
+title: Explorer reloads an untitled draft into the active editor without a recovery banner
+ui_standard: [UI-FBK-07]
+covers: [F-EXPLORER-1, F-FILEOPEN-1, F-NOTEPAD-1]
+tags: [p0, file-open, notepad, draft, recovery, regression]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 100
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- fill: {selector: '[data-testid="viewer-editor"] .cm-content', value: "第一行\nUnfiled text"}
+- assert_localstorage: {key: taomni.viewer.drafts.v1, contains: Unfiled text}
+- assert_localstorage: {key: taomni.explorer.tabs.v1, contains: 'untitled:'}
+- reload_window: null
+- wait_for: '[data-testid="file-viewer"][data-active="true"][data-path^="untitled:"][data-dirty="true"]'
+- assert_items: {selector: '[data-testid="viewer-editor"] .cm-line', equals: [第一行, Unfiled text]}
+- assert_visible: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
+- assert_count: {selector: '[data-testid="viewer-draft-restored"]', equal: 0}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
+- assert_count: {selector: '[data-testid="viewer-draft-restored"]', equal: 0}
+- assert_items: {selector: '[data-testid="viewer-editor"] .cm-line', equals: [第一行, Unfiled text]}
+- screenshot: explorer-restored-untitled.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-FBK-07]
+    requirement: An untitled draft resumes silently with the same text and visible unsaved marker across tab switches.
+    actions: [2, 4, 5, 8, 13, 14]
+    checkpoints:
+    - {step: 9, expectation: The active untitled document is still dirty.}
+    - {step: 10, expectation: Both original lines appear exactly once.}
+    - {step: 11, expectation: The active tab shows its unsaved indicator.}
+    - {step: 12, expectation: No disk-file recovery notice appears above the untitled editor.}
+    - {step: 15, expectation: Switching away and back leaves the editor free of duplicate notifications.}
+    - {step: 16, expectation: The draft still contains both original lines.}
+    - {step: 18, expectation: The reload and tab switches raised no runtime errors.}
+    results: [9, 10, 11, 12, 15, 16, 18]
+  visual:
+  - {check: Draft editor and tab status, method: automated, reason: The recovered content and the active tab's unsaved indicator are asserted together.}
+  native:
+  - {check: Process exit and relaunch, method: external, reason: TC-FILE-OPEN-051 covers a native cold restart.}

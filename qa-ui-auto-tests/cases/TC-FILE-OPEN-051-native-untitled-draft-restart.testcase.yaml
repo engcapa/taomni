@@ -1,0 +1,55 @@
+id: TC-FILE-OPEN-051
+title: Native Explorer preserves an untitled draft across application exit and saves the restored bytes on request
+ui_standard: [UI-FBK-07]
+covers: [F-EXPLORER-1, F-FILEOPEN-1, F-NOTEPAD-1]
+tags: [p0, file-open, notepad, draft, recovery, regression]
+modes: [native]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-draft-restart
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- fill: {selector: '[data-testid="viewer-editor"] .cm-content', value: 'Restart 草稿'}
+- assert_localstorage: {key: taomni.viewer.drafts.v1, contains: 'Restart 草稿'}
+- assert_localstorage: {key: taomni.explorer.tabs.v1, contains: 'untitled:'}
+- native_restart_app:
+    preserve_dirty_drafts: true
+    expect_exit_confirmation:
+      title: Exit
+      message: There are 2 open tabs. Exit Taomni and close them?
+      confirm_label: Exit
+- wait_for: '[data-testid="file-viewer"][data-active="true"][data-path^="untitled:"][data-dirty="true"]'
+- assert_items: {selector: '[data-testid="viewer-editor"] .cm-line', equals: ['Restart 草稿']}
+- assert_count: {selector: '[data-testid="viewer-draft-restored"]', equal: 0}
+- assert_visible: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
+- click: '[data-testid="viewer-save"]'
+- fill: {selector: '[data-testid="notepad-save-as-input"]', value: '${fixture.file_open_root}/restored-draft.txt'}
+- click: '[data-testid="notepad-save-as-confirm"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/restored-draft.txt', equals: 'Restart 草稿'}
+- wait_for: '[data-testid="file-viewer"][data-active="true"][data-path$="restored-draft.txt"][data-dirty="false"]'
+- assert_count: {selector: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]', equal: 0}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-FBK-07]
+    requirement: Retaining the draft at normal process exit restores the active unsaved editor silently. Explicit Save As writes its text to a new local file.
+    actions: [3, 5, 6, 9, 14, 15, 16]
+    checkpoints:
+    - {step: 10, expectation: The new process restored an active untitled dirty document.}
+    - {step: 11, expectation: Restored Unicode editor content matches the original.}
+    - {step: 12, expectation: No recovery notice claims a disk file for the untitled draft.}
+    - {step: 13, expectation: The tab is visibly unsaved after restart.}
+    - {step: 17, expectation: The new disk file contains exactly the restored UTF-8 bytes.}
+    - {step: 18, expectation: The active viewer now owns the named destination and is clean.}
+    - {step: 19, expectation: The unsaved marker disappears after the successful write.}
+    - {step: 20, expectation: Restart and Save As raised no runtime errors.}
+    results: [10, 11, 12, 13, 17, 18, 19, 20]
+  visual:
+  - {check: Draft recovery feedback, method: automated, reason: The new process renders the active dirty tab and its content with no recovery banner.}
+  native:
+  - {check: Process identity and saved bytes, method: automated, reason: The harness closes the owned QA process through both dialogs and relaunches its profile. An independent file read verifies the subsequent Save As.}

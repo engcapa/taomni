@@ -1,12 +1,13 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import { AlertCircle, FolderOpen, RefreshCw, Save, Shield } from "lucide-react";
 import { useDocumentStore } from "../../stores/documentStore";
-import { documentPathKey } from "../../lib/openFile/pathIdentity";
+import { documentPathKey, isUntitledKey } from "../../lib/openFile/pathIdentity";
 import { sftpOpenPath, parentPath } from "../../lib/sftp";
 import { openExplorer } from "../../lib/explorer/openExplorer";
 import { useViewerLabels } from "./viewerLabels";
 import { ViewerDiff } from "./ViewerDialogs";
+import { ToastStack } from "../ui/Toast";
 import { NotepadEditor } from "../notepad/NotepadEditor";
 import { DelimitedDocumentPane } from "./DelimitedDocumentPane";
 import { fileExtension } from "../../lib/openFile/classifyFile";
@@ -62,6 +63,8 @@ function BuiltinViewer({ viewer, active = true, workspaceId, host }: ViewerShell
   const [error, setError] = useState<string | null>(null);
   const [compare, setCompare] = useState(false);
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
+  const root = useRef<HTMLElement>(null);
+  const dismissRecovery = useCallback(() => useDocumentStore.getState().dismissRecoveryNotice(key), [key]);
   useEffect(() => {
     void useDocumentStore.getState().open(viewer.path, viewer.readOnlyReason);
   }, [key, viewer.path, viewer.readOnlyReason]);
@@ -104,7 +107,7 @@ function BuiltinViewer({ viewer, active = true, workspaceId, host }: ViewerShell
   // Notepad; Notepad supplies its own toolbar and status bar. Image, SVG render,
   // Markdown live editor and HTML preview keep their existing viewers.
   const notepadMode = viewer.mode === "source" || viewer.mode === "notepad" || viewer.kind === "text" || !!document?.large;
-  return <section className={`fv${active ? " fv-active" : ""}`} data-testid="file-viewer" data-path={viewer.path} data-kind={viewer.kind} data-active={active} data-dirty={document?.dirty ?? false} data-readonly={document?.readOnly || undefined} onKeyDown={(event) => {
+  return <section ref={root} tabIndex={-1} className={`fv${active ? " fv-active" : ""}`} data-testid="file-viewer" data-path={viewer.path} data-kind={viewer.kind} data-active={active} data-dirty={document?.dirty ?? false} data-readonly={document?.readOnly || undefined} onKeyDown={(event) => {
       if (event.defaultPrevented || event.nativeEvent.isComposing || !active || event.altKey || event.shiftKey) return;
       const mod = getAppPlatform() === "macos" ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
       if (mod && event.key.toLowerCase() === "s") {
@@ -113,7 +116,11 @@ function BuiltinViewer({ viewer, active = true, workspaceId, host }: ViewerShell
       }
     }}>
     {document?.readOnlyReason && <div className="fv-banner info" data-testid="viewer-readonly"><Shield /><span>{label("只读副本", "Read-only copy")} — {document.readOnlyReason}</span><span className="fv-spacer" /><button type="button" className="fv-button outline" data-testid="viewer-save-as" onClick={() => run(toLocal)}>{label("另存为本地后编辑", "Save locally to edit")}</button></div>}
-    {document?.restored && <div className="fv-banner info" data-testid="viewer-draft-restored">{label("已恢复未保存草稿；磁盘文件未被改动。", "Recovered unsaved draft; the disk file has not been modified.")}</div>}
+    {active && document?.restored && !isUntitledKey(key) &&
+      <ToastStack key={key} testId="viewer-draft-restored" paused={false} dismiss={dismissRecovery}
+        closeLabel={label("关闭提示", "Dismiss notification")}
+        returnFocus={() => (root.current?.querySelector<HTMLElement>(".cm-content") ?? root.current)?.focus()}
+        entries={[{ id: 1, count: 1, message: label("已恢复未保存的修改。", "Unsaved changes restored.") }]} />}
     {document?.external && <div className="fv-banner warn" data-testid="viewer-conflict"><AlertCircle /><span>{label("文件已被其他程序修改。", "This file was modified by another program.")}</span><button type="button" className="fv-button outline" data-testid="viewer-reload" onClick={() => run(() => useDocumentStore.getState().reload(viewer.path))}>{label("重新加载", "Reload")}</button><button type="button" className="fv-button outline" data-testid="viewer-compare" onClick={() => setCompare(true)}>{label("比较差异", "Compare changes")}</button><button type="button" className="fv-button" data-testid="viewer-keep" onClick={() => useDocumentStore.getState().keepMine(viewer.path)}>{label("保留我的版本", "Keep my version")}</button></div>}
     {(error || draftError || document?.error && !showError) && <div className="fv-banner warn" role="alert" data-testid="viewer-operation-error">{error || draftError || document?.error}<button type="button" className="fv-button" onClick={() => setError(null)}>×</button></div>}
     {!document || document.loading && !document.content ? <div className="fv-loading" role="status">{label("正在打开文件…", "Opening file…")}</div>

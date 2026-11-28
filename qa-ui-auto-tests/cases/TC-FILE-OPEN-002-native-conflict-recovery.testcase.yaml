@@ -123,7 +123,7 @@ steps:
 - assert_no_runtime_errors: null
 - reload_window: null
 - wait_for: '[data-testid="file-viewer"] [data-testid="viewer-editor"] .cm-content'
-- assert_visible: '[data-testid="viewer-draft-restored"]'
+- assert_visible: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
 - assert_items:
     selector: '[data-testid="viewer-editor"] .cm-line'
     equals:
@@ -232,7 +232,7 @@ verification:
     - step: 36
       expectation: Reload clears dirty state.
     - step: 42
-      expectation: Reloaded host explicitly identifies recovered draft.
+      expectation: Reloaded host displays the unsaved indicator on the active draft tab.
     - step: 43
       expectation: Recovery content is exact.
     - step: 44

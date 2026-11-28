@@ -142,6 +142,44 @@ describe("shared viewer lifecycle and close guard", () => {
     expect(useAppStore.getState().tabs).toHaveLength(0);
     expect(viewerWriteText).not.toHaveBeenCalled();
   });
+  it("restores an untitled draft directly into the dirty editor", async () => {
+    const id = "untitled:quiet-recovery";
+    useDocumentStore.getState().createUntitled(id, { content: "Unfiled notes", dirty: true });
+    useDocumentStore.getState().release(id);
+    render(<ViewerShell viewer={{ path: id, kind: "text", untitled: true }} host="explorer" />);
+    await waitFor(() => expect(screen.getByTestId("viewer-editor")).toHaveTextContent("Unfiled notes"));
+    expect(screen.getByTestId("file-viewer")).toHaveAttribute("data-dirty", "true");
+    expect(screen.queryByTestId("viewer-draft-restored")).toBeNull();
+    expect(viewerWriteText).not.toHaveBeenCalled();
+  });
+  it("expires the recovery notice once across document hosts and preserves an unresolved disk conflict", async () => {
+    await useDocumentStore.getState().open(path);
+    useDocumentStore.getState().edit(path, "local draft");
+    useDocumentStore.getState().release(path);
+    vi.mocked(viewerReadText).mockResolvedValue({
+      path, content: "external", hash: "external-hash", encoding: "UTF-8", bom: false,
+      eol: "LF", mtime: 2, size: 8, truncated: false,
+    });
+    await useDocumentStore.getState().open(path);
+    vi.useFakeTimers();
+    try {
+      const mounted = render(<ViewerShell viewer={viewer} active={false} />);
+      expect(screen.queryByTestId("viewer-draft-restored")).toBeNull();
+      mounted.rerender(<ViewerShell viewer={viewer} />);
+      expect(screen.getByTestId("viewer-draft-restored")).toBeVisible();
+      act(() => vi.advanceTimersByTime(3999));
+      expect(screen.getByTestId("viewer-draft-restored")).toBeVisible();
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.queryByTestId("viewer-draft-restored")).toBeNull();
+      mounted.rerender(<><ViewerShell viewer={viewer} active={false} /><ViewerShell viewer={viewer} /></>);
+      expect(screen.queryByTestId("viewer-draft-restored")).toBeNull();
+      expect(screen.getAllByTestId("viewer-conflict").at(-1)).toBeVisible();
+      expect(useDocumentStore.getState().documents[path]).toMatchObject({ dirty: true, content: "local draft", external: { content: "external" } });
+      expect(viewerWriteText).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("keeps the close dialog open with an actionable error when the draft cannot persist", async () => {
     render(<><ViewerShell viewer={viewer} /><ViewerCloseDialog /></>);
     await screen.findByTestId("viewer-editor");

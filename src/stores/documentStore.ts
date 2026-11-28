@@ -29,6 +29,7 @@ interface DocumentState {
   configure: (path: string, options: { encoding?: string; eol?: ViewerEol; bom?: boolean }) => void;
   setEditorReadOnly: (path: string, readOnly: boolean) => void;
   applyRestoredBackup: (path: string, backup: { content: string; encoding?: string; bom?: boolean; eol?: ViewerEol; savedHash?: string }) => void;
+  dismissRecoveryNotice: (path: string) => void;
   rekey: (oldPath: string, newPath: string, ack: ViewerWriteAck, options?: { encoding?: string; bom?: boolean; eol?: ViewerEol; content?: string }) => void;
   save: (path: string) => Promise<void>;
   reload: (path: string, encoding?: string) => Promise<void>;
@@ -284,6 +285,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
         restored: true,
         revision: document.revision + 1,
       }));
+    },
+    dismissRecoveryNotice(path) {
+      update(path, (document) => ({ ...document, restored: false }));
     },
     rekey(oldPath, newPath, ack, options) {
       const oldKey = documentPathKey(oldPath);

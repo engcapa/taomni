@@ -17696,6 +17696,7 @@ controls:
   - id: viewer-draft-restored
     selector: '[data-testid="viewer-draft-restored"]'
     kind: display
+    optional: true
   - id: viewer-large-file
     selector: '[data-testid="viewer-large-file"]'
     kind: display
