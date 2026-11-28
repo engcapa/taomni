@@ -11422,13 +11422,13 @@ dependencies = [
 name = "taomni-file-search"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "dirs 6.0.0",
  "libc",
  "serde",
  "tempfile",
  "tokio",
  "windows 0.62.2",
- "windows-future 0.3.2",
 ]
 
 [[package]]

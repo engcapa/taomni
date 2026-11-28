@@ -1,20 +1,25 @@
-//! Query the Windows Search index in-process. OnlyUseIndexer avoids a recursive
-//! filesystem scan when a drive is only partly indexed.
-use crate::providers::{Indexed, MAX_CANDIDATES};
+//! Read Windows Search through its OLE DB provider under the desktop user.
+use crate::providers::{Indexed, collect};
 use crate::{Provider, check_cancelled};
+use base64::{Engine, engine::general_purpose::STANDARD};
+use std::ffi::OsString;
+use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
-use tokio::time::Instant;
-use windows::Storage::Search::{FolderDepth, IndexedState, IndexerOption, QueryOptions};
-use windows::Storage::StorageFolder;
+use tokio::process::Command;
 use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetLogicalDrives};
-use windows::core::{HSTRING, PCWSTR, RuntimeType};
-use windows_future::IAsyncOperation;
+use windows::Win32::System::Services::{
+    CloseServiceHandle, OpenSCManagerW, OpenServiceW, QueryServiceStatus, SC_HANDLE,
+    SC_MANAGER_CONNECT, SERVICE_QUERY_STATUS, SERVICE_RUNNING, SERVICE_STATUS,
+};
+use windows::Win32::System::SystemInformation::GetSystemDirectoryW;
+use windows::Win32::System::Threading::{BELOW_NORMAL_PRIORITY_CLASS, CREATE_NO_WINDOW};
+use windows::core::{PCWSTR, w};
 
 pub(super) fn fixed_drive_mask() -> u32 {
-    // SAFETY: GetLogicalDrives takes no arguments. Each GetDriveTypeW call
-    // receives a live, NUL-terminated UTF-16 drive root.
+    // SAFETY: The OS call takes no arguments. GetDriveTypeW receives a
+    // temporary NUL-terminated drive root valid for the call.
     let logical = unsafe { GetLogicalDrives() };
     (0..26)
         .filter(|&i| logical & (1 << i) != 0)
@@ -27,122 +32,104 @@ pub(super) fn fixed_drive_mask() -> u32 {
         })
 }
 
-struct Pending<T: RuntimeType + 'static>(Option<IAsyncOperation<T>>);
-impl<T: RuntimeType> Drop for Pending<T> {
+struct ServiceHandle(SC_HANDLE);
+
+impl Drop for ServiceHandle {
     fn drop(&mut self) {
-        if let Some(op) = &self.0 {
-            let _ = op.Cancel();
-        }
+        // SAFETY: Only live handles returned by the service manager are stored.
+        let _ = unsafe { CloseServiceHandle(self.0) };
     }
 }
 
-async fn wait<T: RuntimeType>(
-    operation: IAsyncOperation<T>,
-    deadline: Instant,
-    cancelled: &AtomicBool,
-) -> Option<T> {
-    let mut pending = Pending(Some(operation.clone()));
-    let stop = async {
-        while check_cancelled(cancelled).is_ok() && Instant::now() < deadline {
-            tokio::time::sleep(Duration::from_millis(12)).await;
-        }
-    };
-    tokio::select! {
-        result = operation => {
-            pending.0 = None;
-            result.ok()
-        }
-        _ = stop => None,
+fn index_running() -> bool {
+    // SAFETY: A null server and database select the local default manager.
+    // QueryServiceStatus writes into an initialized, writable SERVICE_STATUS.
+    unsafe {
+        let Ok(manager) = OpenSCManagerW(PCWSTR::null(), PCWSTR::null(), SC_MANAGER_CONNECT) else {
+            return false;
+        };
+        let manager = ServiceHandle(manager);
+        let Ok(service) = OpenServiceW(manager.0, w!("WSearch"), SERVICE_QUERY_STATUS) else {
+            return false;
+        };
+        let service = ServiceHandle(service);
+        let mut status = SERVICE_STATUS::default();
+        QueryServiceStatus(service.0, &mut status).is_ok()
+            && status.dwCurrentState == SERVICE_RUNNING
     }
 }
 
-async fn query_drive(
-    drive: u8,
-    options: &QueryOptions,
-    remaining: usize,
-    deadline: Instant,
-    cancelled: &AtomicBool,
-) -> Option<(Vec<PathBuf>, bool)> {
-    let root = HSTRING::from(format!("{}:\\", char::from(drive)));
-    let open = StorageFolder::GetFolderFromPathAsync(&root).ok()?;
-    // StorageFolder, StorageItemQueryResult and IVectorView are apartment
-    // objects. Retain only agile asynchronous operations across await points
-    // so Tauri can move its command future between runtime threads.
-    let (fetch, mut index_state) = {
-        let folder = wait(open, deadline, cancelled).await?;
-        let query = folder.CreateItemQueryWithOptions(options).ok()?;
-        (
-            query.GetItemsAsync(0, remaining as u32).ok()?,
-            Pending(folder.GetIndexedStateAsync().ok()),
-        )
-    };
-    let (count, paths) = {
-        let items = wait(fetch, deadline, cancelled).await?;
-        let count = items.Size().ok()?;
-        let paths = (0..count)
-            .filter_map(|i| {
-                let path = items.GetAt(i).ok()?.Path().ok()?;
-                Some(PathBuf::from(path.to_os_string()))
-            })
-            .collect();
-        (count, paths)
-    };
-    if count == 0 {
-        // A disabled index and a completed index with zero hits are different
-        // user-visible states. Do not label an unindexed drive a healthy search.
-        let state = wait(index_state.0.take()?, deadline, cancelled).await?;
-        if !matches!(
-            state,
-            IndexedState::PartiallyIndexed | IndexedState::FullyIndexed
-        ) {
-            return None;
+fn executable() -> Option<PathBuf> {
+    let mut directory = [0; 32768];
+    // SAFETY: The slice is a writable UTF-16 buffer for the duration of the call.
+    let len = unsafe { GetSystemDirectoryW(Some(&mut directory)) } as usize;
+    if len == 0 || len >= directory.len() {
+        return None;
+    }
+    let directory = PathBuf::from(OsString::from_wide(&directory[..len]));
+    Some(directory.join("WindowsPowerShell/v1.0/powershell.exe"))
+}
+
+fn search_pattern(query: &str, separator: &str) -> String {
+    let mut pattern = "%".to_owned();
+    for (i, c) in query.chars().enumerate() {
+        if i != 0 {
+            pattern.push_str(separator);
+        }
+        match c {
+            '\'' => pattern.push_str("''"),
+            '%' => pattern.push_str("[%]"),
+            '_' => pattern.push_str("[_]"),
+            '[' => pattern.push_str("[[]"),
+            ']' => pattern.push_str("[]]"),
+            _ => pattern.push(c),
         }
     }
-    Some((paths, count as usize == remaining))
+    pattern.push('%');
+    pattern
 }
 
 pub(super) async fn lookup(query: &str, cancelled: &AtomicBool) -> Result<Indexed, String> {
-    let mut indexed = Indexed::unavailable();
-    // Double quotes, wildcards and path separators cannot occur in a Windows
-    // filename. Avoid interpreting user characters as executable AQS syntax.
-    if query.contains(['"', '*', '?', '/', '\\', ':', '<', '>', '|']) {
-        return Ok(indexed);
-    }
-    let deadline = Instant::now() + Duration::from_millis(850);
-    let options = QueryOptions::new().and_then(|options| {
-        options.SetFolderDepth(FolderDepth::Deep)?;
-        options.SetIndexerOption(IndexerOption::OnlyUseIndexer)?;
-        let mut wildcard = "*".to_owned();
-        for c in query.chars() {
-            wildcard.push(c);
-            wildcard.push('*');
-        }
-        options.SetApplicationSearchFilter(&HSTRING::from(format!(
-            "System.FileName:~\"{wildcard}\""
-        )))?;
-        Ok(options)
-    });
-    let Ok(options) = options else {
-        return Ok(indexed);
-    };
-    let mask = fixed_drive_mask();
-    for i in (0..26).filter(|i| mask & (1 << i) != 0) {
-        check_cancelled(cancelled)?;
-        if Instant::now() >= deadline || indexed.paths.len() >= MAX_CANDIDATES {
-            indexed.limited = true;
-            break;
-        }
-        let remaining = MAX_CANDIDATES - indexed.paths.len();
-        if let Some((paths, limited)) =
-            query_drive(b'A' + i, &options, remaining, deadline, cancelled).await
-        {
-            indexed.provider = Provider::WindowsSearch;
-            indexed.paths.extend(paths);
-            indexed.limited |= limited;
-        } else {
-            indexed.limited = true;
-        }
-    }
     check_cancelled(cancelled)?;
-    Ok(indexed)
+    // A stopped or unavailable service needs neither a subprocess nor a disk crawl.
+    let Some(program) = executable().filter(|_| index_running()) else {
+        return Ok(Indexed::unavailable());
+    };
+    let mut command = Command::new(program);
+    // The encoded command is fixed. The query travels only as escaped data for LIKE.
+    let encoded = STANDARD.encode(
+        include_str!("windows_search.ps1")
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>(),
+    );
+    command
+        .creation_flags(CREATE_NO_WINDOW.0 | BELOW_NORMAL_PRIORITY_CLASS.0)
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-EncodedCommand",
+        ])
+        .arg(encoded)
+        .env("TAOMNI_FILE_SEARCH_LITERAL", search_pattern(query, ""))
+        .env("TAOMNI_FILE_SEARCH_FUZZY", search_pattern(query, "%"));
+    collect(
+        command,
+        Provider::WindowsSearch,
+        Duration::from_millis(1600),
+        cancelled,
+    )
+    .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn escapes_wildcards_and_quotes_for_search_sql() {
+        assert_eq!(search_pattern("a'b[%_]", ""), "%a''b[[][%][_][]]%");
+        assert_eq!(search_pattern("ac", "%"), "%a%c%");
+    }
 }

@@ -1,22 +1,15 @@
 //! Platform index results share one bounded candidate contract.
 use std::path::PathBuf;
-#[cfg(not(windows))]
 use std::process::Stdio;
-#[cfg(not(windows))]
 use std::sync::atomic::AtomicBool;
-#[cfg(not(windows))]
 use std::time::Duration;
-#[cfg(not(windows))]
 use tokio::io::AsyncReadExt;
-#[cfg(not(windows))]
 use tokio::process::Command;
 
 use crate::Provider;
-#[cfg(not(windows))]
 use crate::check_cancelled;
 
 pub(super) const MAX_CANDIDATES: usize = 384;
-#[cfg(not(windows))]
 const MAX_BYTES: usize = 512 * 1024;
 
 pub(super) struct Indexed {
@@ -35,11 +28,11 @@ impl Indexed {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "macos", test))]
-fn glob_value(query: &str, literal_prefix: usize, spotlight: bool) -> String {
+#[cfg(any(target_os = "linux", test))]
+fn locate_pattern(query: &str, literal_prefix: usize) -> String {
     let mut pattern = "*".to_owned();
     for (i, ch) in query.chars().enumerate() {
-        if matches!(ch, '\\' | '*' | '?' | '[' | ']') || (spotlight && matches!(ch, '"' | '\'')) {
+        if matches!(ch, '\\' | '*' | '?' | '[' | ']') {
             pattern.push('\\');
         }
         pattern.push(ch);
@@ -59,7 +52,7 @@ fn command(query: &str, literal_prefix: usize) -> Option<(Command, Provider, Dur
     cmd.args(["-n", "10", "/usr/bin/plocate", "-b", "-i", "-0", "-l"])
         .arg(MAX_CANDIDATES.to_string())
         .arg("--")
-        .arg(glob_value(query, literal_prefix, false));
+        .arg(locate_pattern(query, literal_prefix));
     Some((
         cmd,
         Provider::Plocate,
@@ -67,25 +60,9 @@ fn command(query: &str, literal_prefix: usize) -> Option<(Command, Provider, Dur
     ))
 }
 
-#[cfg(target_os = "macos")]
-fn command(query: &str, literal_prefix: usize) -> Option<(Command, Provider, Duration)> {
-    let mut cmd = Command::new("/usr/bin/mdfind");
-    cmd.arg("-0").arg(format!(
-        "kMDItemFSName ==[c] \"{}\"",
-        glob_value(query, literal_prefix, true)
-    ));
-    Some((cmd, Provider::Spotlight, Duration::from_millis(450)))
-}
-
-#[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
-fn command(_: &str, _: usize) -> Option<(Command, Provider, Duration)> {
-    None
-}
-
 /// Drain output incrementally so a deadline or a very broad query can preserve
 /// complete rows without keeping a provider alive to enumerate its entire index.
-#[cfg(not(windows))]
-async fn collect(
+pub(super) async fn collect(
     mut command: Command,
     provider: Provider,
     timeout: Duration,
@@ -181,7 +158,7 @@ async fn collect(
     })
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 pub(super) async fn lookup(query: &str, cancelled: &AtomicBool) -> Result<Indexed, String> {
     check_cancelled(cancelled)?;
     let Some((cmd, source, timeout)) = command(query, usize::MAX) else {
@@ -191,7 +168,7 @@ pub(super) async fn lookup(query: &str, cancelled: &AtomicBool) -> Result<Indexe
     // A contiguous prefix lets plocate skip most trigram postings. This
     // commonly catches omitted separators before the general subsequence pass.
     let prefix = query.chars().count().div_ceil(2).max(3);
-    let anchor = cfg!(target_os = "linux") && query.chars().count() > 3 && result.paths.is_empty();
+    let anchor = query.chars().count() > 3 && result.paths.is_empty();
     for literal_prefix in anchor.then_some(prefix).into_iter().chain([1]) {
         if result.provider == Provider::BoundedScan {
             break;
@@ -218,6 +195,12 @@ pub(super) async fn lookup(query: &str, cancelled: &AtomicBool) -> Result<Indexe
         result.paths.extend(extra.paths);
     }
     Ok(result)
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
+pub(super) async fn lookup(_: &str, cancelled: &AtomicBool) -> Result<Indexed, String> {
+    check_cancelled(cancelled)?;
+    Ok(Indexed::unavailable())
 }
 
 #[cfg(test)]
@@ -312,7 +295,6 @@ mod tests {
 
     #[test]
     fn native_patterns_preserve_literal_metacharacters() {
-        assert_eq!(glob_value("a[b?*", 1, false), "*a*\\[*b*\\?*\\**");
-        assert_eq!(glob_value("a'\"b", usize::MAX, true), "*a\\'\\\"b*");
+        assert_eq!(locate_pattern("a[b?*", 1), "*a*\\[*b*\\?*\\**");
     }
 }

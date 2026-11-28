@@ -15,8 +15,8 @@ tokio = { version = "1", features = ["io-util", "macros", "process", "rt", "sync
 tempfile = "3"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62", features = ["Storage_Search", "Win32_Storage_FileSystem"] }
-windows-future = "0.3"
+base64 = "0.22"
+windows = { version = "0.62", features = ["Win32_Storage_FileSystem", "Win32_System_Services", "Win32_System_SystemInformation", "Win32_System_Threading"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = "0.2"
