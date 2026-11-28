@@ -14,3 +14,9 @@ WinRAR 6.11 created `records.RAR` with `-ma5 -m5 -s` and `legacy.rar` with `-ma4
 `forecast.xlsx` extends the quarterly workbook with a cross-sheet SUM and a dependent text-valued IF in Inventory. Changing Totals!B2 from 12 to 15.5 changes Totals!C2 to 31, Inventory!D2 to 47 and Inventory!E2 to Review.
 
 `shift-work.mppx` adds named resources and two assignments to the holiday-aware shift plan. It exercises new tasks, dependency recalculation and resource assignment round trips.
+
+`ppt-review.pptx` contains two slides with mixed text runs, table cells, notes and chart content. Regenerate it with `node qa-ui-auto-tests/fixtures/taoffice/ppt-build-review.mjs`. The edit checks compare the saved slide and the original OPC parts.
+
+`media-edit.webm` and `media-legacy.*` use synthetic test patterns and tones. The browser case trims the VP8/Opus WebM fixture. The native cases open AVI, FLV, WMV and RealMedia, and save a resized H.264/AAC copy of the AVI.
+
+Visio fixture inputs and provenance are documented in [visio-sources.md](visio-sources.md).

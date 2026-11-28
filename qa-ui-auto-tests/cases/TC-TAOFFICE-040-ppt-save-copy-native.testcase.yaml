@@ -1,0 +1,103 @@
+id: TC-TAOFFICE-040
+title: Save and reopen an edited PPTX through the native chooser
+description: Install the signed presentation module, edit two paragraphs, cancel and retry the system save dialog, and reopen the edited copy and its untouched second slide.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, file-open, taoffice, taoffice-ppt, native-boundary, crash-regression]
+fixtures: [reset_db, file_open_files, taoffice_signed_ppt]
+ui_standard: [UI-BTN-03, UI-DLG-12, UI-FOC-02]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.ppt_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.ppt_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- wait_for: '[data-testid="module-action-enable-taoffice-ppt"]:enabled'
+- press: {selector: '[data-testid="module-action-enable-taoffice-ppt"]', key: Enter}
+- wait_for: '[data-testid="module-action-disable-taoffice-ppt"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="ppt-review.pptx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="ppt-review.pptx"]'
+- wait_for: {selector: '[data-testid="taoffice-ppt-preview"][data-image-ready="true"][alt*="Quarterly review"]', timeout_sec: 45}
+- assert_disabled: '[data-testid="taoffice-ppt-save"]'
+- press: {selector: '[data-testid="taoffice-ppt-edit"]', key: Enter}
+- assert_focus_on: '[data-testid="taoffice-ppt-paragraph"][value="Quarterly review"]'
+- fill: {selector: '[data-testid="taoffice-ppt-paragraph"][value="Quarterly review"]', value: Updated quarterly review}
+- fill: {selector: '[data-testid="taoffice-ppt-paragraph"][value="Ready"]', value: Ready after review}
+- press: {selector: '[data-testid="taoffice-ppt-paragraph"][value="Ready after review"]', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-ppt-edit"]'
+- wait_for: '[data-testid="taoffice-ppt-preview"][data-image-ready="true"][alt*="Updated quarterly review"]'
+- native_file_dialog:
+    kind: save
+    action: cancel
+    trigger: '[data-testid="taoffice-ppt-save"]'
+- wait_for: '[data-testid="taoffice-ppt-save"]:enabled'
+- assert_visible: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/revised.pptx', absent: true}
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.file_open_root}/revised.pptx
+    trigger: '[data-testid="taoffice-ppt-save"]'
+- wait_for: '[data-testid="taoffice-ppt-output"]'
+- assert_disabled: '[data-testid="taoffice-ppt-save"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/ppt-review.pptx', sha256: '${fixture.taoffice_ppt_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="revised.pptx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="revised.pptx"]'
+- wait_for: {selector: '[data-testid="taoffice-ppt-preview"][data-image-ready="true"][alt*="Updated quarterly review"]', timeout_sec: 45}
+- press: {selector: '[data-testid="taoffice-ppt-edit"]', key: Enter}
+- assert_visible: '[data-testid="taoffice-ppt-paragraph"][value="Ready after review"]'
+- press: {selector: '[data-testid="taoffice-ppt-paragraph"][value="Updated quarterly review"]', key: Escape}
+- press: {selector: '[data-testid="taoffice-ppt-next"]', key: Enter}
+- wait_for: {selector: '[data-testid="taoffice-ppt-preview"][data-image-ready="true"][alt*="Delivery appendix"]', timeout_sec: 45}
+- assert_text_equals: {selector: '[data-testid="taoffice-ppt-position"]', equals: Slide 2 of 2}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-BTN-03]
+    requirement: Save a copy is available only while the current presentation has unsaved changes.
+    actions: [19, 24, 33]
+    checkpoints:
+    - {step: 21, expectation: Save a copy is initially disabled.}
+    - {step: 30, expectation: Cancelling the chooser restores the enabled Save a copy button.}
+    - {step: 35, expectation: Writing the copy disables Save a copy again.}
+    results: [21, 30, 35]
+  - id: R2
+    ui_standard: [UI-DLG-12]
+    requirement: The system file dialog belongs to the signed module's active presentation and cancellation preserves the draft.
+    actions: [29, 33]
+    checkpoints:
+    - {step: 31, expectation: Cancellation leaves the current tab dirty.}
+    - {step: 32, expectation: Cancellation writes no copy.}
+    - {step: 36, expectation: Save a copy preserves the original's SHA-256.}
+    - {step: 46, expectation: The separately reopened copy contains the edited table cell.}
+    - {step: 50, expectation: The second slide is viewable in the saved copy.}
+    results: [31, 32, 36, 46, 50]
+  - id: R3
+    ui_standard: [UI-FOC-02]
+    requirement: Enter opens the slide text editor on the title paragraph and Escape returns focus to the launcher.
+    actions: [22, 26]
+    checkpoints:
+    - {step: 23, expectation: The first editable paragraph receives focus.}
+    - {step: 27, expectation: Escape restores focus to the Edit slide text control.}
+    results: [23, 27]
+  visual:
+  - {check: Edited and retained slide previews, method: automated, reason: The case waits for each reopened slide's decoded image and checks the matching title and page position.}
+  native:
+  - {check: Save a copy from the signed renderer, method: automated, reason: The case uses the system file chooser and compares the original SHA-256 through the independent host file observation.}

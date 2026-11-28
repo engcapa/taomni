@@ -1,0 +1,22 @@
+{
+  "id": "taomni-plugin-taoffice-ppt",
+  "slug": "taoffice-ppt",
+  "name": "TaOffice PowerPoint",
+  "description": "Preview slides, replace slide text with its existing styling, and create PPTX copies.",
+  "version": "0.1.0",
+  "coreApiVersion": "1",
+  "kind": "media",
+  "status": "provisional",
+  "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
+  "entry": { "frontend": "frontend/index.js", "protocol": 1 },
+  "document": { "fileKinds": ["powerpoint"], "extensions": ["pptx"] },
+  "tabs": [],
+  "commands": [],
+  "permissions": ["fs.readUserFile"],
+  "dataDir": "plugins/taoffice-ppt",
+  "dataSchemaVersion": 1,
+  "backupPaths": [],
+  "legacyTables": [],
+  "vaultFixedKeys": [],
+  "snapshot": "file"
+}

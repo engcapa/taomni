@@ -62,6 +62,14 @@ Project 0.4.0 增加任务详情编辑，可新增或删除任务，调整日期
 
 TaOffice Media 0.1.2 在已加载且聚焦的播放器中支持 Space 播放或暂停，使用左右方向键定位 5 秒。TC-TAOFFICE-025/026 使用由旧编码样本离线转换的 VP8/WebM，验证 WebView 实际解码、定位和离开标签暂停。
 
+文档来源增加可选 `copyExtensions` 与 `saveCopy(bytes, { extension })`。核心按模块限制输出扩展名，Media 可另存 MP4 或 WebM，Visio 可另存 SVG。模块在 `copyExtensions` 提供目标格式时开放相应操作，以兼容较早的 API 1 核心。系统对话框和原始文件保护由核心负责。
+
+Media 0.3.0 的原生宿主使用模块包内的 FFmpeg 库处理 AVI、FLV、WMV 和 RM 等旧格式。浏览器预览在支持 WebCodecs 的环境中使用 Mediabunny。转换分别限制输入和输出为 32 MiB，原生直播放继续流式读源。另存支持以毫秒为精度裁剪，按原比例缩小，并输出 VP8/Opus WebM 或 H.264/AAC MP4。处理期间可取消，转换数据随标签或宿主释放。TC-TAOFFICE-043 至 046 验证转换前预览、恢复、播放和副本重开。
+
+PowerPoint 0.1.0 通过独立前端渲染 PPTX。可在已打开的文档中替换受支持段落的文字并继承已有文字样式，或生成一页新的演示文稿。编辑副本只改动涉及的幻灯片部件。TC-TAOFFICE-039/040 使用两页 PPTX 验证预览、焦点、保存和重开。
+
+Visio 0.1.0 使用模块内的 libvisio WebAssembly 解码器预览 VSDX、VSD 和相应模板。解码在独立 Worker 中运行，页面先清理成自包含 SVG，再用于预览和导出。查看器提供分页、缩放、查找和系统打开。TC-TAOFFICE-041/042 验证现代与旧版文件、坏文件恢复和导出的实际字节。
+
 | SDK 字段 | 当前公开内容 |
 |---|---|
 | `coreApiVersion` | 与 manifest 协商的核心 API 版本 |
@@ -70,6 +78,7 @@ TaOffice Media 0.1.2 在已加载且聚焦的播放器中支持 Space 播放或�
 | `zustand` | `create`、`createStore`、`useStore` |
 | `icons` | 显式公开的 Check、Loader2、Package、RefreshCw、X |
 | `i18n` | `getLocale`、`t`、`useLocale`、`useT` |
+| `formatShortcutDisplay` | 按当前平台显示快捷键。兼容旧版核心的模块可以回退到平台对应的标签 |
 
 组件的类型以 `src/lib/pluginFrontendHost.ts` 为准：
 

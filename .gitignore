@@ -33,6 +33,8 @@ src-tauri/frameworks/
 /src-tauri/plugins/taoffice-excel/dist/
 /src-tauri/plugins/taoffice-word/dist/
 /src-tauri/plugins/taoffice-project/dist/
+/src-tauri/plugins/taoffice-ppt/dist/
+/src-tauri/plugins/taoffice-visio/dist/
 /src-tauri/plugins/taoffice-video/dist/
 
 

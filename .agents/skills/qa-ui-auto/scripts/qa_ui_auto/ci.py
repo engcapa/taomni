@@ -100,6 +100,10 @@ def capabilities(cases, mode: str) -> list[str]:
             result.add("taoffice-word")
         if mode == "browser" and "taoffice-project" in case.tags:
             result.add("taoffice-project")
+        if mode == "browser" and "taoffice-ppt" in case.tags:
+            result.add("taoffice-ppt")
+        if mode == "browser" and "taoffice-visio" in case.tags:
+            result.add("taoffice-visio")
         if mode == "browser" and "taoffice-video" in case.tags:
             result.add("taoffice-video")
         if mode == "native" and "mobile_service" in fixtures:
@@ -150,6 +154,10 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.add("signed-taoffice-word")
             if "taoffice_signed_project" in fixtures:
                 result.add("signed-taoffice-project")
+            if "taoffice_signed_ppt" in fixtures:
+                result.add("signed-taoffice-ppt")
+            if "taoffice_signed_visio" in fixtures:
+                result.add("signed-taoffice-visio")
             if "module_signed_voice_archive" in fixtures:
                 result.add("signed-local-voice")
             if "module_signed_sockscap_archive" in fixtures:
@@ -330,7 +338,9 @@ def make_plan(args, *, cases=None, features=None) -> dict:
             raise ValueError("full native profile requires a matching Release Bundle run ID")
         roster = module_profile.roster()
         requires_plugin = policy.get("requires_plugin", {})
-        if set(requires_plugin) - explicit or set(requires_plugin.values()) - roster.keys():
+        module_slugs = {path.parent.name for path in Path("src-tauri/plugins").glob("*/module.json")}
+        crash_cases = {case.id for case in cases if "crash-regression" in case.tags}
+        if set(requires_plugin) - crash_cases or set(requires_plugin.values()) - module_slugs:
             raise ValueError("invalid plugin dependency in the crash-regression case catalog")
         installation = {"name": installation_profile, "source": head, "release_run": release_run,
                         "modules": roster if installation_profile == "full" else {}}

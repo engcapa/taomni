@@ -138,7 +138,9 @@ class BuildPipelineTests(unittest.TestCase):
                 jobs[f'execute-{platform}-native']['needs'],
                 dependencies + [
                     'signed-mail', 'signed-screenshot', 'signed-vnc-server', 'signed-servers',
-                    'signed-voice', 'signed-sockscap', 'signed-taoffice-video', 'signed-taoffice-pdf', 'signed-taoffice-excel', rdp_server_signer,
+                    'signed-voice', 'signed-sockscap', 'signed-taoffice-video', 'signed-taoffice-pdf',
+                    'signed-taoffice-excel', 'signed-taoffice-word', 'signed-taoffice-project',
+                    'signed-taoffice-ppt', 'signed-taoffice-visio', rdp_server_signer,
                 ],
             )
             self.assertIn(f'execute-{platform}-native', jobs['summarize']['needs'])
@@ -166,6 +168,7 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-sockscap')", jobs['signed-sockscap']['if'])
         self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-local-vnc')", jobs['signed-vnc-server']['if'])
         self.assertIs(jobs['signed-rdp-server-macos']['with']['native_macos_signing'], True)
+        self.assertIs(jobs['signed-taoffice-video']['with']['native_macos_signing'], True)
         self.assertIn('APPLE_CERTIFICATE', jobs['signed-rdp-server-macos']['secrets'])
         self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-module')", jobs['signed-modular-packages']['if'])
         self.assertNotIn('Validate QA tools', [s.get('name') for s in jobs['plan']['steps']])
@@ -313,7 +316,9 @@ class NightlyAndCachePipelineTests(unittest.TestCase):
         macos = jobs['execute-macos-browser']
         self.assertEqual(macos['with']['max_parallel'], 3)
         self.assertEqual(macos['with']['matrix'], '${{ needs.plan.outputs.macos_browser_matrix }}')
-        self.assertEqual(macos['if'], "needs.plan.outputs.has_macos_browser == 'true'")
+        self.assertIn("needs.plan.outputs.has_macos_browser == 'true'", macos['if'])
+        self.assertIn('taoffice-visio-browser-frontend', macos['needs'])
+        self.assertIn("needs.taoffice-visio-browser-frontend.result == 'success'", macos['if'])
         self.assertIn('execute-macos-browser', jobs['summarize']['needs'])
 
     def test_trusted_default_branch_cargo_lookup_precedes_a_cold_build(self):

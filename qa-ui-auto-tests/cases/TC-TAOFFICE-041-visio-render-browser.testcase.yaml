@@ -1,0 +1,145 @@
+id: TC-TAOFFICE-041
+title: Render Visio pages, search diagram text and export the selected page
+description: Recover from a damaged file and a system-open error, then render a two-page VSDX, navigate search results with keyboard and button controls, and download the matching SVG.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-visio, crash-regression]
+fixtures: [reset_db, file_open_files]
+ui_standard: [UI-BTN-03, UI-BTN-04, UI-FOC-02, UI-FND-03a, UI-FND-13, UI-INP-03, UI-INP-06, UI-SRF-02]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-visio.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- press: {selector: '#ui-font-size-slider', key: Home}
+- click: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-light"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="visio-damaged.vsdx"]'
+- assert_text: {selector: '[data-testid="taoffice-visio-error"]', contains: The file is damaged}
+- assert_enabled: '[data-testid="taoffice-visio-open-system"]'
+- click: '[data-testid="taoffice-visio-open-system"]'
+- assert_text:
+    selector: '[data-testid="taoffice-visio"] > [role="alert"]'
+    contains: Opening files with the OS shell is not available in browser preview
+- assert_enabled: '[data-testid="taoffice-visio-open-system"]'
+- press: {selector: '[data-testid="taoffice-visio-retry"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-visio-error"]', contains: The file is damaged}
+- assert_count: {selector: '[data-testid="taoffice-visio"] > [role="alert"]', equal: 0}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="visio-routing.vsdx"]'
+- wait_for: {selector: '[data-testid="taoffice-visio-page"][data-page="1"][data-rendered="true"]', timeout_sec: 50}
+- assert_text_equals: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-visio-page-name"]', equals: 'Routing overview · 1/2'}
+- assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-visio-previous"]'
+- assert_computed_style: {selector: '.taoffice-visio-toolbar', property: font-size, equals: 10px}
+- assert_solid_text_contrast: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-visio-fidelity"]', minimum: 4.5, composite_ancestors: true}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-visio-next"]', key: Enter}
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-visio-page"][data-page="2"][data-rendered="true"]'
+- assert_text_equals: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-visio-page-name"]', equals: 'Delivery details · 2/2'}
+- assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-visio-next"]'
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-visio-zoom-in"]', key: Enter}
+- assert_attribute: {selector: '[data-testid="taoffice-visio-fit"]', name: aria-pressed, equals: 'false'}
+- press: {selector: '[data-testid="taoffice-visio-fit"]', key: Enter}
+- assert_attribute: {selector: '[data-testid="taoffice-visio-fit"]', name: aria-pressed, equals: 'true'}
+- press: {selector: '[data-testid="taoffice-visio-viewport"]', key: Control+f, macos_key: Meta+f}
+- assert_focus_on: '[data-testid="taoffice-visio-find-input"]'
+- compose_text: {selector: '[data-testid="taoffice-visio-find-input"]', text: Routing, during_key: Enter}
+- assert_text_equals: {selector: '[data-testid="taoffice-visio-find-status"]', equals: '2 matching pages'}
+- assert_attribute: {selector: '[data-testid="taoffice-visio-page"]', name: data-page, equals: '2'}
+- press: {selector: '[data-testid="taoffice-visio-find-input"]', key: Enter}
+- wait_for: '[data-testid="taoffice-visio-page"][data-page="1"][data-rendered="true"]'
+- press: {selector: '[data-testid="taoffice-visio-find-input"]', key: Shift+Enter}
+- wait_for: '[data-testid="taoffice-visio-page"][data-page="2"][data-rendered="true"]'
+- assert_text_equals: {selector: '[data-testid="taoffice-visio-find-status"]', equals: 'Matching page 2 of 2'}
+- click: '[data-testid="taoffice-visio-find-next"]'
+- wait_for: '[data-testid="taoffice-visio-page"][data-page="1"][data-rendered="true"]'
+- assert_text_equals: {selector: '[data-testid="taoffice-visio-find-status"]', equals: 'Matching page 1 of 2'}
+- press: {selector: '[data-testid="taoffice-visio-find-input"]', key: Shift+Enter}
+- wait_for: '[data-testid="taoffice-visio-page"][data-page="2"][data-rendered="true"]'
+- fill: {selector: '[data-testid="taoffice-visio-find-input"]', value: Missing text}
+- assert_text_equals: {selector: '[data-testid="taoffice-visio-find-status"]', equals: No text found}
+- assert_disabled: '[data-testid="taoffice-visio-find-next"]'
+- press: {selector: '[data-testid="taoffice-visio-find-input"]', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-visio-find-input"]'
+- press: {selector: '[data-testid="taoffice-visio-find-input"]', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-visio-viewport"]'
+- click: '[data-testid="ribbon-settings"]'
+- press: {selector: '#ui-font-size-slider', key: End}
+- click: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-dark"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: 'html[data-app-theme="dark"] [data-testid="taoffice-visio-page"][data-page="2"][data-rendered="true"]'
+- assert_computed_style: {selector: '.taoffice-visio-toolbar', property: font-size, equals: 18px}
+- assert_solid_text_contrast: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-visio-fidelity"]', minimum: 4.5, composite_ancestors: true}
+- eval_readonly:
+    expression: >-
+      document.querySelector("img.taoffice-visio-image").naturalWidth === 768 &&
+      document.querySelector("img.taoffice-visio-image").naturalHeight === 384
+    expect_truthy: true
+- assert_download:
+    trigger: '[data-testid="taoffice-visio-export"]'
+    filename: visio-routing - copy.svg
+    contains: ['<svg', '<path', 'Routing approval', '#dfeddb']
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/visio-routing.vsdx', sha256: '${fixture.taoffice_visio_modern_sha}'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-BTN-03]
+    requirement: Page navigation and search expose usable enabled and disabled states.
+    actions: [25, 31, 49, 54]
+    checkpoints:
+    - {step: 28, expectation: Previous page is disabled on the first page.}
+    - {step: 34, expectation: Next page is disabled on the last page.}
+    - {step: 50, expectation: Clicking Next result wraps to the first matching page and displays it.}
+    - {step: 51, expectation: The result status reports the first of two matching pages.}
+    - {step: 56, expectation: An empty search result disables moving to the next match.}
+    results: [28, 34, 50, 51, 56]
+  - id: R2
+    ui_standard: [UI-SRF-02, UI-FOC-02, UI-INP-03, UI-INP-06]
+    requirement: A focused document opens Find with the standard shortcut and supports IME, result navigation and focus restoration.
+    actions: [39, 41, 44, 46, 57, 59]
+    checkpoints:
+    - {step: 40, expectation: The search input receives focus.}
+    - {step: 43, expectation: Composing Enter leaves the currently visible page unchanged.}
+    - {step: 45, expectation: Ordinary Enter moves to the first matching page.}
+    - {step: 48, expectation: Shift+Enter reaches the last matching page.}
+    - {step: 58, expectation: The search input keeps focus after the first Escape.}
+    - {step: 60, expectation: A second Escape restores focus to the invoking viewport.}
+    results: [40, 43, 45, 48, 58, 60]
+  - id: R3
+    ui_standard: [UI-FND-03a, UI-FND-13]
+    requirement: The Visio toolbar and footer follow the live app appearance settings while document colors remain visible.
+    actions: [7, 9, 62, 64]
+    checkpoints:
+    - {step: 29, expectation: The light toolbar resolves to the 10px setting.}
+    - {step: 30, expectation: The light footer text meets the 4.5:1 contrast threshold.}
+    - {step: 67, expectation: The same toolbar resolves to the 18px setting.}
+    - {step: 68, expectation: The dark footer text meets the 4.5:1 contrast threshold.}
+    - {step: 69, expectation: The browser decodes the second page at the expected diagram dimensions.}
+    - {step: 70, expectation: The exported second page retains the original shape fill.}
+    results: [29, 30, 67, 68, 69, 70]
+  - id: R4
+    ui_standard: [UI-BTN-04]
+    requirement: Open in system app shows an actionable failure in the browser, re-enables the action, and clears its feedback on retrying the preview.
+    actions: [18, 21]
+    checkpoints:
+    - {step: 19, expectation: The alert explains why browser preview cannot open a system application.}
+    - {step: 20, expectation: The system-open action is available again.}
+    - {step: 22, expectation: Retry reports the damaged preview again.}
+    - {step: 23, expectation: The system-open alert has cleared.}
+    results: [19, 20, 22, 23]
+  visual:
+  - {check: Diagram geometry and document fill, method: automated, reason: Confirms the visible rendered SVG image dimensions and checks the exported shape geometry and original fill.}
+  native:
+  - {check: Signed renderer and system save, method: external, reason: TC-TAOFFICE-042 validates the signed package in the desktop WebView and verifies the saved file on disk.}

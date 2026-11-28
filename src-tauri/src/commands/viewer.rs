@@ -90,6 +90,7 @@ async fn viewer_document_save_copy(
     slug: String,
     version: String,
     bytes: Vec<u8>,
+    output_extension: Option<String>,
     window: Window,
     state: State<'_, AppState>,
 ) -> Result<Option<String>, String> {
@@ -100,13 +101,26 @@ async fn viewer_document_save_copy(
         let source =
             viewer::document_access::approved_path(&registry, &protected, &path, &slug, &version)?;
         viewer::document_copy::validate(&source, &bytes)?;
-        let Some(selected) = viewer::document_copy::select_destination(&window, &source, &slug)?
+        let Some(selected) = viewer::document_copy::select_destination(
+            &window,
+            &source,
+            &slug,
+            output_extension.as_deref(),
+        )?
         else {
             return Ok(None);
         };
         let source =
             viewer::document_access::approved_path(&registry, &protected, &path, &slug, &version)?;
-        viewer::document_copy::write(&source, &slug, &selected, &protected, &bytes).map(Some)
+        viewer::document_copy::write(
+            &source,
+            &slug,
+            &selected,
+            &protected,
+            &bytes,
+            output_extension.as_deref(),
+        )
+        .map(Some)
     })
     .await
 }

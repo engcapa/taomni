@@ -567,9 +567,13 @@ jobs:
       artifact_key: ${{ format('{0}-taoffice-video', needs.plan.outputs.artifact_key) }}
       macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
       native_builds: ${{ needs.plan.outputs.build_matrix }}
+      native_macos_signing: true
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
 
   signed-taoffice-pdf:
     needs: plan
@@ -607,6 +611,34 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       module: taoffice-project
       artifact_key: ${{ format('{0}-taoffice-project', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-taoffice-ppt:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.native_matrix, 'signed-taoffice-ppt')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: taoffice-ppt
+      artifact_key: ${{ format('{0}-taoffice-ppt', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-taoffice-visio:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.native_matrix, 'signed-taoffice-visio')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: taoffice-visio
+      artifact_key: ${{ format('{0}-taoffice-visio', needs.plan.outputs.artifact_key) }}
       macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
       native_builds: ${{ needs.plan.outputs.build_matrix }}
     secrets:
@@ -689,9 +721,18 @@ jobs:
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
 
-  execute-browser:
+  taoffice-visio-browser-frontend:
     needs: plan
-    if: needs.plan.outputs.has_browser == 'true'
+    if: contains(needs.plan.outputs.browser_matrix, 'taoffice-visio') || contains(needs.plan.outputs.macos_browser_matrix, 'taoffice-visio')
+    uses: ./.github/workflows/build-vnc-frontend.yml
+    with:
+      module: taoffice-visio
+      source: ${{ needs.plan.outputs.head }}
+      artifact: taoffice-visio-browser-${{ needs.plan.outputs.artifact_key }}
+
+  execute-browser:
+    needs: [plan, taoffice-visio-browser-frontend]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.has_browser == 'true' && (!contains(needs.plan.outputs.browser_matrix, 'taoffice-visio') || needs.taoffice-visio-browser-frontend.result == 'success') }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
       matrix: ${{ needs.plan.outputs.browser_matrix }}
@@ -704,8 +745,8 @@ jobs:
   # browser shards. Schedule browser separately with a smaller cap so native
   # shards get the slots first.
   execute-macos-browser:
-    needs: plan
-    if: needs.plan.outputs.has_macos_browser == 'true'
+    needs: [plan, taoffice-visio-browser-frontend]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.has_macos_browser == 'true' && (!contains(needs.plan.outputs.macos_browser_matrix, 'taoffice-visio') || needs.taoffice-visio-browser-frontend.result == 'success') }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
       max_parallel: 3
@@ -728,8 +769,8 @@ jobs:
       trusted_cache: ${{ inputs.trusted_cache }}
 
   execute-linux-native:
-    needs: [plan, build-linux, signed-modular-packages, signed-mfa-linux, signed-vnc-linux, signed-rdp-linux, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-taoffice-video, signed-taoffice-pdf, signed-taoffice-excel, signed-taoffice-word, signed-taoffice-project, signed-rdp-server-linux]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-linux.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-mfa-linux.result == 'success' || needs.signed-mfa-linux.result == 'skipped') && (needs.signed-vnc-linux.result == 'success' || needs.signed-vnc-linux.result == 'skipped') && (needs.signed-rdp-linux.result == 'success' || needs.signed-rdp-linux.result == 'skipped') && (needs.signed-mail.result == 'success' || needs.signed-mail.result == 'skipped') && (needs.signed-screenshot.result == 'success' || needs.signed-screenshot.result == 'skipped') && (needs.signed-vnc-server.result == 'success' || needs.signed-vnc-server.result == 'skipped') && (needs.signed-servers.result == 'success' || needs.signed-servers.result == 'skipped') && (needs.signed-voice.result == 'success' || needs.signed-voice.result == 'skipped') && (needs.signed-sockscap.result == 'success' || needs.signed-sockscap.result == 'skipped') && (needs.signed-taoffice-video.result == 'success' || needs.signed-taoffice-video.result == 'skipped') && (needs.signed-taoffice-pdf.result == 'success' || needs.signed-taoffice-pdf.result == 'skipped') && (needs.signed-taoffice-excel.result == 'success' || needs.signed-taoffice-excel.result == 'skipped') && (needs.signed-taoffice-word.result == 'success' || needs.signed-taoffice-word.result == 'skipped') && (needs.signed-taoffice-project.result == 'success' || needs.signed-taoffice-project.result == 'skipped') && (needs.signed-rdp-server-linux.result == 'success' || needs.signed-rdp-server-linux.result == 'skipped') && needs.plan.outputs.has_linux_native == 'true' }}
+    needs: [plan, build-linux, signed-modular-packages, signed-mfa-linux, signed-vnc-linux, signed-rdp-linux, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-taoffice-video, signed-taoffice-pdf, signed-taoffice-excel, signed-taoffice-word, signed-taoffice-project, signed-taoffice-ppt, signed-taoffice-visio, signed-rdp-server-linux]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-linux.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-mfa-linux.result == 'success' || needs.signed-mfa-linux.result == 'skipped') && (needs.signed-vnc-linux.result == 'success' || needs.signed-vnc-linux.result == 'skipped') && (needs.signed-rdp-linux.result == 'success' || needs.signed-rdp-linux.result == 'skipped') && (needs.signed-mail.result == 'success' || needs.signed-mail.result == 'skipped') && (needs.signed-screenshot.result == 'success' || needs.signed-screenshot.result == 'skipped') && (needs.signed-vnc-server.result == 'success' || needs.signed-vnc-server.result == 'skipped') && (needs.signed-servers.result == 'success' || needs.signed-servers.result == 'skipped') && (needs.signed-voice.result == 'success' || needs.signed-voice.result == 'skipped') && (needs.signed-sockscap.result == 'success' || needs.signed-sockscap.result == 'skipped') && (needs.signed-taoffice-video.result == 'success' || needs.signed-taoffice-video.result == 'skipped') && (needs.signed-taoffice-pdf.result == 'success' || needs.signed-taoffice-pdf.result == 'skipped') && (needs.signed-taoffice-excel.result == 'success' || needs.signed-taoffice-excel.result == 'skipped') && (needs.signed-taoffice-word.result == 'success' || needs.signed-taoffice-word.result == 'skipped') && (needs.signed-taoffice-project.result == 'success' || needs.signed-taoffice-project.result == 'skipped') && (needs.signed-taoffice-ppt.result == 'success' || needs.signed-taoffice-ppt.result == 'skipped') && (needs.signed-taoffice-visio.result == 'success' || needs.signed-taoffice-visio.result == 'skipped') && (needs.signed-rdp-server-linux.result == 'success' || needs.signed-rdp-server-linux.result == 'skipped') && needs.plan.outputs.has_linux_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
       matrix: ${{ needs.plan.outputs.linux_native_matrix }}
@@ -752,8 +793,8 @@ jobs:
       trusted_cache: ${{ inputs.trusted_cache }}
 
   execute-windows-native:
-    needs: [plan, build-windows, signed-modular-packages, signed-mfa-windows, signed-vnc-windows, signed-rdp-windows, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-taoffice-video, signed-taoffice-pdf, signed-taoffice-excel, signed-taoffice-word, signed-taoffice-project, signed-rdp-server-windows]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-windows.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-mfa-windows.result == 'success' || needs.signed-mfa-windows.result == 'skipped') && (needs.signed-vnc-windows.result == 'success' || needs.signed-vnc-windows.result == 'skipped') && (needs.signed-rdp-windows.result == 'success' || needs.signed-rdp-windows.result == 'skipped') && (needs.signed-mail.result == 'success' || needs.signed-mail.result == 'skipped') && (needs.signed-screenshot.result == 'success' || needs.signed-screenshot.result == 'skipped') && (needs.signed-vnc-server.result == 'success' || needs.signed-vnc-server.result == 'skipped') && (needs.signed-servers.result == 'success' || needs.signed-servers.result == 'skipped') && (needs.signed-voice.result == 'success' || needs.signed-voice.result == 'skipped') && (needs.signed-sockscap.result == 'success' || needs.signed-sockscap.result == 'skipped') && (needs.signed-taoffice-video.result == 'success' || needs.signed-taoffice-video.result == 'skipped') && (needs.signed-taoffice-pdf.result == 'success' || needs.signed-taoffice-pdf.result == 'skipped') && (needs.signed-taoffice-excel.result == 'success' || needs.signed-taoffice-excel.result == 'skipped') && (needs.signed-taoffice-word.result == 'success' || needs.signed-taoffice-word.result == 'skipped') && (needs.signed-taoffice-project.result == 'success' || needs.signed-taoffice-project.result == 'skipped') && (needs.signed-rdp-server-windows.result == 'success' || needs.signed-rdp-server-windows.result == 'skipped') && needs.plan.outputs.has_windows_native == 'true' }}
+    needs: [plan, build-windows, signed-modular-packages, signed-mfa-windows, signed-vnc-windows, signed-rdp-windows, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-taoffice-video, signed-taoffice-pdf, signed-taoffice-excel, signed-taoffice-word, signed-taoffice-project, signed-taoffice-ppt, signed-taoffice-visio, signed-rdp-server-windows]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-windows.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-mfa-windows.result == 'success' || needs.signed-mfa-windows.result == 'skipped') && (needs.signed-vnc-windows.result == 'success' || needs.signed-vnc-windows.result == 'skipped') && (needs.signed-rdp-windows.result == 'success' || needs.signed-rdp-windows.result == 'skipped') && (needs.signed-mail.result == 'success' || needs.signed-mail.result == 'skipped') && (needs.signed-screenshot.result == 'success' || needs.signed-screenshot.result == 'skipped') && (needs.signed-vnc-server.result == 'success' || needs.signed-vnc-server.result == 'skipped') && (needs.signed-servers.result == 'success' || needs.signed-servers.result == 'skipped') && (needs.signed-voice.result == 'success' || needs.signed-voice.result == 'skipped') && (needs.signed-sockscap.result == 'success' || needs.signed-sockscap.result == 'skipped') && (needs.signed-taoffice-video.result == 'success' || needs.signed-taoffice-video.result == 'skipped') && (needs.signed-taoffice-pdf.result == 'success' || needs.signed-taoffice-pdf.result == 'skipped') && (needs.signed-taoffice-excel.result == 'success' || needs.signed-taoffice-excel.result == 'skipped') && (needs.signed-taoffice-word.result == 'success' || needs.signed-taoffice-word.result == 'skipped') && (needs.signed-taoffice-project.result == 'success' || needs.signed-taoffice-project.result == 'skipped') && (needs.signed-taoffice-ppt.result == 'success' || needs.signed-taoffice-ppt.result == 'skipped') && (needs.signed-taoffice-visio.result == 'success' || needs.signed-taoffice-visio.result == 'skipped') && (needs.signed-rdp-server-windows.result == 'success' || needs.signed-rdp-server-windows.result == 'skipped') && needs.plan.outputs.has_windows_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
       matrix: ${{ needs.plan.outputs.windows_native_matrix }}
@@ -776,8 +817,8 @@ jobs:
       trusted_cache: ${{ inputs.trusted_cache }}
 
   execute-macos-native:
-    needs: [plan, build-macos, signed-modular-packages, signed-mfa-macos, signed-vnc-macos, signed-rdp-macos, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-taoffice-video, signed-taoffice-pdf, signed-taoffice-excel, signed-taoffice-word, signed-taoffice-project, signed-rdp-server-macos]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-macos.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-mfa-macos.result == 'success' || needs.signed-mfa-macos.result == 'skipped') && (needs.signed-vnc-macos.result == 'success' || needs.signed-vnc-macos.result == 'skipped') && (needs.signed-rdp-macos.result == 'success' || needs.signed-rdp-macos.result == 'skipped') && (needs.signed-mail.result == 'success' || needs.signed-mail.result == 'skipped') && (needs.signed-screenshot.result == 'success' || needs.signed-screenshot.result == 'skipped') && (needs.signed-vnc-server.result == 'success' || needs.signed-vnc-server.result == 'skipped') && (needs.signed-servers.result == 'success' || needs.signed-servers.result == 'skipped') && (needs.signed-voice.result == 'success' || needs.signed-voice.result == 'skipped') && (needs.signed-sockscap.result == 'success' || needs.signed-sockscap.result == 'skipped') && (needs.signed-taoffice-video.result == 'success' || needs.signed-taoffice-video.result == 'skipped') && (needs.signed-taoffice-pdf.result == 'success' || needs.signed-taoffice-pdf.result == 'skipped') && (needs.signed-taoffice-excel.result == 'success' || needs.signed-taoffice-excel.result == 'skipped') && (needs.signed-taoffice-word.result == 'success' || needs.signed-taoffice-word.result == 'skipped') && (needs.signed-taoffice-project.result == 'success' || needs.signed-taoffice-project.result == 'skipped') && (needs.signed-rdp-server-macos.result == 'success' || needs.signed-rdp-server-macos.result == 'skipped') && needs.plan.outputs.has_macos_native == 'true' }}
+    needs: [plan, build-macos, signed-modular-packages, signed-mfa-macos, signed-vnc-macos, signed-rdp-macos, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-taoffice-video, signed-taoffice-pdf, signed-taoffice-excel, signed-taoffice-word, signed-taoffice-project, signed-taoffice-ppt, signed-taoffice-visio, signed-rdp-server-macos]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-macos.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-mfa-macos.result == 'success' || needs.signed-mfa-macos.result == 'skipped') && (needs.signed-vnc-macos.result == 'success' || needs.signed-vnc-macos.result == 'skipped') && (needs.signed-rdp-macos.result == 'success' || needs.signed-rdp-macos.result == 'skipped') && (needs.signed-mail.result == 'success' || needs.signed-mail.result == 'skipped') && (needs.signed-screenshot.result == 'success' || needs.signed-screenshot.result == 'skipped') && (needs.signed-vnc-server.result == 'success' || needs.signed-vnc-server.result == 'skipped') && (needs.signed-servers.result == 'success' || needs.signed-servers.result == 'skipped') && (needs.signed-voice.result == 'success' || needs.signed-voice.result == 'skipped') && (needs.signed-sockscap.result == 'success' || needs.signed-sockscap.result == 'skipped') && (needs.signed-taoffice-video.result == 'success' || needs.signed-taoffice-video.result == 'skipped') && (needs.signed-taoffice-pdf.result == 'success' || needs.signed-taoffice-pdf.result == 'skipped') && (needs.signed-taoffice-excel.result == 'success' || needs.signed-taoffice-excel.result == 'skipped') && (needs.signed-taoffice-word.result == 'success' || needs.signed-taoffice-word.result == 'skipped') && (needs.signed-taoffice-project.result == 'success' || needs.signed-taoffice-project.result == 'skipped') && (needs.signed-taoffice-ppt.result == 'success' || needs.signed-taoffice-ppt.result == 'skipped') && (needs.signed-taoffice-visio.result == 'success' || needs.signed-taoffice-visio.result == 'skipped') && (needs.signed-rdp-server-macos.result == 'success' || needs.signed-rdp-server-macos.result == 'skipped') && needs.plan.outputs.has_macos_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
       # Run all 4 planned shards in one wave within GitHub's hosted macOS limit.
@@ -913,7 +954,7 @@ jobs:
   summarize:
     name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, tool-contracts, sftp-contracts, selected-build-checks, frontend-contracts, signed-modular-packages, signed-mfa-linux, signed-mfa-windows, signed-mfa-macos, signed-vnc-linux, signed-vnc-windows, signed-vnc-macos, signed-rdp-linux, signed-rdp-windows, signed-rdp-macos, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-taoffice-video, signed-taoffice-pdf, signed-taoffice-excel, signed-taoffice-word, signed-taoffice-project, signed-rdp-server-linux, signed-rdp-server-windows, signed-rdp-server-macos, execute-browser, execute-macos-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
+    needs: [plan, tool-contracts, sftp-contracts, selected-build-checks, frontend-contracts, signed-modular-packages, signed-mfa-linux, signed-mfa-windows, signed-mfa-macos, signed-vnc-linux, signed-vnc-windows, signed-vnc-macos, signed-rdp-linux, signed-rdp-windows, signed-rdp-macos, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-taoffice-video, signed-taoffice-pdf, signed-taoffice-excel, signed-taoffice-word, signed-taoffice-project, signed-taoffice-ppt, signed-taoffice-visio, signed-rdp-server-linux, signed-rdp-server-windows, signed-rdp-server-macos, taoffice-visio-browser-frontend, execute-browser, execute-macos-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

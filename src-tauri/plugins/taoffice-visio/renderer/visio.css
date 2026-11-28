@@ -1,0 +1,80 @@
+.taoffice-visio {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: var(--taomni-panel-bg);
+  color: var(--taomni-text);
+  font-size: var(--taomni-fs-body);
+}
+.taoffice-visio-toolbar,
+.taoffice-visio-find,
+.taoffice-visio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.taoffice-visio-toolbar,
+.taoffice-visio-find {
+  padding: 8px;
+  border-bottom: 1px solid var(--taomni-card-border);
+}
+.taoffice-visio :is(.taomni-btn, .taomni-input) {
+  min-height: max(26px, calc(1em + 8px));
+  padding-inline: 8px;
+  white-space: nowrap;
+}
+.taoffice-visio :focus-visible {
+  outline: 2px solid var(--taomni-focus-ring);
+  outline-offset: 2px;
+}
+.taoffice-visio [aria-pressed="true"],
+.taoffice-visio [aria-expanded="true"] {
+  color: var(--taomni-text);
+  background: var(--taomni-selected);
+}
+.taoffice-visio-zoom {
+  min-width: 5ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.taoffice-visio-find .taomni-input {
+  width: min(24ch, 100%);
+}
+.taoffice-visio-viewport {
+  box-sizing: border-box;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  background: var(--taomni-card-bg);
+}
+.taoffice-visio-viewport:focus-visible {
+  outline-offset: -2px;
+}
+.taoffice-visio-image {
+  display: block;
+  max-width: none;
+  margin-inline: auto;
+  color-scheme: light;
+  background: Canvas;
+}
+.taoffice-visio-status,
+.taoffice-visio-failure,
+.taoffice-visio-note {
+  margin: 0;
+  padding: 8px;
+  overflow-wrap: anywhere;
+}
+.taoffice-visio-status,
+.taoffice-visio-failure {
+  user-select: text;
+}
+.taoffice-visio-failure p {
+  margin: 0 0 8px;
+}
+.taoffice-visio-note {
+  font-size: var(--taomni-fs-small);
+}

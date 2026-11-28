@@ -185,7 +185,7 @@ jobs:
               raise SystemExit('manifest must declare supported production release targets')
           targets = [target for target in targets if target['platform'] in declared]
           built_frontend = slug in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
-                                   'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project', 'taoffice-video'}
+                                   'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project', 'taoffice-ppt', 'taoffice-visio', 'taoffice-video'}
           output = os.environ['GITHUB_OUTPUT']
           with open(output, 'a', encoding='utf-8') as stream:
               stream.write(f"sha={subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()}\n")
@@ -249,6 +249,11 @@ jobs:
       - name: Refresh cached Local Voice runtime
         if: needs.source.outputs.slug == 'ai-voice-local'
         run: node scripts/refresh-sherpa-onnx-cache.mjs src-tauri/Cargo.toml '${{ matrix.target }}'
+      - name: Build the TaOffice Media shared runtime
+        if: needs.source.outputs.slug == 'taoffice-video'
+        uses: ./.github/actions/taoffice-media-runtime
+        with:
+          platform: ${{ matrix.platform }}
       - name: Build the module host without signing credentials
         if: needs.source.outputs.package != ''
         run: cargo build --manifest-path src-tauri/Cargo.toml -p '${{ needs.source.outputs.package }}' --release --target '${{ matrix.target }}' --locked
@@ -302,6 +307,11 @@ jobs:
               'module': slug,
           }, sort_keys=True) + '\n', encoding='utf-8')
           PY
+      - name: Stage the TaOffice Media shared runtime and source notices
+        if: needs.source.outputs.slug == 'taoffice-video'
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+        run: python src-tauri/plugins/taoffice-video/packaging/stage.py "$MODULE_PLATFORM" unsigned-module
       - name: Stage pinned SocksCap Xray payload
         if: needs.source.outputs.slug == 'sockscap'
         env:
@@ -390,6 +400,15 @@ jobs:
               raise SystemExit('candidate module status or identity is invalid for this release')
           if any(path.is_symlink() for path in root.rglob('*')):
               raise SystemExit('candidate payload contains a symlink')
+          if os.environ['MODULE_SLUG'] == 'taoffice-video' and host:
+              sys.path.insert(0, 'src-tauri/plugins/taoffice-video/packaging')
+              from stage import runtime_files as media_files, verify_payload as verify_media
+              payload = root / 'unsigned-module'
+              platform = os.environ['MODULE_PLATFORM']
+              allowed = {'module.json', host, *media_files(platform)}
+              if {path.relative_to(payload).as_posix() for path in payload.rglob('*') if path.is_file()} != allowed:
+                  raise SystemExit('candidate contains unexpected Media runtime files')
+              verify_media(platform, payload)
           verify_runtime(os.environ['MODULE_SLUG'], os.environ['MODULE_PLATFORM'], root / 'unsigned-module')
           if os.environ['MODULE_SLUG'] == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
               helper = root / 'unsigned-module/taomni-vnc-key-helper.exe'

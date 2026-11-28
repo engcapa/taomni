@@ -118,6 +118,8 @@
           "taoffice_signed_excel",
           "taoffice_signed_word",
           "taoffice_signed_project",
+          "taoffice_signed_ppt",
+          "taoffice_signed_visio",
           "module_signed_voice_archive",
           "local_servers_http",
           "local_servers_ssh",

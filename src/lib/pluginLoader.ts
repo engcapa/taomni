@@ -70,7 +70,8 @@ export async function loadPluginFrontend<Props = PluginFrontendProps>(
     if (importer === defaultImporter && import.meta.env.DEV && !isTauriRuntime()) {
       if (manifest.slug === "hello-plugin") url = "/src-tauri/plugins/hello-plugin/frontend/index.js";
       if (manifest.document) url = `/src-tauri/plugins/${manifest.slug}/${manifest.entry.frontend}`;
-      if (["taoffice-pdf", "taoffice-excel", "taoffice-word", "taoffice-project", "taoffice-video"].includes(manifest.slug)) {
+      if (["taoffice-pdf", "taoffice-excel", "taoffice-word", "taoffice-project", "taoffice-video",
+        "taoffice-ppt", "taoffice-visio"].includes(manifest.slug)) {
         url = `/src-tauri/plugins/${manifest.slug}/dist/${manifest.entry.frontend}`;
       }
       if (manifest.slug === "vnc-client") url = "/src-tauri/plugins/vnc-client/renderer/VncPanel.tsx";

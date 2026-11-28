@@ -10,7 +10,7 @@ on:
       module:
         description: Official QA module
         type: choice
-        options: [hello-plugin, mfa, mail, vnc-client, vnc-server, rdp-client, rdp-server, screenshot, servers, ai-voice-local, sockscap, taoffice-video, taoffice-pdf, taoffice-excel, taoffice-word, taoffice-project]
+        options: [hello-plugin, mfa, mail, vnc-client, vnc-server, rdp-client, rdp-server, screenshot, servers, ai-voice-local, sockscap, taoffice-video, taoffice-pdf, taoffice-excel, taoffice-word, taoffice-project, taoffice-ppt, taoffice-visio]
         default: hello-plugin
       macos_runner:
         description: Hosted macOS package builder (both Darwin targets remain explicit)
@@ -74,10 +74,10 @@ jobs:
           fi
           case "$QA_MODULE" in
             hello-plugin) echo 'host_package=taomni-hello-plugin' >> "$GITHUB_OUTPUT" ;;
-            taoffice-video|taoffice-pdf|taoffice-word) echo 'host_package=' >> "$GITHUB_OUTPUT" ;;
+            taoffice-pdf|taoffice-word|taoffice-ppt|taoffice-visio) echo 'host_package=' >> "$GITHUB_OUTPUT" ;;
             mfa) echo 'host_package=taomni-plugin-mfa' >> "$GITHUB_OUTPUT" ;;
             mail) echo 'host_package=taomni-plugin-mail' >> "$GITHUB_OUTPUT" ;;
-            vnc-client|vnc-server|rdp-client|rdp-server|screenshot|servers|ai-voice-local|sockscap|taoffice-excel|taoffice-project) echo "host_package=taomni-plugin-$QA_MODULE" >> "$GITHUB_OUTPUT" ;;
+            vnc-client|vnc-server|rdp-client|rdp-server|screenshot|servers|ai-voice-local|sockscap|taoffice-excel|taoffice-project|taoffice-video) echo "host_package=taomni-plugin-$QA_MODULE" >> "$GITHUB_OUTPUT" ;;
             *) echo 'Unknown official QA module.' >&2; exit 1 ;;
           esac
           test -n "$(git for-each-ref --format='%(refname)' --contains HEAD refs/remotes/origin/)" || {
@@ -112,7 +112,8 @@ jobs:
                         'ai-voice-local': 'signed-local-voice', 'sockscap': 'signed-sockscap',
                         'taoffice-video': 'signed-taoffice-video', 'taoffice-pdf': 'signed-taoffice-pdf',
                         'taoffice-excel': 'signed-taoffice-excel', 'taoffice-word': 'signed-taoffice-word',
-                        'taoffice-project': 'signed-taoffice-project',
+                        'taoffice-project': 'signed-taoffice-project', 'taoffice-ppt': 'signed-taoffice-ppt',
+                        'taoffice-visio': 'signed-taoffice-visio',
                         'screenshot': 'signed-screenshot'}[os.environ['QA_MODULE']]
           roster = set()
           lifecycle = set()
@@ -145,7 +146,7 @@ jobs:
               ]}, separators=(',', ':')) + '\n')
               suffix = '-'.join(target['platform'] for target in targets)
               if os.environ['QA_MODULE'] in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
-                                             'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project', 'taoffice-video'}:
+                                             'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project', 'taoffice-ppt', 'taoffice-visio', 'taoffice-video'}:
                   output.write(f"frontend_artifact=qa-{os.environ['QA_MODULE']}-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
               if roster:
                   output.write(f"roster_mfa_frontend_artifact=qa-roster-mfa-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
@@ -209,6 +210,11 @@ jobs:
       - name: Refresh cached Local Voice runtime
         if: env.QA_MODULE == 'ai-voice-local'
         run: node scripts/refresh-sherpa-onnx-cache.mjs src-tauri/Cargo.toml '${{ matrix.target }}'
+      - name: Build the TaOffice Media shared runtime
+        if: env.QA_MODULE == 'taoffice-video'
+        uses: ./.github/actions/taoffice-media-runtime
+        with:
+          platform: ${{ matrix.platform }}
       # Candidate code, Cargo build scripts and host binaries never share a
       # runner/job with signing secrets. Nothing from this job is executed by
       # the signing job; it receives only an inert payload directory.
@@ -260,7 +266,7 @@ jobs:
                   helper = 'taomni-vnc-key-helper.exe'
                   shutil.copyfile(binaries / helper, output / helper)
               if slug not in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
-                              'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project', 'taoffice-video'} and manifest['entry'].get('frontend'):
+                              'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project', 'taoffice-ppt', 'taoffice-visio', 'taoffice-video'} and manifest['entry'].get('frontend'):
                   shutil.copytree(source / 'frontend', output / 'frontend')
 
           stage(os.environ['QA_MODULE'], 'unsigned-module')
@@ -268,6 +274,11 @@ jobs:
               stage('mfa', 'unsigned-roster-mfa')
           pathlib.Path('candidate-source.json').write_text(json.dumps({'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': os.environ['QA_MODULE']}), encoding='utf-8')
           PY
+      - name: Stage the TaOffice Media shared runtime and source notices
+        if: env.QA_MODULE == 'taoffice-video'
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+        run: python src-tauri/plugins/taoffice-video/packaging/stage.py "$MODULE_PLATFORM" unsigned-module
       - name: Stage pinned SocksCap Xray payload
         if: env.QA_MODULE == 'sockscap'
         env:
@@ -381,7 +392,7 @@ jobs:
           import sockscap_xray_resource as xray
           root = pathlib.Path('candidate')
           module = os.environ['QA_MODULE']
-          assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client', 'vnc-server', 'rdp-client', 'rdp-server', 'screenshot', 'servers', 'ai-voice-local', 'sockscap', 'taoffice-video', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project'}, 'Unknown official QA module'
+          assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client', 'vnc-server', 'rdp-client', 'rdp-server', 'screenshot', 'servers', 'ai-voice-local', 'sockscap', 'taoffice-video', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project', 'taoffice-ppt', 'taoffice-visio'}, 'Unknown official QA module'
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
           assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': module}
           assert not any(p.is_symlink() for p in root.rglob('*'))
@@ -400,6 +411,11 @@ jobs:
                   binaries.add('taomni-vnc-key-helper.exe')
               payload = root / folder
               resources = set(redirector.files(slug, platform))
+              if slug == 'taoffice-video' and expected['entry'].get('host'):
+                  sys.path.insert(0, str(trusted_source / 'packaging'))
+                  from stage import runtime_files as media_files, verify_payload as verify_media
+                  resources.update(media_files(platform))
+                  verify_media(platform, payload)
               if slug == 'sockscap':
                   resources.update(xray.files(platform))
                   xray.verify(trusted_source, platform, payload)
@@ -410,7 +426,7 @@ jobs:
               allowed = {'module.json', *binaries, *resources}
               frontend = expected['entry'].get('frontend')
               if frontend and slug not in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
-                                           'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project', 'taoffice-video'}:
+                                           'rdp-server', 'vnc-server', 'servers', 'taoffice-pdf', 'taoffice-excel', 'taoffice-word', 'taoffice-project', 'taoffice-ppt', 'taoffice-visio', 'taoffice-video'}:
                   assert (trusted_source / frontend).is_file()
                   for source in (trusted_source / 'frontend').rglob('*'):
                       assert not source.is_symlink()

@@ -16,7 +16,8 @@ SCREENSHOT_ASSETS = {
 
 def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, Path]:
     if slug not in {"rdp-client", "vnc-client", "mail", "mfa", "screenshot", "sockscap",
-                    "rdp-server", "vnc-server", "servers", "taoffice-pdf", "taoffice-excel", "taoffice-word", "taoffice-project", "taoffice-video"}:
+                    "rdp-server", "vnc-server", "servers", "taoffice-pdf", "taoffice-excel", "taoffice-word", "taoffice-project", "taoffice-video",
+                    "taoffice-ppt", "taoffice-visio", "taoffice-image"}:
         raise ValueError("Unexpected module")
     expected = {"index.js"}
     directories = set()
@@ -29,6 +30,11 @@ def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, P
         expected.update({"pdfjs/LICENSE", "pdfjs/pdf.worker.mjs", "pdf-lib-LICENSE.md"})
     if slug == "taoffice-video":
         expected.add("mediabunny-LICENSE.txt")
+    if slug == "taoffice-ppt":
+        expected.update({"slide-engine.js", "PPTXViewJS-LICENSE.txt", "Chart.js-LICENSE.txt",
+                         "JSZip-LICENSE.txt", "PptxGenJS-LICENSE.txt"})
+    if slug == "taoffice-visio":
+        expected.update({"visio.wasm", "visio-icu.dat", "visio-third-party-notices.txt"})
     if with_receipt:
         expected.add("receipt.json")
     files = {}
@@ -61,7 +67,7 @@ def frontend_receipt(files: dict[str, Path], source: str, tooling: str, slug: st
         if artifact.stat().st_size == 0:
             raise ValueError("Empty module frontend file")
     receipt = {"sourceSha": source, "toolingSha": tooling, "slug": slug, "sha256": digests["index.js"]}
-    if slug in {"screenshot", "taoffice-pdf", "taoffice-video"}:
+    if slug in {"screenshot", "taoffice-pdf", "taoffice-video", "taoffice-ppt", "taoffice-visio"}:
         receipt["files"] = digests
     return receipt
 

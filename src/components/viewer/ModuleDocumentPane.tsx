@@ -9,7 +9,7 @@ import { useModuleMarketplaceStore } from "../../stores/moduleMarketplaceStore";
 import { openSettingsSection } from "../../lib/settingsNavigation";
 import { getAppPlatform, type AppPlatform } from "../../lib/runtime";
 import { basename, sftpOpenPath } from "../../lib/sftp";
-import { openDocumentMedia, readModuleDocument, saveModuleDocumentCopy, type MediaSourceLease } from "../../lib/openFile/mediaStream";
+import { moduleCopyExtensions, openDocumentMedia, readModuleDocument, saveModuleDocumentCopy, type MediaSourceLease, type ModuleSaveCopyOptions } from "../../lib/openFile/mediaStream";
 import { trackModuleDocumentDraft } from "../../lib/openFile/closeGuard";
 import type { ModuleDocumentDraft } from "../../stores/documentStore";
 import { PluginTabPane } from "../plugins/PluginTabPane";
@@ -24,7 +24,8 @@ export interface ModuleDocumentInput {
     platform: AppPlatform;
     readOnly: boolean;
     read: () => Promise<Blob>;
-    saveCopy?: (bytes: Uint8Array) => Promise<string | null>;
+    saveCopy?: (bytes: Uint8Array, options?: ModuleSaveCopyOptions) => Promise<string | null>;
+    copyExtensions?: ReturnType<typeof moduleCopyExtensions>;
     trackDraft?: (draft: Omit<ModuleDocumentDraft, "path">) => () => void;
     openMedia: (mime: string) => Promise<MediaSourceLease>;
     openSystem: () => Promise<void>;
@@ -70,9 +71,10 @@ export function ModuleDocumentPane({ viewer, active }: { viewer: FileViewerTabIn
       drafts.add(release);
       return () => { if (drafts.delete(release)) release(); };
     };
-    setInput({ document: { name, extension, platform: getAppPlatform(), readOnly, trackDraft, saveCopy: readOnly ? undefined : async (bytes) => {
+    setInput({ document: { name, extension, platform: getAppPlatform(), readOnly, trackDraft,
+      copyExtensions: readOnly ? undefined : moduleCopyExtensions(slug), saveCopy: readOnly ? undefined : async (bytes, options) => {
       ensureCurrent();
-      return saveModuleDocumentCopy(path, name, slug, version, bytes);
+      return saveModuleDocumentCopy(path, name, slug, version, bytes, options);
     }, openMedia: async (mime) => {
       ensureCurrent();
       const lease = await openDocumentMedia(path, mime, slug, version);

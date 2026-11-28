@@ -26,6 +26,18 @@ case "${MACOS_SIGNING_MODE:-}" in
 esac
 test "$(lipo -archs "$host_binary")" = "$arch"
 
+mkdir -p "$evidence"
+if [[ "$slug" == 'taoffice-video' ]]; then
+  for library in "$(dirname "$host_binary")"/lib*.dylib; do
+    test -f "$library"
+    test ! -L "$library"
+    test "$(lipo -archs "$library")" = "$arch"
+    codesign --force --sign "$certificate" "$timestamp" "$library"
+    codesign --verify --strict "$library"
+    shasum -a 256 "$library" >> "$evidence/dependency-sha256.txt"
+  done
+fi
+
 identifier="com.taomni.module.$slug"
 codesign --force --sign "$certificate" --options runtime "$timestamp" \
   --identifier "$identifier" "$host_binary"
@@ -40,7 +52,6 @@ codesign -d --extract-certificates="$scratch/host" "$host_binary"
 actual_certificate="$(shasum -a 1 "$scratch/host0" | awk '{print toupper($1)}')"
 test "$actual_certificate" = "$certificate"
 
-mkdir -p "$evidence"
 printf '%s\n' "$details" > "$evidence/codesign.txt"
 assessment=0
 spctl --assess --type execute --verbose=4 "$host_binary" > "$evidence/gatekeeper.txt" 2>&1 || assessment=$?

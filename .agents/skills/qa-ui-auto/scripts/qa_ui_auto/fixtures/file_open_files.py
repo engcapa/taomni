@@ -156,6 +156,23 @@ def setup(ctx: Any) -> None:
         data = (TAOFFICE_ASSETS / "rollout-compatible.mkv").read_bytes()
         files["rollout-compatible.mkv"] = data
         ctx.values["taoffice_mkv_sha"] = hashlib.sha256(data).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-039", "TC-TAOFFICE-040"}:
+        data = (TAOFFICE_ASSETS / "ppt-review.pptx").read_bytes()
+        files["ppt-review.pptx"] = data
+        files["ppt-damaged.pptx"] = b"This is not a PowerPoint package."
+        ctx.values["taoffice_ppt_sha"] = hashlib.sha256(data).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-041", "TC-TAOFFICE-042"}:
+        for name, key in (("visio-routing.vsdx", "modern"), ("visio-legacy.vsd", "legacy")):
+            data = (TAOFFICE_ASSETS / name).read_bytes()
+            files[name] = data
+            ctx.values[f"taoffice_visio_{key}_sha"] = hashlib.sha256(data).hexdigest()
+        files["visio-damaged.vsdx"] = b"This is not a Visio document."
+    if ctx.case_id in {"TC-TAOFFICE-043", "TC-TAOFFICE-044", "TC-TAOFFICE-045", "TC-TAOFFICE-046"}:
+        for name, key in (("media-legacy.avi", "legacy"), ("media-edit.webm", "edit"),
+                          ("media-legacy.flv", "legacy_flv"), ("media-legacy.wmv", "legacy_wmv"), ("media-legacy.rm", "legacy_rm")):
+            data = (TAOFFICE_ASSETS / name).read_bytes()
+            files[name] = data
+            ctx.values[f"taoffice_{key}_media_sha"] = hashlib.sha256(data).hexdigest()
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative
