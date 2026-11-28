@@ -1,6 +1,14 @@
 name: QA UI Auto Platforms
 'on':
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      platform:
+        type: choice
+        options:
+        - macos
+        - windows
+        default: macos
+        required: true
 permissions:
   contents: read
   actions: read
@@ -83,3 +91,22 @@ jobs:
           !probe-results/**/platform-workspaces/**
         retention-days: 14
         if-no-files-found: error
+    if: inputs.platform == 'windows'
+  macos-index-probe:
+    if: inputs.platform == 'macos'
+    runs-on: macos-15
+    timeout-minutes: 6
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+        sparse-checkout: .github/index-probe
+    - name: Compare raw system Spotlight predicates against an indexed public app
+      run: python3 .github/index-probe/spotlight.py
+    - name: Retain raw queries and mount attributes
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: spotlight-predicate-and-volume-receipt
+        path: probe-results
+        retention-days: 14
