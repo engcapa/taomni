@@ -1,0 +1,28 @@
+origin,case,file,sha256,application,version,build,ordinary_readonly_open,page_or_slide_count,readback_text,preserved_sha256
+native,TC-TAOFFICE-022,revised.docx,9114828e94d36df08cd51421a552bb137452160d194df3f7ecc0fa34ecc7d5f1,Word.Application,16.0,16.0.20625,True,2,Pilot moves to Tuesday & Wednesday | Manager approval is required. | Waiting for approval,True
+native,TC-TAOFFICE-054,accepted-doc.docx,e11e5e93f341d4783403f6208a9f431c4aea865e6866a9f8783b32235ad7c7cb,Word.Application,16.0,16.0.20625,True,1,Converted DOC review | Reviewed | Keep the next page unchanged.,True
+native,TC-TAOFFICE-054,accepted-odt.docx,c61711c76b277d466a14bad78ebef06aefa6008aeebb82386598483f1bd8e232,Word.Application,16.0,16.0.20625,True,2,Converted ODT review | Reviewed | Keep the next page unchanged.,True
+native,TC-TAOFFICE-054,accepted-rtf.docx,fb6dcbd12a64170608603c4b5df326dd47a1a457aa76463efc2750f46ff941ff,Word.Application,16.0,16.0.20625,True,1,Converted RTF review | Reviewed | Keep the next page unchanged.,True
+historical,20 Word copies,ComplexNumberedLists.docx,da4265093766c4035cc993617bfff6339fbc42a0629ed06a13c06933166e552b,Word.Application,16.0,16.0.20625,True,1,TaOffice roundtrip ComplexNumberedLists.docx,True
+historical,20 Word copies,DiffFirstPageHeadFoot.docx,f5340fa2328cb4d226629308b5b32ba62b8140cae1c85aab9f82f8d7180ac01a,Word.Application,16.0,16.0.20625,True,2,TaOffice roundtrip DiffFirstPageHeadFoot.docx,True
+historical,20 Word copies,EmbeddedDocument.docx,cfbdf8b4939b4abfcf59e76b536473333cbb3f5088b41761cc6b7ad13b574d95,Word.Application,16.0,16.0.20625,True,1,TaOffice roundtrip EmbeddedDocument.docx,True
+historical,20 Word copies,FancyFoot.docx,9bd21bbe63cc445cb0added82e0fbd619aeaef68b2ef4ef72b3e527bb20ce3aa,Word.Application,16.0,16.0.20625,True,2,TaOffice roundtrip FancyFoot.docx,True
+historical,20 Word copies,HeaderFooterUnicode.docx,b55d20d296eba097a01b8e2dc9869f1d00106d8879c5d13e942c228846e786d9,Word.Application,16.0,16.0.20625,True,2,TaOffice roundtrip HeaderFooterUnicode.docx,True
+historical,20 Word copies,IllustrativeCases.docx,8c645dfd906b89fc5596b7a42742d0c755391e1407663813fc3a967de3703887,Word.Application,16.0,16.0.20625,True,4,TaOffice roundtrip IllustrativeCases.docx,True
+historical,20 Word copies,Numbering.docx,70631c0717f2f95a413dd6de88aa6badb6b8e3b302d20b20de46523ba82d4519,Word.Application,16.0,16.0.20625,True,1,TaOffice roundtrip Numbering.docx,True
+historical,20 Word copies,PageSpecificHeadFoot.docx,d234a59c529c247f009a1e4dcd04b0974243cc4cabe006467a46a779b3a839b7,Word.Application,16.0,16.0.20625,True,2,TaOffice roundtrip PageSpecificHeadFoot.docx,True
+historical,20 Word copies,SampleDoc.docx,f1b2ea9c18d2c8e6e1bcddc06622b349d2bd17e210f043cd2a3dc2f4c7092ef6,Word.Application,16.0,16.0.20625,True,2,TaOffice roundtrip SampleDoc.docx,True
+historical,20 Word copies,Styles.docx,8e6acf3532090f56651aa157f8c68fb68fd827a8c94e6f7d6ee7f77a718185fa,Word.Application,16.0,16.0.20625,True,1,TaOffice roundtrip Styles.docx,True
+historical,20 Word copies,TestDocument.docx,e6779497251a5c8e50839506e2bd0aef6f5309e98553d4c15adb907f823f59c4,Word.Application,16.0,16.0.20625,True,1,TaOffice roundtrip TestDocument.docx,True
+historical,20 Word copies,TestTableCellAlign.docx,627780b421d010b8a67cfd38b030543213f67de468d4135d81a469f7ca78d19d,Word.Application,16.0,16.0.20625,True,1,TaOffice roundtrip TestTableCellAlign.docx,True
+historical,20 Word copies,VariousPictures.docx,a3ba770b4a452e5da5a605c2a6dd88ee9e17877717d7ef1675cad391bc0d11e7,Word.Application,16.0,16.0.20625,True,1,TaOffice roundtrip VariousPictures.docx,True
+historical,20 Word copies,WordWithAttachments.docx,416d26f2601a889b524b70790dce989a9e0d00a38430950a1689aafe92db60f2,Word.Application,16.0,16.0.20625,True,2,TaOffice roundtrip WordWithAttachments.docx,True
+historical,20 Word copies,bookmarks.docx,718290ae802e769c5bc4300e744d2e33f7ff30282ebe00accc39ce70e95286e8,Word.Application,16.0,16.0.20625,True,1,TaOffice roundtrip bookmarks.docx,True
+historical,20 Word copies,bug56075-changeTracking_on.docx,359d3ba56eeddd56aba60b5e73c0c90c7f0dcbc410aa9d13c5ea83eb833268f4,Word.Application,16.0,16.0.20625,True,1,TaOffice roundtrip bug56075-changeTracking_on.docx,True
+historical,20 Word copies,checkboxes.docx,158b1a4675fc1ca26124d5f07ee34b32f07fafaa530fc5c1fc68c992c39e4004,Word.Application,16.0,16.0.20625,True,1,TaOffice roundtrip checkboxes.docx,True
+historical,20 Word copies,delins.docx,1bb2016912f2ef72aadf7f618bf9a35f192e8fcdeb15dfd65b224171c3b67209,Word.Application,16.0,16.0.20625,True,1,TaOffice roundtrip delins.docx,True
+historical,20 Word copies,ThreeColHeadFoot.docx,dc36e1a42d4ff08c78e058ea79041d972ad483723fc9b3887c7cf5b2d717d5a9,Word.Application,16.0,16.0.20625,True,2,TaOffice roundtrip ThreeColHeadFoot.docx,True
+historical,20 Word copies,SimpleHeadThreeColFoot.docx,25b294419b1727a03301a5ae20a8d446b5a364b3cfe8e47ac651d66aa8304533,Word.Application,16.0,16.0.20625,True,2,TaOffice roundtrip SimpleHeadThreeColFoot.docx,True
+native,TC-TAOFFICE-040,revised.pptx,b4c634c7d217adf5d9cac60a17b5635e83f22471629070b70eac4686a407c9db,PowerPoint.Application,16.0,20625,True,2,Updated quarterly review | Ready after review | Delivery appendix,True
+native,TC-TAOFFICE-060,ppt-import.pptx,6432e3054e086aa5b599623128e0e7c79bb93d86019bc43f9a333504965e78c4,PowerPoint.Application,16.0,20625,True,2,Quarterly review | Delivery appendix,True
+native,TC-TAOFFICE-060,odp-import.pptx,5ce40a983126c26ff41bedfaeabdfc2c451fba0358d85c373ad1a8391ee67dbd,PowerPoint.Application,16.0,20625,True,2,Reviewed ODP import | Delivery appendix,True

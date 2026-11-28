@@ -19,6 +19,10 @@ Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”�
 
 使用 Windows 上的 Microsoft PowerPoint 16.0 重开上述 5 份原件，以及用同一组 Apache POI 输入和本分支读写代码重新生成的 5 份副本。逐份核对输入 SHA-256。副本均只变更 `ppt/slides/slide1.xml`，PowerPoint 形状模型和导出的 PDF 首页都读到完整编辑值。直接导出原件和副本的首页 PNG 并排对照，三个标题保留了原色、对齐和两行排版。后两份表格中的较长替换文字在单元格内换行，行高随之增加，邻近内容也出现在截图中。原 Linux WPS 导出的 5 份 PDF 仍保留各自的文本提取结果。[首页对照截图](taoffice-research/pptx-powerpoint-first-page.png) · [逐文件哈希与对照区域](taoffice-research/pptx-powerpoint-first-page.csv)
 
+### Windows Microsoft Word 与 PowerPoint 重开
+
+Microsoft Word 与 PowerPoint 16.0 build 20625 使用普通只读打开方式读回了 27 份副本。Windows Native 在产品提交 `1acd5cf3a216f60fe5e6f228290d1a1fd7536ee2` 的 022、040、054、060 中通过系统另存生成 4 份 DOCX、3 份 PPTX。Word 读回正文与表格，PowerPoint 读回两页幻灯片及其预期标题。另用同一批公开输入重建了 20 份 Word 语料副本，逐文件与历史 Linux 输出的 SHA-256 匹配，Word 全部读到了相应编辑标记。27 份文件在重开前后都通过 SHA-256 对比。Native 回执为 `receipt-run-20261128-145838-889896600`。[逐文件读回与摘要](taoffice-research/office-microsoft-reopen.csv)
+
 ## 旧版演示文稿导入
 
 Windows Browser 回执 `run-20261128-142945-077647600` 同时通过 039、059。059 使用 Microsoft PowerPoint 导出的两页 PPT、ODP，在 Explorer 内导入，直接下载 PPT 的转换结果，编辑 ODP 首页标题后下载。PowerPoint 16.0 build 20625 用普通打开命令重开两份下载文件，读回两页及各自首页标题，第二页均为 Delivery appendix。原件的 SHA-256 在用例中独立核对。PPT 副本的 SHA-256 为 `a0a1fd54e5d38910339a68052d4cb4bbf560e2566fc9d05c64fb7c3fb3b32407`，ODP 编辑副本为 `b7901ddd7af796693111fc8b2d1f836b535b359fd5d60a0b23044717c9b9dc61`。
