@@ -30,10 +30,12 @@ fn replaces_only_targeted_cells_and_preserves_every_other_package_part() {
     let workbook = Workbook::open(FILE.to_vec()).unwrap();
     let result = create(
         &workbook,
-        vec![edit("A2", " North & East "), edit("B2", "15.5")],
+        &[edit("A2", " North & East "), edit("B2", "15.5")],
         || Ok(()),
     )
     .unwrap();
+    assert!(result.recalculated);
+    let result = result.bytes;
     let mut source = ZipArchive::new(Cursor::new(FILE)).unwrap();
     let mut copy = ZipArchive::new(Cursor::new(result.as_slice())).unwrap();
     let names: Vec<_> = source
@@ -53,7 +55,7 @@ fn replaces_only_targeted_cells_and_preserves_every_other_package_part() {
     let sheet = part(&mut copy, "xl/worksheets/sheet1.xml").unwrap();
     assert!(sheet.contains(" North &amp; East "));
     assert!(sheet.contains("<c r=\"B2\"><v>15.5</v></c>"));
-    assert!(sheet.contains("<c r=\"C2\"><f>B2*2</f><v>24</v></c>"));
+    assert!(sheet.contains("<c r=\"C2\"><f>B2*2</f><v>31</v></c>"));
     let workbook_xml = part(&mut copy, WORKBOOK).unwrap();
     assert!(workbook_xml.contains("fullCalcOnLoad=\"1\" forceFullCalc=\"1\""));
     let mut reopened = Workbook::open(result).unwrap();
@@ -72,7 +74,7 @@ fn rejects_formula_blank_duplicate_and_invalid_numeric_updates() {
         vec![edit("B2", "NaN")],
         vec![edit("A2", "Same"), edit("A2", "Other")],
     ] {
-        assert!(create(&workbook, edits, || Ok(())).is_err());
+        assert!(create(&workbook, &edits, || Ok(())).is_err());
     }
 }
 
@@ -89,9 +91,9 @@ fn rejects_table_headers_and_keeps_ordinary_table_rows_editable() {
         .find(|cell| cell["value"] == "Keyboard")
         .unwrap();
     assert_eq!(body["editType"], "text");
-    let err = create(&workbook, vec![edit("A1", "Renamed")], || Ok(())).unwrap_err();
+    let err = create(&workbook, &[edit("A1", "Renamed")], || Ok(())).unwrap_err();
     assert!(err.message.contains("Table headers and totals"));
-    assert!(create(&workbook, vec![edit("A2", "North")], || Ok(())).is_ok());
+    assert!(create(&workbook, &[edit("A2", "North")], || Ok(())).is_ok());
 }
 
 #[test]

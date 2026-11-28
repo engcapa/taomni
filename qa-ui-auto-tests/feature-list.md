@@ -425,6 +425,9 @@ controls:
     - '[data-testid="module-action-enable-taoffice-excel"]'
     - '[data-testid="module-action-enable-taoffice-word"]'
     - '[data-testid="module-action-enable-taoffice-project"]'
+    - '[data-testid="module-action-enable-taoffice-ppt"]'
+    - '[data-testid="module-action-enable-taoffice-visio"]'
+    - '[data-testid="module-action-enable-taoffice-image"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
@@ -447,6 +450,9 @@ controls:
     - '[data-testid="module-action-disable-taoffice-excel"]'
     - '[data-testid="module-action-disable-taoffice-word"]'
     - '[data-testid="module-action-disable-taoffice-project"]'
+    - '[data-testid="module-action-disable-taoffice-ppt"]'
+    - '[data-testid="module-action-disable-taoffice-visio"]'
+    - '[data-testid="module-action-disable-taoffice-image"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
@@ -16867,14 +16873,21 @@ TC-TAOFFICE-009 验证核心查看器打开 gzip TAR、清除筛选与恢复焦�
 TC-TAOFFICE-010 验证单文件 gzip 预览、直接解压成文件，以及重复解压时保留原有内容。
 TC-TAOFFICE-011 验证原生 7z 固实压缩包的预览和解压，TC-TAOFFICE-012 验证浏览器预览显示桌面打开提示。
 TC-TAOFFICE-013 覆盖原生固实 RAR4/RAR5 解码、只读预览、准确解压和加密包提示。TC-TAOFFICE-014 覆盖浏览器桌面打开提示。
+TC-TAOFFICE-051/052 覆盖提取进度、键盘取消、查看器重开、原生应用重启后恢复以及最终文件和源压缩包的字节校验。
 TC-TAOFFICE-015/016 覆盖独立 Excel 模块的工作表导航、选中单元格恢复、缓存值与原公式、隐藏工作表、输入文件散列以及原生签名安装和停用。
 TC-TAOFFICE-033/034 覆盖页面批注、撤销、旋转、排序、移除，以及另存后重开核对。
 TC-TAOFFICE-017/018 覆盖 PDF 表单填写、关闭守卫、保存副本和原生文件重新打开。
+TC-TAOFFICE-035/036 覆盖跨工作表重算、撤销输入和副本重开后的公式缓存。
 TC-TAOFFICE-019/020 覆盖 XLSX 表格列标题只读、数据行文字与数字编辑、输入校验、取消、保存副本、公式保留和原始文件摘要。
 TC-TAOFFICE-021/022 覆盖 DOCX 页面、页眉、正文混合格式和表格单元格编辑，以及共享关闭守卫、签名安装、原生另存和副本重开。
 TC-TAOFFICE-023/024 覆盖 MSPDI 任务列表及甘特条、筛选、键盘重命名、原生保存和副本重开。
 TC-TAOFFICE-025/026 覆盖 WebM 解码、键盘定位、真实播放、离开标签暂停及原始媒体摘要。
+TC-TAOFFICE-037/038 覆盖新增任务、日期和进度编辑、依赖重算、资源分配、任务删除和保存重开。
 TC-TAOFFICE-027/028 覆盖改工期、避开日历例外、更新后续任务及关键路径，并检查另存和原文件。
+TC-TAOFFICE-039/040 覆盖 PPTX 幻灯片预览、文本编辑、关闭焦点、创建演示文稿与原生另存重开。
+TC-TAOFFICE-041/042 覆盖 VSDX 和 VSD 渲染、跨页查找、缩放、恢复与 SVG 导出。
+TC-TAOFFICE-043/044 覆盖视频裁剪、缩放、WebM 下载及旧编码播放器的恢复操作。
+TC-TAOFFICE-045/046 验证已签名模块的旧格式播放和 MP4 副本裁剪、另存及重开。
 
 <!-- feature
 id: F-FILEOPEN-1
@@ -16892,12 +16905,21 @@ files:
   - src-tauri/src/viewer/archive/compressed_file.rs
   - src-tauri/src/viewer/archive/seven_zip.rs
   - src-tauri/plugins/taoffice-video/frontend/index.js
+  - src-tauri/plugins/taoffice-video/frontend/VideoExport.js
+  - src-tauri/plugins/taoffice-video/src/**
+  - src-tauri/plugins/taoffice-ppt/renderer/**
+  - src-tauri/plugins/taoffice-visio/renderer/**
+  - src-tauri/plugins/taoffice-image/renderer/**
+  - src-tauri/plugins/taoffice-image/heif-wasm/src/**
+  - src-tauri/src/viewer/document_copy.rs
+  - src/lib/openFile/mediaStream.ts
   - src-tauri/plugins/taoffice-pdf/renderer/PdfViewer.jsx
   - src-tauri/plugins/taoffice-pdf/renderer/PdfPage.jsx
   - src-tauri/plugins/taoffice-pdf/renderer/PdfNavigation.jsx
   - src-tauri/plugins/taoffice-pdf/renderer/PdfPassword.jsx
   - src-tauri/plugins/taoffice-word/renderer/WordViewer.jsx
   - src-tauri/plugins/taoffice-project/renderer/ProjectViewer.jsx
+  - src-tauri/plugins/taoffice-project/src/import/**
   - src/lib/openFile/documentProvider.ts
   - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts
@@ -17023,6 +17045,30 @@ controls:
   - id: archive-extract-here
     selector: '[data-testid="archive-extract-here"]'
     kind: interactive
+  - id: archive-extract-to
+    selector: '[data-testid="archive-extract-to"]'
+    kind: interactive
+  - id: archive-extract-entry
+    selector: '[data-testid="archive-extract-entry"]'
+    kind: interactive
+  - id: archive-extraction
+    selector: '[data-testid="archive-extraction"]'
+    kind: display
+  - id: archive-extraction-progress
+    selector: '[data-testid="archive-extraction-progress"]'
+    kind: display
+  - id: archive-extraction-bytes
+    selector: '[data-testid="archive-extraction-bytes"]'
+    kind: display
+  - id: archive-extraction-cancel
+    selector: '[data-testid="archive-extraction-cancel"]'
+    kind: interactive
+  - id: archive-extraction-resume
+    selector: '[data-testid="archive-extraction-resume"]'
+    kind: interactive
+  - id: archive-extraction-discard
+    selector: '[data-testid="archive-extraction-discard"]'
+    kind: interactive
   - id: archive-preview
     selector: '[data-testid="archive-preview"]'
     kind: interactive
@@ -17050,6 +17096,231 @@ controls:
   - id: taoffice-media-retry
     selector: '[data-testid="taoffice-media-retry"]'
     kind: interactive
+  - id: taoffice-ppt
+    selector: '[data-testid="taoffice-ppt"]'
+    kind: display
+  - id: taoffice-ppt-conversion
+    selector: '[data-testid="taoffice-ppt-conversion"]'
+    kind: display
+  - id: taoffice-ppt-conversion-cancel
+    selector: '[data-testid="taoffice-ppt-conversion-cancel"]'
+    kind: interactive
+  - id: taoffice-ppt-retry
+    selector: '[data-testid="taoffice-ppt-retry"]'
+    kind: interactive
+  - id: taoffice-ppt-edit
+    selector: '[data-testid="taoffice-ppt-edit"]'
+    kind: interactive
+  - id: taoffice-ppt-error
+    selector: '[data-testid="taoffice-ppt-error"]'
+    kind: display
+  - id: taoffice-ppt-new
+    selector: '[data-testid="taoffice-ppt-new"]'
+    kind: interactive
+  - id: taoffice-ppt-new-output
+    selector: '[data-testid="taoffice-ppt-new-output"]'
+    kind: display
+  - id: taoffice-ppt-new-save
+    selector: '[data-testid="taoffice-ppt-new-save"]'
+    kind: interactive
+  - id: taoffice-ppt-new-subtitle
+    selector: '[data-testid="taoffice-ppt-new-subtitle"]'
+    kind: interactive
+  - id: taoffice-ppt-new-title
+    selector: '[data-testid="taoffice-ppt-new-title"]'
+    kind: interactive
+  - id: taoffice-ppt-new-title-label
+    selector: '[data-testid="taoffice-ppt-new-title-label"]'
+    kind: display
+  - id: taoffice-ppt-next
+    selector: '[data-testid="taoffice-ppt-next"]'
+    kind: interactive
+  - id: taoffice-ppt-output
+    selector: '[data-testid="taoffice-ppt-output"]'
+    kind: display
+  - id: taoffice-ppt-paragraph
+    selector: '[data-testid="taoffice-ppt-paragraph"]'
+    kind: interactive
+  - id: taoffice-ppt-position
+    selector: '[data-testid="taoffice-ppt-position"]'
+    kind: display
+  - id: taoffice-ppt-prev
+    selector: '[data-testid="taoffice-ppt-prev"]'
+    kind: interactive
+  - id: taoffice-ppt-preview
+    selector: '[data-testid="taoffice-ppt-preview"]'
+    kind: display
+  - id: taoffice-ppt-save
+    selector: '[data-testid="taoffice-ppt-save"]'
+    kind: interactive
+  - id: taoffice-ppt-save-hint
+    selector: '[data-testid="taoffice-ppt-save-hint"]'
+    kind: display
+  - id: taoffice-visio
+    selector: '[data-testid="taoffice-visio"]'
+    kind: display
+  - id: taoffice-visio-copy-output
+    selector: '[data-testid="taoffice-visio-copy-output"]'
+    kind: display
+  - id: taoffice-visio-edit-shapes
+    selector: '[data-testid="taoffice-visio-edit-shapes"]'
+    kind: interactive
+  - id: taoffice-visio-save-copy
+    selector: '[data-testid="taoffice-visio-save-copy"]'
+    kind: interactive
+  - id: taoffice-visio-shape
+    selector: '[data-testid="taoffice-visio-shape"]'
+    kind: interactive
+  - id: taoffice-visio-shape-color
+    selector: '[data-testid="taoffice-visio-shape-color"]'
+    kind: interactive
+  - id: taoffice-visio-shape-position
+    selector: '[data-testid="taoffice-visio-shape-position"]'
+    kind: interactive
+  - id: taoffice-visio-shape-validation
+    selector: '.taoffice-visio-editor [role="alert"]'
+    kind: display
+  - id: taoffice-visio-shape-text
+    selector: '[data-testid="taoffice-visio-shape-text"]'
+    kind: interactive
+  - id: taoffice-visio-error
+    selector: '[data-testid="taoffice-visio-error"]'
+    kind: display
+  - id: taoffice-visio-export
+    selector: '[data-testid="taoffice-visio-export"]'
+    kind: interactive
+  - id: taoffice-visio-export-error
+    selector: '[data-testid="taoffice-visio-export-error"]'
+    kind: display
+  - id: taoffice-visio-export-pending
+    selector: '[data-testid="taoffice-visio-export-pending"]'
+    kind: display
+  - id: taoffice-visio-export-status
+    selector: '[data-testid="taoffice-visio-export-status"]'
+    kind: display
+  - id: taoffice-visio-fidelity
+    selector: '[data-testid="taoffice-visio-fidelity"]'
+    kind: display
+  - id: taoffice-visio-find
+    selector: '[data-testid="taoffice-visio-find"]'
+    kind: interactive
+  - id: taoffice-visio-find-close
+    selector: '[data-testid="taoffice-visio-find-close"]'
+    kind: interactive
+  - id: taoffice-visio-find-input
+    selector: '[data-testid="taoffice-visio-find-input"]'
+    kind: interactive
+  - id: taoffice-visio-find-next
+    selector: '[data-testid="taoffice-visio-find-next"]'
+    kind: interactive
+  - id: taoffice-visio-find-previous
+    selector: '[data-testid="taoffice-visio-find-previous"]'
+    kind: interactive
+  - id: taoffice-visio-find-status
+    selector: '[data-testid="taoffice-visio-find-status"]'
+    kind: display
+  - id: taoffice-visio-fit
+    selector: '[data-testid="taoffice-visio-fit"]'
+    kind: interactive
+  - id: taoffice-visio-next
+    selector: '[data-testid="taoffice-visio-next"]'
+    kind: interactive
+  - id: taoffice-visio-open-system
+    selector: '[data-testid="taoffice-visio-open-system"]'
+    kind: interactive
+  - id: taoffice-visio-page
+    selector: '[data-testid="taoffice-visio-page"]'
+    kind: display
+  - id: taoffice-visio-page-name
+    selector: '[data-testid="taoffice-visio-page-name"]'
+    kind: display
+  - id: taoffice-visio-previous
+    selector: '[data-testid="taoffice-visio-previous"]'
+    kind: interactive
+  - id: taoffice-visio-retry
+    selector: '[data-testid="taoffice-visio-retry"]'
+    kind: interactive
+  - id: taoffice-visio-viewport
+    selector: '[data-testid="taoffice-visio-viewport"]'
+    kind: interactive
+  - id: taoffice-visio-zoom
+    selector: '[data-testid="taoffice-visio-zoom"]'
+    kind: display
+  - id: taoffice-visio-zoom-in
+    selector: '[data-testid="taoffice-visio-zoom-in"]'
+    kind: interactive
+  - id: taoffice-visio-zoom-out
+    selector: '[data-testid="taoffice-visio-zoom-out"]'
+    kind: interactive
+  - id: taoffice-media-export
+    selector: '[data-testid="taoffice-media-export"]'
+    kind: display
+  - id: taoffice-image-viewer
+    selector: '[data-testid="taoffice-image-viewer"]'
+    kind: display
+  - id: taoffice-image-thumbnail
+    selector: '[data-testid="taoffice-image-thumbnail"]'
+    kind: display
+  - id: taoffice-image-dimensions
+    selector: '[data-testid="taoffice-image-dimensions"]'
+    kind: display
+  - id: taoffice-image-error
+    selector: '[data-testid="taoffice-image-error"]'
+    kind: display
+  - id: taoffice-image-copy-error
+    selector: '[data-testid="taoffice-image-copy-error"]'
+    kind: interactive
+  - id: taoffice-image-retry
+    selector: '[data-testid="taoffice-image-retry"]'
+    kind: interactive
+  - id: taoffice-image-open-system
+    selector: '[data-testid="taoffice-image-open-system"]'
+    kind: interactive
+  - id: taoffice-image-zoom
+    selector: '[data-testid="taoffice-image-zoom"]'
+    kind: interactive
+  - id: taoffice-media-export-cancel
+    selector: '[data-testid="taoffice-media-export-cancel"]'
+    kind: interactive
+  - id: taoffice-media-export-error
+    selector: '[data-testid="taoffice-media-export-error"]'
+    kind: display
+  - id: taoffice-media-export-format
+    selector: '[data-testid="taoffice-media-export-format"]'
+    kind: interactive
+  - id: taoffice-media-export-invalid
+    selector: '[data-testid="taoffice-media-export-invalid"]'
+    kind: display
+  - id: taoffice-media-export-open
+    selector: '[data-testid="taoffice-media-export-open"]'
+    kind: interactive
+  - id: taoffice-media-export-preview
+    selector: '[data-testid="taoffice-media-export-preview"]'
+    kind: interactive
+  - id: taoffice-media-export-save
+    selector: '[data-testid="taoffice-media-export-save"]'
+    kind: interactive
+  - id: taoffice-media-export-saved
+    selector: '[data-testid="taoffice-media-export-saved"]'
+    kind: display
+  - id: taoffice-media-export-status
+    selector: '[data-testid="taoffice-media-export-status"]'
+    kind: display
+  - id: taoffice-media-export-width
+    selector: '[data-testid="taoffice-media-export-width"]'
+    kind: interactive
+  - id: taoffice-media-open-system
+    selector: '[data-testid="taoffice-media-open-system"]'
+    kind: interactive
+  - id: taoffice-media-preparing-cancel
+    selector: '[data-testid="taoffice-media-preparing-cancel"]'
+    kind: interactive
+  - id: taoffice-media-trim-end
+    selector: '[data-testid="taoffice-media-trim-end"]'
+    kind: interactive
+  - id: taoffice-media-trim-start
+    selector: '[data-testid="taoffice-media-trim-start"]'
+    kind: interactive
   - id: taoffice-excel
     selector: '[data-testid="taoffice-excel"]'
     kind: display
@@ -17058,6 +17329,9 @@ controls:
     kind: interactive
   - id: taoffice-excel-grid
     selector: '[data-testid="taoffice-excel-grid"]'
+    kind: display
+  - id: taoffice-excel-calculation
+    selector: '[data-testid="taoffice-excel-calculation"]'
     kind: display
   - id: taoffice-excel-cell
     selector: '[data-testid="taoffice-excel-cell"]'
@@ -17070,6 +17344,9 @@ controls:
     kind: display
   - id: taoffice-excel-error
     selector: '[data-testid="taoffice-excel-error"]'
+    kind: display
+  - id: taoffice-excel-readonly
+    selector: '[data-testid="taoffice-excel-readonly"]'
     kind: display
   - id: taoffice-excel-edit-cell
     selector: '[data-testid="taoffice-excel-edit-cell"]'
@@ -17092,6 +17369,18 @@ controls:
   - id: taoffice-pdf-page
     selector: '[data-testid="taoffice-pdf-page"]'
     kind: display
+  - id: taoffice-word-conversion
+    selector: '[data-testid="taoffice-word-conversion"]'
+    kind: display
+  - id: taoffice-word-conversion-cancel
+    selector: '[data-testid="taoffice-word-conversion-cancel"]'
+    kind: interactive
+  - id: taoffice-word-error
+    selector: '[data-testid="taoffice-word-error"]'
+    kind: display
+  - id: taoffice-word-retry
+    selector: '[data-testid="taoffice-word-retry"]'
+    kind: interactive
   - id: taoffice-word-preview
     selector: '[data-testid="taoffice-word-preview"]'
     kind: display
@@ -17148,6 +17437,72 @@ controls:
     kind: display
   - id: taoffice-project-retry
     selector: '[data-testid="taoffice-project-retry"]'
+    kind: interactive
+  - id: taoffice-project-details
+    selector: '[data-testid="taoffice-project-details"]'
+    kind: display
+  - id: taoffice-project-open-details
+    selector: '[data-testid="taoffice-project-open-details"]'
+    kind: interactive
+  - id: taoffice-project-add-task
+    selector: '[data-testid="taoffice-project-add-task"]'
+    kind: interactive
+  - id: taoffice-project-new-name
+    selector: '[data-testid="taoffice-project-new-name"]'
+    kind: interactive
+  - id: taoffice-project-create-task
+    selector: '[data-testid="taoffice-project-create-task"]'
+    kind: interactive
+  - id: taoffice-project-task-start
+    selector: '[data-testid="taoffice-project-task-start"]'
+    kind: interactive
+  - id: taoffice-project-task-finish
+    selector: '[data-testid="taoffice-project-task-finish"]'
+    kind: interactive
+  - id: taoffice-project-apply-dates
+    selector: '[data-testid="taoffice-project-apply-dates"]'
+    kind: interactive
+  - id: taoffice-project-task-progress
+    selector: '[data-testid="taoffice-project-task-progress"]'
+    kind: interactive
+  - id: taoffice-project-apply-progress
+    selector: '[data-testid="taoffice-project-apply-progress"]'
+    kind: interactive
+  - id: taoffice-project-predecessor
+    selector: '[data-testid="taoffice-project-predecessor"]'
+    kind: interactive
+  - id: taoffice-project-link-type
+    selector: '[data-testid="taoffice-project-link-type"]'
+    kind: interactive
+  - id: taoffice-project-link-lag
+    selector: '[data-testid="taoffice-project-link-lag"]'
+    kind: interactive
+  - id: taoffice-project-link-lag-unit
+    selector: '[data-testid="taoffice-project-link-lag-unit"]'
+    kind: interactive
+  - id: taoffice-project-apply-link
+    selector: '[data-testid="taoffice-project-apply-link"]'
+    kind: interactive
+  - id: taoffice-project-task-links
+    selector: '[data-testid="taoffice-project-task-links"]'
+    kind: display
+  - id: taoffice-project-resource
+    selector: '[data-testid="taoffice-project-resource"]'
+    kind: interactive
+  - id: taoffice-project-resource-units
+    selector: '[data-testid="taoffice-project-resource-units"]'
+    kind: interactive
+  - id: taoffice-project-apply-resource
+    selector: '[data-testid="taoffice-project-apply-resource"]'
+    kind: interactive
+  - id: taoffice-project-task-assignments
+    selector: '[data-testid="taoffice-project-task-assignments"]'
+    kind: display
+  - id: taoffice-project-remove-task
+    selector: '[data-testid="taoffice-project-remove-task"]'
+    kind: interactive
+  - id: taoffice-project-confirm-remove
+    selector: '[data-testid="taoffice-project-confirm-remove"]'
     kind: interactive
   - id: taoffice-project-open-system
     selector: '[data-testid="taoffice-project-open-system"]'

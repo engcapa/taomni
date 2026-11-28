@@ -156,34 +156,41 @@ pub(super) fn canonical_entry_path(path: &Path) -> OpResult<String> {
 
 /// Atomic no-replace is essential: a preflight `exists()` check alone can
 /// overwrite a file created by another process between the check and rename.
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 pub(crate) fn rename_no_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
     use std::os::unix::ffi::OsStrExt;
     let source = std::ffi::CString::new(source.as_os_str().as_bytes())?;
     let destination = std::ffi::CString::new(destination.as_os_str().as_bytes())?;
+    rename_no_replace_at(libc::AT_FDCWD, &source, libc::AT_FDCWD, &destination)
+}
+
+#[cfg(unix)]
+pub(crate) fn rename_no_replace_at(
+    source_parent: std::os::fd::RawFd,
+    source: &std::ffi::CStr,
+    destination_parent: std::os::fd::RawFd,
+    destination: &std::ffi::CStr,
+) -> std::io::Result<()> {
+    #[cfg(target_os = "linux")]
     let result = unsafe {
         libc::renameat2(
-            libc::AT_FDCWD,
+            source_parent,
             source.as_ptr(),
-            libc::AT_FDCWD,
+            destination_parent,
             destination.as_ptr(),
             libc::RENAME_NOREPLACE,
         )
     };
-    if result == 0 {
-        Ok(())
-    } else {
-        Err(std::io::Error::last_os_error())
-    }
-}
-
-#[cfg(target_os = "macos")]
-pub(crate) fn rename_no_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
-    use std::os::unix::ffi::OsStrExt;
-    let source = std::ffi::CString::new(source.as_os_str().as_bytes())?;
-    let destination = std::ffi::CString::new(destination.as_os_str().as_bytes())?;
-    let result =
-        unsafe { libc::renamex_np(source.as_ptr(), destination.as_ptr(), libc::RENAME_EXCL) };
+    #[cfg(target_os = "macos")]
+    let result = unsafe {
+        libc::renameatx_np(
+            source_parent,
+            source.as_ptr(),
+            destination_parent,
+            destination.as_ptr(),
+            libc::RENAME_EXCL,
+        )
+    };
     if result == 0 {
         Ok(())
     } else {

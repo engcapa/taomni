@@ -106,3 +106,46 @@
 .taoffice-project-duration-form input {
   width: 7ch;
 }
+
+.taoffice-project-details {
+  max-height: min(55vh, 30rem);
+  overflow: auto;
+  border-bottom: 1px solid var(--taomni-divider);
+  padding: 8px;
+}
+
+.taoffice-project-details-header,
+.taoffice-project-detail-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.taoffice-project-details-header {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.taoffice-project-details fieldset {
+  min-width: 0;
+  margin: 4px 0;
+}
+
+.taoffice-project-detail-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.taoffice-project-details li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.taoffice-project-new-task {
+  padding-inline: 8px;
+}

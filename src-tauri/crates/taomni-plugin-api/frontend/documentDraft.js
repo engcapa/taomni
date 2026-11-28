@@ -26,10 +26,10 @@ export function useDocumentDraft(source, createCopy) {
     setOutput("");
   }
 
-  function save() {
+  function save({ allowUnedited = false } = {}) {
     if (task.current) return task.current;
     const snapshot = current.current;
-    if (!source.saveCopy || sameEdits(snapshot, saved)) return Promise.resolve(false);
+    if (!source.saveCopy || (!allowUnedited && sameEdits(snapshot, saved))) return Promise.resolve(false);
     setSaving(true);
     setError("");
     const work = Promise.resolve().then(async () => {

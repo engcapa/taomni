@@ -7,24 +7,32 @@ use mpxj::{
 use std::{fmt::Display, io::Cursor};
 
 mod calendars;
+mod mpx;
 #[cfg(test)]
 mod tests;
 
 pub const MAX_BYTES: usize = 8 * 1024 * 1024;
 const UNASSIGNED_RESOURCE_UID: i32 = -65_535;
 
-pub fn mpp_to_mspdi(
+pub fn import_to_mspdi(
     bytes: &[u8],
     mut check_current: impl FnMut() -> Result<(), String>,
 ) -> Result<Vec<u8>, String> {
     if bytes.len() > MAX_BYTES {
         return Err("Project previews are limited to 8 MiB".into());
     }
-    let mut reader = mpxj::mpp::mpp_reader::MPPReader::new();
-    reader.set_read_presentation_data(false);
-    let project = reader
-        .read_stream(&mut Cursor::new(bytes))
-        .map_err(|err| err.to_string())?;
+    check_current()?;
+    let mut input = Cursor::new(bytes);
+    let project = if bytes.starts_with(b"MPX") {
+        let mut reader = mpxj::mpx::mpx_reader::MPXReader::new();
+        reader.set_locale(mpx::locale(bytes));
+        reader.read(&mut input)
+    } else {
+        let mut reader = mpxj::mpp::mpp_reader::MPPReader::new();
+        reader.set_read_presentation_data(false);
+        reader.read_stream(&mut input)
+    }
+    .map_err(|error| error.to_string())?;
     write_project(&project.borrow(), &mut check_current)
 }
 

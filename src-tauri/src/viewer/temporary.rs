@@ -5,15 +5,15 @@ use super::{HARD_BYTES, TempFile};
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
-struct OwnedTemp {
+pub(super) struct OwnedTemp {
     directory: tempfile::TempDir,
     path: PathBuf,
 }
 
-fn registry() -> &'static Mutex<HashMap<String, OwnedTemp>> {
-    static REGISTRY: OnceLock<Mutex<HashMap<String, OwnedTemp>>> = OnceLock::new();
+fn registry() -> &'static Mutex<HashMap<String, Arc<OwnedTemp>>> {
+    static REGISTRY: OnceLock<Mutex<HashMap<String, Arc<OwnedTemp>>>> = OnceLock::new();
     REGISTRY.get_or_init(Default::default)
 }
 
@@ -43,7 +43,7 @@ pub(crate) fn create_temp(file_name_input: &str, bytes: &[u8]) -> Result<TempFil
     registry()
         .lock()
         .unwrap_or_else(|error| error.into_inner())
-        .insert(token, OwnedTemp { directory, path });
+        .insert(token, Arc::new(OwnedTemp { directory, path }));
     Ok(result)
 }
 
@@ -73,6 +73,26 @@ fn matches_owned_path(
     })
 }
 
+pub(super) fn lease(path: &std::path::Path) -> Option<Arc<OwnedTemp>> {
+    let canonical = path.canonicalize().ok();
+    registry()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .values()
+        .find(|artifact| matches_owned_path(&artifact.path, path, canonical.as_ref(), false))
+        .cloned()
+}
+
+fn close(artifact: Arc<OwnedTemp>) -> Result<(), String> {
+    if let Ok(artifact) = Arc::try_unwrap(artifact) {
+        artifact
+            .directory
+            .close()
+            .map_err(|error| io_error("release viewer temp file", error))?;
+    }
+    Ok(())
+}
+
 pub(crate) fn is_owned_temp(path: &std::path::Path) -> bool {
     let canonical = path.canonicalize().ok();
     let candidates = registry().lock().unwrap_or_else(|error| error.into_inner());
@@ -91,11 +111,7 @@ pub(crate) fn release_temp(path: &str) -> Result<(), String> {
         .map(|(token, _)| token.clone());
     if let Some(token) = token {
         let artifact = owned.remove(&token).unwrap();
-        artifact
-            .directory
-            .close()
-            .map_err(|error| io_error("release viewer temp file", error))?;
-        Ok(())
+        close(artifact)
     } else {
         Err("permission: Path is not an owned viewer temp copy".into())
     }
@@ -107,15 +123,13 @@ pub(crate) fn release_temp_token(token: &str) -> Result<(), String> {
         .unwrap_or_else(|error| error.into_inner())
         .remove(token);
     match artifact {
-        Some(artifact) => artifact
-            .directory
-            .close()
-            .map_err(|error| io_error("release viewer temp file", error)),
+        Some(artifact) => close(artifact),
         None => Err("permission: Unknown viewer temp token".into()),
     }
 }
 
 pub(crate) fn shutdown() {
+    super::archive::jobs::cancel_all();
     registry()
         .lock()
         .unwrap_or_else(|error| error.into_inner())

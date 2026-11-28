@@ -23,12 +23,12 @@ vi.mock("../../lib/viewer", () => ({ viewerReadBytes: vi.fn() }));
 
 const viewer = { path: "/tmp/ledger.xlsx", kind: "document" as const };
 const slug = "taoffice-excel";
-function install(lifecycle: "disabled" | "enabled") {
+function install(lifecycle: "disabled" | "enabled", owner = { slug, name: "Excel", kind: "excel", extension: "xlsx" }) {
   const record = moduleRecord(lifecycle);
-  record.slug = slug;
-  record.manifest = { ...record.manifest!, slug, id: `taomni-plugin-${slug}`, name: "Excel",
-    document: { fileKinds: ["excel"], extensions: ["xlsx"] }, permissions: ["fs.readUserFile"] };
-  usePluginFrontendStore.setState({ records: { [slug]: record } });
+  record.slug = owner.slug;
+  record.manifest = { ...record.manifest!, slug: owner.slug, id: `taomni-plugin-${owner.slug}`, name: owner.name,
+    document: { fileKinds: [owner.kind], extensions: [owner.extension] }, permissions: ["fs.readUserFile"] };
+  usePluginFrontendStore.setState({ records: { [owner.slug]: record } });
 }
 
 beforeEach(() => {
@@ -72,4 +72,21 @@ it("invalidates pending reads and prevents another read after disable or close",
   view.unmount();
   await expect(attached.read()).rejects.toMatchObject({ name: "AbortError" });
   expect(viewerReadBytes).toHaveBeenCalledTimes(1);
+});
+
+it("offers conversion destinations only to the authorized writable document", async () => {
+  const mediaViewer = { path: "/tmp/recording.avi", kind: "document" as const };
+  install("enabled", { slug: "taoffice-video", name: "Media", kind: "video", extension: "avi" });
+  const view = render(<ModuleDocumentPane viewer={mediaViewer} active />);
+  expect(attached.copyExtensions).toEqual(["mp4", "webm"]);
+  const writable = attached;
+  const contents = new Uint8Array([42]);
+  await expect(writable.saveCopy!(contents, { extension: "svg" })).rejects.toThrow("format is unavailable");
+
+  view.rerender(<ModuleDocumentPane viewer={{ ...mediaViewer, source: "remote-temp" }} active />);
+  expect(attached).not.toBe(writable);
+  expect(attached.readOnly).toBe(true);
+  expect(attached.copyExtensions).toBeUndefined();
+  expect(attached.saveCopy).toBeUndefined();
+  await expect(writable.saveCopy!(contents, { extension: "mp4" })).rejects.toMatchObject({ name: "AbortError" });
 });

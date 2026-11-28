@@ -27,6 +27,18 @@ def setup_project(ctx):
     _setup(ctx, "taoffice-project", "project")
 
 
+def setup_ppt(ctx):
+    _setup(ctx, "taoffice-ppt", "ppt")
+
+
+def setup_visio(ctx):
+    _setup(ctx, "taoffice-visio", "visio")
+
+
+def setup_image(ctx):
+    _setup(ctx, "taoffice-image", "image")
+
+
 def _setup(ctx, slug, name):
     if ctx.cfg["app"]["mode"] != "native":
         raise ValueError("A signed TaOffice package requires the native installer")

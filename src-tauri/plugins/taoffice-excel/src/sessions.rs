@@ -1,3 +1,4 @@
+use crate::legacy_workbook::{LegacyFormat, LegacyWorkbook};
 use crate::workbook::{MAX_INPUT_BYTES, Workbook};
 use crate::workbook_copy::{self, Edit};
 use crate::workbook_package::invalid;
@@ -28,16 +29,72 @@ struct Session {
     touched: Instant,
     state: State,
     copy: Option<CopyResult>,
+    preview: Option<EditedWorkbook>,
 }
 
 struct CopyResult {
     id: Uuid,
-    bytes: Vec<u8>,
+    bytes: Arc<[u8]>,
+}
+
+struct EditedWorkbook {
+    edits: Vec<Edit>,
+    workbook: Workbook,
+    recalculated: bool,
+}
+
+impl Session {
+    fn edited(
+        &mut self,
+        edits: Vec<Edit>,
+        operation: &Operation,
+    ) -> Result<&mut EditedWorkbook, RpcError> {
+        if !self
+            .preview
+            .as_ref()
+            .is_some_and(|preview| preview.edits == edits)
+        {
+            let workbook = match &self.state {
+                State::Open(OpenWorkbook::Xml(workbook)) => workbook,
+                State::Open(OpenWorkbook::Legacy(_)) => {
+                    return Err(invalid("This workbook format is read-only"));
+                }
+                State::Upload { .. } => return Err(invalid("Workbook transfer is incomplete")),
+            };
+            let copy = workbook_copy::create(workbook, &edits, || operation.check_current())?;
+            let preview = EditedWorkbook {
+                workbook: Workbook::open(copy.bytes)?,
+                recalculated: copy.recalculated,
+                edits,
+            };
+            operation.check_current()?;
+            self.preview = Some(preview);
+        }
+        self.preview.as_mut().ok_or_else(expired)
+    }
 }
 
 enum State {
-    Upload { expected: usize, bytes: Vec<u8> },
-    Open(Box<Workbook>),
+    Upload {
+        expected: usize,
+        bytes: Vec<u8>,
+        format: Option<LegacyFormat>,
+    },
+    Open(OpenWorkbook),
+}
+
+enum OpenWorkbook {
+    Xml(Box<Workbook>),
+    Legacy(Box<LegacyWorkbook>),
+}
+
+impl OpenWorkbook {
+    fn sheets(&self) -> &[String] {
+        match self {
+            Self::Xml(workbook) => workbook.sheets(),
+            Self::Legacy(workbook) => workbook.sheets(),
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -49,6 +106,7 @@ struct Identity {
 struct Begin {
     id: Uuid,
     size: usize,
+    format: Option<LegacyFormat>,
 }
 
 #[derive(Deserialize)]
@@ -64,6 +122,8 @@ struct View {
     sheet: String,
     row: u32,
     column: u32,
+    #[serde(default)]
+    edits: Vec<Edit>,
 }
 
 #[derive(Deserialize)]
@@ -104,7 +164,10 @@ fn active(sessions: &mut HashMap<Uuid, Session>, id: Uuid) -> Result<&mut Sessio
 }
 
 fn append(state: &mut State, request: Append) -> Result<(), RpcError> {
-    let State::Upload { expected, bytes } = state else {
+    let State::Upload {
+        expected, bytes, ..
+    } = state
+    else {
         return Err(invalid("Workbook is already open"));
     };
     if request.offset != bytes.len() || request.data.len() > CHUNK_BYTES.div_ceil(3) * 4 {
@@ -160,9 +223,11 @@ impl PluginHandler for Workbooks {
             .map_err(|_| RpcError::from_code(ErrorCode::InternalError))?;
         match method {
             "workbook/begin" => {
-                let Begin { id, size } = request(params)?;
+                let Begin { id, size, format } = request(params)?;
                 if size == 0 || size > MAX_INPUT_BYTES {
-                    return Err(invalid("XLSX and XLSM preview is limited to 16 MiB"));
+                    return Err(invalid(
+                        "Workbook preview requires a file between 1 byte and 16 MiB",
+                    ));
                 }
                 if sessions.len() >= MAX_OPEN {
                     return Err(invalid(
@@ -177,7 +242,9 @@ impl PluginHandler for Workbooks {
                     state: State::Upload {
                         expected: size,
                         bytes: Vec::new(),
+                        format,
                     },
+                    preview: None,
                     copy: None,
                 });
             }
@@ -188,21 +255,34 @@ impl PluginHandler for Workbooks {
             "workbook/open" => {
                 let Identity { id } = request(params)?;
                 let session = sessions.remove(&id).ok_or_else(expired)?;
-                let State::Upload { expected, bytes } = session.state else {
+                let State::Upload {
+                    expected,
+                    bytes,
+                    format,
+                } = session.state
+                else {
                     sessions.insert(id, session);
                     return Err(invalid("Workbook is already open"));
                 };
                 if bytes.len() != expected {
                     return Err(invalid("An incomplete workbook was received"));
                 }
-                let workbook = Workbook::open(bytes)?;
+                let workbook = match format {
+                    Some(format) => {
+                        OpenWorkbook::Legacy(Box::new(LegacyWorkbook::open(bytes, format, || {
+                            operation.check_current()
+                        })?))
+                    }
+                    None => OpenWorkbook::Xml(Box::new(Workbook::open(bytes)?)),
+                };
                 operation.check_current()?;
                 let result = json!({ "sheets": workbook.sheets() });
                 sessions.insert(
                     id,
                     Session {
                         touched: Instant::now(),
-                        state: State::Open(Box::new(workbook)),
+                        state: State::Open(workbook),
+                        preview: None,
                         copy: None,
                     },
                 );
@@ -214,21 +294,45 @@ impl PluginHandler for Workbooks {
                     sheet,
                     row,
                     column,
+                    edits,
                 } = request(params)?;
-                let State::Open(workbook) = &mut active(&mut sessions, id)?.state else {
+                let session = active(&mut sessions, id)?;
+                let State::Open(workbook) = &mut session.state else {
                     return Err(invalid("Workbook transfer is incomplete"));
                 };
-                let window = workbook.sheet(&sheet, row, column, || operation.check_current())?;
+                let check_current = || operation.check_current();
+                let mut window = match workbook {
+                    OpenWorkbook::Xml(workbook) => {
+                        workbook.sheet(&sheet, row, column, check_current)?
+                    }
+                    OpenWorkbook::Legacy(workbook) => {
+                        if !edits.is_empty() {
+                            return Err(invalid("This workbook format is read-only"));
+                        }
+                        workbook.sheet(&sheet, row, column, check_current)?
+                    }
+                };
+                if edits.is_empty() {
+                    session.preview = None;
+                } else {
+                    let preview = session.edited(edits, operation)?;
+                    window.recalculated = Some(preview.recalculated);
+                    if preview.recalculated {
+                        window.apply_formula_values(preview.workbook.sheet(
+                            &sheet,
+                            row,
+                            column,
+                            || operation.check_current(),
+                        )?);
+                    }
+                }
                 return serde_json::to_value(window).map_err(invalid);
             }
             "workbook/copy" => {
                 let CopyRequest { id, copy_id, edits } = request(params)?;
                 let session = active(&mut sessions, id)?;
-                let State::Open(workbook) = &session.state else {
-                    return Err(invalid("Workbook transfer is incomplete"));
-                };
                 session.copy = None;
-                let bytes = workbook_copy::create(workbook, edits, || operation.check_current())?;
+                let bytes = session.edited(edits, operation)?.workbook.shared_bytes();
                 let size = bytes.len();
                 session.copy = Some(CopyResult { id: copy_id, bytes });
                 return Ok(json!({ "size": size }));

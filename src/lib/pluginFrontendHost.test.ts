@@ -13,6 +13,8 @@ describe("shared module host and activation-scoped requests", () => {
     const host = installPluginFrontendHost();
     expect(host.React).toBe(React);
     expect(host.React.useState).toBe(React.useState);
+    expect(host.formatShortcutDisplay("Mod+F", true)).toBe("⌘F");
+    expect(host.formatShortcutDisplay("Mod+F", false)).toBe("Ctrl+F");
     expect(installPluginFrontendHost()).toBe(host);
     expect(Object.isFrozen(host)).toBe(true);
     expect(Object.getOwnPropertyDescriptor(globalThis, "__taomniHost")?.writable).toBe(false);

@@ -1,0 +1,93 @@
+.taoffice-media {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  min-width: 0;
+  height: 100%;
+  overflow: auto;
+}
+
+.taoffice-media h2 {
+  overflow-wrap: anywhere;
+  font-size: var(--taomni-fs-title);
+  font-weight: 600;
+}
+
+.taoffice-media-mode,
+.taoffice-media-actions,
+.taoffice-media-export-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.taoffice-media-surface {
+  width: 100%;
+  min-height: 0;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.taoffice-media-surface:focus-visible {
+  outline: 2px solid var(--taomni-focus-ring);
+  outline-offset: -2px;
+}
+
+.taoffice-media-error {
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.taoffice-media-export,
+.taoffice-media-export-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+  min-width: 0;
+}
+
+.taoffice-media-export > button {
+  align-self: start;
+}
+
+.taoffice-media-export-form {
+  padding: 12px;
+  border: 1px solid var(--taomni-card-border);
+  border-radius: var(--taomni-radius-md);
+}
+
+.taoffice-media-export-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.taoffice-media-export-fields legend {
+  margin-bottom: 8px;
+}
+
+.taoffice-media-export-fields label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.taoffice-media-export-fields input {
+  width: 10ch;
+  max-width: 100%;
+}
+
+.taoffice-media-actions {
+  justify-content: flex-end;
+}
+
+.taoffice-media .taomni-btn[data-primary="true"]:enabled {
+  color: var(--taomni-primary-text);
+}

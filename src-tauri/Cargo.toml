@@ -61,6 +61,7 @@ members = [
     "plugins/sockscap/xray",
     "plugins/taoffice-excel",
     "plugins/taoffice-project",
+    "plugins/taoffice-video",
     "plugins/vnc-client",
     "plugins/vnc-server",
     "plugins/servers",

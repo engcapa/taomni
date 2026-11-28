@@ -26,6 +26,7 @@ steps:
     expression: >-
       document.querySelector('iframe.taoffice-word-preview').contentDocument?.querySelector('header')?.textContent.includes('Operations planning') &&
       document.querySelector('iframe.taoffice-word-preview').contentDocument?.querySelector('table')?.textContent.includes('Pilot')
+    timeout_sec: 20
 - press: {selector: '[data-testid="taoffice-word-edit"]', key: Enter}
 - assert_focus_on: '[data-testid="taoffice-word-paragraph"][value="Planning notes"]'
 - assert_visible: '[data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]'
@@ -43,6 +44,7 @@ steps:
     expression: >-
       document.querySelector('iframe.taoffice-word-preview').contentDocument?.body?.textContent.includes('Pilot moves to Tuesday & Wednesday') &&
       document.querySelector('iframe.taoffice-word-preview').contentDocument?.body?.textContent.includes('Manager approval is required.')
+    timeout_sec: 20
 - eval_readonly:
     expression: >-
       document.querySelector('iframe.taoffice-word-preview').contentDocument?.querySelector('table tr:nth-child(2) td:nth-child(2)')?.textContent === 'Waiting for approval'

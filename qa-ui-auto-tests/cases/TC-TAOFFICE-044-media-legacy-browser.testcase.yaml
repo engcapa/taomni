@@ -1,0 +1,81 @@
+id: TC-TAOFFICE-044
+title: Explain legacy video conversion in browser preview and recover to supported playback
+description: Open an AVI in preview, exercise the recovery controls and inspect contrast and responsive layout on the supported video export form.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, crash-regression, file-open, taoffice, media, taoffice-video]
+fixtures: [reset_db, file_open_files]
+ui_standard: [UI-FBK-03, UI-FND-03a, UI-FND-13]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage: {key: taomni.preview.modules.taoffice-video.v1, value: '{"lifecycle":"enabled","values":[]}'}
+- seed_storage: {key: taomni.uiFontSize, value: '10'}
+- reload_window: null
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="light"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="media-legacy.avi"]'
+- wait_for: '[data-testid="taoffice-media-error"]'
+- assert_text: {selector: '[data-testid="taoffice-media-error"]', contains: Legacy media conversion requires the Taomni desktop app}
+- press: {selector: '[data-testid="taoffice-media-open-system"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-media-error"] [role="alert"]', contains: Opening files with the OS shell is not available in browser preview}
+- press: {selector: '[data-testid="taoffice-media-retry"]', key: Enter}
+- wait_for: '[data-testid="taoffice-media-error"]'
+- assert_count: {selector: '[data-testid="taoffice-media-error"] [role="alert"]', equal: 0}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/media-legacy.avi', sha256: '${fixture.taoffice_legacy_media_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="media-edit.webm"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] video[data-ready="true"]'
+- press: {selector: '[data-testid="taoffice-media-export-open"]', key: Enter}
+- assert_solid_text_contrast: {selector: '[data-testid="taoffice-media-export-save"]', minimum: 4.5}
+- assert_computed_style: {selector: '[data-testid="taoffice-media-export-save"]', property: font-size, equals: '10px'}
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="dark"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- press: {selector: '#ui-font-size-slider', key: End}
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-media-export"]'
+- assert_solid_text_contrast: {selector: '[data-testid="taoffice-media-export-save"]', minimum: 4.5}
+- assert_computed_style: {selector: '[data-testid="taoffice-media-export-save"]', property: font-size, equals: '18px'}
+- eval_readonly:
+    expression: >-
+      document.querySelector('.taoffice-media-export-form').scrollWidth
+      <= document.querySelector('.taoffice-media-export-form').clientWidth
+- screenshot: media-export-dark.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: media-error
+    ui_standard: [UI-FBK-03]
+    requirement: A legacy file explains the desktop requirement, and the unavailable system-app action gives a distinct recovery message.
+    actions: [13, 16, 18, 23]
+    checkpoints:
+    - {step: 15, expectation: The player explains that AVI conversion needs the desktop application.}
+    - {step: 17, expectation: Preview explains why a system app cannot be launched and gives an alternative.}
+    - {step: 20, expectation: Retry clears the previous system-app error.}
+    - {step: 21, expectation: The failed preview leaves the AVI bytes intact.}
+    - {step: 24, expectation: Opening WebM in the same workspace succeeds after the rejected legacy file.}
+    results: [15, 17, 20, 21, 24]
+  - id: media-appearance
+    ui_standard: [UI-FND-03a, UI-FND-13]
+    requirement: The open export form applies the live theme and user font size while keeping its fields and actions in view.
+    actions: [4, 6, 25, 28, 32, 33]
+    checkpoints:
+    - {step: 26, expectation: The primary action clears 4.5 to 1 contrast in light mode.}
+    - {step: 27, expectation: The action uses the 10 px setting.}
+    - {step: 35, expectation: The primary action clears 4.5 to 1 contrast in dark mode.}
+    - {step: 36, expectation: The retained form uses the updated 18 px setting.}
+    - {step: 37, expectation: The export controls fit horizontally inside the form.}
+    results: [26, 27, 35, 36, 37]
+  visual:
+  - {check: Theme contrast and UI scale, method: automated, reason: Reads rendered color and geometry at both font endpoints.}
+  native:
+  - {check: Desktop conversion, method: external, reason: TC-TAOFFICE-045 covers actual playback through the signed host.}

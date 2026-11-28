@@ -10,7 +10,19 @@
 | TC-WS-039 | 真实嵌套面板、编辑器内部分屏、隐藏／显示、resize、工具 tab 关闭及 reload；dirty 内容保留 | browser/native |
 | TC-MODULES-102 | 安装 MFA 时验证 Home、Tools 与 Sessions 切换后的 MFA 标签命中和设置标签关闭 | browser/native |
 | TC-TAOFFICE-001 | 缺少 Project 模块时，MPP 与 MSPDI 文件各有占位页。重复打开激活已有标签，用户可从占位页进入模块商店。 | browser/native |
+| TC-TAOFFICE-033 | PDF 批注、旋转、前后移动、移除和撤销后另存副本，保留原件 | browser |
+| TC-TAOFFICE-034 | 用签名 PDF 模块和系统保存对话框写入副本，重开后核对旋转、页数及已保存便笺 | native/release |
+| TC-TAOFFICE-059/060 | PPT、ODP 离线导入、PPTX 副本另存和原件校验 | browser、native/release |
+| TC-TAOFFICE-039/040 | 两页 PPTX 渲染、文本修改、关闭焦点、签名安装和另存重开 | browser、native/release |
+| TC-TAOFFICE-057/058 | Visio 简单形状编辑、无效编辑反馈、另存与重开 | browser、native/release |
+| TC-TAOFFICE-041/042 | VSDX/VSD 渲染、跨页查找、坏文件重试与 SVG 导出 | browser、native/release |
+| TC-TAOFFICE-043/044 | 视频裁剪、缩放、下载 WebM 与旧格式播放器的恢复操作 | browser |
+| TC-TAOFFICE-045/046 | 签名模块转码旧格式并实际播放、裁剪输出 MP4 和通过系统对话框保存重开 | native/release |
+| TC-TAOFFICE-047/048 | HEIC、PSD、DNG 缩略图，坏文件重试和签名图片模块启用、关闭与重开 | browser、native/release |
+| TC-TAOFFICE-049/050 | XLS、XLSB、ODS 只读工作表、缓存公式、坏文件恢复与原始字节校验 | browser、native/release |
+| TC-TAOFFICE-053/054 | DOC、ODT、RTF 离线转换、坏文件恢复、只读预览和 DOCX 保存重开 | browser、native/release |
 | TC-TAOFFICE-009 | gzip TAR 的筛选焦点、只读预览、原始文件和解压字节，以及异常归档的错误反馈 | browser/native |
+| TC-TAOFFICE-051/052 | 提取进度、取消、查看器重开、应用重启后恢复以及完整结果原子发布 | browser/native |
 | TC-WS-045 | 空工作区从 Tools/Home 进入；折叠／展开、Sessions 导航切换；只保留一个编辑器运行时 | browser/native |
 | TC-WS-051 | 工作区文件／终端混合布局及过滤；实际 PTY 输出、同一个终端、原生磁盘保存校验 | native |
 | TC-WS-052 | 四个独立 dirty buffer；工具栏直接 Grid、Split/Grid/Single 连续切换；面板文件映射及跨模式返回 | browser/native |

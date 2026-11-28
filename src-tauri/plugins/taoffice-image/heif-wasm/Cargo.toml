@@ -1,0 +1,23 @@
+[package]
+name = "taoffice-heif-preview"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+heic-rs = { version = "=0.1.5", default-features = false }
+png = "=0.18.1"
+
+# Build the decoder independently of the desktop core and its native hosts.
+[workspace]
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+strip = true

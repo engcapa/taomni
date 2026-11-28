@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use taomni_host_gates::host::{
-    HostProcess, HostSupervisorConfig, HostTick, PLUGIN_WATCHDOG_ARG,
-    enable_plugin_watchdog_exec, run_plugin_watchdog,
+    HostProcess, HostSupervisorConfig, HostTick, PLUGIN_WATCHDOG_ARG, enable_plugin_watchdog_exec,
+    run_plugin_watchdog,
 };
 
 fn main() {

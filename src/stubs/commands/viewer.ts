@@ -108,6 +108,10 @@ async function htmlOpen(path: string, allowScripts: boolean) {
 
 export async function invokeViewer(command: string, args: Record<string, unknown> = {}): Promise<unknown> {
   const path = String(args.path ?? "");
+  if (command.startsWith("viewer_archive_job_")) {
+    const { invokeArchiveJob } = await import("../archiveExtraction");
+    return invokeArchiveJob(command, path, args);
+  }
   switch (command) {
     case "viewer_archive_list":
     case "viewer_archive_extract":

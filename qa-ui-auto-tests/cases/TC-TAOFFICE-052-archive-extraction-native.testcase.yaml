@@ -1,0 +1,93 @@
+id: TC-TAOFFICE-052
+title: Resume a cancelled archive extraction across an application restart
+description: Check physical staged progress, cancellation, restart recovery and exact file bytes from the original archive.
+modes: [native]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, archive, core-only, crash-regression]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 240
+ui_standard: [UI-BTN-03, UI-FBK-04, UI-A11Y-03, UI-PAT-09]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="transfer.zip"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="transfer.zip"]'
+- wait_for: '[data-testid="archive-entry"][data-name="notes/readme.txt"]'
+- press: {selector: '[data-testid="archive-extract-here"]', key: Enter}
+- wait_for: '[data-testid="archive-extraction"][data-phase="extracting"]:not([data-retained-bytes="0"])'
+- assert_visible: '[data-testid="archive-extraction-progress"][value]'
+- assert_disabled: '[data-testid="archive-extract-here"]'
+- press: {selector: '[data-testid="archive-extraction-cancel"]', key: Enter}
+- wait_for: '[data-testid="archive-extraction"][data-phase="cancelled"]:not([data-retained-bytes="0"])'
+- assert_text: {selector: '[data-testid="archive-extraction"] [role="status"]', contains: Extraction cancelled}
+- assert_focus_on: '[data-testid="archive-extraction-resume"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/transfer/notes/readme.txt', absent: true}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- assert_not_visible: '[data-testid="archive-extraction"]'
+- assert_no_runtime_errors: null
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="transfer.zip"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="transfer.zip"]'
+- wait_for: '[data-testid="archive-extraction"][data-phase="cancelled"]:not([data-retained-bytes="0"])'
+- press: {selector: '[data-testid="archive-extraction-resume"]', key: Enter}
+- wait_for: {selector: '[data-testid="archive-output"]', timeout_sec: 90}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/transfer/notes/readme.txt', sha256: '${fixture.file_open_original_sha}'}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/transfer/payload/chunk-04.bin', sha256: '${fixture.taoffice_extraction_large_sha}'}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/transfer.zip', sha256: '${fixture.taoffice_extraction_archive_sha}'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: ARCHIVE-CANCEL
+    ui_standard: [UI-BTN-03, UI-FBK-04, UI-A11Y-03]
+    requirement: UI-BTN-03, UI-FBK-04 and UI-A11Y-03. Show progress, disable duplicate starts, and acknowledge a native cancellation with a keyboard-accessible Resume action.
+    actions: [12, 16]
+    checkpoints:
+    - step: 14
+      expectation: The extraction shows determinate progress.
+    - step: 15
+      expectation: An extraction cannot be started twice.
+    - step: 18
+      expectation: The live status acknowledges the cancellation.
+    - step: 19
+      expectation: The newly available Resume action owns focus.
+    results: [14, 15, 18, 19]
+  - id: ARCHIVE-RESTART
+    ui_standard: [UI-PAT-09]
+    requirement: UI-PAT-09. Closing the viewer and restarting Taomni preserve the cancelled extraction and allow it to finish without losing the completed members.
+    actions: [21, 24, 31, 33]
+    checkpoints:
+    - step: 20
+      expectation: No part of the final tree is visible during the pause.
+    - step: 32
+      expectation: The reopened viewer observes the paused extraction with its retained byte count.
+    - step: 35
+      expectation: The first committed member has its expected digest.
+    - step: 36
+      expectation: The final member has its expected digest.
+    - step: 37
+      expectation: The physical source archive retains its exact digest.
+    results: [20, 32, 35, 36, 37]
+  native:
+  - check: The native application preserves the cancelled task across a normal process restart and publishes physical output files.
+    method: automated
+    reason: The runner restarts the isolated app and verifies output with independent filesystem reads.
+  visual:
+  - check: A determinate progress indicator appears next to the extraction actions.
+    method: automated
+    reason: Step 14 observes the visible progressbar with a concrete value.

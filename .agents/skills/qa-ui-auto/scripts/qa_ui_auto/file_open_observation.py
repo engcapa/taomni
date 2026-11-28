@@ -18,7 +18,10 @@ READ_VFS = """async (path) => {
   try { await vfs.vfsStat(path); }
   catch (error) { if (missing(error)) return {exists: false}; throw error; }
   try {
-    return {exists: true, bytes: Array.from(new Uint8Array(await vfs.vfsReadBytes(path)))};
+    const bytes = await vfs.vfsReadBytes(path);
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+    const sha256 = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
+    return {exists: true, size: bytes.byteLength, sha256};
   } catch (error) {
     // Cleanup can remove the file after stat. "Not a file" also means a directory
     // or damaged record, so only a fresh, exact not-found observation proves absence.
@@ -77,7 +80,8 @@ def run(ctx: Any, args: Any, *, mode: str) -> str:
             raise StepError("assert_file_open_bytes: symlink refused")
         def read() -> dict:
             try:
-                return {"exists": True, "bytes": target.read_bytes()}
+                data = target.read_bytes()
+                return {"exists": True, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
             except FileNotFoundError:
                 return {"exists": False}
     else:
@@ -87,6 +91,9 @@ def run(ctx: Any, args: Any, *, mode: str) -> str:
             return ctx.page.evaluate(READ_VFS, path)
     if args.get("remember"):
         ctx._file_open_paths[args["remember"]] = path
+    expected_digest = args.get("sha256")
+    if "equals" in args:
+        expected_digest = hashlib.sha256(str(args["equals"]).encode("utf-8")).hexdigest()
     started = time.monotonic()
     timeout = float(args.get("timeout_sec", 10))
     record: dict[str, Any] = {"mode": mode, "path": path, "passed": False, "samples": []}
@@ -105,15 +112,11 @@ def run(ctx: Any, args: Any, *, mode: str) -> str:
                     raise
                 time.sleep(0.1)
                 continue
-            data = bytes(value.get("bytes", []))
-            digest = hashlib.sha256(data).hexdigest()
-            if args.get("absent"):
-                matched = not value["exists"]
-            elif "equals" in args:
-                matched = bool(value["exists"]) and data == str(args["equals"]).encode("utf-8")
-            else:
-                matched = bool(value["exists"]) and digest == args["sha256"]
-            record["samples"].append({"exists": value["exists"], "size": len(data), "sha256": digest, "elapsedMs": (time.monotonic() - started) * 1000})
+            exists = value["exists"]
+            digest = value["sha256"] if exists else hashlib.sha256(b"").hexdigest()
+            matched = not exists if args.get("absent") else exists and digest == expected_digest
+            record["samples"].append({"exists": exists, "size": value.get("size", 0), "sha256": digest,
+                                      "elapsedMs": (time.monotonic() - started) * 1000})
             if matched:
                 record["passed"] = True
                 return f"{mode} independent byte postcondition matched: {path}"

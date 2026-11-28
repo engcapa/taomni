@@ -12,16 +12,17 @@ use taomni_plugin_api::{ErrorCode, RpcError};
 use zip::ZipArchive;
 
 mod tables;
+pub(crate) use tables::position;
 
 pub(crate) const MAX_ROWS: u32 = 1_048_576;
 pub(crate) const MAX_COLUMNS: u32 = 16_384;
 const MAX_XML_BYTES: usize = 24 * 1024 * 1024;
-const CONTENT_TYPES: &str = "[Content_Types].xml";
+pub(crate) const CONTENT_TYPES: &str = "[Content_Types].xml";
 pub(crate) const WORKBOOK: &str = "xl/workbook.xml";
-const RELATIONSHIPS: &str = "xl/_rels/workbook.xml.rels";
+pub(crate) const RELATIONSHIPS: &str = "xl/_rels/workbook.xml.rels";
 pub(crate) const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const REL: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
-const CONTENT: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
+pub(crate) const REL: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
+pub(crate) const CONTENT: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
 const RID: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const SHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet";

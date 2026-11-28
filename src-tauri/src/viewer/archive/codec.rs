@@ -1,4 +1,5 @@
-use std::io::{self, Read};
+use rars::ReadCancellation;
+use std::io::{self, Read, Seek, SeekFrom};
 
 #[derive(Clone, Copy)]
 pub(super) enum Codec {
@@ -53,5 +54,40 @@ impl<R: Read> Read for CheckedReader<R> {
         self.size += count as u64;
         self.crc.update(&bytes[..count]);
         Ok(count)
+    }
+}
+
+pub(super) struct Cancellable<R> {
+    inner: R,
+    cancel: ReadCancellation,
+}
+
+impl<R> Cancellable<R> {
+    pub(super) fn new(inner: R, cancel: &ReadCancellation) -> Self {
+        Self {
+            inner,
+            cancel: cancel.clone(),
+        }
+    }
+
+    fn check(&self) -> io::Result<()> {
+        if self.cancel.is_cancelled() {
+            return Err(io::Error::other("Extraction cancelled"));
+        }
+        Ok(())
+    }
+}
+
+impl<R: Read> Read for Cancellable<R> {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        self.check()?;
+        self.inner.read(bytes)
+    }
+}
+
+impl<R: Seek> Seek for Cancellable<R> {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        self.check()?;
+        self.inner.seek(position)
     }
 }

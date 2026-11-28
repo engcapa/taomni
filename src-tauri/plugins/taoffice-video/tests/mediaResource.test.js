@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { initialMediaAttempt, mediaSeekTarget, openMediaResource, shouldRetryAsBlob } from "../frontend/mediaResource.js";
+import {
+  fallbackAttempt, initialMediaAttempt, mediaSeekTarget, nativePlaybackFormat, openMediaResource,
+  shouldRetryAsBlob,
+} from "../frontend/mediaResource.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -8,6 +11,28 @@ describe("the TaOffice media resource", () => {
     expect(initialMediaAttempt("mkv", () => "maybe")).toBe("stream");
     expect(initialMediaAttempt("mkv", () => "")).toBe("compatible");
     expect(initialMediaAttempt("mp4", () => "")).toBe("stream");
+  });
+
+  it("uses one native fallback after stream or Matroska compatibility and prefers a supported output codec", () => {
+    for (const extension of ["avi", "flv", "wmv", "rm", "rmvb"]) {
+      expect(initialMediaAttempt(extension, () => "probably")).toBe("native");
+    }
+    expect(fallbackAttempt("mkv", "stream", true, "http://127.0.0.1/media")).toBe("compatible");
+    expect(fallbackAttempt("mkv", "compatible", true, "blob:prepared")).toBe("native");
+    expect(fallbackAttempt("mp4", "stream", true, "http://127.0.0.1/media")).toBe("blob");
+    expect(fallbackAttempt("mp4", "blob", true, "blob:prepared")).toBe("native");
+    expect(fallbackAttempt("mp4", "blob", false, "blob:prepared")).toBeNull();
+    expect(fallbackAttempt("avi", "native", true, "blob:prepared")).toBeNull();
+    expect(nativePlaybackFormat((type) => type.includes("avc1."))).toBe("mp4");
+    expect(nativePlaybackFormat((type) => type.includes("vp8"))).toBe("webm");
+  });
+
+  it("explains legacy playback in preview without reading or opening a native job", async () => {
+    const source = { read: vi.fn(), openMedia: vi.fn() };
+    await expect(openMediaResource(source, "video/x-msvideo", "native", undefined, undefined, undefined, false))
+      .rejects.toThrow("requires the Taomni desktop app");
+    expect(source.read).not.toHaveBeenCalled();
+    expect(source.openMedia).not.toHaveBeenCalled();
   });
   it("bounds keyboard seeks to the available duration", () => {
     expect(mediaSeekTarget(0, 12, "ArrowRight")).toBe(5);

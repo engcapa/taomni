@@ -1,0 +1,95 @@
+id: TC-TAOFFICE-045
+title: Play AVI, FLV, WMV and RealMedia through the signed Media host
+description: Install the signed package and open real local legacy files through Explorer, with native conversion, metadata, keyboard playback and an unchanged source digest.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, crash-regression, file-open, taoffice, media, taoffice-video, native-boundary]
+fixtures: [reset_db, file_open_files, taoffice_signed_media]
+ui_standard: [UI-KEY-03, UI-KEY-05, UI-KEY-06]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.media_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.media_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 60}
+- press: {selector: '[data-testid="module-action-enable-taoffice-video"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-taoffice-video"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="media-legacy.avi"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] video[data-playback="native"][data-ready="true"]', timeout_sec: 45}
+- eval_readonly:
+    expression: >-
+      document.querySelector('video[aria-label\u003d"media-legacy.avi"]').videoWidth === 160 &&
+      document.querySelector('video[aria-label\u003d"media-legacy.avi"]').videoHeight === 90 &&
+      Math.abs(document.querySelector('video[aria-label\u003d"media-legacy.avi"]').duration - 6) < 0.15
+- assert_attribute: {selector: '[data-testid="file-viewer"][data-active="true"] video', name: title, equals: Space to play or pause. Left and Right to seek by 5 seconds.}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] video', key: ArrowRight}
+- eval_readonly:
+    expression: Math.abs(document.querySelector('[data-testid\u003d"file-viewer"][data-active\u003d"true"] video').currentTime - 5) < 0.2
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] video', key: Space}
+- eval_readonly:
+    expression: >-
+      !document.querySelector('video[aria-label\u003d"media-legacy.avi"]').paused &&
+      document.querySelector('video[aria-label\u003d"media-legacy.avi"]').currentTime > 5.15
+    timeout_sec: 8
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- eval_readonly:
+    expression: document.querySelector('video[aria-label\u003d"media-legacy.avi"]').paused
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/media-legacy.avi', sha256: '${fixture.taoffice_legacy_media_sha}'}
+- dblclick: '[data-testid="explorer-file-row"][data-name="media-legacy.flv"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] video[aria-label="media-legacy.flv"][data-playback="native"][data-ready="true"]', timeout_sec: 45}
+- eval_readonly:
+    expression: document.querySelector('video[aria-label\u003d"media-legacy.flv"]').videoWidth === 80 && Math.abs(document.querySelector('video[aria-label\u003d"media-legacy.flv"]').duration - 1) < 0.15
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/media-legacy.flv', sha256: '${fixture.taoffice_legacy_flv_media_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="media-legacy.wmv"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] video[aria-label="media-legacy.wmv"][data-playback="native"][data-ready="true"]', timeout_sec: 45}
+- eval_readonly:
+    expression: document.querySelector('video[aria-label\u003d"media-legacy.wmv"]').videoWidth === 80 && Math.abs(document.querySelector('video[aria-label\u003d"media-legacy.wmv"]').duration - 1) < 0.15
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/media-legacy.wmv', sha256: '${fixture.taoffice_legacy_wmv_media_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="media-legacy.rm"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] video[aria-label="media-legacy.rm"][data-playback="native"][data-ready="true"]', timeout_sec: 45}
+- eval_readonly:
+    expression: document.querySelector('video[aria-label\u003d"media-legacy.rm"]').videoWidth === 80 && Math.abs(document.querySelector('video[aria-label\u003d"media-legacy.rm"]').duration - 1) < 0.15
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/media-legacy.rm', sha256: '${fixture.taoffice_legacy_rm_media_sha}'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: media-playback-keys
+    ui_standard: [UI-KEY-03, UI-KEY-05, UI-KEY-06]
+    requirement: The player shows the playback shortcut hint, and its focused HTML media control owns unmodified ArrowRight and Space in each native WebView.
+    actions: [17, 21, 23, 25]
+    checkpoints:
+    - {step: 19, expectation: The AVI has the expected dimensions and duration after native conversion.}
+    - {step: 20, expectation: The playback hint documents Space and seeking.}
+    - {step: 22, expectation: One Right Arrow seeks five seconds from the beginning.}
+    - {step: 24, expectation: Space starts playback and the media timeline advances.}
+    - {step: 26, expectation: Switching away pauses the source.}
+    - {step: 27, expectation: The AVI digest matches the original fixture.}
+    results: [19, 20, 22, 24, 26, 27]
+  - id: media-legacy-formats
+    requirement: The signed host decodes each additional legacy container and leaves its input unchanged.
+    actions: [28, 33, 38]
+    checkpoints:
+    - {step: 30, expectation: The FLV player loads the expected dimensions and duration.}
+    - {step: 31, expectation: The FLV digest matches the original fixture.}
+    - {step: 35, expectation: The WMV player loads the expected dimensions and duration.}
+    - {step: 36, expectation: The WMV digest matches the original fixture.}
+    - {step: 40, expectation: The RealMedia player loads the expected dimensions and duration.}
+    - {step: 41, expectation: The RealMedia digest matches the original fixture.}
+    results: [30, 31, 35, 36, 40, 41]
+  visual:
+  - {check: Visible legacy media player, method: automated, reason: The case waits for the active video surface and checks the actual decoded dimensions.}
+  native:
+  - {check: Signed FFmpeg conversion and desktop player, method: automated, reason: The fixture installs the signed package and the active native WebView loads real media from the host conversion.}

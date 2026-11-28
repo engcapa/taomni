@@ -1,0 +1,149 @@
+id: TC-TAOFFICE-047
+title: Preview HEIC, PSD and DNG thumbnails with keyboard zoom and error recovery
+description: Open actual image bytes from Explorer, verify healthy previews and read-only behavior, then close and reopen a thumbnail at the default zoom.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-image, crash-regression]
+fixtures: [reset_db, file_open_files]
+ui_standard: [UI-BTN-04, UI-FBK-03, UI-FND-03a, UI-FND-13, UI-KEY-06, UI-SEL-01]
+timeout_sec: 220
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage: {key: taomni.preview.modules.taoffice-image.v1, value: '{"lifecycle":"enabled","values":[]}'}
+- seed_storage: {key: taomni.uiFontSize, value: '10'}
+- reload_window: null
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="light"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="image-no-preview.dng"]'
+- assert_text: {selector: '[data-testid="taoffice-image-error"]', contains: no supported embedded preview}
+- press: {selector: '[data-testid="taoffice-image-copy-error"]', key: Space}
+- assert_text: {selector: '[data-testid="taoffice-image-viewer"] [role="status"]', contains: Error details copied.}
+- eval_readonly: {expression: navigator.clipboard.readText(), contains: no supported embedded preview, timeout_sec: 10}
+- press: {selector: '[data-testid="taoffice-image-open-system"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-image-viewer"] > [role="alert"]', contains: Opening files with the OS shell is not available in browser preview}
+- assert_enabled: '[data-testid="taoffice-image-open-system"]'
+- press: {selector: '[data-testid="taoffice-image-retry"]', key: Space}
+- assert_text: {selector: '[data-testid="taoffice-image-error"]', contains: no supported embedded preview}
+- assert_count: {selector: '[data-testid="taoffice-image-viewer"] > [role="alert"]', equal: 0}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/image-no-preview.dng', sha256: '${fixture.taoffice_image_no_preview_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="heif-quadrants.heic"]'
+- wait_for: {selector: '[data-testid="taoffice-image-thumbnail"][alt="heif-quadrants.heic"]', timeout_sec: 45}
+- assert_text_equals: {selector: '[data-testid="taoffice-image-dimensions"]', equals: '160 × 96'}
+- eval_readonly:
+    expression: document.querySelector('.taoffice-image-canvas img').naturalWidth === 160 && document.querySelector('.taoffice-image-canvas img').naturalHeight === 96
+    timeout_sec: 10
+- assert_text: {selector: '[data-testid="taoffice-image-viewer"]', contains: Read-only preview}
+- assert_computed_style: {selector: '.taoffice-image-tools', property: font-size, equals: '10px'}
+- assert_solid_text_contrast: {selector: '[data-testid="taoffice-image-dimensions"]', minimum: 4.5, composite_ancestors: true}
+- press: {selector: '[data-testid="taoffice-image-zoom"][class~="taomni-input"]', key: End}
+- assert_computed_style: {selector: '[data-testid="taoffice-image-thumbnail"]', property: width, equals: '320px'}
+- press: {selector: '[data-testid="taoffice-image-zoom"][class~="taomni-input"]', key: Home}
+- eval_readonly:
+    expression: document.querySelector('.taoffice-image-canvas').dataset.fit === "true"
+    timeout_sec: 10
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="dark"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- press: {selector: '#ui-font-size-slider', key: End}
+- click: '[data-testid="side-tab-explorer"]'
+- assert_computed_style: {selector: '.taoffice-image-tools', property: font-size, equals: '18px'}
+- assert_solid_text_contrast: {selector: '[data-testid="taoffice-image-dimensions"]', minimum: 4.5, composite_ancestors: true}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/heif-quadrants.heic', sha256: '${fixture.taoffice_image_heic_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="image-sample.psd"]'
+- wait_for: {selector: '[data-testid="taoffice-image-thumbnail"][alt="image-sample.psd"]', timeout_sec: 45}
+- assert_text_equals: {selector: '[data-testid="taoffice-image-dimensions"]', equals: '96 × 64'}
+- eval_readonly:
+    expression: document.querySelector('.taoffice-image-canvas img').naturalWidth === 96 && document.querySelector('.taoffice-image-canvas img').naturalHeight === 64
+    timeout_sec: 10
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/image-sample.psd', sha256: '${fixture.taoffice_image_psd_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="image-sample.dng"]'
+- wait_for: {selector: '[data-testid="taoffice-image-thumbnail"][alt="image-sample.dng"]', timeout_sec: 45}
+- assert_text_equals: {selector: '[data-testid="taoffice-image-dimensions"]', equals: '96 × 64'}
+- eval_readonly:
+    expression: document.querySelector('.taoffice-image-canvas img').naturalWidth === 96 && document.querySelector('.taoffice-image-canvas img').naturalHeight === 64
+    timeout_sec: 10
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/image-sample.dng', sha256: '${fixture.taoffice_image_dng_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="taoffice-image-thumbnail"]', state: detached}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="heif-quadrants.heic"]'
+- wait_for: {selector: '[data-testid="taoffice-image-thumbnail"][alt="heif-quadrants.heic"]', timeout_sec: 45}
+- eval_readonly:
+    expression: >-
+      document.querySelector('.taoffice-image-canvas img').naturalWidth === 160 &&
+      document.querySelector('.taoffice-image-canvas img').naturalHeight === 96 &&
+      document.querySelector('.taoffice-image-canvas').dataset.fit === "true"
+    timeout_sec: 10
+- screenshot: image-preview-browser.png
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="image-damaged.heic"]'
+- assert_text: {selector: '[data-testid="taoffice-image-error"]', contains: Could not decode this HEIC photo., timeout_sec: 45}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="image-oversized.heic"]'
+- assert_text: {selector: '[data-testid="taoffice-image-error"]', contains: This HEIC photo exceeds the preview limits., timeout_sec: 45}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: heic-failure-cause
+    ui_standard: [UI-FBK-03]
+    requirement: Opening a corrupt HEIC explains the decode failure and an image with an oversized dimension reports the preview limit.
+    actions: [69, 72]
+    checkpoints:
+    - {step: 70, expectation: The damaged photo reports the decode error.}
+    - {step: 73, expectation: The 9000-pixel photo reports the preview limit.}
+    results: [70, 73]
+  - id: image-recovery
+    ui_standard: [UI-BTN-04, UI-FBK-03, UI-KEY-06]
+    requirement: Keyboard activation copies the RAW preview error, reports an unavailable system app and retries the original file.
+    actions: [13, 15, 18, 21]
+    checkpoints:
+    - {step: 14, expectation: The viewer explains that the DNG has no supported embedded preview.}
+    - {step: 16, expectation: Copying reports success next to the error.}
+    - {step: 17, expectation: The clipboard includes the displayed RAW error.}
+    - {step: 19, expectation: System open reports the browser limitation.}
+    - {step: 20, expectation: The system open button becomes available after the failed request.}
+    - {step: 22, expectation: Retry reports the original preview error again.}
+    - {step: 23, expectation: Retrying clears the previous system open error.}
+    - {step: 24, expectation: The source DNG has its original digest.}
+    results: [14, 16, 17, 19, 20, 22, 23, 24]
+  - id: image-controls
+    ui_standard: [UI-FND-03a, UI-FND-13, UI-SEL-01]
+    requirement: The read-only image uses keyboard zoom and remains legible at both font endpoints.
+    actions: [27, 34, 36, 38, 42, 43]
+    checkpoints:
+    - {step: 30, expectation: The WebView reports the decoded HEIC dimensions.}
+    - {step: 31, expectation: A visible label identifies the read-only preview.}
+    - {step: 32, expectation: The toolbar uses the 10 px setting.}
+    - {step: 33, expectation: The dimensions have at least 4.5 to 1 contrast in light mode.}
+    - {step: 35, expectation: Keyboard End sets the thumbnail width to twice the source width.}
+    - {step: 37, expectation: Keyboard Home restores fit to window.}
+    - {step: 44, expectation: The toolbar uses the 18 px setting.}
+    - {step: 45, expectation: The dimensions have at least 4.5 to 1 contrast in dark mode.}
+    results: [30, 31, 32, 33, 35, 37, 44, 45]
+  - id: image-lifecycle
+    requirement: PSD and DNG decode through the same viewer and closing the current file releases its preview before a fresh HEIC opens.
+    actions: [49, 56, 61, 64]
+    checkpoints:
+    - {step: 52, expectation: The Photoshop composite loads with the expected intrinsic size.}
+    - {step: 59, expectation: The DNG embedded preview loads with the expected intrinsic size.}
+    - {step: 62, expectation: Closing the viewer detaches the last thumbnail.}
+    - {step: 66, expectation: The reopened HEIC decodes again with fit to window selected.}
+    results: [52, 59, 62, 66]
+  visual:
+  - {check: Intrinsic dimensions and displayed zoom, method: automated, reason: The case reads the decoded image dimensions and its computed size.}
+  native:
+  - {check: Signed module and local file reads, method: external, reason: TC-TAOFFICE-048 uses the native package installer and actual disk files.}

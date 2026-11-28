@@ -15,7 +15,7 @@ steps:
 - fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.media_archive}'}
 - fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.media_signature}'}
 - click: '[data-testid="module-offline-submit"]'
-- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 60}
 - click: '[data-testid="module-action-enable-taoffice-video"]'
 - wait_for: '[data-testid="module-action-disable-taoffice-video"]'
 - click: '[data-testid="side-tab-explorer"]'
@@ -27,6 +27,7 @@ steps:
 - dblclick: '[data-testid="explorer-file-row"][data-name="rollout-compatible.mkv"]'
 - select_option: {selector: '[data-testid="taoffice-media-playback-mode"]', value: compatible}
 - wait_for: 'video[data-testid="taoffice-media-player"][data-playback="compatible"][data-ready="true"]'
+- assert_count: {selector: 'video[data-testid="taoffice-media-player"]', equal: 1}
 - eval_readonly:
     expression: document.querySelector('video').videoWidth === 160 && document.querySelector('video').videoHeight === 90 && Math.abs(document.querySelector('video').duration - 12) < 0.2
 - press: {selector: 'video[data-testid="taoffice-media-player"]', key: ArrowRight}

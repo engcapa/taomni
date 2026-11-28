@@ -5,6 +5,7 @@ import { create, createStore, useStore } from "zustand";
 import { Check, Loader2, Package, RefreshCw, X } from "lucide-react";
 import { getLocale, t, useLocale, useT } from "./i18n";
 import { cancelPluginRequest, invokePlugin } from "./ipc/plugin";
+import { formatShortcutDisplay } from "./notepad/commands/keymap";
 import { PLUGIN_CORE_API_VERSION } from "./pluginRegistry";
 
 export interface PluginFrontendApi {
@@ -98,6 +99,7 @@ const host = Object.freeze({
   zustand: Object.freeze({ create, createStore, useStore }),
   icons: Object.freeze({ Check, Loader2, Package, RefreshCw, X }),
   i18n: Object.freeze({ getLocale, t, useLocale, useT }),
+  formatShortcutDisplay,
 });
 
 export type PluginFrontendHost = typeof host;

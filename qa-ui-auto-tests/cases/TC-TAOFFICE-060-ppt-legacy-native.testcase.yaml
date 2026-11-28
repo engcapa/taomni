@@ -1,0 +1,130 @@
+id: TC-TAOFFICE-060
+title: Save and reopen PPTX copies imported from PPT and ODP
+description: Install the signed presentation module and verify conversion, chooser cancellation, source integrity and reopening on disk.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, file-open, taoffice, taoffice-ppt, native-boundary, crash-regression]
+fixtures: [reset_db, file_open_files, taoffice_signed_ppt]
+ui_standard: [UI-BTN-03, UI-FOC-02, UI-DLG-12]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.ppt_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.ppt_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- wait_for: '[data-testid="module-action-enable-taoffice-ppt"]:enabled'
+- press: {selector: '[data-testid="module-action-enable-taoffice-ppt"]', key: Enter}
+- wait_for: '[data-testid="module-action-disable-taoffice-ppt"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="legacy-review.ppt"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-review.ppt"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-preview"][data-image-ready="true"]', timeout_sec: 45}
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-conversion"]', contains: Imported as PPTX}
+- assert_text_equals: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-position"]', equals: Slide 1 of 2}
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-save"]', contains: Save PPTX copy}
+- native_file_dialog:
+    kind: save
+    action: cancel
+    trigger: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-save"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/ppt-import.pptx', absent: true}
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.file_open_root}/ppt-import.pptx
+    trigger: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-save"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-output"]'
+- assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-save"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-review.ppt', sha256: '${fixture.taoffice_legacy_ppt_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="ppt-import.pptx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="ppt-import.pptx"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-preview"][data-image-ready="true"]', timeout_sec: 45}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-edit"]', key: Enter}
+- assert_visible: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-paragraph"][value="Quarterly review"]'
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-next"]', key: Enter}
+- assert_visible: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-paragraph"][value="Delivery appendix"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="legacy-review.odp"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-review.odp"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-preview"][data-image-ready="true"]', timeout_sec: 45}
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-conversion"]', contains: Imported as PPTX}
+- assert_text_equals: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-position"]', equals: Slide 1 of 2}
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-save"]', contains: Save PPTX copy}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-edit"]', key: Enter}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-paragraph"][value="Quarterly review"]'
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-paragraph"][value="Quarterly review"]', value: Reviewed ODP import}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-paragraph"][value="Reviewed ODP import"]', key: Escape}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-edit"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.file_open_root}/odp-import.pptx
+    trigger: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-save"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-output"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-review.odp', sha256: '${fixture.taoffice_legacy_odp_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="odp-import.pptx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="odp-import.pptx"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-preview"][data-image-ready="true"]', timeout_sec: 45}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-edit"]', key: Enter}
+- assert_visible: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-paragraph"][value="Reviewed ODP import"]'
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-next"]', key: Enter}
+- assert_visible: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-paragraph"][value="Delivery appendix"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-BTN-03]
+    requirement: The save action describes the new format and reflects pending changes.
+    actions: [22]
+    checkpoints:
+    - {step: 23, expectation: The save action names the PPTX format.}
+    - {step: 28, expectation: Saving a clean conversion disables the action until the next edit.}
+    - {step: 49, expectation: The save action names the PPTX format.}
+    results: [23, 28, 49]
+  - id: R2
+    ui_standard: [UI-FOC-02]
+    requirement: Keyboard editing focuses the first paragraph and returns focus on Escape.
+    actions: [50, 53]
+    checkpoints:
+    - {step: 51, expectation: The slide title receives keyboard focus.}
+    - {step: 54, expectation: Escape returns focus to Edit slide text.}
+    results: [51, 54]
+  - id: R3
+    ui_standard: [UI-DLG-12]
+    requirement: The independent PPTX retains both slides and preserves the source bytes.
+    actions: [24, 26, 55]
+    checkpoints:
+    - {step: 25, expectation: Cancelling the native chooser creates no destination.}
+    - {step: 29, expectation: The PPT source still has the fixture SHA-256.}
+    - {step: 39, expectation: The reopened PPT copy contains the expected slide title.}
+    - {step: 41, expectation: Slide two retains its original title on disk.}
+    - {step: 57, expectation: The ODP source still has the fixture SHA-256.}
+    - {step: 67, expectation: The reopened ODP copy contains the expected slide title.}
+    - {step: 69, expectation: Slide two retains its original title on disk.}
+    results: [25, 29, 39, 41, 57, 67, 69]
+  visual:
+  - {check: Converted slides display, method: automated, reason: The case waits for a decoded image and checks the slide count.}
+  native:
+  - {check: Native chooser and independent files, method: automated, reason: TC-TAOFFICE-060 installs the signed module and reopens disk copies.}

@@ -3,12 +3,18 @@ export const COLUMNS = 12;
 const MAX_BYTES = 16 * 1024 * 1024;
 const CHUNK_BYTES = 768 * 1024;
 
+export function legacyWorkbookFormat(extension) {
+  const format = extension?.toLowerCase();
+  return format === "xls" || format === "xlsb" || format === "ods" ? format : undefined;
+}
+
 export async function openWorkbook(api, source, id, signal) {
   const workbook = await source.read();
   signal.throwIfAborted();
-  if (workbook.size > MAX_BYTES) throw new Error("XLSX and XLSM preview is limited to 16 MiB.");
+  if (workbook.size > MAX_BYTES) throw new Error("Workbook preview is limited to 16 MiB.");
   const options = { signal };
-  await api.invoke("workbook/begin", { id, size: workbook.size }, options);
+  const format = legacyWorkbookFormat(source.extension);
+  await api.invoke("workbook/begin", { id, size: workbook.size, ...(format ? { format } : {}) }, options);
   for (let offset = 0; offset < workbook.size; offset += CHUNK_BYTES) {
     const bytes = new Uint8Array(await workbook.slice(offset, offset + CHUNK_BYTES).arrayBuffer());
     signal.throwIfAborted();

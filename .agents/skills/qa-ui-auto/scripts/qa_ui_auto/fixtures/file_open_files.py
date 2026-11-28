@@ -13,10 +13,11 @@ from uuid import uuid4
 
 from . import platform_workspace_root, mail_server
 from .taoffice_7z import archive as seven_zip_fixture
+from .taoffice_archive_extraction import archive as resumable_zip_fixture
 from .taoffice_locked_pdf import document as locked_pdf_fixture
 from .taoffice_pdf import document as pdf_fixture
 from .taoffice_tar import archives as tar_fixtures, compressed_text
-from .taoffice_workbook import fixtures as workbook_fixtures
+from .taoffice_workbook import fixtures as workbook_fixtures, legacy_fixtures
 from .explorer_files import PNG
 
 TEXT = "File open original\nSecond line\n中文\n"
@@ -73,6 +74,11 @@ def setup(ctx: Any) -> None:
             "SUkqABoAAACAB0opCBQSBwWEQeFQaGQlIQEKAAABAwABAAAABAAAAAEBAwABAAAAAwAAAAIBAwADAAAAmAAAAAMBAwAB"
             "AAAABQAAAAYBAwABAAAAAgAAABEBBAABAAAACAAAABUBAwABAAAAAwAAABYBAwABAAAAAwAAABcBBAABAAAAEgAAABwBAwABAAAAAQAAAAAAAAAIAAgACAA="
         )
+    if ctx.case_id in {"TC-TAOFFICE-051", "TC-TAOFFICE-052"}:
+        archive, large_sha = resumable_zip_fixture(TEXT.encode())
+        files["transfer.zip"] = archive
+        ctx.values["taoffice_extraction_archive_sha"] = hashlib.sha256(archive).hexdigest()
+        ctx.values["taoffice_extraction_large_sha"] = large_sha
     if ctx.case_id == "TC-TAOFFICE-006":
         archive = io.BytesIO()
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
@@ -119,6 +125,10 @@ def setup(ctx: Any) -> None:
         ctx.values["taoffice_locked_pdf_sha"] = hashlib.sha256(files["locked.pdf"]).hexdigest()
     if ctx.case_id in {"TC-TAOFFICE-015", "TC-TAOFFICE-016", "TC-TAOFFICE-019", "TC-TAOFFICE-020"}:
         files.update(workbook_fixtures(TAOFFICE_ASSETS, ctx.values))
+    if ctx.case_id in {"TC-TAOFFICE-035", "TC-TAOFFICE-036"}:
+        files.update(workbook_fixtures(TAOFFICE_ASSETS, ctx.values, forecast=True))
+    if ctx.case_id in {"TC-TAOFFICE-049", "TC-TAOFFICE-050"}:
+        files.update(legacy_fixtures(TAOFFICE_ASSETS, ctx.values))
     if ctx.case_id in {"TC-TAOFFICE-017", "TC-TAOFFICE-018"}:
         files["order-form.pdf"] = (TAOFFICE_ASSETS / "order-form.pdf").read_bytes()
         ctx.values["taoffice_pdf_form_sha"] = hashlib.sha256(files["order-form.pdf"]).hexdigest()
@@ -126,6 +136,16 @@ def setup(ctx: Any) -> None:
         files["planning-notes.docx"] = (TAOFFICE_ASSETS / "planning-notes.docx").read_bytes()
         files["damaged.docx"] = b"This is not a Word document."
         ctx.values["taoffice_word_sha"] = hashlib.sha256(files["planning-notes.docx"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-053", "TC-TAOFFICE-054"}:
+        for extension in ("doc", "odt", "rtf"):
+            name = f"legacy-notes.{extension}"
+            files[name] = (TAOFFICE_ASSETS / name).read_bytes()
+            ctx.values[f"taoffice_word_{extension}_sha"] = hashlib.sha256(files[name]).hexdigest()
+        files["legacy-damaged.rtf"] = b"This is not an RTF document."
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            bundle.writestr("archive-notes.rtf", files["legacy-notes.rtf"])
+        files["legacy-readonly.zip"] = archive.getvalue()
     if ctx.case_id in {"TC-TAOFFICE-023", "TC-TAOFFICE-024"}:
         schedule = (TAOFFICE_ASSETS / "rollout.mppx").read_bytes()
         files["rollout.xml" if native else "rollout.mppx"] = schedule
@@ -137,6 +157,10 @@ def setup(ctx: Any) -> None:
         plan = (TAOFFICE_ASSETS / "shift-plan.mppx").read_bytes()
         files["shift-plan.xml" if native else "shift-plan.mppx"] = plan
         ctx.values["taoffice_schedule_sha"] = hashlib.sha256(plan).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-037", "TC-TAOFFICE-038"}:
+        plan = (TAOFFICE_ASSETS / "shift-work.mppx").read_bytes()
+        files["shift-work.xml" if native else "shift-work.mppx"] = plan
+        ctx.values["taoffice_schedule_sha"] = hashlib.sha256(plan).hexdigest()
     if ctx.case_id in {"TC-TAOFFICE-029", "TC-TAOFFICE-030"}:
         files["linked-tasks.mpp"] = (TAOFFICE_ASSETS / "linked-tasks.mpp").read_bytes()
         files["damaged.mpp"] = b"This is not a Project file."
@@ -146,10 +170,54 @@ def setup(ctx: Any) -> None:
             ctx.values["taoffice_mpp_preview"] = json.dumps({
                 "hash": digest, "xml": (TAOFFICE_ASSETS / "linked-tasks-preview.xml").read_text(encoding="utf-8"),
             })
+    if ctx.case_id in {"TC-TAOFFICE-055", "TC-TAOFFICE-056"}:
+        data = (TAOFFICE_ASSETS / "exchange-de.mpx").read_bytes()
+        files["exchange-de.mpx"] = data
+        files["damaged.mpx"] = b"MPX"
+        ctx.values["taoffice_mpx_sha"] = hashlib.sha256(data).hexdigest()
+        if not native:
+            ctx.values["taoffice_mpx_preview"] = json.dumps({
+                "hash": ctx.values["taoffice_mpx_sha"],
+                "xml": (TAOFFICE_ASSETS / "exchange-preview.xml").read_text(encoding="utf-8"),
+            })
     if ctx.case_id in {"TC-TAOFFICE-031", "TC-TAOFFICE-032"}:
         data = (TAOFFICE_ASSETS / "rollout-compatible.mkv").read_bytes()
         files["rollout-compatible.mkv"] = data
         ctx.values["taoffice_mkv_sha"] = hashlib.sha256(data).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-059", "TC-TAOFFICE-060"}:
+        for extension in ("ppt", "odp"):
+            name = f"legacy-review.{extension}"
+            files[name] = (TAOFFICE_ASSETS / name).read_bytes()
+            ctx.values[f"taoffice_legacy_{extension}_sha"] = hashlib.sha256(files[name]).hexdigest()
+        files["legacy-damaged.ppt"] = b"This is not a PowerPoint document."
+    if ctx.case_id in {"TC-TAOFFICE-039", "TC-TAOFFICE-040"}:
+        data = (TAOFFICE_ASSETS / "ppt-review.pptx").read_bytes()
+        files["ppt-review.pptx"] = data
+        files["ppt-damaged.pptx"] = b"This is not a PowerPoint package."
+        ctx.values["taoffice_ppt_sha"] = hashlib.sha256(data).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-041", "TC-TAOFFICE-042", "TC-TAOFFICE-057", "TC-TAOFFICE-058"}:
+        for name, key in (("visio-routing.vsdx", "modern"), ("visio-legacy.vsd", "legacy")):
+            data = (TAOFFICE_ASSETS / name).read_bytes()
+            files[name] = data
+            ctx.values[f"taoffice_visio_{key}_sha"] = hashlib.sha256(data).hexdigest()
+        files["visio-damaged.vsdx"] = b"This is not a Visio document."
+    if ctx.case_id in {"TC-TAOFFICE-043", "TC-TAOFFICE-044", "TC-TAOFFICE-045", "TC-TAOFFICE-046"}:
+        for name, key in (("media-legacy.avi", "legacy"), ("media-edit.webm", "edit"),
+                          ("media-legacy.flv", "legacy_flv"), ("media-legacy.wmv", "legacy_wmv"), ("media-legacy.rm", "legacy_rm")):
+            data = (TAOFFICE_ASSETS / name).read_bytes()
+            files[name] = data
+            ctx.values[f"taoffice_{key}_media_sha"] = hashlib.sha256(data).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-047", "TC-TAOFFICE-048"}:
+        for name, key in (("heif-quadrants.heic", "heic"), ("image-sample.psd", "psd"),
+                          ("image-sample.dng", "dng"), ("image-no-preview.dng", "no_preview")):
+            data = (TAOFFICE_ASSETS / name).read_bytes()
+            files[name] = data
+            ctx.values[f"taoffice_image_{key}_sha"] = hashlib.sha256(data).hexdigest()
+        files["image-damaged.heic"] = b"This is not a HEIC image."
+        oversized = bytearray(files["heif-quadrants.heic"])
+        width_offset = oversized.index(b"ispe") + 8
+        oversized[width_offset:width_offset + 4] = (9000).to_bytes(4, "big")
+        files["image-oversized.heic"] = bytes(oversized)
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative

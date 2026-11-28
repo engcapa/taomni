@@ -29,8 +29,7 @@ async function zipDirectory(bytes: Uint8Array) {
   return { entries, content };
 }
 
-export async function invokeArchive(command: string, path: string, args: Record<string, unknown>,
-  createTemp: (name: string, data: ArrayBuffer) => Promise<unknown>) {
+export async function loadArchive(path: string) {
   const stat = await vfsStat(path);
   if (stat.size > 64 * 1024 * 1024) throw new Error("Archive input exceeds 64 MiB");
   const name = basenameOf(path);
@@ -42,9 +41,15 @@ export async function invokeArchive(command: string, path: string, args: Record<
   const bytes = await vfsReadBytes(path);
   const suffix = tarSuffix(name);
   const compressed = suffix ? undefined : compressionSuffix(name);
-  const { entries, content } = suffix ? await tarDirectory(bytes, suffix)
+  const directory = suffix ? await tarDirectory(bytes, suffix)
     : compressed ? await compressedDirectory(bytes, compressed, archiveFolderName(name))
     : await zipDirectory(new Uint8Array(bytes));
+  return { ...directory, compressed, bytes };
+}
+
+export async function invokeArchive(command: string, path: string, args: Record<string, unknown>,
+  createTemp: (name: string, data: ArrayBuffer) => Promise<unknown>) {
+  const { entries, content, compressed } = await loadArchive(path);
   if (command === "viewer_archive_list") return entries;
   const selected = args.entry as ArchiveEntry | undefined;
   const entry = selected ? entries[selected.index] : compressed ? entries[0] : undefined;
@@ -53,31 +58,44 @@ export async function invokeArchive(command: string, path: string, args: Record<
   }
   if (command === "viewer_archive_preview" && entry) return createTemp(basenameOf(entry.name), await content(entry));
   if (command !== "viewer_archive_extract") throw new Error("Expected an archive extraction");
-  const dest = String(args.destination);
-  const folder = dest + "/.taomni-extract-" + crypto.randomUUID();
-  const target = dest + "/" + (entry ? basenameOf(entry.name) : archiveFolderName(basenameOf(path)));
-  await vfsMkdir(folder);
+  const destination = String(args.destination);
+  const stage = await createArchiveStage(destination);
   try {
-    const created = new Set([folder]);
-    const outputs = new Set<string>();
-    for (const item of entry ? [entry] : entries) {
-      const output = folder + "/" + item.name;
-      const directories = (item.directory ? item.name : item.name.split("/").slice(0, -1).join("/")).split("/").filter(Boolean);
-      let parent = folder;
-      for (const name of directories) {
-        parent += "/" + name;
-        if (!created.has(parent)) { await vfsMkdir(parent); created.add(parent); }
-      }
-      if (!item.directory) {
-        if (outputs.has(output) || created.has(output)) throw new Error("Duplicate archive entry");
-        await vfsWriteBytes(output, await content(item));
-        outputs.add(output);
-      }
-    }
-    await vfsRename(entry ? folder + "/" + entry.name : folder, target);
-    return target;
+    for (const item of entry ? [entry] : entries) await stageArchiveEntry(stage, item, content);
+    return await publishArchiveStage(path, destination, stage, entry);
   } finally {
-    // vfsRemove is a no-op once the staged directory has moved.
-    await vfsRemove(folder, true);
+    await vfsRemove(stage.path, true);
   }
+}
+
+export async function createArchiveStage(destination: string) {
+  const path = destination + "/.taomni-extract-" + crypto.randomUUID();
+  await vfsMkdir(path);
+  return { path, directories: new Set([path]), outputs: new Set<string>() };
+}
+
+type ArchiveStage = Awaited<ReturnType<typeof createArchiveStage>>;
+
+export async function stageArchiveEntry(stage: ArchiveStage, item: ArchiveEntry, content: (item: ArchiveEntry) => Promise<ArrayBuffer>) {
+  const output = stage.path + "/" + item.name;
+  const directories = (item.directory ? item.name : item.name.split("/").slice(0, -1).join("/")).split("/").filter(Boolean);
+  let parent = stage.path;
+  for (const name of directories) {
+    parent += "/" + name;
+    if (!stage.directories.has(parent)) {
+      await vfsMkdir(parent);
+      stage.directories.add(parent);
+    }
+  }
+  if (!item.directory) {
+    if (stage.outputs.has(output) || stage.directories.has(output)) throw new Error("Duplicate archive entry");
+    await vfsWriteBytes(output, await content(item));
+    stage.outputs.add(output);
+  }
+}
+
+export async function publishArchiveStage(path: string, destination: string, stage: ArchiveStage, entry?: ArchiveEntry) {
+  const target = destination + "/" + (entry ? basenameOf(entry.name) : archiveFolderName(basenameOf(path)));
+  await vfsRename(entry ? stage.path + "/" + entry.name : stage.path, target);
+  return target;
 }

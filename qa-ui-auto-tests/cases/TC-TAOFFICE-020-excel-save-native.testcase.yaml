@@ -68,4 +68,5 @@ steps:
 - assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', contains: '15.5'}
 - click: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
 - assert_attribute: {selector: '[data-testid="taoffice-excel-formula"]', name: value, equals: '=B2*2'}
+- assert_text: {selector: '[data-testid="taoffice-excel-cell"][data-address="C2"]', contains: '31'}
 - assert_no_runtime_errors: null

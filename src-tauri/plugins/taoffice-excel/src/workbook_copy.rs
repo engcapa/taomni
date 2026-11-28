@@ -9,12 +9,15 @@ use std::{
 use taomni_plugin_api::RpcError;
 use zip::{CompressionMethod, ZipArchive, ZipWriter, write::SimpleFileOptions};
 
+mod calculation;
+mod calculation_chain;
+mod formula_cache;
 mod sheet;
 
 pub const MAX_COPY_BYTES: usize = 24 * 1024 * 1024;
 const MAX_EDITS: usize = 128;
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize, PartialEq, Eq)]
 pub struct Edit {
     pub sheet: String,
     pub address: String,
@@ -95,18 +98,27 @@ fn recalculate_on_open(xml: &str) -> Result<Vec<u8>, RpcError> {
     Ok(bytes)
 }
 
+#[derive(Debug)]
+pub struct WorkbookCopy {
+    pub bytes: Vec<u8>,
+    pub recalculated: bool,
+}
+
 pub fn create(
     workbook: &Workbook,
-    edits: Vec<Edit>,
+    edits: &[Edit],
     mut check_current: impl FnMut() -> Result<(), RpcError>,
-) -> Result<Vec<u8>, RpcError> {
+) -> Result<WorkbookCopy, RpcError> {
     if edits.len() > MAX_EDITS {
         return Err(invalid(
             "A workbook copy can include up to 128 edited cells",
         ));
     }
     if edits.is_empty() {
-        return Ok(workbook.bytes().to_vec());
+        return Ok(WorkbookCopy {
+            bytes: workbook.bytes().to_vec(),
+            recalculated: false,
+        });
     }
     let mut archive = ZipArchive::new(Cursor::new(workbook.bytes())).map_err(invalid)?;
     let mut by_part = BTreeMap::<String, BTreeMap<String, String>>::new();
@@ -134,7 +146,7 @@ pub fn create(
         if by_part
             .entry(layout.path.clone())
             .or_default()
-            .insert(edit.address, edit.value)
+            .insert(edit.address.clone(), edit.value.clone())
             .is_some()
         {
             return Err(invalid("A cell is edited more than once"));
@@ -147,6 +159,18 @@ pub fn create(
         let xml = part(&mut archive, &path)?;
         replacements.insert(path, sheet::rewrite(&xml, edits, &mut check_current)?);
     }
+    let calculation = calculation::calculate(workbook, edits, &mut check_current)?;
+    let recalculated = calculation.is_some();
+    for (path, values) in calculation.into_iter().flatten() {
+        let xml = match replacements.get(&path) {
+            Some(bytes) => std::str::from_utf8(bytes).map_err(invalid)?.to_owned(),
+            None => part(&mut archive, &path)?,
+        };
+        if let Some(bytes) = formula_cache::rewrite(&xml, values, &mut check_current)? {
+            replacements.insert(path, bytes);
+        }
+    }
+    let obsolete = calculation_chain::remove_chain(&mut archive, &mut replacements)?;
     let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
     let original_comment = archive.comment();
     writer
@@ -156,6 +180,9 @@ pub fn create(
         check_current()?;
         let item = archive.by_index_raw(index).map_err(invalid)?;
         let name = item.name().map_err(invalid)?;
+        if obsolete.contains(name.as_ref()) {
+            continue;
+        }
         if let Some(bytes) = replacements.remove(name.as_ref()) {
             writer
                 .start_file(
@@ -175,8 +202,13 @@ pub fn create(
         ));
     }
     check_current()?;
-    Ok(output)
+    Ok(WorkbookCopy {
+        bytes: output,
+        recalculated,
+    })
 }
 
+#[cfg(test)]
+mod recalculation_tests;
 #[cfg(test)]
 mod tests;

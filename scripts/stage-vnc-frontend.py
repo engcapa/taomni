@@ -16,7 +16,8 @@ SCREENSHOT_ASSETS = {
 
 def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, Path]:
     if slug not in {"rdp-client", "vnc-client", "mail", "mfa", "screenshot", "sockscap",
-                    "rdp-server", "vnc-server", "servers", "taoffice-pdf", "taoffice-excel", "taoffice-word", "taoffice-project", "taoffice-video"}:
+                    "rdp-server", "vnc-server", "servers", "taoffice-pdf", "taoffice-excel", "taoffice-word", "taoffice-project", "taoffice-video",
+                    "taoffice-ppt", "taoffice-visio", "taoffice-image"}:
         raise ValueError("Unexpected module")
     expected = {"index.js"}
     directories = set()
@@ -26,9 +27,20 @@ def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, P
         expected.update(f"screenshot-ocr/{name}" for name in SCREENSHOT_ASSETS)
     if slug == "taoffice-pdf":
         directories.update({"pdfjs", "pdfjs/cmaps", "pdfjs/iccs", "pdfjs/standard_fonts", "pdfjs/wasm"})
-        expected.update({"pdfjs/LICENSE", "pdfjs/pdf.worker.mjs"})
+        expected.update({"pdfjs/LICENSE", "pdfjs/pdf.worker.mjs", "pdf-lib-LICENSE.md"})
     if slug == "taoffice-video":
         expected.add("mediabunny-LICENSE.txt")
+    if slug == "taoffice-ppt":
+        expected.update({"slide-engine.js", "PPTXViewJS-LICENSE.txt", "Chart.js-LICENSE.txt",
+                         "JSZip-LICENSE.txt", "PptxGenJS-LICENSE.txt", "OfficeParser-LICENSE.txt",
+                         "legacy-ppt.worker.txt", "legacy-odp.worker.txt", "ppt-converter_bg.wasm", "ppt-converter-NOTICES.txt"})
+    if slug == "taoffice-visio":
+        expected.update({"visio.wasm", "visio-icu.dat", "visio-third-party-notices.txt"})
+    if slug == "taoffice-image":
+        expected.update({"heif.wasm", "heif-third-party-notices.txt"})
+    if slug == "taoffice-word":
+        expected.update({"legacy-doc.worker.txt", "legacy-office.worker.txt", "doc-converter_bg.wasm",
+                         "doc-converter-NOTICES.txt", "OfficeParser-LICENSE.txt"})
     if with_receipt:
         expected.add("receipt.json")
     files = {}
@@ -61,7 +73,7 @@ def frontend_receipt(files: dict[str, Path], source: str, tooling: str, slug: st
         if artifact.stat().st_size == 0:
             raise ValueError("Empty module frontend file")
     receipt = {"sourceSha": source, "toolingSha": tooling, "slug": slug, "sha256": digests["index.js"]}
-    if slug in {"screenshot", "taoffice-pdf", "taoffice-video"}:
+    if slug in {"screenshot", "taoffice-pdf", "taoffice-video", "taoffice-ppt", "taoffice-visio", "taoffice-image", "taoffice-word"}:
         receipt["files"] = digests
     return receipt
 

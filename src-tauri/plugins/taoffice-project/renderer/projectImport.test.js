@@ -13,7 +13,7 @@ describe("Project import transfer", () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
-  it("transfers binary input in order and releases the converted bytes", async () => {
+  it.each(["mpp", "mpx"])("transfers %s input in order and releases the converted bytes", async (extension) => {
     const result = "<Project/>";
     const invoke = vi.fn(async (method) => {
       if (method === "project/convert") return { size: result.length };
@@ -22,7 +22,7 @@ describe("Project import transfer", () => {
     });
     const release = vi.fn();
     const deferCleanup = vi.fn(() => release);
-    const bytes = await readProject({ invoke, deferCleanup }, source("mpp", Uint8Array.of(0xd0, 0xcf)), signal());
+    const bytes = await readProject({ invoke, deferCleanup }, source(extension, Uint8Array.of(0xd0, 0xcf)), signal());
     expect(new TextDecoder().decode(bytes)).toBe(result);
     const id = invoke.mock.calls[0][1].id;
     expect(invoke.mock.calls.map(([method, payload]) => [method, payload])).toEqual([

@@ -1,4 +1,4 @@
-import { openWorkbook, ROWS, COLUMNS } from "./workbook.js";
+import { legacyWorkbookFormat, openWorkbook, ROWS, COLUMNS } from "./workbook.js";
 import { Worksheet } from "./Worksheet.jsx";
 import { useWorkbookEdits } from "./useWorkbookEdits.js";
 import styles from "./workbook.css?inline";
@@ -18,6 +18,7 @@ export default function ExcelViewer({ document: source, active, api }) {
   const [sheetIndex, setSheetIndex] = useState(0);
   const [cursor, setCursor] = useState(ORIGIN);
   const [range, setRange] = useState(null);
+  const [calculationError, setCalculationError] = useState("");
   const [failure, setFailure] = useState("");
   const editor = useWorkbookEdits(book, source, api);
 
@@ -53,11 +54,23 @@ export default function ExcelViewer({ document: source, active, api }) {
   useEffect(() => {
     if (!book || !sheet) return;
     const controller = new AbortController();
-    void api.invoke("workbook/sheet", { id: book.id, sheet, row, column }, { signal: controller.signal })
-      .then((window) => { if (!controller.signal.aborted) setRange({ sheet, start: { row, column }, window }); })
-      .catch((error) => { if (!controller.signal.aborted) setFailure(error.message ?? String(error)); });
+    const edits = editor.edits;
+    setCalculationError("");
+    void api.invoke("workbook/sheet", { id: book.id, sheet, row, column, edits: [...edits.values()] }, { signal: controller.signal })
+      .then((window) => { if (!controller.signal.aborted) setRange({ sheet, edits, start: { row, column }, window }); })
+      .catch(async (error) => {
+        if (controller.signal.aborted) return;
+        if (!edits.size) { setFailure(error.message ?? String(error)); return; }
+        setCalculationError(error.message ?? String(error));
+        try {
+          const window = await api.invoke("workbook/sheet", { id: book.id, sheet, row, column }, { signal: controller.signal });
+          if (!controller.signal.aborted) setRange({ sheet, edits, start: { row, column }, window });
+        } catch (failure) {
+          if (!controller.signal.aborted) setFailure(failure.message ?? String(failure));
+        }
+      });
     return () => controller.abort();
-  }, [api, book, sheet, row, column]);
+  }, [api, book, sheet, row, column, editor.edits]);
 
   function chooseSheet(index) {
     if (index === sheetIndex) return;
@@ -97,6 +110,9 @@ export default function ExcelViewer({ document: source, active, api }) {
         {label("用系统应用打开", "Open in system app")}
       </button>
     </div> : <>
+      {book && legacyWorkbookFormat(source.extension) && <p className="taoffice-excel-feedback" data-testid="taoffice-excel-readonly">
+        {label("只读预览", "Read-only preview")}
+      </p>}
       {book && <div className="taoffice-excel-sheets" role="tablist" aria-label={label("工作表", "Worksheets")}>
         {book.sheets.map((name, index) => <button key={name} id={`${prefix}-sheet-${index}`}
           ref={(node) => { sheetButtons.current[index] = node; }} role="tab" type="button" className="taomni-section-tab"
@@ -115,7 +131,12 @@ export default function ExcelViewer({ document: source, active, api }) {
           {label("保存副本…", "Save a copy…")}
         </button>
         {editor.saving ? <span role="status">{label("正在保存副本…", "Saving workbook copy…")}</span>
-          : editor.edits.size > 0 && <span>{label("公式仍显示原工作簿的缓存结果。", "Formulas display cached results from the original workbook.")}</span>}
+          : editor.edits.size > 0 && <span role="status" data-testid="taoffice-excel-calculation">
+            {visibleRange?.edits !== editor.edits ? label("正在计算公式…", "Calculating formulas…")
+              : visibleRange.window.recalculated ? label("公式已重算。", "Formulas recalculated.")
+                : label("部分公式需在 Excel 中重算。当前显示文件缓存值。", "This workbook requires recalculation in Excel. Showing cached formula values.")}
+          </span>}
+        {calculationError && <span role="alert">{calculationError}</span>}
         {editor.output && <span role="status" data-testid="taoffice-excel-copy-output">{label("已保存副本", "Saved copy")} {editor.output}</span>}
         {editor.error && <span role="alert" data-testid="taoffice-excel-copy-error">{label("无法保存副本。", "Could not save the copy.")} {editor.error}</span>}
       </div>}

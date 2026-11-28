@@ -431,11 +431,7 @@ fn preserves_custom_storage_mailbox_in_place_without_copying_archives() {
     fs::create_dir_all(custom_root.join(&attachments)).unwrap();
     fs::write(custom_root.join(attachments.join("3-1.bin")), b"attachment").unwrap();
     let db_before = fs::read(&custom_mailbox.database).unwrap();
-    let object = object_path(
-        &custom_root.join(format!("{stem}.mail")),
-        &stored.hash,
-    )
-    .unwrap();
+    let object = object_path(&custom_root.join(format!("{stem}.mail")), &stored.hash).unwrap();
     let object_before = fs::read(&object).unwrap();
 
     let staged = StagedMailData::prepare(
@@ -452,7 +448,10 @@ fn preserves_custom_storage_mailbox_in_place_without_copying_archives() {
             .unwrap()
             .is_none()
     );
-    assert_eq!(fs::read(custom_root.join(format!("{stem}.db"))).unwrap(), db_before);
+    assert_eq!(
+        fs::read(custom_root.join(format!("{stem}.db"))).unwrap(),
+        db_before
+    );
     assert_eq!(fs::read(&object).unwrap(), object_before);
 
     let broken_name = format!("{}.db", mail_db_file_stem("broken-link"));

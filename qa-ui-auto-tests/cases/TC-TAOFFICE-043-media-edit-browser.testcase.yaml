@@ -1,0 +1,81 @@
+id: TC-TAOFFICE-043
+title: Trim and resize a video using the browser export form
+description: Use the real video decoder and encoder to download a resized segment with its audio, while verifying keyboard focus and invalid trim handling.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, crash-regression, file-open, taoffice, media, taoffice-video]
+fixtures: [reset_db, file_open_files]
+ui_standard: [UI-BTN-03, UI-FOC-02, UI-INP-02, UI-INP-07, UI-PAT-15]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage: {key: taomni.preview.modules.taoffice-video.v1, value: '{"lifecycle":"enabled","values":[]}'}
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="media-edit.webm"]'
+- wait_for: 'video[data-testid="taoffice-media-player"][data-ready="true"]'
+- press: {selector: '[data-testid="taoffice-media-export-open"]', key: Enter}
+- assert_focus_on: '[data-testid="taoffice-media-trim-start"]'
+- fill: {selector: '[data-testid="taoffice-media-trim-start"]', value: '5'}
+- fill: {selector: '[data-testid="taoffice-media-trim-end"]', value: '2'}
+- assert_disabled: '[data-testid="taoffice-media-export-save"]'
+- assert_attribute: {selector: '[data-testid="taoffice-media-trim-end"]', name: aria-invalid, equals: 'true'}
+- assert_text: {selector: '[data-testid="taoffice-media-export-invalid"]', contains: The end must be after the start}
+- press: {selector: '[data-testid="taoffice-media-trim-end"]', key: Enter}
+- assert_visible: '[data-testid="taoffice-media-export-invalid"]'
+- press: {selector: '[data-testid="taoffice-media-trim-end"]', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-media-export-open"]'
+- assert_not_visible: '[data-testid="taoffice-media-export"]'
+- press: {selector: '[data-testid="taoffice-media-export-open"]', key: Space}
+- fill: {selector: '[data-testid="taoffice-media-trim-start"]', value: '2'}
+- fill: {selector: '[data-testid="taoffice-media-trim-end"]', value: '5'}
+- select_option: {selector: '[data-testid="taoffice-media-export-width"]', value: '80'}
+- press: {selector: '[data-testid="taoffice-media-export-preview"]', key: Enter}
+- eval_readonly:
+    expression: >-
+      document.querySelector('video').paused && !document.querySelector('video').seeking &&
+      Math.abs(document.querySelector('video').currentTime - 2) < 0.05 &&
+      document.querySelector('[data-testid\u003d"taoffice-media-export-width"]').value === '80'
+    timeout_sec: 10
+- assert_download:
+    trigger: '[data-testid="taoffice-media-export-save"]'
+    filename: media-edit - copy.webm
+    contains: [webm, V_VP8, A_OPUS]
+- wait_for: '[data-testid="taoffice-media-export-saved"]'
+- assert_focus_on: '[data-testid="taoffice-media-export-open"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/media-edit.webm', sha256: '${fixture.taoffice_edit_media_sha}'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: export-focus
+    ui_standard: [UI-FOC-02, UI-PAT-15]
+    requirement: Keyboard activation opens the trim form, Escape returns focus, and a confirmed export returns focus when the form closes.
+    actions: [12, 21, 24, 27, 28, 30]
+    checkpoints:
+    - {step: 13, expectation: The start time owns focus when the form opens.}
+    - {step: 22, expectation: Escape returns focus to the export trigger.}
+    - {step: 29, expectation: The selected width is 80 px and keyboard preview pauses at the 2 second start.}
+    - {step: 30, expectation: The download has a WebM header with VP8 video and Opus audio tracks.}
+    - {step: 32, expectation: A successful export returns focus to its trigger.}
+    - {step: 33, expectation: The source video keeps its original digest.}
+    results: [13, 22, 29, 30, 32, 33]
+  - id: invalid-trim
+    ui_standard: [UI-BTN-03, UI-INP-02, UI-INP-07]
+    requirement: An invalid time range disables export, links the error to the input, and blocks Enter.
+    actions: [14, 15, 19]
+    checkpoints:
+    - {step: 16, expectation: The save button is disabled.}
+    - {step: 17, expectation: The end time is marked invalid.}
+    - {step: 18, expectation: The visible error describes the order required for the time range.}
+    - {step: 20, expectation: The explanatory error stays visible after Enter.}
+    results: [16, 17, 18, 20]
+  visual:
+  - {check: Export state and focus, method: automated, reason: The case checks the live form controls and the exact active element.}
+  native:
+  - {check: Desktop encoder and save chooser, method: external, reason: TC-TAOFFICE-046 covers the native conversion and save path.}

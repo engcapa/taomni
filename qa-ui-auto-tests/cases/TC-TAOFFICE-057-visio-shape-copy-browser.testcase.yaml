@@ -1,0 +1,95 @@
+id: TC-TAOFFICE-057
+title: Edit and download simple Visio shapes
+description: Edit a selected VSDX shape, verify draft and focus behavior, save a copy and keep the source intact.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-visio, crash-regression]
+fixtures: [reset_db, file_open_files]
+ui_standard: [UI-BTN-03, UI-FOC-02, UI-INP-02, UI-INP-06, UI-OTH-03]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-visio.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="visio-routing.vsdx"]'
+- wait_for: {selector: '[data-testid="taoffice-visio-page"][data-page="1"][data-rendered="true"]', timeout_sec: 55}
+- assert_disabled: '[data-testid="taoffice-visio-save-copy"]'
+- press: {selector: '[data-testid="taoffice-visio-next"]', key: Enter}
+- wait_for: '[data-testid="taoffice-visio-page"][data-page="2"][data-rendered="true"]'
+- press: {selector: '[data-testid="taoffice-visio-edit-shapes"]', key: Enter}
+- assert_focus_on: '[data-testid="taoffice-visio-shape"]'
+- select_option: {selector: '[data-testid="taoffice-visio-shape"]', value: '3'}
+- eval_readonly:
+    expression: >-
+      document.querySelector('.taoffice-visio-fields textarea')?.value === "Delivery"
+    expect_truthy: true
+- fill: {selector: '[data-testid="taoffice-visio-shape-text"]', value: Release confirmed}
+- fill: {selector: '[data-testid="taoffice-visio-shape-position"][data-field="PinX"]', value: '4.25'}
+- press: {selector: '[data-testid="taoffice-visio-shape-text"]', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-visio-edit-shapes"]'
+- assert_enabled: '[data-testid="taoffice-visio-save-copy"]'
+- assert_download:
+    trigger: '[data-testid="taoffice-visio-export"]:enabled'
+    filename: visio-routing - copy.svg
+    contains: ['<svg', Release confirmed, Routing approval]
+- assert_download:
+    trigger: '[data-testid="taoffice-visio-save-copy"]'
+    filename: visio-routing - copy.vsdx
+    contains: ['visio/pages/page2.xml', 'visio/pages/page1.xml']
+- assert_text: {selector: '[data-testid="taoffice-visio-copy-output"]', contains: visio-routing - copy.vsdx}
+- assert_disabled: '[data-testid="taoffice-visio-save-copy"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/visio-routing.vsdx', sha256: '${fixture.taoffice_visio_modern_sha}'}
+- press: {selector: '[data-testid="taoffice-visio-edit-shapes"]', key: Enter}
+- fill: {selector: '[data-testid="taoffice-visio-shape-position"][data-field="PinX"]', value: '100001'}
+- assert_attribute: {selector: '[data-testid="taoffice-visio-shape-position"][data-field="PinX"]', name: aria-invalid, equals: 'true'}
+- assert_visible: '.taoffice-visio-editor [role="alert"]'
+- assert_disabled: '[data-testid="taoffice-visio-save-copy"]'
+- fill: {selector: '[data-testid="taoffice-visio-shape-position"][data-field="PinX"]', value: '5'}
+- assert_enabled: '[data-testid="taoffice-visio-save-copy"]'
+- compose_text: {selector: '[data-testid="taoffice-visio-shape-text"]', text: Delivery, during_key: Escape}
+- assert_focus_on: '[data-testid="taoffice-visio-shape-text"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-FOC-02]
+    requirement: Pressing Enter opens the shape list and Escape returns focus to the edit control.
+    actions: [15, 21]
+    checkpoints:
+    - {step: 16, expectation: The shape selector receives focus.}
+    - {step: 22, expectation: Focus returns to Edit shapes.}
+    results: [16, 22]
+  - id: R2
+    ui_standard: [UI-BTN-03, UI-OTH-03]
+    requirement: Editing a shape enables saving and updates the rendered SVG and VSDX copy.
+    actions: [19, 20, 25]
+    checkpoints:
+    - {step: 23, expectation: Save copy becomes available.}
+    - {step: 24, expectation: The SVG contains the edited shape text.}
+    - {step: 25, expectation: The VSDX download contains both page parts.}
+    - {step: 27, expectation: Saving clears the dirty state.}
+    results: [23, 24, 25, 27]
+  - id: R3
+    ui_standard: [UI-INP-02, UI-INP-06]
+    requirement: Invalid shape coordinates block saving and Escape during composition preserves the editor.
+    actions: [30, 34, 36]
+    checkpoints:
+    - {step: 31, expectation: The invalid coordinate input reports aria-invalid.}
+    - {step: 32, expectation: The shape editor displays the validation message.}
+    - {step: 33, expectation: A draft with an invalid position cannot be saved.}
+    - {step: 35, expectation: Correcting the coordinate restores the save action.}
+    - {step: 37, expectation: The textarea retains focus after a composing Escape.}
+    results: [31, 32, 33, 35, 37]
+  visual:
+  - {check: Shape editor and page rendering, method: automated, reason: The test exercises the visible editor and checks the decoded page image.}
+  native:
+  - {check: Native file save and reopen, method: external, reason: TC-TAOFFICE-058 drives the native chooser and reopens the new file from Explorer.}

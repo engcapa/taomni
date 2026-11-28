@@ -1,4 +1,4 @@
-use crate::import::{MAX_BYTES, mpp_to_mspdi};
+use crate::import::{MAX_BYTES, import_to_mspdi};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
@@ -91,7 +91,7 @@ impl Projects {
             session.touched = Instant::now();
             bytes
         };
-        let converted = mpp_to_mspdi(&bytes, || {
+        let converted = import_to_mspdi(&bytes, || {
             operation.check_current().map_err(|error| error.message)
         });
         let mut sessions = self.sessions()?;

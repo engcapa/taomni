@@ -18,10 +18,41 @@ pub(crate) fn validate(source: &Path, bytes: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-fn extension<'a>(source: &'a Path, slug: &str) -> Result<&'a OsStr, String> {
+fn extension<'a>(
+    source: &'a Path,
+    slug: &str,
+    output: Option<&'a str>,
+) -> Result<&'a OsStr, String> {
+    if let Some(output) = output {
+        if matches!(
+            (slug, output),
+            ("taoffice-video", "mp4" | "webm") | ("taoffice-visio", "svg")
+        ) {
+            return Ok(OsStr::new(output));
+        }
+        return Err("permission: The requested document copy format is unavailable".into());
+    }
     let extension = source.extension().ok_or("Missing document extension")?;
+    if slug == "taoffice-ppt"
+        && ["ppt", "odp"]
+            .iter()
+            .any(|legacy| extension.eq_ignore_ascii_case(legacy))
+    {
+        return Ok(OsStr::new("pptx"));
+    }
+    if slug == "taoffice-word"
+        && ["doc", "odt", "rtf"]
+            .iter()
+            .any(|legacy| extension.eq_ignore_ascii_case(legacy))
+    {
+        return Ok(OsStr::new("docx"));
+    }
     Ok(
-        if slug == "taoffice-project" && extension.eq_ignore_ascii_case("mpp") {
+        if slug == "taoffice-project"
+            && ["mpp", "mpx"]
+                .iter()
+                .any(|ext| extension.eq_ignore_ascii_case(ext))
+        {
             OsStr::new("xml")
         } else {
             extension
@@ -29,12 +60,12 @@ fn extension<'a>(source: &'a Path, slug: &str) -> Result<&'a OsStr, String> {
     )
 }
 
-fn suggested_name(source: &Path, slug: &str) -> Result<String, String> {
+fn suggested_name(source: &Path, slug: &str, output: Option<&str>) -> Result<String, String> {
     let base = source
         .file_stem()
         .and_then(|name| name.to_str())
         .ok_or("Missing document name")?;
-    let extension = extension(source, slug)?
+    let extension = extension(source, slug, output)?
         .to_str()
         .ok_or("Missing document extension")?;
     Ok(format!("{base} - copy.{extension}"))
@@ -44,8 +75,9 @@ pub(crate) fn select_destination(
     window: &Window,
     source: &Path,
     slug: &str,
+    output: Option<&str>,
 ) -> Result<Option<String>, String> {
-    let name = suggested_name(source, slug)?;
+    let name = suggested_name(source, slug, output)?;
     let parent = source.parent().ok_or("Missing document directory")?;
     let selected = window
         .dialog()
@@ -69,6 +101,7 @@ pub(crate) fn write(
     selected: &str,
     protected: &[&Path],
     bytes: &[u8],
+    output: Option<&str>,
 ) -> Result<String, String> {
     validate(source, bytes)?;
     let selected = Path::new(selected);
@@ -77,7 +110,7 @@ pub(crate) fn write(
         .and_then(|name| name.to_str())
         .ok_or("Missing copy name")?;
     let name = file_name(name)?;
-    let expected = extension(source, slug)?;
+    let expected = extension(source, slug, output)?;
     if !selected
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case(expected))
@@ -129,7 +162,7 @@ mod tests {
         let protected = [config.as_path()];
         let slug = "taoffice-pdf";
         assert_eq!(
-            suggested_name(&original, slug).unwrap(),
+            suggested_name(&original, slug, None).unwrap(),
             "report - copy.pdf"
         );
         assert!(
@@ -138,7 +171,8 @@ mod tests {
                 slug,
                 original.to_str().unwrap(),
                 &protected,
-                b"other"
+                b"other",
+                None,
             )
             .is_err()
         );
@@ -148,7 +182,8 @@ mod tests {
                 slug,
                 config.join("copy.pdf").to_str().unwrap(),
                 &protected,
-                b"bytes"
+                b"bytes",
+                None,
             )
             .is_err()
         );
@@ -159,7 +194,8 @@ mod tests {
                 slug,
                 copy.to_str().unwrap(),
                 &protected,
-                b"bytes"
+                b"bytes",
+                None,
             )
             .is_ok()
         );
@@ -169,7 +205,8 @@ mod tests {
                 slug,
                 copy.to_str().unwrap(),
                 &protected,
-                b"replacement"
+                b"replacement",
+                None,
             )
             .is_err()
         );
@@ -184,13 +221,103 @@ mod tests {
         let source = root.path().join("plan.MPP");
         let valid = root.path().join("plan - copy.xml");
         let invalid = root.path().join("other.mpp");
+        assert_eq!(
+            suggested_name(&root.path().join("plan.MPX"), "taoffice-project", None).unwrap(),
+            "plan - copy.xml"
+        );
         fs::write(&source, b"original").unwrap();
         let slug = "taoffice-project";
-        assert_eq!(suggested_name(&source, slug).unwrap(), "plan - copy.xml");
-        assert!(write(&source, slug, invalid.to_str().unwrap(), &[], b"xml").is_err());
+        assert_eq!(
+            suggested_name(&source, slug, None).unwrap(),
+            "plan - copy.xml"
+        );
+        assert!(write(&source, slug, invalid.to_str().unwrap(), &[], b"xml", None).is_err());
         assert!(!invalid.exists());
-        write(&source, slug, valid.to_str().unwrap(), &[], b"xml").unwrap();
+        write(&source, slug, valid.to_str().unwrap(), &[], b"xml", None).unwrap();
         assert_eq!(fs::read(&source).unwrap(), b"original");
         assert_eq!(fs::read(&valid).unwrap(), b"xml");
+    }
+
+    #[test]
+    fn legacy_word_copies_require_docx_and_keep_the_original() {
+        let root = tempfile::tempdir().unwrap();
+        for extension in ["DOC", "odt", "Rtf"] {
+            let source = root.path().join(format!("notes.{extension}"));
+            let target = root.path().join(format!("notes-{extension}.docx"));
+            let invalid = root.path().join(format!("duplicate.{extension}"));
+            let slug = "taoffice-word";
+            fs::write(&source, b"legacy document").unwrap();
+            assert_eq!(
+                suggested_name(&source, slug, None).unwrap(),
+                "notes - copy.docx"
+            );
+            assert!(write(&source, slug, invalid.to_str().unwrap(), &[], b"docx", None).is_err());
+            assert!(!invalid.exists());
+            assert!(suggested_name(&source, slug, Some("rtf")).is_err());
+            write(&source, slug, target.to_str().unwrap(), &[], b"docx", None).unwrap();
+            assert_eq!(fs::read(&source).unwrap(), b"legacy document");
+            assert_eq!(fs::read(&target).unwrap(), b"docx");
+        }
+    }
+
+    #[test]
+    fn legacy_presentations_suggest_pptx_and_reject_the_input_extension() {
+        let root = tempfile::tempdir().unwrap();
+        for extension in ["PPT", "oDp"] {
+            let source = root.path().join(format!("review.{extension}"));
+            fs::write(&source, b"original").unwrap();
+            assert_eq!(
+                suggested_name(&source, "taoffice-ppt", None).unwrap(),
+                "review - copy.pptx"
+            );
+            assert!(
+                write(
+                    &source,
+                    "taoffice-ppt",
+                    source.to_str().unwrap(),
+                    &[],
+                    b"converted",
+                    None
+                )
+                .is_err()
+            );
+            assert_eq!(fs::read(source).unwrap(), b"original");
+        }
+    }
+
+    #[test]
+    fn a_media_transcode_saves_only_to_the_authorized_output_extension() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("recording.avi");
+        let target = root.path().join("review.webm");
+        fs::write(&source, b"source").unwrap();
+        assert_eq!(
+            suggested_name(&source, "taoffice-video", Some("webm")).unwrap(),
+            "recording - copy.webm"
+        );
+        assert!(suggested_name(&source, "taoffice-video", Some("mov")).is_err());
+        assert!(suggested_name(&source, "taoffice-ppt", Some("webm")).is_err());
+        assert!(
+            write(
+                &source,
+                "taoffice-video",
+                target.to_str().unwrap(),
+                &[],
+                b"encoded",
+                Some("mp4")
+            )
+            .is_err()
+        );
+        write(
+            &source,
+            "taoffice-video",
+            target.to_str().unwrap(),
+            &[],
+            b"encoded",
+            Some("webm"),
+        )
+        .unwrap();
+        assert_eq!(fs::read(&source).unwrap(), b"source");
+        assert_eq!(fs::read(&target).unwrap(), b"encoded");
     }
 }

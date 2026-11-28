@@ -1,11 +1,11 @@
-use super::codec::CheckedReader;
+use super::codec::{Cancellable, CheckedReader};
 use super::{
     Entry, MAX_ENTRIES, MAX_ENTRY, MAX_TOTAL, Selection, UNSAFE_ENTRY, invalid, validate_member,
 };
 use rars::filename::LegacyNameEncoding;
 use rars::{
     ArchiveMember, ArchiveMemberDetail, ArchiveReadOptions, ArchiveReader, AttrSource, Error,
-    ErrorKind, ExtractionDecision,
+    ErrorKind, ExtractionDecision, ReadCancellation,
 };
 use std::collections::HashSet;
 use std::fs::File;
@@ -91,10 +91,11 @@ fn consume(
     mut contents: File,
     calculate_crc: bool,
     selection: Selection,
+    cancel: &ReadCancellation,
     visitor: &mut impl FnMut(&Entry, &mut dyn Read) -> Result<(), String>,
 ) -> Result<(), String> {
     contents.seek(SeekFrom::Start(0)).map_err(invalid)?;
-    let mut checked = CheckedReader::new(contents.take(entry.size + 1));
+    let mut checked = CheckedReader::new(Cancellable::new(contents, cancel).take(entry.size + 1));
     if selection.includes(entry.index) {
         visitor(entry, &mut checked)?;
     }
@@ -109,11 +110,13 @@ fn consume(
 }
 
 pub(super) fn visit(
-    file: File,
+    file: impl Read + Seek + Send + 'static,
     selection: Selection,
+    cancel: &ReadCancellation,
     mut visitor: impl FnMut(&Entry, &mut dyn Read) -> Result<(), String>,
 ) -> Result<Vec<Entry>, String> {
     let options = ArchiveReadOptions::default()
+        .with_cancellation(cancel)
         .with_max_header_count((MAX_ENTRIES + 64) as u64)
         .with_max_header_bytes(8 << 20)
         .with_max_member_output_bytes(MAX_ENTRY)
@@ -156,6 +159,7 @@ pub(super) fn visit(
                 contents,
                 missing_crc[previous],
                 selection,
+                cancel,
                 &mut visitor,
             )
         {
@@ -194,6 +198,7 @@ pub(super) fn visit(
             contents,
             missing_crc[last],
             selection,
+            cancel,
             &mut visitor,
         )?;
     }

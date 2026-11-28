@@ -11,11 +11,13 @@ use zip::ZipArchive;
 pub const MAX_INPUT_BYTES: usize = 16 * 1024 * 1024;
 pub const WINDOW_ROWS: u32 = 32;
 pub const WINDOW_COLUMNS: u32 = 12;
-const MAX_ENTRY_BYTES: u64 = 24 * 1024 * 1024;
-const MAX_EXPANDED_BYTES: u64 = 64 * 1024 * 1024;
+pub(super) const MAX_ENTRY_BYTES: u64 = 24 * 1024 * 1024;
+pub(super) const MAX_EXPANDED_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_PARTS: usize = 4096;
 const MAX_SHEETS: usize = 256;
 const MAX_CELL_CHARS: usize = 960;
+const WORKBOOK_OPEN_ERROR: &str =
+    "This workbook could not be opened as XLSX or XLSM. Check for encryption or file damage.";
 
 pub struct Workbook {
     file: Xlsx<Cursor<Arc<[u8]>>>,
@@ -27,6 +29,8 @@ pub struct Workbook {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SheetWindow {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recalculated: Option<bool>,
     rows: u32,
     columns: u32,
     cells: Vec<Cell>,
@@ -34,7 +38,7 @@ pub struct SheetWindow {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Cell {
+pub(super) struct Cell {
     row: u32,
     column: u32,
     value: String,
@@ -48,14 +52,38 @@ struct Cell {
     table_metadata: bool,
 }
 
+impl SheetWindow {
+    pub(super) fn read_only(rows: u32, columns: u32, cells: Vec<Cell>) -> Self {
+        Self {
+            recalculated: None,
+            rows,
+            columns,
+            cells,
+        }
+    }
+
+    pub fn apply_formula_values(&mut self, calculated: SheetWindow) {
+        let values: HashMap<_, _> = calculated
+            .cells
+            .into_iter()
+            .filter(|cell| cell.formula.is_some())
+            .map(|cell| ((cell.row, cell.column), cell))
+            .collect();
+        for cell in self.cells.iter_mut().filter(|cell| cell.formula.is_some()) {
+            if let Some(result) = values.get(&(cell.row, cell.column)) {
+                cell.value.clone_from(&result.value);
+                cell.truncated = result.truncated;
+            }
+        }
+    }
+}
+
 fn is_false(value: &bool) -> bool {
     !value
 }
 
-fn check_package(bytes: &[u8]) -> Result<Source<'_>, RpcError> {
-    let mut zip = ZipArchive::new(Cursor::new(bytes)).map_err(|_| {
-        invalid("This workbook could not be opened as XLSX or XLSM. Check for encryption or file damage.")
-    })?;
+pub(super) fn check_package<'a>(bytes: &'a [u8], open_error: &str) -> Result<Source<'a>, RpcError> {
+    let mut zip = ZipArchive::new(Cursor::new(bytes)).map_err(|_| invalid(open_error))?;
     let mut compressed_total = 0u64;
     let mut expanded_total = 0u64;
     if zip.len() > MAX_PARTS {
@@ -84,47 +112,80 @@ fn check_package(bytes: &[u8]) -> Result<Source<'_>, RpcError> {
     Ok(zip)
 }
 
-fn excerpt(text: &str) -> (String, bool) {
+pub(super) fn excerpt(text: &str) -> (String, bool) {
     let Some((end, _)) = text.char_indices().nth(MAX_CELL_CHARS) else {
         return (text.to_owned(), false);
     };
     (format!("{}…", &text[..end]), true)
 }
 
-fn value_text(value: DataRef<'_>) -> (String, bool) {
+pub(super) fn value_text(value: &DataRef<'_>) -> (String, bool) {
     match value {
-        DataRef::String(text) => excerpt(&text),
+        DataRef::String(text) => excerpt(text),
         DataRef::SharedString(text) => excerpt(text),
-        DataRef::Bool(value) => (if value { "TRUE" } else { "FALSE" }.into(), false),
+        DataRef::Bool(value) => (if *value { "TRUE" } else { "FALSE" }.into(), false),
         DataRef::DateTime(value) => (
             value
                 .as_datetime()
                 .map_or_else(|| value.to_string(), |date| date.to_string()),
             false,
         ),
-        _ => excerpt(&Data::from(value).to_string()),
+        _ => excerpt(&Data::from(value.clone()).to_string()),
     }
+}
+
+impl Cell {
+    pub(super) fn read_only(
+        row: u32,
+        column: u32,
+        (value, value_truncated): (String, bool),
+        formula: Option<&str>,
+    ) -> Option<Self> {
+        let (formula, formula_truncated) =
+            formula
+                .filter(|formula| !formula.is_empty())
+                .map_or((None, false), |formula| {
+                    let (text, truncated) = excerpt(formula);
+                    (Some(text), truncated)
+                });
+        if value.is_empty() && formula.is_none() {
+            return None;
+        }
+        Some(Self {
+            row,
+            column,
+            value,
+            formula,
+            truncated: value_truncated || formula_truncated,
+            edit_type: None,
+            table_metadata: false,
+        })
+    }
+}
+
+pub(super) fn visible_sheets<R: std::io::Read + std::io::Seek>(
+    reader: &impl Reader<R>,
+) -> Result<Vec<String>, RpcError> {
+    let sheets: Vec<String> = reader
+        .sheets_metadata()
+        .iter()
+        .filter(|sheet| sheet.typ == SheetType::WorkSheet && sheet.visible == SheetVisible::Visible)
+        .map(|sheet| sheet.name.clone())
+        .collect();
+    if sheets.is_empty() || sheets.len() > MAX_SHEETS || sheets.iter().any(|name| name.len() > 256)
+    {
+        return Err(invalid("The workbook has no supported visible worksheets"));
+    }
+    Ok(sheets)
 }
 
 impl Workbook {
     pub fn open(bytes: Vec<u8>) -> Result<Self, RpcError> {
-        let editable_sheets = editable_worksheets(&mut check_package(&bytes)?).unwrap_or_default();
+        let editable_sheets = editable_worksheets(&mut check_package(&bytes, WORKBOOK_OPEN_ERROR)?)
+            .unwrap_or_default();
         let bytes: Arc<[u8]> = bytes.into();
         let file: Xlsx<_> = open_workbook_from_rs(Cursor::new(bytes.clone())).map_err(invalid)?;
-        let sheets: Vec<String> = file
-            .sheets_metadata()
-            .iter()
-            .filter(|sheet| {
-                sheet.typ == SheetType::WorkSheet && sheet.visible == SheetVisible::Visible
-            })
-            .map(|sheet| sheet.name.clone())
-            .collect();
-        if sheets.is_empty()
-            || sheets.len() > MAX_SHEETS
-            || sheets.iter().any(|name| name.len() > 256)
-        {
-            return Err(invalid("The workbook has no supported visible worksheets"));
-        }
+        let sheets = visible_sheets(&file)?;
         Ok(Self {
             file,
             sheets,
@@ -135,6 +196,10 @@ impl Workbook {
 
     pub fn sheets(&self) -> &[String] {
         &self.sheets
+    }
+
+    pub fn shared_bytes(&self) -> Arc<[u8]> {
+        self.bytes.clone()
     }
 
     pub fn bytes(&self) -> &[u8] {
@@ -186,7 +251,7 @@ impl Workbook {
                     DataRef::Int(_) | DataRef::Float(_) => Some("number"),
                     _ => None,
                 };
-                let (value, value_truncated) = value_text(cell.value);
+                let (value, value_truncated) = value_text(&cell.value);
                 let table_metadata = layout.is_some_and(|sheet| !sheet.allows_cell(row, column));
                 let edit_type = edit_type.filter(|_| {
                     layout.is_some()
@@ -219,6 +284,7 @@ impl Workbook {
         }
         check_current()?;
         Ok(SheetWindow {
+            recalculated: None,
             rows,
             columns,
             cells,

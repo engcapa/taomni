@@ -1,0 +1,101 @@
+id: TC-TAOFFICE-046
+title: Cancel and save a resized MP4 clip through the native Media host
+description: Trim an AVI into a separate H.264/AAC MP4 copy, check native Save As cancellation and focus, then reopen the saved video from Explorer.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, crash-regression, file-open, taoffice, media, taoffice-video, native-boundary]
+fixtures: [reset_db, file_open_files, taoffice_signed_media]
+ui_standard: [UI-BTN-04, UI-FBK-04, UI-FOC-02, UI-INP-07, UI-PAT-15]
+timeout_sec: 260
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.media_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.media_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 60}
+- press: {selector: '[data-testid="module-action-enable-taoffice-video"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-taoffice-video"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="media-legacy.avi"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] video[data-playback="native"][data-ready="true"]', timeout_sec: 45}
+- press: {selector: '[data-testid="taoffice-media-export-open"]', key: Enter}
+- assert_focus_on: '[data-testid="taoffice-media-trim-start"]'
+- fill: {selector: '[data-testid="taoffice-media-trim-start"]', value: '2'}
+- fill: {selector: '[data-testid="taoffice-media-trim-end"]', value: '5'}
+- select_option: {selector: '[data-testid="taoffice-media-export-width"]', value: '80'}
+- select_option: {selector: '[data-testid="taoffice-media-export-format"]', value: mp4}
+- press: {selector: '[data-testid="taoffice-media-trim-end"]', key: Enter}
+- native_file_dialog:
+    kind: save
+    action: cancel
+    path: ${fixture.file_open_root}/cancelled-clip.mp4
+- wait_for: '[data-testid="taoffice-media-export-save"]:enabled'
+- assert_focus_on: '[data-testid="taoffice-media-export-save"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/cancelled-clip.mp4', absent: true}
+- eval_readonly:
+    expression: document.querySelector('[data-testid\u003d"taoffice-media-trim-start"]').value === '2' && document.querySelector('[data-testid\u003d"taoffice-media-trim-end"]').value === '5' && document.querySelector('[data-testid\u003d"taoffice-media-export-width"]').value === '80' && document.querySelector('[data-testid\u003d"taoffice-media-export-format"]').value === 'mp4'
+- assert_not_visible: '[data-testid="taoffice-media-export-saved"]'
+- press: Enter
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.file_open_root}/resized-clip.mp4
+- wait_for: '[data-testid="taoffice-media-export-saved"]'
+- assert_focus_on: '[data-testid="taoffice-media-export-open"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/media-legacy.avi', sha256: '${fixture.taoffice_legacy_media_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="resized-clip.mp4"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] video[aria-label="resized-clip.mp4"][data-ready="true"]', timeout_sec: 45}
+- eval_readonly:
+    expression: >-
+      document.querySelector('video[aria-label\u003d"resized-clip.mp4"]').videoWidth === 80 &&
+      Math.abs(document.querySelector('video[aria-label\u003d"resized-clip.mp4"]').videoHeight - 45) <= 1 &&
+      Math.abs(document.querySelector('video[aria-label\u003d"resized-clip.mp4"]').duration - 3) < 0.12
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] video', key: Space}
+- eval_readonly:
+    expression: >-
+      !document.querySelector('video[aria-label\u003d"resized-clip.mp4"]').paused &&
+      document.querySelector('video[aria-label\u003d"resized-clip.mp4"]').currentTime > 0.15
+    timeout_sec: 8
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: native-save-cancellation
+    ui_standard: [UI-BTN-04, UI-FBK-04, UI-FOC-02, UI-INP-07]
+    requirement: Enter opens the native save chooser after conversion, and cancelling restores the enabled action and existing trim settings without writing to the destination.
+    actions: [19, 21, 22, 23, 24, 25, 26]
+    checkpoints:
+    - {step: 20, expectation: The opening action focuses the start time input.}
+    - {step: 27, expectation: The save action is enabled after cancellation.}
+    - {step: 28, expectation: Focus returns to the enabled Save video copy action.}
+    - {step: 29, expectation: The cancelled path does not exist.}
+    - {step: 30, expectation: 'Both time inputs, the output width and the MP4 selection are retained.'}
+    - {step: 31, expectation: Cancelling the chooser leaves the success message absent.}
+    results: [20, 27, 28, 29, 30, 31]
+  - id: native-save-copy
+    ui_standard: [UI-FOC-02, UI-PAT-15]
+    requirement: Keyboard submission saves the converted copy, returns focus to Export video and permits playback from the newly created file.
+    actions: [32, 33, 41, 44]
+    checkpoints:
+    - {step: 34, expectation: The player confirms the video copy was saved.}
+    - {step: 35, expectation: Focus returns to Export video after the form closes.}
+    - {step: 36, expectation: The source AVI digest is unchanged.}
+    - {step: 43, expectation: The saved MP4 reopens with an 80 px width and a three-second duration.}
+    - {step: 45, expectation: The copy plays and advances its timeline.}
+    results: [34, 35, 36, 43, 45]
+  visual:
+  - {check: Export completion and opened copy, method: automated, reason: The native WebView reports the saved state and renders the copy's video surface.}
+  native:
+  - {check: Operating-system Save As and conversion result, method: automated, reason: 'The native Save As helper cancels and accepts the real chooser, and Explorer reopens the actual disk copy.'}

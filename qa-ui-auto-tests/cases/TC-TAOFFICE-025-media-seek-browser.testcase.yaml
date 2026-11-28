@@ -35,5 +35,6 @@ steps:
 - wait_for: 'video[data-testid="taoffice-media-player"][data-ready="true"]'
 - eval_readonly:
     expression: document.querySelector('video').paused === true
+- assert_count: {selector: 'video[data-testid="taoffice-media-player"]', equal: 1}
 - assert_file_open_bytes: {path: '${fixture.file_open_root}/rollout-replay.webm', sha256: '${fixture.taoffice_video_sha}'}
 - assert_no_runtime_errors: null

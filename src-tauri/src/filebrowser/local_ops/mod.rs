@@ -5,6 +5,8 @@ mod model;
 mod operation;
 mod paths;
 pub(crate) use paths::rename_no_replace;
+#[cfg(unix)]
+pub(crate) use paths::rename_no_replace_at;
 mod search;
 mod transfer;
 mod trash;

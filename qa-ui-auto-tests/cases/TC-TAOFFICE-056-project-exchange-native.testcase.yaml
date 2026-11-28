@@ -1,0 +1,97 @@
+id: TC-TAOFFICE-056
+title: Import a German MPX schedule in the signed host and reopen its XML copy
+description: Read localized field names and dated links in a Project exchange file, reject an incomplete header, and reopen an edited XML copy alongside its original.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, file-open, taoffice, taoffice-project, native-boundary]
+fixtures: [reset_db, file_open_files, taoffice_signed_project]
+ui_standard: [UI-FOC-02, UI-OTH-03]
+timeout_sec: 250
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.project_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.project_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- press: {selector: '[data-testid="module-action-enable-taoffice-project"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-taoffice-project"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="damaged.mpx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="damaged.mpx"]'
+- wait_for: '[data-testid="taoffice-project-error"]'
+- assert_visible: '[data-testid="taoffice-project-retry"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="exchange-de.mpx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="exchange-de.mpx"]'
+- wait_for: '[data-testid="taoffice-project-schedule"]'
+- assert_attribute: {selector: '[data-testid="taoffice-project-task"][data-uid="12"]', name: data-start, equals: '2003-01-09T00:00:00'}
+- assert_visible: '[data-testid="taoffice-project-task"][data-uid="12"] [data-testid="taoffice-project-bar"]'
+- assert_visible: '[data-testid="taoffice-project-task"][data-uid="21"]'
+- press: {selector: '[data-testid="taoffice-project-task"][data-uid="12"] [data-testid="taoffice-project-rename"]', key: Enter}
+- assert_focus_on: '[data-testid="taoffice-project-task-name"]'
+- fill: {selector: '[data-testid="taoffice-project-task-name"]', value: 'Review imported lag'}
+- press: Enter
+- assert_focus_on: '[data-testid="taoffice-project-task"][data-uid="12"] [data-testid="taoffice-project-rename"]'
+- native_file_dialog:
+    kind: save
+    action: cancel
+    trigger: '[data-testid="taoffice-project-save"]'
+- wait_for: '[data-testid="taoffice-project-save"]:enabled'
+- assert_text: {selector: '[data-testid="taoffice-project-task"][data-uid="12"]', contains: 'Review imported lag'}
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.file_open_root}/exchange-de-revised.xml
+    trigger: '[data-testid="taoffice-project-save"]'
+- wait_for: '[data-testid="taoffice-project-output"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/exchange-de.mpx', sha256: '${fixture.taoffice_mpx_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="exchange-de-revised.xml"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="exchange-de-revised.xml"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-project-schedule"]'
+- assert_text:
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-project-task"][data-uid="12"]'
+    contains: 'Review imported lag'
+- assert_attribute:
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-project-task"][data-uid="12"]'
+    name: data-start
+    equals: '2003-01-09T00:00:00'
+- assert_no_runtime_errors: null
+
+verification:
+  review: reviewed
+  requirements:
+  - id: task-rename
+    ui_standard: [UI-FOC-02]
+    requirement: Enter moves focus into the task name and applying the edit restores the rename control.
+    actions: [28, 31]
+    checkpoints:
+    - {step: 29, expectation: The task name field has focus.}
+    - {step: 32, expectation: The rename control for the same imported task has focus.}
+    results: [29, 32]
+  - id: xml-copy
+    ui_standard: [UI-OTH-03]
+    requirement: Cancelling the native save chooser retains the edit and the second invocation writes a new XML file.
+    actions: [33, 36]
+    checkpoints:
+    - {step: 34, expectation: The save button is available for another attempt.}
+    - {step: 35, expectation: The in-memory task still shows the edited name.}
+    - {step: 38, expectation: The original MPX retains its input SHA-256.}
+    - {step: 46, expectation: The reopened XML copy shows the edited name.}
+    - {step: 47, expectation: The imported start date is preserved.}
+    results: [34, 35, 38, 46, 47]
+  visual:
+  - {check: Imported timeline, method: automated, reason: The dated German MPX task has a visible Gantt bar and retains its start date in the reopened copy.}
+  native:
+  - {check: Native save chooser, method: automated, reason: The signed host imports the original MPX and the OS copy is reopened through Explorer.}

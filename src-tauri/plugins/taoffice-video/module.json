@@ -2,8 +2,8 @@
   "id": "taomni-plugin-taoffice-video",
   "slug": "taoffice-video",
   "name": "TaOffice Media",
-  "description": "Play local audio and video, with compatible playback for supported Matroska tracks.",
-  "version": "0.2.0",
+  "description": "Play local media, prepare compatible playback for legacy video, and save trimmed or resized video copies.",
+  "version": "0.3.0",
   "coreApiVersion": "1",
   "kind": "media",
   "status": "provisional",
@@ -15,7 +15,8 @@
   ],
   "entry": {
     "frontend": "frontend/index.js",
-    "protocol": 1
+    "protocol": 1,
+    "host": "taomni-plugin-taoffice-video"
   },
   "document": {
     "fileKinds": [
@@ -28,6 +29,12 @@
       "webm",
       "mov",
       "mkv",
+      "avi",
+      "flv",
+      "wmv",
+      "rm",
+      "rmvb",
+      "3gp",
       "mp3",
       "wav",
       "flac",
@@ -37,8 +44,17 @@
     ]
   },
   "tabs": [],
-  "commands": [],
-  "permissions": ["fs.readUserFile"],
+  "commands": [
+    "media/begin",
+    "media/append",
+    "media/convert",
+    "media/status",
+    "media/read",
+    "media/close"
+  ],
+  "permissions": [
+    "fs.readUserFile"
+  ],
   "dataDir": "plugins/taoffice-video",
   "dataSchemaVersion": 1,
   "backupPaths": [],

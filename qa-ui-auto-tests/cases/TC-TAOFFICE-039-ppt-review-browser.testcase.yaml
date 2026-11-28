@@ -1,0 +1,155 @@
+id: TC-TAOFFICE-039
+title: Navigate, edit, and create PowerPoint presentations
+description: Render both slides from a real PPTX, replace text with the shared draft, retain it after cancelling close, and download edited and newly created decks.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-ppt, crash-regression]
+fixtures: [reset_db, file_open_files]
+ui_standard: [UI-BTN-03, UI-DLG-04, UI-DLG-06, UI-FND-03a, UI-FND-13, UI-FOC-02, UI-INP-01, UI-INP-06]
+timeout_sec: 250
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-ppt.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="ppt-review.pptx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="ppt-review.pptx"]'
+- wait_for: {selector: '[data-testid="taoffice-ppt-preview"][data-image-ready="true"]', timeout_sec: 45}
+- assert_text_equals: {selector: '[data-testid="taoffice-ppt-position"]', equals: Slide 1 of 2}
+- assert_disabled: '[data-testid="taoffice-ppt-prev"]'
+- assert_disabled: '[data-testid="taoffice-ppt-save"]'
+- assert_text: {selector: '[data-testid="taoffice-ppt-save-hint"]', contains: Edit slide text to enable saving a copy.}
+- eval_readonly:
+    expression: >-
+      document.querySelector('.taoffice-ppt-slide img').naturalWidth >= 960
+      && document.querySelector('.taoffice-ppt-slide img').naturalHeight >= 540
+- press: {selector: '[data-testid="taoffice-ppt-next"]', key: Enter}
+- wait_for: {selector: '[data-testid="taoffice-ppt-preview"][data-image-ready="true"][alt*="Delivery appendix"]', timeout_sec: 45}
+- assert_text_equals: {selector: '[data-testid="taoffice-ppt-position"]', equals: Slide 2 of 2}
+- assert_disabled: '[data-testid="taoffice-ppt-next"]'
+- press: {selector: '[data-testid="taoffice-ppt-prev"]', key: Enter}
+- wait_for: '[data-testid="taoffice-ppt-preview"][data-image-ready="true"][alt*="Quarterly review"]'
+- press: {selector: '[data-testid="taoffice-ppt-edit"]', key: Enter}
+- assert_focus_on: '[data-testid="taoffice-ppt-paragraph"][value="Quarterly review"]'
+- fill: {selector: '[data-testid="taoffice-ppt-paragraph"][value="Pilot moves with approval"]', value: Pilot moves after legal & customer approval}
+- fill: {selector: '[data-testid="taoffice-ppt-paragraph"][value="Ready"]', value: Waiting for review}
+- press: {selector: '[data-testid="taoffice-ppt-paragraph"][value="Waiting for review"]', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-ppt-edit"]'
+- wait_for: '[data-testid="taoffice-ppt-preview"][data-image-ready="true"]'
+- wait_for: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- assert_focus_on: '[data-testid="viewer-close-cancel"]'
+- press: Escape
+- wait_for: {selector: '[data-testid="viewer-close-dialog"]', state: detached}
+- assert_visible: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
+- assert_download:
+    trigger: '[data-testid="taoffice-ppt-save"]'
+    filename: ppt-review - copy.pptx
+    contains: ['ppt/slides/slide2.xml', 'ppt/charts/chart1.xml', 'ppt/notesSlides/notesSlide1.xml']
+- wait_for: '[data-testid="taoffice-ppt-output"]'
+- press: {selector: '[data-testid="taoffice-ppt-new"]', key: Enter}
+- assert_focus_on: '[data-testid="taoffice-ppt-new-title"]'
+- assert_disabled: '[data-testid="taoffice-ppt-new-save"]'
+- assert_text_equals: {selector: '[data-testid="taoffice-ppt-new-title-label"]', equals: Title}
+- compose_text: {selector: '[data-testid="taoffice-ppt-new-title"]', text: '发布回顾', during_key: Enter}
+- assert_count: {selector: '[data-testid="taoffice-ppt-new-output"]', equal: 0}
+- assert_enabled: '[data-testid="taoffice-ppt-new-save"]'
+- fill: {selector: '[data-testid="taoffice-ppt-new-subtitle"]', value: Next steps}
+- assert_download:
+    trigger: '[data-testid="taoffice-ppt-new-save"]'
+    filename: ppt-review - copy.pptx
+    contains: ['ppt/presentation.xml', 'ppt/slides/slide1.xml']
+- wait_for: '[data-testid="taoffice-ppt-new-output"]'
+- press: {selector: '[data-testid="taoffice-ppt-new-subtitle"]', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-ppt-new"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/ppt-review.pptx', sha256: '${fixture.taoffice_ppt_sha}'}
+- click: 'button[aria-label="Cycle application theme"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: light}
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- press: {selector: '#ui-font-size-slider', key: Home}
+- click: '[data-testid="side-tab-explorer"]'
+- assert_computed_style: {selector: '.taoffice-ppt-position', property: font-size, equals: '9px'}
+- assert_solid_text_contrast: {selector: '.taoffice-ppt-position', minimum: 4.5, composite_ancestors: true}
+- click: 'button[aria-label="Cycle application theme"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: dark}
+- click: '[data-testid="ribbon-settings"]'
+- press: {selector: '#ui-font-size-slider', key: End}
+- click: '[data-testid="side-tab-explorer"]'
+- assert_computed_style: {selector: '.taoffice-ppt-position', property: font-size, equals: '17px'}
+- assert_solid_text_contrast: {selector: '.taoffice-ppt-position', minimum: 4.5, composite_ancestors: true}
+- assert_element_geometry: {selector: '.taoffice-ppt-toolbar button', min_width: 24, min_height: 26, min_count: 5, viewport_margin: 0}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="ppt-damaged.pptx"]'
+- assert_text: {selector: '[data-testid="taoffice-ppt-error"]', contains: Could not open the PowerPoint file.}
+- press: {selector: '[data-testid="taoffice-ppt-retry"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-ppt-error"]', contains: Could not open the PowerPoint file.}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]:has-text("ppt-review.pptx")'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-preview"][data-image-ready="true"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-BTN-03]
+    requirement: Save a copy stays disabled with a visible explanation until a slide has unsaved edits.
+    actions: [11]
+    checkpoints:
+    - {step: 15, expectation: Save a copy is disabled on opening a presentation.}
+    - {step: 16, expectation: The adjacent explanation says that changing slide text enables saving.}
+    - {step: 37, expectation: Save a copy downloads the edited presentation after the draft gains changes.}
+    results: [15, 16, 37]
+  - id: R2
+    ui_standard: [UI-FOC-02]
+    requirement: Edit and new-presentation keyboard paths place and restore focus on their owning controls.
+    actions: [24, 28, 39, 49]
+    checkpoints:
+    - {step: 25, expectation: The title paragraph receives focus on entering edit mode.}
+    - {step: 29, expectation: Escape restores focus to Edit slide text.}
+    - {step: 40, expectation: The new presentation title receives focus.}
+    - {step: 50, expectation: Escape restores focus to New presentation.}
+    results: [25, 29, 40, 50]
+  - id: R3
+    ui_standard: [UI-DLG-04, UI-DLG-06]
+    requirement: The dirty-close prompt focuses Cancel and Escape retains the edited presentation.
+    actions: [32, 34]
+    checkpoints:
+    - {step: 33, expectation: Cancel owns initial focus.}
+    - {step: 35, expectation: Escape dismisses the confirmation.}
+    - {step: 36, expectation: The active presentation remains dirty and can be saved.}
+    - {step: 37, expectation: Saving the retained draft produces a PPTX copy.}
+    results: [33, 35, 36, 37]
+  - id: R4
+    ui_standard: [UI-INP-01, UI-INP-06]
+    requirement: The new deck title is labelled and IME composition can complete before the user saves it.
+    actions: [39, 43]
+    checkpoints:
+    - {step: 42, expectation: A visible Title label wraps the title input.}
+    - {step: 44, expectation: Composing Enter creates no saved presentation.}
+    - {step: 45, expectation: The committed title enables explicit saving.}
+    - {step: 47, expectation: Explicit saving downloads a new presentation.}
+    results: [42, 44, 45, 47]
+  - id: R5
+    ui_standard: [UI-FND-03a, UI-FND-13]
+    requirement: The open deck adopts the current theme and UI font size while its controls and slide status remain readable at both endpoints.
+    actions: [52, 56, 60, 63]
+    checkpoints:
+    - {step: 53, expectation: The app switches to light appearance.}
+    - {step: 58, expectation: Slide status uses the compact font token.}
+    - {step: 59, expectation: Light status text meets the 4.5 to 1 contrast minimum.}
+    - {step: 61, expectation: The app switches to dark appearance.}
+    - {step: 65, expectation: Slide status uses the large font token.}
+    - {step: 66, expectation: Dark status text meets the 4.5 to 1 contrast minimum.}
+    - {step: 67, expectation: Each toolbar button fits in the viewport with a minimum target size.}
+    results: [53, 58, 59, 61, 65, 66, 67]
+  visual:
+  - {check: Slide preview dimensions and navigation, method: automated, reason: The case waits for decoded slide images and checks their native bitmap dimensions and active page state.}
+  native:
+  - {check: Signed module and native Save a copy, method: external, reason: TC-TAOFFICE-040 installs the signed package and uses the system chooser to save and reopen an edited deck.}
