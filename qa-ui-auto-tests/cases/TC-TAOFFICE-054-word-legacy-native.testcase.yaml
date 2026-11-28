@@ -5,7 +5,7 @@ modes: [native]
 covers: [F-FILEOPEN-1, F-Modules-1]
 tags: [p0, file-open, taoffice, taoffice-word, crash-regression, native-boundary]
 fixtures: [reset_db, file_open_files, taoffice_signed_word]
-ui_standard: [UI-BTN-03, UI-BTN-04, UI-BTN-05, UI-FND-07a, UI-FOC-02]
+ui_standard: [UI-BTN-03, UI-BTN-04, UI-BTN-05, UI-FND-07a, UI-FOC-02, UI-KEY-06]
 timeout_sec: 400
 steps:
 - open: ${cfg.app.base_url}
@@ -162,7 +162,7 @@ steps:
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="legacy-readonly.zip"]'
 - wait_for: '[data-testid="archive-entry"][data-name="archive-notes.rtf"]'
-- press: {selector: '[data-testid="archive-preview"]', key: Enter}
+- press: {selector: '[data-testid="archive-entry"][data-name="archive-notes.rtf"] [data-testid="archive-preview"]', key: Enter}
 - wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-preview"]'
 - wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="document-readonly"]'
 - eval_readonly:
@@ -203,6 +203,16 @@ verification:
     - {step: 32, expectation: Save DOCX copy becomes available again.}
     - {step: 33, expectation: The document still has the original draft.}
     results: [32, 33]
+  - id: R4
+    ui_standard: [UI-KEY-06]
+    requirement: Enter on the archive member opens its temporary file in the signed Word module read-only.
+    actions: [104]
+    checkpoints:
+    - {step: 106, expectation: The temporary document displays the read-only notice.}
+    - {step: 107, expectation: The preview shows the selected member's text and table.}
+    - {step: 108, expectation: The active document has no paragraph editing action.}
+    - {step: 109, expectation: The active document has no save action.}
+    results: [106, 107, 108, 109]
   visual:
   - {check: Document preview, method: automated, reason: Assertions inspect visible layout guidance and page content.}
   native:

@@ -5,7 +5,7 @@ modes: [browser]
 covers: [F-FILEOPEN-1]
 tags: [p0, file-open, taoffice, taoffice-word, crash-regression]
 fixtures: [reset_db, file_open_files]
-ui_standard: [UI-BTN-03, UI-BTN-05, UI-FBK-03, UI-FND-03a, UI-FND-04, UI-FND-07a, UI-FOC-02, UI-INP-06]
+ui_standard: [UI-BTN-03, UI-BTN-05, UI-FBK-03, UI-FND-03a, UI-FND-04, UI-FND-07a, UI-FOC-02, UI-INP-06, UI-KEY-06]
 timeout_sec: 280
 steps:
 - open: ${cfg.app.base_url}
@@ -127,7 +127,7 @@ steps:
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="legacy-readonly.zip"]'
 - wait_for: '[data-testid="archive-entry"][data-name="archive-notes.rtf"]'
-- press: {selector: '[data-testid="archive-preview"]', key: Enter}
+- press: {selector: '[data-testid="archive-entry"][data-name="archive-notes.rtf"] [data-testid="archive-preview"]', key: Enter}
 - wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-word-preview"]'
 - wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="document-readonly"]'
 - eval_readonly:
@@ -177,6 +177,16 @@ verification:
     - {step: 80, expectation: The status explains the failed conversion.}
     - {step: 82, expectation: Retry returns a stable conversion error.}
     results: [80, 82]
+  - id: R5
+    ui_standard: [UI-KEY-06]
+    requirement: Enter on the selected archive member opens its converted Word preview read-only.
+    actions: [87]
+    checkpoints:
+    - {step: 89, expectation: The active document displays the read-only notice.}
+    - {step: 90, expectation: The preview contains the member's paragraphs and table.}
+    - {step: 91, expectation: The active document has no paragraph editing action.}
+    - {step: 92, expectation: The active document has no save action.}
+    results: [89, 90, 91, 92]
   visual:
   - {check: Document preview, method: automated, reason: Assertions inspect visible layout guidance and page content.}
   native:

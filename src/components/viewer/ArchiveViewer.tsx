@@ -11,7 +11,7 @@ import { useArchiveExtraction } from "./useArchiveExtraction";
 import "./archiveViewer.css";
 
 const PAGE_SIZE = 100;
-const previews = new Set(["text", "source", "markdown", "image", "svg"]);
+const previews = new Set(["text", "source", "markdown", "image", "svg", "pdf", "document"]);
 
 export function ArchiveViewer({ viewer, active = true, workspaceId, host }: {
   viewer: FileViewerTabInfo; active?: boolean; workspaceId?: string; host?: "explorer";
