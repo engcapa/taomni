@@ -1604,6 +1604,10 @@
 - `[data-testid="taoffice-word-retry"]` — interactive — F-FILEOPEN-1.taoffice-word-retry
 - `[data-testid="taoffice-word-preview"]` — display — F-FILEOPEN-1.taoffice-word-preview
 - `[data-testid="taoffice-word-edit"]` — interactive — F-FILEOPEN-1.taoffice-word-edit
+- `[data-testid="taoffice-word-editor"]` — display — F-FILEOPEN-1.taoffice-word-editor
+- `[data-testid="taoffice-word-zoom-in"]` — interactive — F-FILEOPEN-1.taoffice-word-zoom-in
+- `[data-testid="taoffice-word-zoom-out"]` — interactive — F-FILEOPEN-1.taoffice-word-zoom-out
+- `[data-testid="taoffice-word-zoom-reset"]` — interactive — F-FILEOPEN-1.taoffice-word-zoom-reset
 - `[data-testid="taoffice-word-paragraph"]` — interactive — F-FILEOPEN-1.taoffice-word-paragraph
 - `[data-testid="taoffice-word-save"]` — interactive — F-FILEOPEN-1.taoffice-word-save
 - `[data-testid="taoffice-word-output"]` — display — F-FILEOPEN-1.taoffice-word-output

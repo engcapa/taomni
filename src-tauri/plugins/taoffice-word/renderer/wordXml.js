@@ -24,6 +24,7 @@ export function editableParagraphs(xml) {
   const stack = [];
   const paragraphs = [];
   let body = false;
+  let paragraphIndex = -1;
   let paragraph;
   let span;
   parser.on("doctype", () => { throw new Error("DOCX XML declarations must not contain a document type."); });
@@ -31,10 +32,11 @@ export function editableParagraphs(xml) {
     const parent = stack.at(-1);
     stack.push(tag);
     if (stack.length > 128) throw new Error("The Word document is nested too deeply.");
+    if (isWord(tag, "p")) paragraphIndex++;
     if (stack.length === 2 && isWord(stack[0], "document") && isWord(tag, "body")) body = true;
     if (!paragraph && isWord(tag, "p")) {
       const depth = tableDepth(stack);
-      if (depth >= 0) paragraph = { depth: stack.length, tableDepth: depth, supported: true, spans: [] };
+      if (depth >= 0) paragraph = { depth: stack.length, index: paragraphIndex, tableDepth: depth, supported: true, spans: [] };
       return;
     }
     if (!paragraph?.supported) return;
@@ -67,7 +69,7 @@ export function editableParagraphs(xml) {
     if (paragraph && stack.length === paragraph.depth) {
       const text = paragraph.spans.map((entry) => entry.text).join("");
       if (paragraph.supported && paragraph.spans.length && validText(text)) {
-        paragraphs.push({ id: paragraphs.length, tableDepth: paragraph.tableDepth, text, spans: paragraph.spans });
+        paragraphs.push({ id: paragraphs.length, index: paragraph.index, tableDepth: paragraph.tableDepth, text, spans: paragraph.spans });
       }
       paragraph = undefined;
     }

@@ -27,6 +27,10 @@ Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”�
 
 Microsoft Word 与 PowerPoint 16.0 build 20625 使用普通只读打开方式读回了 27 份副本。Windows Native 在产品提交 `1acd5cf3a216f60fe5e6f228290d1a1fd7536ee2` 的 022、040、054、060 中通过系统另存生成 4 份 DOCX、3 份 PPTX。Word 读回正文与表格，PowerPoint 读回两页幻灯片及其预期标题。另用同一批公开输入重建了 20 份 Word 语料副本，逐文件与历史 Linux 输出的 SHA-256 匹配，Word 全部读到了相应编辑标记。27 份文件在重开前后都通过 SHA-256 对比。Native 回执为 `receipt-run-20261128-145838-889896600`。[逐文件读回与摘要](taoffice-research/office-microsoft-reopen.csv)
 
+## Word 页面编辑与缩放
+
+Word 0.4.0 的编辑区按文档顺序显示正文、标题和表格，纸张宽高与页边距读取自 DOCX 的节设置。用户可在原行列输入文本，Tab 和 Shift+Tab 按正文及表格顺序切换，Escape 返回阅读视图。状态栏的缩放在阅读、编辑间保留。编辑范围为既有的单段文字和表格单元格，带域的段落保留静态值；原始打印预览仍用于检查页眉、图片及复杂版式。TC-TAOFFICE-021、022、053、054 覆盖现代与转换文档的编辑和副本保存。纸张内容遵从 UI-FND-04，键盘焦点遵从 UI-FOC-02。[Microsoft Word 视图](https://learn.microsoft.com/en-us/office/vba/api/word.wdviewtype) · [Word 文档缩放](https://learn.microsoft.com/en-us/office/vba/api/word.view.zoom)
+
 ## 旧版演示文稿导入
 
 Windows Browser 回执 `run-20261128-142945-077647600` 同时通过 039、059。059 使用 Microsoft PowerPoint 导出的两页 PPT、ODP，在 Explorer 内导入，直接下载 PPT 的转换结果，编辑 ODP 首页标题后下载。PowerPoint 16.0 build 20625 用普通打开命令重开两份下载文件，读回两页及各自首页标题，第二页均为 Delivery appendix。原件的 SHA-256 在用例中独立核对。PPT 副本的 SHA-256 为 `a0a1fd54e5d38910339a68052d4cb4bbf560e2566fc9d05c64fb7c3fb3b32407`，ODP 编辑副本为 `b7901ddd7af796693111fc8b2d1f836b535b359fd5d60a0b23044717c9b9dc61`。

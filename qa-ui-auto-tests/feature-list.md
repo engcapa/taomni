@@ -17396,6 +17396,18 @@ controls:
   - id: taoffice-word-edit
     selector: '[data-testid="taoffice-word-edit"]'
     kind: interactive
+  - id: taoffice-word-editor
+    selector: '[data-testid="taoffice-word-editor"]'
+    kind: display
+  - id: taoffice-word-zoom-in
+    selector: '[data-testid="taoffice-word-zoom-in"]'
+    kind: interactive
+  - id: taoffice-word-zoom-out
+    selector: '[data-testid="taoffice-word-zoom-out"]'
+    kind: interactive
+  - id: taoffice-word-zoom-reset
+    selector: '[data-testid="taoffice-word-zoom-reset"]'
+    kind: interactive
   - id: taoffice-word-paragraph
     selector: '[data-testid="taoffice-word-paragraph"]'
     kind: interactive
