@@ -4,7 +4,7 @@ import { wordPageLayout } from "./wordPageLayout.js";
 const { React } = globalThis.__taomniHost;
 
 export function WordEditingPage({ document, draft, editor, label, zoom }) {
-  const { blocks, paper } = React.useMemo(() => wordPageLayout(document), [document]);
+  const { pages, paper } = React.useMemo(() => wordPageLayout(document), [document]);
   function renderBlock(block, key) {
     if (block.kind === "table") return <table key={key}>
       <tbody>{block.rows.map((row, index) => <tr key={index}>{row.map((cell, col) =>
@@ -26,8 +26,9 @@ export function WordEditingPage({ document, draft, editor, label, zoom }) {
     </label>;
   }
   return <div className="taoffice-word-edit-surface" data-testid="taoffice-word-editor">
-    <article className="taoffice-word-sheet" aria-label={label("编辑文档", "Edit document")} style={{ ...paper, zoom }}>
+    {pages.map((blocks, index) => <article key={index} className="taoffice-word-sheet"
+      aria-label={label("第 " + (index + 1) + " 页", "Page " + (index + 1))} style={{ ...paper, zoom }}>
       {blocks.map(renderBlock)}
-    </article>
+    </article>)}
   </div>;
 }

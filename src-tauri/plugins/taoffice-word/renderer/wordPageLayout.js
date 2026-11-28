@@ -19,8 +19,26 @@ export function wordPageLayout(document) {
         const alignment = properties && attr(child(properties, "jc"), "val");
         const heading = /^(?:Title|Heading[1-6])$/i.test(style || "");
         const text = paragraph?.text ?? Array.from(item.getElementsByTagNameNS(ns, "t"), tag => tag.textContent).join("");
-        return [{ kind: "paragraph", paragraph, text, heading,
-          align: ["center", "left", "right", "start", "end"].includes(alignment) ? alignment : undefined }];
+        const block = { kind: "paragraph", paragraph, text, heading,
+          align: ["center", "left", "right", "start", "end"].includes(alignment) ? alignment : undefined };
+        if (node !== body) return [block];
+        const breakBefore = properties && child(properties, "pageBreakBefore");
+        const prefix = breakBefore && !["0", "false", "off"].includes(attr(breakBefore, "val"))
+          ? [{ kind: "breakBefore" }] : [];
+        if (paragraph || ![...item.getElementsByTagNameNS(ns, "br")].some(tag => attr(tag, "type") === "page")) {
+          return [...prefix, block];
+        }
+        let fragment = "";
+        for (const tag of item.getElementsByTagNameNS(ns, "*")) {
+          if (tag.localName === "t") fragment += tag.textContent;
+          if (tag.localName === "br" && attr(tag, "type") === "page") {
+            if (fragment) prefix.push({ ...block, text: fragment });
+            prefix.push({ kind: "pageBreak" });
+            fragment = "";
+          }
+        }
+        if (fragment) prefix.push({ ...block, text: fragment });
+        return prefix;
       }
       if (item.localName === "tbl") {
         const rows = wordChildren(item).filter(tag => tag.localName === "tr").map(row =>
@@ -34,7 +52,7 @@ export function wordPageLayout(document) {
       return [];
     });
   }
-  if (!body) return { blocks: [], paper: {} };
+  if (!body) return { pages: [], paper: {} };
   const section = child(body, "sectPr");
   const size = section && child(section, "pgSz");
   const margin = section && child(section, "pgMar");
@@ -53,5 +71,14 @@ export function wordPageLayout(document) {
     paddingBottom: inches(margin, "bottom", 1, height / 2) + "in",
     paddingLeft: inches(margin, "left", 1, width / 2) + "in",
   };
-  return { blocks: blocks(body), paper };
+  const pages = [[]];
+  for (const block of blocks(body)) {
+    const page = pages.at(-1);
+    if (block.kind === "pageBreak" || block.kind === "breakBefore") {
+      if (block.kind === "pageBreak" || page.length) pages.push([]);
+    } else {
+      page.push(block);
+    }
+  }
+  return { pages, paper };
 }

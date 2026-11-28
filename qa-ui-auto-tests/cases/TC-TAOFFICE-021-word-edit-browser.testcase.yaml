@@ -67,6 +67,8 @@ steps:
 - eval_readonly:
     expression: >-
       document.querySelector('.taoffice-word-sheet')?.style.zoom === '1.1' &&
+      document.querySelectorAll('.taoffice-word-sheet').length === 2 &&
+      document.querySelector('.taoffice-word-sheet:last-child label:last-child textarea')?.value === 'Keep the next page unchanged.' &&
       document.querySelector('.taoffice-word-sheet table tr:nth-child(2) td:nth-child(2) textarea')?.value === 'Waiting for approval'
     expect_truthy: true
 - press: {selector: '[data-testid="taoffice-word-editor"] table tr:first-child td:first-child textarea', key: Tab}
@@ -112,7 +114,7 @@ verification:
     actions: [33, 36, 38, 40, 42, 44]
     checkpoints:
     - {step: 35, expectation: The rendered document page is enlarged by ten percent.}
-    - {step: 37, expectation: The editing page keeps the zoom and the saved text in the original second-row cell.}
+    - {step: 37, expectation: Zoom is retained and the table and follow-up text remain on their respective pages.}
     - {step: 39, expectation: Tab moves from the first table cell to the next cell in the same row.}
     - {step: 41, expectation: Escape returns to the editing mode button.}
     - {step: 43, expectation: Reset returns the page to its original scale.}

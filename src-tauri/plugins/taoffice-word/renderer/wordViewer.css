@@ -49,6 +49,7 @@
 }
 
 .taoffice-word-sheet table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+.taoffice-word-sheet + .taoffice-word-sheet { margin-top: 1em; }
 .taoffice-word-sheet td { border: 1px solid #999; padding: .25em .45em; vertical-align: top; }
 .taoffice-word-sheet p { margin: 0 0 .5em; white-space: pre-wrap; }
 .taoffice-word-line {

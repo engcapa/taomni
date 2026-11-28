@@ -11,7 +11,7 @@ function layout(body) {
 describe("Word editing page", () => {
   it("places repeated text in its own body paragraph or merged cell and preserves read-only fields", () => {
     const plain = "<w:p><w:r><w:t>Later</w:t></w:r></w:p>";
-    const { blocks: [title, field, table, last], paper } = layout(
+    const { pages: [[title, field, table, last]], paper } = layout(
       '<w:p><w:pPr><w:pStyle w:val="Title"/><w:jc w:val="center"/></w:pPr><w:r><w:t>Review</w:t></w:r></w:p>'
       + '<w:p><w:r><w:fldChar w:fldCharType="begin"/><w:t>Field result</w:t></w:r></w:p>'
       + '<w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr>' + plain
@@ -23,5 +23,13 @@ describe("Word editing page", () => {
     expect(field.paragraph).toBeUndefined();
     expect(table.rows[0][0]).toMatchObject({ span: 2, blocks: [{ paragraph: { id: 1, tableDepth: 1 } }] });
     expect(last).toMatchObject({ paragraph: { id: 2, tableDepth: 0 } });
+  });
+  it("respects manual breaks in a paragraph and page-break-before without duplicating editable text", () => {
+    const { pages } = layout('<w:p><w:r><w:t>End</w:t><w:br w:type="page"/><w:t>Start</w:t></w:r></w:p>'
+      + '<w:p><w:pPr><w:pageBreakBefore/></w:pPr><w:r><w:t>Last</w:t></w:r></w:p>'
+      + '<w:p><w:pPr><w:pageBreakBefore w:val="0"/></w:pPr><w:r><w:t>Tail</w:t></w:r></w:p>');
+    expect(pages.map(page => page.map(p => p.text))).toEqual([["End"], ["Start"], ["Last", "Tail"]]);
+    expect(pages[1][0].paragraph).toBeUndefined();
+    expect(pages[2][0].paragraph.id).toBe(0);
   });
 });
