@@ -1,0 +1,105 @@
+id: TC-TAOFFICE-049
+title: Preview XLS, XLSB and ODS workbooks through the same read-only worksheet
+description: Open real workbook bytes with the browser host fixture. Verify keyboard navigation, selection, read-only controls and theme changes.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, crash-regression, file-open, taoffice, taoffice-excel]
+fixtures: [reset_db, file_open_files]
+ui_standard: [UI-TAB-02, UI-FND-03a, UI-FND-13]
+timeout_sec: 190
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage: {key: taomni.preview.modules.taoffice-excel.v1, value: '{"lifecycle":"enabled","values":[]}'}
+- seed_storage: {key: taomni.preview.taoffice-excel.workbook.v1, value: '${fixture.taoffice_workbook_model}'}
+- seed_storage: {key: taomni.uiFontSize, value: '10'}
+- reload_window: null
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="light"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-orders.xls"]'
+- assert_text: {selector: '[data-testid="taoffice-excel-readonly"]', contains: Read-only preview}
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-cell"][data-address="C2"]', equals: '21'}
+- assert_attribute: {selector: '[data-testid="taoffice-excel-grid"]', name: aria-readonly, equals: 'true'}
+- click: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
+- assert_attribute: {selector: '[data-testid="taoffice-excel-formula"]', name: value, equals: '=B2*3'}
+- press: {selector: '[data-testid="taoffice-excel-cell"][data-address="C2"]', key: F2}
+- assert_count: {selector: '[data-testid="taoffice-excel-input"], [data-testid="taoffice-excel-edit-cell"], [data-testid="taoffice-excel-save-copy"]', equal: 0}
+- assert_count: {selector: '[data-testid="taoffice-excel-sheet"]', equal: 2}
+- press: {selector: '[data-testid="taoffice-excel-sheet"][aria-selected="true"]', key: ArrowRight}
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-sheet"][aria-selected="true"]:focus', equals: Stock}
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-cell"][data-address="A2"]', equals: 上海}
+- press: {selector: '[data-testid="taoffice-excel-sheet"][aria-selected="true"]', key: Home}
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-sheet"][aria-selected="true"]:focus', equals: Orders}
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-cell-address"]', equals: C2}
+- assert_computed_style: {selector: '[data-testid="taoffice-excel-readonly"]', property: font-size, equals: '10px'}
+- assert_solid_text_contrast: {selector: '[data-testid="taoffice-excel-readonly"]', minimum: 4.5, composite_ancestors: true}
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="dark"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- press: {selector: '#ui-font-size-slider', key: End}
+- click: '[data-testid="side-tab-explorer"]'
+- assert_computed_style: {selector: '[data-testid="taoffice-excel-readonly"]', property: font-size, equals: '18px'}
+- assert_solid_text_contrast: {selector: '[data-testid="taoffice-excel-readonly"]', minimum: 4.5, composite_ancestors: true}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-orders.xls', sha256: '${fixture.taoffice_xls_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-orders.xlsb"]'
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', equals: '7'}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-orders.xlsb', sha256: '${fixture.taoffice_xlsb_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="broken-legacy.xlsb"]'
+- assert_text: {selector: '[data-testid="taoffice-excel-error"]', contains: Could not open the workbook.}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-orders.ods"]'
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-cell"][data-address="C2"]', equals: '21'}
+- click: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
+- assert_attribute: {selector: '[data-testid="taoffice-excel-formula"]', name: value, equals: '=[.B2]*3'}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-orders.ods', sha256: '${fixture.taoffice_ods_sha}'}
+- screenshot: legacy-worksheet-browser.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: sheet-navigation
+    ui_standard: [UI-TAB-02]
+    requirement: The worksheet remains read-only and restores selection when the workbook sheet changes.
+    actions: [14, 18, 20, 23, 26]
+    checkpoints:
+    - {step: 17, expectation: The grid identifies itself as read-only.}
+    - {step: 19, expectation: The formula bar displays the selected original formula.}
+    - {step: 21, expectation: The edit and save controls remain unmounted after F2.}
+    - {step: 24, expectation: Arrow Right activates and focuses Stock.}
+    - {step: 27, expectation: Home activates and focuses Orders.}
+    - {step: 28, expectation: C2 selection is restored.}
+    results: [17, 19, 21, 24, 27, 28]
+  - id: preview-appearance
+    ui_standard: [UI-FND-03a, UI-FND-13]
+    requirement: The read-only state follows the current theme and font size.
+    actions: [7, 31, 35, 36]
+    checkpoints:
+    - {step: 29, expectation: The status uses the 10 px setting.}
+    - {step: 30, expectation: The status meets contrast in light mode.}
+    - {step: 37, expectation: The status uses the 18 px setting.}
+    - {step: 38, expectation: The status meets contrast in dark mode.}
+    results: [29, 30, 37, 38]
+  - id: alternate-workbooks
+    requirement: XLSB and ODS open through the same grid after closing the first document and recovering from a damaged workbook.
+    actions: [42, 47, 49, 51, 53]
+    checkpoints:
+    - {step: 43, expectation: XLSB displays the source numeric cell.}
+    - {step: 48, expectation: The damaged workbook has a visible error.}
+    - {step: 52, expectation: ODS displays the cached result.}
+    - {step: 54, expectation: The formula bar displays the ODS formula.}
+    results: [43, 48, 52, 54]
+  visual:
+  - {check: Read-only status contrast and font size, method: automated, reason: Computed text styles are checked in both themes.}
+  native:
+  - {check: Real workbook decoding, method: external, reason: TC-TAOFFICE-050 uses the signed host and reads disk files.}

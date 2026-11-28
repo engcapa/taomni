@@ -17286,6 +17286,9 @@ controls:
   - id: taoffice-excel-error
     selector: '[data-testid="taoffice-excel-error"]'
     kind: display
+  - id: taoffice-excel-readonly
+    selector: '[data-testid="taoffice-excel-readonly"]'
+    kind: display
   - id: taoffice-excel-edit-cell
     selector: '[data-testid="taoffice-excel-edit-cell"]'
     kind: interactive

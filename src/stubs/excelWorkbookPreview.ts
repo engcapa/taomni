@@ -2,16 +2,18 @@ const FIXTURE_KEY = "taomni.preview.taoffice-excel.workbook.v1";
 
 interface Cell { row: number; column: number; value: string; formula?: string }
 interface Sheet { rows: number; columns: number; cells: Cell[] }
-interface Fixture { hash: string; sheets: Record<string, Sheet> }
+type LegacyFormat = "xls" | "xlsb" | "ods";
+interface Fixture { hash: string; format?: LegacyFormat; sheets: Record<string, Sheet> }
 interface Edit { sheet: string; address: string; value: string }
-interface Transfer { bytes: Uint8Array; offset: number; sheets?: Fixture["sheets"] }
+interface Transfer { bytes: Uint8Array; offset: number; format?: LegacyFormat; sheets?: Fixture["sheets"] }
 
 const transfers = new Map<string, Transfer>();
 
 /** Serve the browser fixture's cell model only after the renderer transfers the actual fixture bytes. */
 export async function invokeExcelPreview(command: string, payload: unknown) {
-  const { id, size, offset, data, sheet, row, column, edits = [] } = payload as {
-    id: string; size: number; offset: number; data: string; sheet: string; row: number; column: number; edits?: Edit[];
+  const { id, size, offset, data, sheet, row, column, format, edits = [] } = payload as {
+    id: string; size: number; offset: number; data: string; sheet: string; row: number; column: number;
+    format?: LegacyFormat; edits?: Edit[];
   };
   if (command === "workbook/close") {
     transfers.delete(id);
@@ -19,7 +21,7 @@ export async function invokeExcelPreview(command: string, payload: unknown) {
   }
   if (command === "workbook/begin") {
     if (!Number.isSafeInteger(size) || size <= 0 || size > 16 * 1024 * 1024) throw new Error("Invalid workbook size");
-    transfers.set(id, { bytes: new Uint8Array(size), offset: 0 });
+    transfers.set(id, { bytes: new Uint8Array(size), offset: 0, format });
     return null;
   }
   const transfer = transfers.get(id);
@@ -33,10 +35,11 @@ export async function invokeExcelPreview(command: string, payload: unknown) {
       return null;
     }
     case "workbook/open": {
-      const fixture = JSON.parse(localStorage.getItem(FIXTURE_KEY) ?? "null") as Fixture | null;
+      const stored = JSON.parse(localStorage.getItem(FIXTURE_KEY) ?? "null") as Fixture | Fixture[] | null;
       const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(transfer.bytes)));
       const hash = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
-      if (!fixture || transfer.offset !== transfer.bytes.length || fixture.hash !== hash) {
+      const fixture = [stored].flat().find((entry) => entry?.hash === hash && entry.format === transfer.format);
+      if (!fixture || transfer.offset !== transfer.bytes.length) {
         throw new Error("The browser fixture could not open this workbook");
       }
       transfer.sheets = fixture.sheets;
@@ -48,6 +51,7 @@ export async function invokeExcelPreview(command: string, payload: unknown) {
       const cells = current.cells.filter((cell) => cell.row >= row && cell.row < row + 32 &&
         cell.column >= column && cell.column < column + 12);
       if (!edits.length) return { ...current, cells };
+      if (transfer.format) throw new Error("This workbook format is read-only");
       // Browser fixtures model the two sample workbooks. The desktop module runs IronCalc.
       const quantity = (index: number) => Number(edits.find((edit) => edit.sheet === "Totals" &&
         edit.address === "B" + (index + 1))?.value ??

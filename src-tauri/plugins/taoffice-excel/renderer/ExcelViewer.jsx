@@ -1,4 +1,4 @@
-import { openWorkbook, ROWS, COLUMNS } from "./workbook.js";
+import { legacyWorkbookFormat, openWorkbook, ROWS, COLUMNS } from "./workbook.js";
 import { Worksheet } from "./Worksheet.jsx";
 import { useWorkbookEdits } from "./useWorkbookEdits.js";
 import styles from "./workbook.css?inline";
@@ -110,6 +110,9 @@ export default function ExcelViewer({ document: source, active, api }) {
         {label("用系统应用打开", "Open in system app")}
       </button>
     </div> : <>
+      {book && legacyWorkbookFormat(source.extension) && <p className="taoffice-excel-feedback" data-testid="taoffice-excel-readonly">
+        {label("只读预览", "Read-only preview")}
+      </p>}
       {book && <div className="taoffice-excel-sheets" role="tablist" aria-label={label("工作表", "Worksheets")}>
         {book.sheets.map((name, index) => <button key={name} id={`${prefix}-sheet-${index}`}
           ref={(node) => { sheetButtons.current[index] = node; }} role="tab" type="button" className="taomni-section-tab"

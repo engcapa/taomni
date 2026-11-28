@@ -1,0 +1,92 @@
+id: TC-TAOFFICE-050
+title: Open real XLS, XLSB and ODS files with the signed Excel module
+description: Install the current signed module, read worksheet windows and cached formulas from disk, and verify that malformed files leave the same host usable.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, crash-regression, file-open, taoffice, taoffice-excel, native-boundary]
+fixtures: [reset_db, file_open_files, taoffice_signed_excel]
+ui_standard: [UI-TAB-02]
+timeout_sec: 280
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.excel_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.excel_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 60}
+- press: {selector: '[data-testid="module-action-enable-taoffice-excel"]:enabled', key: Enter}
+- wait_for: {selector: '[data-testid="module-action-disable-taoffice-excel"]', timeout_sec: 60}
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-orders.xls"]'
+- assert_text: {selector: '[data-testid="taoffice-excel-readonly"]', contains: Read-only preview}
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-cell"][data-address="C2"]', equals: '21'}
+- click: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
+- assert_attribute: {selector: '[data-testid="taoffice-excel-formula"]', name: value, equals: '=B2*3'}
+- assert_count: {selector: '[data-testid="taoffice-excel-sheet"]', equal: 2}
+- press: {selector: '[data-testid="taoffice-excel-sheet"][aria-selected="true"]', key: ArrowRight}
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-sheet"][aria-selected="true"]:focus', equals: Stock}
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-cell"][data-address="A2"]', equals: 上海}
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', equals: 'TRUE'}
+- press: {selector: '[data-testid="taoffice-excel-sheet"][aria-selected="true"]', key: Home}
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-cell-address"]', equals: C2}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-orders.xls', sha256: '${fixture.taoffice_xls_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-orders.xlsb"]'
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', equals: '7'}
+- assert_attribute: {selector: '[data-testid="taoffice-excel-grid"]', name: aria-readonly, equals: 'true'}
+- press: {selector: '[data-testid="taoffice-excel-cell"][data-address="B2"]', key: Control+End, macos_key: Meta+End}
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-cell"][data-address="M35"]', equals: Far corner}
+- assert_count: {selector: '[data-testid="taoffice-excel-save-copy"]', equal: 0}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-orders.xlsb', sha256: '${fixture.taoffice_xlsb_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="broken-legacy.xlsb"]'
+- assert_text: {selector: '[data-testid="taoffice-excel-error"]', contains: 'Check the file format, encryption or damage.'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-orders.ods"]'
+- assert_text_equals: {selector: '[data-testid="taoffice-excel-cell"][data-address="C2"]', equals: '21'}
+- click: '[data-testid="taoffice-excel-cell"][data-address="C2"]'
+- assert_attribute: {selector: '[data-testid="taoffice-excel-formula"]', name: value, equals: '=[.B2]*3'}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-orders.ods', sha256: '${fixture.taoffice_ods_sha}'}
+- screenshot: legacy-worksheet-native.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: legacy-sheets
+    ui_standard: [UI-TAB-02]
+    requirement: The signed host reads the numeric result and original XLS formula, then supports keyboard sheet selection and restoring the current cell.
+    actions: [10, 17, 20, 23, 27]
+    checkpoints:
+    - {step: 19, expectation: The real XLS displays its cached amount.}
+    - {step: 21, expectation: The formula bar shows the original XLS formula.}
+    - {step: 22, expectation: The hidden worksheet is excluded.}
+    - {step: 24, expectation: Arrow Right selects and focuses Stock.}
+    - {step: 25, expectation: The selected sheet exposes its Unicode cell.}
+    - {step: 28, expectation: The Orders selection returns to C2.}
+    results: [19, 21, 22, 24, 25, 28]
+  - id: legacy-window-recovery
+    requirement: The read-only XLSB window can reach the last worksheet cell and a parse error lets the user reopen another format.
+    actions: [32, 35, 41, 43, 45, 47]
+    checkpoints:
+    - {step: 34, expectation: The XLSB grid is read-only.}
+    - {step: 36, expectation: The distant cell is visible with its stored text.}
+    - {step: 37, expectation: A save action never mounts for the XLSB file.}
+    - {step: 42, expectation: The error gives a reason to check the damaged file.}
+    - {step: 46, expectation: The host reads the ODS cached formula value after the error.}
+    - {step: 48, expectation: The ODS formula is visible in the formula bar.}
+    - {step: 49, expectation: The ODS digest matches the original.}
+    results: [34, 36, 37, 42, 46, 48, 49]
+  visual:
+  - {check: Legacy workbook surface, method: manual, reason: The case saves a screenshot of the native worksheet and formula bar.}
+  native:
+  - {check: Signed package and original file bytes, method: automated, reason: The desktop installs the signed host and reads each fixture directly from disk.}

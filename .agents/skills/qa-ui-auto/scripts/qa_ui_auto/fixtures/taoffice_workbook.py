@@ -38,3 +38,33 @@ def fixtures(assets, values, forecast=False):
         "hash": digest, "sheets": {"Totals": sheet(35, 13, totals), "Inventory": sheet(2, 5 if forecast else 3, inventory)},
     }, ensure_ascii=False)
     return {name: data, "broken.xlsx": b"This is not an Excel workbook."}
+
+
+def legacy_fixtures(assets, values):
+    files = {"broken-legacy.xlsb": b"This file is not an XLSB workbook."}
+    models = []
+    for format in ("xls", "xlsb", "ods"):
+        name = f"legacy-orders.{format}"
+        data = (assets / name).read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        files[name] = data
+        values[f"taoffice_{format}_sha"] = digest
+        orders = [
+            (0, 0, "Item"), (0, 1, "Units"), (0, 2, "Amount"),
+            (1, 0, "Pencils"), (1, 1, "7"), (1, 2, "21"),
+            (2, 0, "Notebook"), (2, 1, "5"), (2, 2, "15"), (34, 12, "Far corner"),
+        ]
+        sheets = {
+            "Orders": {"rows": 35, "columns": 13, "cells": [
+                {"row": row, "column": column, "value": value} for row, column, value in orders
+            ]},
+            "Stock": {"rows": 2, "columns": 2, "cells": [
+                {"row": row, "column": column, "value": value}
+                for row, column, value in ((0, 0, "Warehouse"), (0, 1, "In stock"), (1, 0, "上海"), (1, 1, "TRUE"))
+            ]},
+        }
+        if format != "xlsb":
+            sheets["Orders"]["cells"][5]["formula"] = "B2*3" if format == "xls" else "[.B2]*3"
+        models.append({"hash": digest, "format": format, "sheets": sheets})
+    values["taoffice_workbook_model"] = json.dumps(models, ensure_ascii=False)
+    return files

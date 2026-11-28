@@ -1568,6 +1568,7 @@
 - `[data-testid="taoffice-excel-cell-address"]` — display — F-FILEOPEN-1.taoffice-excel-cell-address
 - `[data-testid="taoffice-excel-formula"]` — display — F-FILEOPEN-1.taoffice-excel-formula
 - `[data-testid="taoffice-excel-error"]` — display — F-FILEOPEN-1.taoffice-excel-error
+- `[data-testid="taoffice-excel-readonly"]` — display — F-FILEOPEN-1.taoffice-excel-readonly
 - `[data-testid="taoffice-excel-edit-cell"]` — interactive — F-FILEOPEN-1.taoffice-excel-edit-cell
 - `[data-testid="taoffice-excel-input"]` — interactive — F-FILEOPEN-1.taoffice-excel-input
 - `[data-testid="taoffice-excel-input-error"]` — display — F-FILEOPEN-1.taoffice-excel-input-error

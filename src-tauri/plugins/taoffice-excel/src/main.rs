@@ -1,6 +1,7 @@
 use std::{io, sync::Arc, time::Duration};
 use taomni_plugin_sdk::{HostConfig, serve_stdio_with};
 
+mod legacy_workbook;
 mod sessions;
 mod workbook;
 mod workbook_copy;

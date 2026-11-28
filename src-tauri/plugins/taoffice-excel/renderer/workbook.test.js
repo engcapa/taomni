@@ -26,4 +26,14 @@ describe("Excel workbook renderer", () => {
     expect(api.invoke.mock.calls[1][1]).toMatchObject({ id: "id", offset: 0 });
     expect(api.invoke.mock.calls[1][1].data).toHaveLength(1024 * 1024);
   });
+
+  it.each(["XLS", "xlsb", "ods", "xlsx", "xlsm"])("sends the format only for a legacy %s transfer", async (extension) => {
+    const api = { invoke: vi.fn(async () => ({ sheets: ["Orders"] })) };
+    const source = { extension, read: async () => new Blob(["workbook"]) };
+    const signal = new AbortController().signal;
+    await expect(openWorkbook(api, source, "id", signal)).resolves.toEqual({ sheets: ["Orders"] });
+    const format = extension.length < 4 || extension === "xlsb" ? { format: extension.toLowerCase() } : {};
+    expect(api.invoke.mock.calls[0]).toEqual(["workbook/begin", { id: "id", size: 8, ...format }, { signal }]);
+    expect(api.invoke.mock.calls.at(-1)).toEqual(["workbook/open", { id: "id" }, { signal }]);
+  });
 });
