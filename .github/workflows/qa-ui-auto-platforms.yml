@@ -1,52 +1,112 @@
 name: QA UI Auto Platforms
-on:
-  workflow_dispatch:
+'on':
+  workflow_dispatch: {}
 permissions:
   contents: read
+  actions: read
 jobs:
-  system-index:
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [windows-2025, macos-15]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 14
+  windows-index-probe:
+    runs-on: windows-2025
+    timeout-minutes: 65
+    env:
+      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+      PYTHONUTF8: '1'
+      CARGO_TERM_COLOR: never
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Provision and independently query Windows Search
-        if: runner.os == 'Windows'
-        shell: powershell
-        run: |
-          & ./.github/index-probe/prepare.ps1
-          $value = Get-Content probe-results/control.json -Raw | ConvertFrom-Json
-          Add-Content $env:GITHUB_ENV "TAOMNI_FILE_SEARCH_INDEXED_CONTROL=$($value.path)"
-      - name: Independently query Spotlight
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          mkdir -p probe-results
-          /usr/bin/mdfind -0 'kMDItemFSName == "Calculator.app"' > probe-results/spotlight-control.nul
-          python3 - <<'PY'
-          import os
-          from pathlib import Path
-          path = '/System/Applications/Calculator.app'
-          assert path.encode() in Path('probe-results/spotlight-control.nul').read_bytes().split(bytes([0]))
-          with open(os.environ['GITHUB_ENV'], 'a') as env:
-              env.write(f'TAOMNI_FILE_SEARCH_INDEXED_CONTROL={path}\n')
-          PY
-      - name: Run real system index through production search engine
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo test --locked --manifest-path src-tauri/Cargo.toml -p taomni-file-search 2>&1 | tee probe-results/units.log
-          cargo test --locked --manifest-path src-tauri/Cargo.toml -p taomni-file-search indexed_system_control -- --ignored --nocapture 2>&1 | tee probe-results/production-index.log
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: production-index-${{ runner.os }}
-          path: probe-results
-          retention-days: 14
-          if-no-files-found: warn
+    - name: Checkout pinned production source and candidate testcase
+      uses: actions/checkout@v4
+      with:
+        ref: 25574c0a12728a9f13484033d503fe5d33f16682
+        persist-credentials: false
+    - name: Export diagnostic scripts from the temporary workflow revision
+      uses: actions/checkout@v4
+      with:
+        path: probe-code
+        sparse-checkout: .github/index-probe
+        persist-credentials: false
+    - name: Start Windows Search and confirm an independent indexed control
+      shell: powershell
+      run: '& ./probe-code/.github/index-probe/prepare.ps1'
+    - uses: ./.github/actions/qa-runtime
+      with:
+        mode: native
+        install_node_deps: 'false'
+    - name: Wait for the verified candidate runtime artifact
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: "$wanted = 'runtime-native-build-windows-x64-release-28bbfee00042494ca0effed52d567cd3'\n\
+        $deadline = [DateTime]::UtcNow.AddMinutes(50)\ndo {\n  $artifacts = gh api\
+        \ \"repos/$env:GITHUB_REPOSITORY/actions/runs/46138785693/artifacts\" --paginate\
+        \ --jq '.artifacts[].name'\n  if ($artifacts -contains $wanted) { exit 0 }\n\
+        \  Start-Sleep -Seconds 30\n} while ([DateTime]::UtcNow -lt $deadline)\nthrow\
+        \ 'Candidate workflow did not upload its Windows native runtime'\n"
+    - name: Download candidate selection
+      uses: actions/download-artifact@v4
+      with:
+        name: qa-selection-28bbfee00042494ca0effed52d567cd3
+        run-id: 46138785693
+        github-token: ${{ github.token }}
+        path: probe-input/selection
+    - name: Download verified candidate runtime
+      uses: actions/download-artifact@v4
+      with:
+        name: runtime-native-build-windows-x64-release-28bbfee00042494ca0effed52d567cd3
+        run-id: 46138785693
+        github-token: ${{ github.token }}
+        path: probe-input/runtime
+    - name: Install matching system WebView2 driver
+      shell: pwsh
+      run: '$ErrorActionPreference = ''Stop''
+
+        $runtimeRoot = "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application"
+
+        $runtime = Get-ChildItem -LiteralPath $runtimeRoot -Directory | Where-Object
+        Name -Match ''^\d+\.\d+\.\d+\.\d+$'' | Sort-Object { [version]$_.Name } -Descending
+        | Select-Object -First 1
+
+        if (-not $runtime) { throw ''WebView2 runtime unavailable'' }
+
+        $zip = Join-Path $env:RUNNER_TEMP ''qa-edgedriver.zip''
+
+        $driver = Join-Path $env:RUNNER_TEMP ''qa-edgedriver''
+
+        Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip"
+        -OutFile $zip
+
+        Expand-Archive -LiteralPath $zip -DestinationPath $driver -Force
+
+        $driver >> $env:GITHUB_PATH
+
+        '
+    - uses: actions/cache/restore@v4
+      with:
+        path: ~/.cache/taomni-qa/adapter
+        key: qa-tauri-driver-2.0.4-Windows-X64-windows-2025
+    - name: Prepare native adapter
+      shell: bash
+      run: 'adapter="$HOME/.cache/taomni-qa/adapter"
+
+        if ! "$adapter/bin/tauri-driver" --help; then cargo install tauri-driver --version
+        2.0.4 --locked --root "$adapter"; fi
+
+        cygpath -w "$adapter/bin" >> "$GITHUB_PATH"'
+    - name: Run candidate native application and require Windows Search provider
+      shell: pwsh
+      run: python probe-code/.github/index-probe/native.py
+    - name: Publish service state, independent control and native receipt
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-index-native-positive
+        path: 'probe-results/
+
+          !probe-results/**/native-appdata/**
+
+          !probe-results/**/native-appconfig/**
+
+          !probe-results/**/native-appcache/**
+
+          !probe-results/**/platform-workspaces/**'
+        retention-days: 14
+        if-no-files-found: error
