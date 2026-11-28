@@ -16910,6 +16910,7 @@ files:
   - src-tauri/plugins/taoffice-ppt/renderer/**
   - src-tauri/plugins/taoffice-visio/renderer/**
   - src-tauri/plugins/taoffice-image/renderer/**
+  - src-tauri/plugins/taoffice-image/heif-wasm/src/**
   - src-tauri/src/viewer/document_copy.rs
   - src/lib/openFile/mediaStream.ts
   - src-tauri/plugins/taoffice-pdf/renderer/PdfViewer.jsx

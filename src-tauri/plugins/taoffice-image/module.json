@@ -3,7 +3,7 @@
   "slug": "taoffice-image",
   "name": "TaOffice Image",
   "description": "View read-only previews of HEIC photos, Photoshop files and camera RAW images.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "coreApiVersion": "1",
   "kind": "media",
   "status": "provisional",

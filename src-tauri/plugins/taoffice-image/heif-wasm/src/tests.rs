@@ -57,6 +57,15 @@ fn composites_the_10_bit_heif_grid_with_colors_matching_apple_sips() {
 }
 
 #[test]
+fn rejects_an_unrelated_file_renamed_to_heic_as_a_format_error() {
+    // The first four ASCII bytes also happen to encode a box size above 1 GiB.
+    assert_eq!(
+        decode_thumbnail(b"This is not a HEIC image.").unwrap_err(),
+        PreviewError::Format
+    );
+}
+
+#[test]
 fn malformed_input_has_a_format_error_and_large_dimensions_have_a_limit_error() {
     assert_eq!(
         decode_thumbnail(&QUADRANTS[..64]).unwrap_err(),

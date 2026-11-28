@@ -22,7 +22,9 @@ enum PreviewError {
 impl From<Error> for PreviewError {
     fn from(error: Error) -> Self {
         match error {
-            Error::PixelLimit { .. } | Error::BoxTooLarge { .. } => Self::Limits,
+            Error::PixelLimit { .. } => Self::Limits,
+            // The worker accepts at most 32 MiB. A box declaring more than the
+            // parser's 1 GiB ceiling cannot fit in any input we accept.
             _ => Self::Format,
         }
     }

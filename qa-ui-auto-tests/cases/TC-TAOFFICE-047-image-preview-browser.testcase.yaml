@@ -88,10 +88,24 @@ steps:
       document.querySelector('.taoffice-image-canvas').dataset.fit === "true"
     timeout_sec: 10
 - screenshot: image-preview-browser.png
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="image-damaged.heic"]'
+- assert_text: {selector: '[data-testid="taoffice-image-error"]', contains: Could not decode this HEIC photo., timeout_sec: 45}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="image-oversized.heic"]'
+- assert_text: {selector: '[data-testid="taoffice-image-error"]', contains: This HEIC photo exceeds the preview limits., timeout_sec: 45}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
+  - id: heic-failure-cause
+    ui_standard: [UI-FBK-03]
+    requirement: Opening a corrupt HEIC explains the decode failure and an image with an oversized dimension reports the preview limit.
+    actions: [69, 72]
+    checkpoints:
+    - {step: 70, expectation: The damaged photo reports the decode error.}
+    - {step: 73, expectation: The 9000-pixel photo reports the preview limit.}
+    results: [70, 73]
   - id: image-recovery
     ui_standard: [UI-BTN-04, UI-FBK-03, UI-KEY-06]
     requirement: Keyboard activation copies the RAW preview error, reports an unavailable system app and retries the original file.

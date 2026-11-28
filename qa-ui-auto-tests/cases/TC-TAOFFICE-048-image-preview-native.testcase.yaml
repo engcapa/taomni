@@ -30,7 +30,7 @@ steps:
 - assert_text: {selector: '[data-testid="taoffice-image-viewer"] [role="status"]', contains: Error details copied.}
 - host_clipboard: {action: assert, kind: text, contains: Could not decode this HEIC photo.}
 - press: {selector: '[data-testid="taoffice-image-retry"]', key: Enter}
-- wait_for: {selector: '[data-testid="taoffice-image-viewer"][aria-busy="false"] [data-testid="taoffice-image-error"]', timeout_sec: 45}
+- assert_text: {selector: '[data-testid="taoffice-image-viewer"][aria-busy="false"] [data-testid="taoffice-image-error"]', contains: Could not decode this HEIC photo., timeout_sec: 45}
 - assert_count: {selector: '[data-testid="taoffice-image-thumbnail"]', equal: 0}
 - assert_visible: '[data-testid="taoffice-image-open-system"]'
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
@@ -81,14 +81,17 @@ steps:
       document.querySelector('.taoffice-image-canvas').dataset.fit === "true"
     timeout_sec: 10
 - screenshot: image-preview-native.png
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="image-oversized.heic"]'
+- assert_text: {selector: '[data-testid="taoffice-image-error"]', contains: This HEIC photo exceeds the preview limits., timeout_sec: 45}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: native-image-failure
     ui_standard: [UI-FBK-03, UI-KEY-06]
-    requirement: A damaged HEIC can copy its error to the desktop clipboard and reports a repeat failure after a keyboard retry.
-    actions: [17, 19, 22]
+    requirement: A damaged HEIC can copy its decode error to the desktop clipboard and reports it again on retry. An oversized HEIC reports the preview limit.
+    actions: [17, 19, 22, 64]
     checkpoints:
     - {step: 18, expectation: The damaged image reaches the decoder error state.}
     - {step: 20, expectation: Copying reports success next to the error.}
@@ -96,7 +99,8 @@ verification:
     - {step: 23, expectation: Retry finishes and again reports the decode error.}
     - {step: 24, expectation: The damaged file has no rendered thumbnail.}
     - {step: 25, expectation: Opening the original with a system app remains available.}
-    results: [18, 20, 21, 23, 24, 25]
+    - {step: 65, expectation: Opening a 9000-pixel photo reaches the size limit error.}
+    results: [18, 20, 21, 23, 24, 25, 65]
   - id: native-image-reads
     ui_standard: [UI-SEL-01]
     requirement: The installed module decodes local files with the expected dimensions and exposes read-only zoom through a native select.

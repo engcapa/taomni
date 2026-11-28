@@ -208,6 +208,10 @@ def setup(ctx: Any) -> None:
             files[name] = data
             ctx.values[f"taoffice_image_{key}_sha"] = hashlib.sha256(data).hexdigest()
         files["image-damaged.heic"] = b"This is not a HEIC image."
+        oversized = bytearray(files["heif-quadrants.heic"])
+        width_offset = oversized.index(b"ispe") + 8
+        oversized[width_offset:width_offset + 4] = (9000).to_bytes(4, "big")
+        files["image-oversized.heic"] = bytes(oversized)
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative
