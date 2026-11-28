@@ -34,7 +34,7 @@ export function saveModuleDocumentCopy(
     return invoke("viewer_document_save_copy", { path, slug, version, bytes: Array.from(bytes), outputExtension });
   }
   const filename = name.replace(/\.([^.]+)$/, (_suffix, extension: string) => {
-    const defaultExtension = slug === "taoffice-project" && extension.toLowerCase() === "mpp" ? "xml" : extension;
+    const defaultExtension = slug === "taoffice-project" && ["mpp", "mpx"].includes(extension.toLowerCase()) ? "xml" : extension;
     return ` - copy.${outputExtension ?? defaultExtension}`;
   });
   const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/octet-stream" }));

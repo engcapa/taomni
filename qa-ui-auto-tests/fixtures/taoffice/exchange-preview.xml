@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns="http://schemas.microsoft.com/project">
+  <Name>sample98</Name>
+  <ScheduleFromStart>1</ScheduleFromStart>
+  <StartDate>2003-01-07T00:00:00</StartDate>
+  <FinishDate>2003-03-18T00:00:00</FinishDate>
+  <Tasks>
+    <Task>
+      <UID>11</UID>
+      <ID>10</ID>
+      <Name>Related Task 2a</Name>
+      <OutlineLevel>2</OutlineLevel>
+      <Start>2003-01-07T00:00:00</Start>
+      <Finish>2003-01-07T00:00:00</Finish>
+      <Duration>PT8H0M0S</Duration>
+    </Task>
+    <Task>
+      <UID>12</UID>
+      <ID>11</ID>
+      <Name>Related Task 2b</Name>
+      <OutlineLevel>2</OutlineLevel>
+      <Start>2003-01-09T00:00:00</Start>
+      <Finish>2003-01-09T00:00:00</Finish>
+      <Duration>PT8H0M0S</Duration>
+      <PredecessorLink>
+        <PredecessorUID>11</PredecessorUID>
+        <Type>1</Type>
+        <LinkLag>4800</LinkLag>
+        <LagFormat>3</LagFormat>
+      </PredecessorLink>
+    </Task>
+  </Tasks>
+</Project>

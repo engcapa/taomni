@@ -34,7 +34,11 @@ fn extension<'a>(
     }
     let extension = source.extension().ok_or("Missing document extension")?;
     Ok(
-        if slug == "taoffice-project" && extension.eq_ignore_ascii_case("mpp") {
+        if slug == "taoffice-project"
+            && ["mpp", "mpx"]
+                .iter()
+                .any(|ext| extension.eq_ignore_ascii_case(ext))
+        {
             OsStr::new("xml")
         } else {
             extension
@@ -203,6 +207,10 @@ mod tests {
         let source = root.path().join("plan.MPP");
         let valid = root.path().join("plan - copy.xml");
         let invalid = root.path().join("other.mpp");
+        assert_eq!(
+            suggested_name(&root.path().join("plan.MPX"), "taoffice-project", None).unwrap(),
+            "plan - copy.xml"
+        );
         fs::write(&source, b"original").unwrap();
         let slug = "taoffice-project";
         assert_eq!(

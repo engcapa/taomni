@@ -16917,6 +16917,7 @@ files:
   - src-tauri/plugins/taoffice-pdf/renderer/PdfPassword.jsx
   - src-tauri/plugins/taoffice-word/renderer/WordViewer.jsx
   - src-tauri/plugins/taoffice-project/renderer/ProjectViewer.jsx
+  - src-tauri/plugins/taoffice-project/src/import/**
   - src/lib/openFile/documentProvider.ts
   - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts

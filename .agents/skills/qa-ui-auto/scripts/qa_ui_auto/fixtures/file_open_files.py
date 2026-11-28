@@ -152,6 +152,16 @@ def setup(ctx: Any) -> None:
             ctx.values["taoffice_mpp_preview"] = json.dumps({
                 "hash": digest, "xml": (TAOFFICE_ASSETS / "linked-tasks-preview.xml").read_text(encoding="utf-8"),
             })
+    if ctx.case_id in {"TC-TAOFFICE-055", "TC-TAOFFICE-056"}:
+        data = (TAOFFICE_ASSETS / "exchange-de.mpx").read_bytes()
+        files["exchange-de.mpx"] = data
+        files["damaged.mpx"] = b"MPX"
+        ctx.values["taoffice_mpx_sha"] = hashlib.sha256(data).hexdigest()
+        if not native:
+            ctx.values["taoffice_mpx_preview"] = json.dumps({
+                "hash": ctx.values["taoffice_mpx_sha"],
+                "xml": (TAOFFICE_ASSETS / "exchange-preview.xml").read_text(encoding="utf-8"),
+            })
     if ctx.case_id in {"TC-TAOFFICE-031", "TC-TAOFFICE-032"}:
         data = (TAOFFICE_ASSETS / "rollout-compatible.mkv").read_bytes()
         files["rollout-compatible.mkv"] = data

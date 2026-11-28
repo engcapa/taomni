@@ -14,7 +14,7 @@ export async function readProject(api, source, signal) {
   const file = await source.read();
   signal.throwIfAborted();
   if (file.size > MAX_PROJECT_BYTES) throw new Error("Project preview is limited to 8 MiB.");
-  if (source.extension !== "mpp") return new Uint8Array(await file.arrayBuffer());
+  if (!["mpp", "mpx"].includes(source.extension)) return new Uint8Array(await file.arrayBuffer());
 
   const id = crypto.randomUUID();
   const options = { signal };

@@ -168,7 +168,7 @@ function ProjectSchedule({ source, project: original, model: originalModel, mode
       {source.saveCopy && <button type="button" className="taomni-btn" data-variant="primary"
         data-testid="taoffice-project-save" disabled={!draft.dirty || draft.saving}
         aria-busy={draft.saving} onClick={save}>{draft.saving ? label("正在保存…", "Saving…")
-          : source.extension === "mpp" ? label("保存 XML 副本", "Save XML copy") : label("保存副本", "Save a copy")}</button>}
+          : ["mpp", "mpx"].includes(source.extension) ? label("保存 XML 副本", "Save XML copy") : label("保存副本", "Save a copy")}</button>}
     </div>
     {draft.output && <p role="status" data-testid="taoffice-project-output">{draft.output}</p>}
     {draft.error && <p role="alert">{draft.error}</p>}
