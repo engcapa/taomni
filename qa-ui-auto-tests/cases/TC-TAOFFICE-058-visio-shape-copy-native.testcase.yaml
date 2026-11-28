@@ -1,0 +1,107 @@
+id: TC-TAOFFICE-058
+title: Save and reopen a signed Visio shape copy through the native dialog
+description: Edit a selected VSDX shape, verify draft and focus behavior, save a copy and keep the source intact.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, file-open, taoffice, taoffice-visio, native-boundary]
+fixtures: [reset_db, file_open_files, taoffice_signed_visio]
+ui_standard: [UI-BTN-03, UI-DLG-12, UI-FOC-02]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.visio_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.visio_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-taoffice-visio"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-taoffice-visio"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="visio-routing.vsdx"]'
+- wait_for: {selector: '[data-testid="taoffice-visio-page"][data-page="1"][data-rendered="true"]', timeout_sec: 55}
+- assert_disabled: '[data-testid="taoffice-visio-save-copy"]'
+- press: {selector: '[data-testid="taoffice-visio-next"]', key: Enter}
+- wait_for: '[data-testid="taoffice-visio-page"][data-page="2"][data-rendered="true"]'
+- press: {selector: '[data-testid="taoffice-visio-edit-shapes"]', key: Enter}
+- assert_focus_on: '[data-testid="taoffice-visio-shape"]'
+- select_option: {selector: '[data-testid="taoffice-visio-shape"]', value: '3'}
+- eval_readonly:
+    expression: >-
+      document.querySelector('.taoffice-visio-fields textarea')?.value === "Delivery"
+    expect_truthy: true
+- fill: {selector: '[data-testid="taoffice-visio-shape-text"]', value: Release confirmed}
+- fill: {selector: '[data-testid="taoffice-visio-shape-position"][data-field="PinX"]', value: '4.25'}
+- press: {selector: '[data-testid="taoffice-visio-shape-text"]', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-visio-edit-shapes"]'
+- assert_enabled: '[data-testid="taoffice-visio-save-copy"]'
+- native_file_dialog:
+    kind: save
+    action: cancel
+    trigger: '[data-testid="taoffice-visio-save-copy"]'
+- assert_enabled: '[data-testid="taoffice-visio-save-copy"]'
+- assert_visible: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/revised.vsdx', absent: true}
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.file_open_root}/revised.vsdx
+    trigger: '[data-testid="taoffice-visio-save-copy"]'
+- assert_text: {selector: '[data-testid="taoffice-visio-copy-output"]', contains: revised.vsdx}
+- assert_disabled: '[data-testid="taoffice-visio-save-copy"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/visio-routing.vsdx', sha256: '${fixture.taoffice_visio_modern_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+
+- wait_for: '[data-testid="explorer-file-row"][data-name="revised.vsdx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="revised.vsdx"]'
+- wait_for: {selector: '[data-testid="taoffice-visio-page"][data-page="1"][data-rendered="true"]', timeout_sec: 55}
+- click: '[data-testid="taoffice-visio-next"]'
+- wait_for: '[data-testid="taoffice-visio-page"][data-page="2"][data-rendered="true"]'
+- click: '[data-testid="taoffice-visio-edit-shapes"]'
+- select_option: {selector: '[data-testid="taoffice-visio-shape"]', value: '3'}
+- eval_readonly:
+    expression: >-
+      document.querySelector('.taoffice-visio-fields textarea')?.value === "Release confirmed"
+    expect_truthy: true
+- eval_readonly:
+    expression: >-
+      document.querySelector('.taoffice-visio-fields input')?.value === "4.25"
+    expect_truthy: true
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-FOC-02]
+    requirement: Pressing Enter opens the shape list and Escape returns focus to the edit control.
+    actions: [22, 28]
+    checkpoints:
+    - {step: 23, expectation: The shape selector receives focus.}
+    - {step: 29, expectation: Focus returns to Edit shapes.}
+    results: [23, 29]
+  - id: R2
+    ui_standard: [UI-BTN-03, UI-DLG-12]
+    requirement: Cancellation retains the draft and selecting a destination saves the independently reopenable copy.
+    actions: [31, 35]
+    checkpoints:
+    - {step: 33, expectation: The tab remains dirty.}
+    - {step: 34, expectation: Cancelling produces no file.}
+    - {step: 38, expectation: The source hash remains intact.}
+    - {step: 52, expectation: The edited text reopens.}
+    - {step: 53, expectation: The edited position reopens.}
+    results: [33, 34, 38, 52, 53]
+  visual:
+  - {check: Shape editor and page rendering, method: automated, reason: The test exercises the visible editor and checks the decoded page image.}
+  native:
+  - {check: Native file save and reopen, method: automated, reason: TC-TAOFFICE-058 drives the native chooser and reopens the new file from Explorer.}

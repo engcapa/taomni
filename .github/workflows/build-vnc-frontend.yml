@@ -41,7 +41,7 @@ jobs:
             rdp-server|vnc-server|servers) dependencies=(vite-plugins/serverSettings.ts src/lib/servers) ;;
             taoffice-pdf|taoffice-excel) dependencies=() ;;
             taoffice-image) dependencies=(src-tauri/plugins/taoffice-image/heif-wasm scripts/rust-wasm-notices.py) ;;
-            taoffice-visio) dependencies=(src-tauri/plugins/taoffice-visio/wasm) ;;
+            taoffice-visio) dependencies=(src-tauri/plugins/taoffice-visio/wasm src-tauri/crates/taomni-plugin-api/frontend/documentDraft.js) ;;
             taoffice-video) dependencies=(src-tauri/plugins/taoffice-video/frontend) ;;
             taoffice-word)
               dependencies=(src-tauri/crates/taomni-plugin-api/frontend/documentDraft.js scripts/rust-wasm-notices.py

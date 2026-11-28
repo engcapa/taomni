@@ -25,8 +25,8 @@ export default function VisioViewer({ document: source, active }) {
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
-    openVisio(source, signal).then((pages) => {
-      if (!signal.aborted) setState({ source, retry, pages });
+    openVisio(source, signal).then((result) => {
+      if (!signal.aborted) setState({ source, retry, ...result });
     }).catch((error) => {
       if (!signal.aborted) setState({ source, retry, error: error.message ?? String(error) });
     });
@@ -54,7 +54,7 @@ export default function VisioViewer({ document: source, active }) {
             {openSystem}
           </div>
         </div>
-        : <VisioPages pages={state.pages} source={source} active={active} label={label} openSystem={openSystem} />}
+        : <VisioPages initialPages={state.pages} diagram={state.diagram} source={source} active={active} label={label} openSystem={openSystem} />}
     {systemError && <p className="taoffice-visio-status" role="alert">
       {label("系统应用打开失败。请检查文件关联。", "Could not open the system app. Check the file association.")} {systemError}
     </p>}

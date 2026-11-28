@@ -2,12 +2,41 @@ import { Button } from "../../../crates/taomni-plugin-api/frontend/ui/Button";
 import { usePendingAction } from "../../../crates/taomni-plugin-api/frontend/ui/usePendingAction";
 import { composing, VisioFind } from "./VisioFind.jsx";
 
+import { VisioShapes } from "./VisioShapes.jsx";
+import { decodeVisio } from "./visioDocument.js";
+import { saveVisioCopy } from "./visioPackage.js";
+
 const { React, formatShortcutDisplay } = globalThis.__taomniHost;
 const { useEffect, useLayoutEffect, useRef, useState } = React;
 const minZoom = 0.25;
 const maxZoom = 4;
 
-export function VisioPages({ pages, source, active, label, openSystem }) {
+export function VisioPages({ initialPages, diagram, source, active, label, openSystem }) {
+  const [previewEdits, setPreviewEdits] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const pages = preview?.pages ?? initialPages;
+  const pending = Boolean(previewEdits?.size) && preview?.edits !== previewEdits;
+  useEffect(() => {
+    if (!previewEdits?.size) {
+      setPreview(null);
+      return;
+    }
+    const controller = new AbortController();
+    async function refresh() {
+      const bytes = saveVisioCopy(diagram, previewEdits);
+      const updated = await decodeVisio(bytes.buffer, false, controller.signal);
+      if (!controller.signal.aborted) setPreview({ edits: previewEdits, pages: updated });
+    }
+    const timeout = setTimeout(() => {
+      void refresh().catch(() => {
+        if (!controller.signal.aborted) setPreview({ edits: previewEdits, error: true });
+      });
+    }, 250);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [diagram, previewEdits]);
   const [pageIndex, setPage] = useState(0);
   const [zoom, setZoom] = useState(null);
   const [fit, setFit] = useState(1);
@@ -78,6 +107,12 @@ export function VisioPages({ pages, source, active, label, openSystem }) {
   }
 
   return <>
+    <VisioShapes diagram={diagram} pageIndex={pageIndex} label={label} source={source}
+      active={active} onPreview={setPreviewEdits} />
+    {pending ? <p className="taoffice-visio-status" role="status">{label("正在更新预览…", "Updating preview…")}</p>
+      : preview?.error && <p className="taoffice-visio-status" role="alert">
+        {label("无法预览编辑后的图形，当前显示原图。", "Could not preview the edits. Showing the original diagram.")}
+      </p>}
     <div className="taoffice-visio-toolbar" role="group" aria-label={label("Visio 工具栏", "Visio controls")}>
       <Button data-testid="taoffice-visio-previous" disabled={pageIndex === 0} onClick={() => setPage(pageIndex - 1)}>
         {label("上一页", "Previous page")}
@@ -100,7 +135,7 @@ export function VisioPages({ pages, source, active, label, openSystem }) {
         data-taomni-tooltip={findShortcut ? `${findName} (${findShortcut})` : findName}
         onClick={(event) => toggleFind(event.currentTarget)}>{findName}</Button>
       {openSystem}
-      {canExport && <Button data-testid="taoffice-visio-export" variant="primary" busy={exportTask.busy}
+      {canExport && <Button data-testid="taoffice-visio-export" variant="primary" disabled={Boolean(pending || preview?.error)} busy={exportTask.busy}
         onClick={() => void exportTask.run()}>{label("导出此页为 SVG…", "Export page as SVG…")}</Button>}
     </div>
     <div ref={canvas}>
@@ -132,6 +167,8 @@ function VisioPage({ page, index, name, scale, label }) {
   const [error, setError] = useState(false);
   useEffect(() => {
     const pageUrl = URL.createObjectURL(new Blob([page.svg], { type: "image/svg+xml" }));
+    setRendered(false);
+    setError(false);
     setUrl(pageUrl);
     return () => URL.revokeObjectURL(pageUrl);
   }, [page]);

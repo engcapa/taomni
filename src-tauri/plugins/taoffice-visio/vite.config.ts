@@ -1,4 +1,4 @@
-import { cpSync } from "node:fs";
+import { appendFileSync, cpSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
@@ -26,6 +26,8 @@ export default defineConfig({
     },
     writeBundle() {
       for (const asset of assets) cpSync(join(wasmBuild, asset), join(outDir, asset));
+      const license = new URL("../../../node_modules/fflate/LICENSE", import.meta.url);
+      appendFileSync(join(outDir, "visio-third-party-notices.txt"), "\nfflate\n" + readFileSync(license, "utf8"));
     },
   }],
   build: {

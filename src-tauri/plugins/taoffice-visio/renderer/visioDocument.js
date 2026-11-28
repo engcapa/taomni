@@ -1,5 +1,6 @@
 import engine from "../wasm/.build/visio.mjs?raw";
 import worker from "./decode.worker.js?raw";
+import { editableVisio } from "./visioPackage.js";
 import { preparePage } from "./visioSvg.js";
 
 const MAX_INPUT = 32 * 1024 * 1024;
@@ -17,9 +18,14 @@ export async function openVisio(source, signal) {
   const document = await source.read();
   if (!document.size) throw new Error("format");
   if (document.size > MAX_INPUT) throw new Error("limits");
-  const [input, wasmBinary, icuData] = await Promise.all([
-    document.arrayBuffer(), asset("visio.wasm", signal), asset("visio-icu.dat", signal),
-  ]);
+  const input = await document.arrayBuffer();
+  const editableInput = source.saveCopy && source.extension === "vsdx" ? new Uint8Array(input.slice(0)) : null;
+  const pages = await decodeVisio(input, stencils.has(source.extension), signal);
+  return { pages, diagram: editableInput && editableVisio(editableInput, pages) };
+}
+
+export async function decodeVisio(input, stencil, signal) {
+  const [wasmBinary, icuData] = await Promise.all([asset("visio.wasm", signal), asset("visio-icu.dat", signal)]);
   if (signal.aborted) throw signal.reason;
   const script = URL.createObjectURL(new Blob([engine, "\n", worker], { type: "text/javascript" }));
   let decoder;
@@ -43,7 +49,7 @@ export async function openVisio(source, signal) {
         finish(reject, new Error("engine"));
       };
       try {
-        decoder.postMessage({ input, wasmBinary, icuData, stencils: stencils.has(source.extension) },
+        decoder.postMessage({ input, wasmBinary, icuData, stencils: stencil },
           [input, wasmBinary, icuData]);
       } catch (error) {
         finish(reject, error);

@@ -78,3 +78,33 @@
 .taoffice-visio-note {
   font-size: var(--taomni-fs-small);
 }
+
+.taoffice-visio-editor {
+  padding: 8px;
+  border-bottom: 1px solid var(--taomni-card-border);
+}
+.taoffice-visio-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 8px;
+  padding-block-start: 8px;
+  max-height: 24vh;
+  overflow: auto;
+}
+.taoffice-visio-fields label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+.taoffice-visio-fields :is(select, input, textarea) {
+  max-width: 100%;
+}
+.taoffice-visio-fields textarea {
+  white-space: pre-wrap;
+  width: 24ch;
+}
+.taoffice-visio-fields input[type="number"] {
+  width: 12ch;
+}

@@ -29,6 +29,10 @@ Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”�
 
 比较时将页面等比放入 480 × 480 白底画布。34 对页面的宽高比相对差均小于 1.5%。用任一颜色通道低于 224 判定有墨迹后，33 对有墨迹的页面中，两个渲染结果的交并比中位数为 0.3821。薄线、文字换行和图形填充可明显影响该数值。抽查中，`color-boxes.vsdx` 的色块位置吻合，`Visio11PlanWithDimensions.vsd` 的文字换行有差异，`dwg.vsdx` 的嵌入对象填充和 `tdf154379-QuickStyleFillMatrix.vsdx` 的主题填充也有差异。Microsoft Visio 的原应用外观仍待对照。 [六份样本并排截图](taoffice-research/visio-libvisio-0.1.12.png)
 
+Visio 0.1.1 的 VSDX 副本支持修改简单形状的纯文本、PinX/PinY 及已有的字面填充色和线色。编辑器按 OPC 页面关系定位目标。带签名或受保护的文档、带公式的单元格、连接与继承的形状保留查看能力。模块通过核心的文档草稿和另存能力处理关闭、取消及权限。编辑结果保存在用户文档中，模块数据 schema 为 1。
+
+Windows Chromium 的 TC-TAOFFICE-057 从资源管理器打开两页图纸，将第二页的形状 3 改为 Release confirmed，PinX 改为 4.25 英寸。下载的 SVG 含新文字，下载的 VSDX 重读得到两项新值。与输入逐部件比对，仅 visio/pages/page2.xml 有变化，另 7 个部件的原始内容逐字节一致。用例同时验证焦点返回、无效坐标禁用保存及输入法组词时的 Escape。TC-TAOFFICE-058 包含签名模块的系统另存取消、重试及从磁盘重开，实机回执由集成验证归档。
+
 ## 图片预览语料
 
 Image 0.1.0 在 Linux Chromium 上打开了 33 份公开输入。15 份 PSD、3 份 HEIC 和 10 份相机 RAW 输出了可独立读取的 PNG。PSD 与 psd-tools 1.27.0 的内嵌预览或合成图、RAW 与 LibRaw 的内嵌缩略图、HEIC 与 libheif 的输出分别缩放至 48 × 48 后比较了 RGB 像素。平均绝对通道差在 0–255 标度上分别为 0、0–0.84 和 0.03–4.96。逐文件记录包含输入、输出摘要和两端尺寸。 [逐文件回执](taoffice-research/image-preview-corpus.csv)

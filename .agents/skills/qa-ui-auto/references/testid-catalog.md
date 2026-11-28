@@ -1522,6 +1522,13 @@
 - `[data-testid="taoffice-ppt-save"]` — interactive — F-FILEOPEN-1.taoffice-ppt-save
 - `[data-testid="taoffice-ppt-save-hint"]` — display — F-FILEOPEN-1.taoffice-ppt-save-hint
 - `[data-testid="taoffice-visio"]` — display — F-FILEOPEN-1.taoffice-visio
+- `[data-testid="taoffice-visio-copy-output"]` — display — F-FILEOPEN-1.taoffice-visio-copy-output
+- `[data-testid="taoffice-visio-edit-shapes"]` — interactive — F-FILEOPEN-1.taoffice-visio-edit-shapes
+- `[data-testid="taoffice-visio-save-copy"]` — interactive — F-FILEOPEN-1.taoffice-visio-save-copy
+- `[data-testid="taoffice-visio-shape"]` — interactive — F-FILEOPEN-1.taoffice-visio-shape
+- `[data-testid="taoffice-visio-shape-color"]` — interactive — F-FILEOPEN-1.taoffice-visio-shape-color
+- `[data-testid="taoffice-visio-shape-position"]` — interactive — F-FILEOPEN-1.taoffice-visio-shape-position
+- `[data-testid="taoffice-visio-shape-text"]` — interactive — F-FILEOPEN-1.taoffice-visio-shape-text
 - `[data-testid="taoffice-visio-error"]` — display — F-FILEOPEN-1.taoffice-visio-error
 - `[data-testid="taoffice-visio-export"]` — interactive — F-FILEOPEN-1.taoffice-visio-export
 - `[data-testid="taoffice-visio-export-error"]` — display — F-FILEOPEN-1.taoffice-visio-export-error

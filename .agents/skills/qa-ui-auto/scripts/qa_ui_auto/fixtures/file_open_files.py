@@ -189,7 +189,7 @@ def setup(ctx: Any) -> None:
         files["ppt-review.pptx"] = data
         files["ppt-damaged.pptx"] = b"This is not a PowerPoint package."
         ctx.values["taoffice_ppt_sha"] = hashlib.sha256(data).hexdigest()
-    if ctx.case_id in {"TC-TAOFFICE-041", "TC-TAOFFICE-042"}:
+    if ctx.case_id in {"TC-TAOFFICE-041", "TC-TAOFFICE-042", "TC-TAOFFICE-057", "TC-TAOFFICE-058"}:
         for name, key in (("visio-routing.vsdx", "modern"), ("visio-legacy.vsd", "legacy")):
             data = (TAOFFICE_ASSETS / name).read_bytes()
             files[name] = data

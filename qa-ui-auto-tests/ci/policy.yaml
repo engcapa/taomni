@@ -42,6 +42,8 @@ smoke:
 - TC-TAOFFICE-040
 - TC-TAOFFICE-041
 - TC-TAOFFICE-042
+- TC-TAOFFICE-057
+- TC-TAOFFICE-058
 - TC-TAOFFICE-043
 - TC-TAOFFICE-044
 - TC-TAOFFICE-045
@@ -64,6 +66,8 @@ requires_plugin:
   TC-TAOFFICE-040: taoffice-ppt
   TC-TAOFFICE-041: taoffice-visio
   TC-TAOFFICE-042: taoffice-visio
+  TC-TAOFFICE-057: taoffice-visio
+  TC-TAOFFICE-058: taoffice-visio
   TC-TAOFFICE-043: taoffice-video
   TC-TAOFFICE-044: taoffice-video
   TC-TAOFFICE-045: taoffice-video
@@ -135,6 +139,8 @@ cases:
 - TC-TAOFFICE-040
 - TC-TAOFFICE-041
 - TC-TAOFFICE-042
+- TC-TAOFFICE-057
+- TC-TAOFFICE-058
 - TC-TAOFFICE-043
 - TC-TAOFFICE-044
 - TC-TAOFFICE-045

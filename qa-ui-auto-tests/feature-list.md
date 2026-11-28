@@ -17150,6 +17150,27 @@ controls:
   - id: taoffice-visio
     selector: '[data-testid="taoffice-visio"]'
     kind: display
+  - id: taoffice-visio-copy-output
+    selector: '[data-testid="taoffice-visio-copy-output"]'
+    kind: display
+  - id: taoffice-visio-edit-shapes
+    selector: '[data-testid="taoffice-visio-edit-shapes"]'
+    kind: interactive
+  - id: taoffice-visio-save-copy
+    selector: '[data-testid="taoffice-visio-save-copy"]'
+    kind: interactive
+  - id: taoffice-visio-shape
+    selector: '[data-testid="taoffice-visio-shape"]'
+    kind: interactive
+  - id: taoffice-visio-shape-color
+    selector: '[data-testid="taoffice-visio-shape-color"]'
+    kind: interactive
+  - id: taoffice-visio-shape-position
+    selector: '[data-testid="taoffice-visio-shape-position"]'
+    kind: interactive
+  - id: taoffice-visio-shape-text
+    selector: '[data-testid="taoffice-visio-shape-text"]'
+    kind: interactive
   - id: taoffice-visio-error
     selector: '[data-testid="taoffice-visio-error"]'
     kind: display
