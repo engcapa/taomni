@@ -41,7 +41,8 @@
   line-height: 1.4;
 }
 .fv *, .fv *::before, .fv *::after { box-sizing: border-box; }
-.fv button, .fv select, .fv input { font: inherit; color: inherit; }
+.fv button, .fv select, .fv input { font: inherit; }
+.fv button:not(:where(.taomni-btn)), .fv select, .fv input { color: inherit; }
 .fv select { color-scheme: var(--taomni-color-scheme, light); }
 .fv select option {
   background-color: var(--taomni-card-bg);

@@ -6,7 +6,7 @@ covers: [F-FILEOPEN-1]
 tags: [p0, file-open, taoffice, archive, core-only, crash-regression]
 fixtures: [reset_db, file_open_files]
 timeout_sec: 180
-ui_standard: [UI-BTN-03, UI-FBK-04, UI-A11Y-03, UI-PAT-09]
+ui_standard: [UI-BTN-03, UI-FBK-04, UI-A11Y-03, UI-PAT-09, UI-FND-03a]
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: taoffice-document
@@ -32,6 +32,11 @@ steps:
 - assert_not_visible: '[data-testid="archive-extraction"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="transfer.zip"]'
 - wait_for: '[data-testid="archive-extraction"][data-phase="cancelled"]:not([data-retained-bytes="0"])'
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="light"]'
+- assert_solid_text_contrast: {selector: '[data-testid="archive-extraction-resume"]', minimum: 4.5}
+- click: '[data-testid="theme-cycle"]'
+- wait_for: 'html[data-app-theme="dark"]'
 - assert_solid_text_contrast: {selector: '[data-testid="archive-extraction-resume"]', minimum: 4.5}
 - press: {selector: '[data-testid="archive-extraction-resume"]', key: Enter}
 - wait_for: {selector: '[data-testid="archive-output"]', timeout_sec: 60}
@@ -60,17 +65,25 @@ verification:
   - id: ARCHIVE-REOPEN
     ui_standard: [UI-PAT-09]
     requirement: UI-PAT-09. Closing the viewer keeps the extraction checkpoint, and resuming only publishes after the remaining members are ready.
-    actions: [21, 23, 26]
+    actions: [21, 23, 31]
     checkpoints:
     - step: 20
       expectation: The final destination has no extracted member while paused.
     - step: 24
       expectation: The reopened viewer observes the cancelled task with retained bytes.
-    - step: 30
+    - step: 35
       expectation: The final member has its original digest.
-    - step: 31
+    - step: 36
       expectation: The source archive retains its original digest.
-    results: [20, 24, 30, 31]
+    results: [20, 24, 35, 36]
+  - id: ARCHIVE-RESUME-CONTRAST
+    ui_standard: [UI-FND-03a]
+    requirement: Resume uses the primary button foreground in Light and Dark.
+    actions: [25, 28]
+    checkpoints:
+    - {step: 27, expectation: The enabled Resume button has at least 4.5 to 1 contrast in Light.}
+    - {step: 30, expectation: The enabled Resume button has at least 4.5 to 1 contrast in Dark.}
+    results: [27, 30]
   native:
   - check: Checkpoint recovery after the application process exits.
     method: external
@@ -78,4 +91,4 @@ verification:
   visual:
   - check: The Resume button has readable text when the extraction is paused.
     method: automated
-    reason: Step 25 measures painted contrast on the shared primary button.
+    reason: Steps 27 and 30 measure painted contrast on the shared primary button in both themes.
