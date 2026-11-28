@@ -2,13 +2,15 @@ import { MAX_TASK_NAME, parseProject, projectCopy } from "./projectXml.js";
 import { readProject } from "./projectImport.js";
 import { recalculateSchedule, scheduleModel } from "./projectSchedule.js";
 import { MINUTE, scheduleDateText } from "./scheduleTime.js";
+import { ProjectDetails, ProjectNewTask } from "./ProjectDetails.jsx";
+import { detailsFor, editProject, modelForProject, projectResources, taskRecords } from "./projectOperations.js";
 import { ProjectDuration } from "./ProjectDuration.jsx";
 import { taskBar, timelineExtent } from "./timeline.js";
 import { useDocumentDraft } from "../../../crates/taomni-plugin-api/frontend/documentDraft.js";
 import styles from "./projectViewer.css?inline";
 
 const { React, i18n } = globalThis.__taomniHost;
-const { useEffect, useRef, useState } = React;
+const { useEffect, useMemo, useRef, useState } = React;
 const PAGE_SIZE = 100;
 const SCHEDULE = "schedule";
 const dateLabel = (value) => value?.slice(0, 10) ?? "—";
@@ -63,13 +65,23 @@ export default function ProjectViewer({ document: source, active, api }) {
   </section>;
 }
 
-function ProjectSchedule({ source, project, model, modelError, active, label }) {
+function ProjectSchedule({ source, project: original, model: originalModel, modelError, active, label }) {
   const [filter, setFilter] = useState("");
   const [page, setPage] = useState(0);
   const [calculationError, setCalculationError] = useState("");
-  const draft = useDocumentDraft(source, (edits) => projectCopy(project, edits, edits.get(SCHEDULE)?.dates));
+  const [selected, setSelected] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const detailsButton = useRef(null);
+  const addButton = useRef(null);
+  const draft = useDocumentDraft(source, (edits) => {
+    const schedule = edits.get(SCHEDULE);
+    return projectCopy(schedule?.project ?? original, edits, schedule?.dates);
+  });
   const schedule = draft.edits.get(SCHEDULE);
-  const allTasks = schedule ? project.tasks.map((task) => {
+  const project = schedule?.project ?? original;
+  const model = schedule?.project ? schedule.model : originalModel;
+  const records = useMemo(() => taskRecords(project.xml), [project]);
+  const allTasks = schedule?.dates ? project.tasks.map((task) => {
     const dates = schedule.dates.get(task.uid);
     return dates ? { ...task, start: scheduleDateText(dates.start), finish: scheduleDateText(dates.finish),
       milestone: task.milestone || dates.duration === 0, critical: dates.critical, slack: dates.slack } : task;
@@ -78,6 +90,8 @@ function ProjectSchedule({ source, project, model, modelError, active, label }) 
     .toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
   const visible = scheduled.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const extent = timelineExtent(allTasks);
+  const focusedTask = allTasks.find((task) => task.uid === selected);
+  const detail = focusedTask && { ...detailsFor(records, selected), start: focusedTask.start, finish: focusedTask.finish };
   const save = () => { void draft.save().catch(() => {}); };
 
   function calculate(uid, duration) {
@@ -86,8 +100,42 @@ function ProjectSchedule({ source, project, model, modelError, active, label }) 
     try {
       const dates = recalculateSchedule(model, durations);
       projectCopy(project, draft.edits, dates);
-      draft.edit(SCHEDULE, { durations, dates }, undefined);
+      draft.edit(SCHEDULE, { project, model, durations, dates }, undefined);
       setCalculationError("");
+      return true;
+    } catch (error) {
+      setCalculationError(error.message ?? String(error));
+      return false;
+    }
+  }
+
+  function closeDetails() {
+    setSelected(null);
+    setAdding(false);
+    (detailsButton.current?.isConnected ? detailsButton : addButton).current?.focus();
+  }
+
+  function applyTaskChange(action) {
+    try {
+      const materialized = schedule?.dates ? parseProject(projectCopy(project, new Map(), schedule.dates)) : project;
+      const change = editProject(materialized, model, selected, action);
+      if (!change) return true;
+      let nextModel;
+      if (model || change.recalculate) nextModel = modelForProject(change.project);
+      const durations = new Map();
+      const dates = change.recalculate && nextModel ? recalculateSchedule(nextModel, durations) : undefined;
+      projectCopy(change.project, draft.edits, dates);
+      draft.edit(SCHEDULE, { project: change.project, model: nextModel, durations, dates }, undefined);
+      setCalculationError("");
+      setSelected(change.selected);
+      if (action.kind === "addTask") {
+        setAdding(false);
+        setFilter("");
+        setPage(Math.max(0, Math.ceil(change.project.tasks.length / PAGE_SIZE) - 1));
+      } else if (!change.selected) {
+        addButton.current?.focus();
+        setPage(0);
+      }
       return true;
     } catch (error) {
       setCalculationError(error.message ?? String(error));
@@ -108,6 +156,13 @@ function ProjectSchedule({ source, project, model, modelError, active, label }) 
       <input type="search" className="taomni-input" data-testid="taoffice-project-filter"
         aria-label={label("筛选任务", "Filter tasks")} placeholder={label("筛选任务", "Filter tasks")} value={filter}
         onChange={(event) => { setFilter(event.target.value); setPage(0); }} />
+      {source.saveCopy && <button type="button" className="taomni-btn" data-testid="taoffice-project-add-task"
+        ref={addButton} aria-expanded={adding} disabled={draft.saving} onClick={() => {
+          if (adding) { closeDetails(); return; }
+          detailsButton.current = null;
+          setSelected(null);
+          setAdding(true);
+        }}>{label("添加任务", "Add task")}</button>}
       {source.saveCopy && model && <button type="button" className="taomni-btn" data-testid="taoffice-project-recalculate"
         disabled={draft.saving} onClick={() => calculate()}>{label("重算排程", "Recalculate schedule")}</button>}
       {source.saveCopy && <button type="button" className="taomni-btn" data-variant="primary"
@@ -118,9 +173,13 @@ function ProjectSchedule({ source, project, model, modelError, active, label }) 
     {draft.output && <p role="status" data-testid="taoffice-project-output">{draft.output}</p>}
     {draft.error && <p role="alert">{draft.error}</p>}
     {calculationError && <p role="alert" data-testid="taoffice-project-schedule-error">{calculationError}</p>}
-    {source.saveCopy && modelError && <p role="status" data-testid="taoffice-project-schedule-error">
+    {source.saveCopy && modelError && !model && <p role="status" data-testid="taoffice-project-schedule-error">
       {label("排程无法重算。", "Schedule recalculation is unavailable.")} {modelError}
     </p>}
+    {adding && <ProjectNewTask change={applyTaskChange} close={closeDetails} saving={draft.saving} label={label} />}
+    {detail && <ProjectDetails key={selected} task={{ ...focusedTask, name: draft.edits.get(selected) ?? focusedTask.name }}
+      details={detail} tasks={allTasks} resources={projectResources(records)} change={applyTaskChange}
+      close={closeDetails} canSchedule={!!model?.byId.has(selected)} saving={draft.saving} label={label} />}
     {visible.length ? <div className="taoffice-project-scroll">
       <table className="taoffice-project-table" data-testid="taoffice-project-schedule"
         aria-label={label("项目任务和时间轴", "Project tasks and timeline")}>
@@ -139,7 +198,12 @@ function ProjectSchedule({ source, project, model, modelError, active, label }) 
           duration={schedule?.durations.get(task.uid) ?? model?.byId.get(task.uid)?.duration}
           editDuration={source.saveCopy && model?.byId.has(task.uid) && !model.byId.get(task.uid).fixed && !task.summary
             ? (value) => calculate(task.uid, value) : undefined}
-          editable={!!source.saveCopy && !!task.range} label={label} />)}</tbody>
+          editable={!!source.saveCopy && !!task.range} label={label}
+          details={source.saveCopy ? (button) => {
+            detailsButton.current = button;
+            setSelected(task.uid);
+            setAdding(false);
+          } : null} />)}</tbody>
       </table>
     </div> : <p role="status">{filter ? label("没有匹配任务", "No matching tasks") : label("没有任务", "No tasks")}</p>}
     {scheduled.length > PAGE_SIZE && <div className="taoffice-project-toolbar">
@@ -151,7 +215,7 @@ function ProjectSchedule({ source, project, model, modelError, active, label }) 
   </div>;
 }
 
-function ProjectRow({ task, extent, draft, duration, editDuration, editable, label }) {
+function ProjectRow({ task, extent, draft, duration, editDuration, editable, label, details }) {
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState("");
   const editButton = useRef(null);
@@ -187,6 +251,9 @@ function ProjectRow({ task, extent, draft, duration, editDuration, editable, lab
           data-testid="taoffice-project-rename" disabled={draft.saving} title={label("重命名任务", "Rename task")}
           onClick={() => { setInput(name); setEditing(true); }}>{name || label("未命名任务", "Unnamed task")}</button>
         : name || label("未命名任务", "Unnamed task")}
+      {details && <button type="button" className="taomni-btn" data-testid="taoffice-project-open-details"
+        aria-label={label(`${name} 的详情`, `Details for ${name}`)} disabled={draft.saving}
+        onClick={(event) => details(event.currentTarget)}>{label("详情", "Details")}</button>}
     </th>
     <td title={task.start}>{dateLabel(task.start)}</td>
     <td title={task.finish}>{dateLabel(task.finish)}</td>

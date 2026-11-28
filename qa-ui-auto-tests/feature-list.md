@@ -16875,6 +16875,7 @@ TC-TAOFFICE-019/020 覆盖 XLSX 表格列标题只读、数据行文字与数字
 TC-TAOFFICE-021/022 覆盖 DOCX 页面、页眉、正文混合格式和表格单元格编辑，以及共享关闭守卫、签名安装、原生另存和副本重开。
 TC-TAOFFICE-023/024 覆盖 MSPDI 任务列表及甘特条、筛选、键盘重命名、原生保存和副本重开。
 TC-TAOFFICE-025/026 覆盖 WebM 解码、键盘定位、真实播放、离开标签暂停及原始媒体摘要。
+TC-TAOFFICE-037/038 覆盖新增任务、日期和进度编辑、依赖重算、资源分配、任务删除和保存重开。
 TC-TAOFFICE-027/028 覆盖改工期、避开日历例外、更新后续任务及关键路径，并检查另存和原文件。
 
 <!-- feature
@@ -17152,6 +17153,72 @@ controls:
     kind: display
   - id: taoffice-project-retry
     selector: '[data-testid="taoffice-project-retry"]'
+    kind: interactive
+  - id: taoffice-project-details
+    selector: '[data-testid="taoffice-project-details"]'
+    kind: display
+  - id: taoffice-project-open-details
+    selector: '[data-testid="taoffice-project-open-details"]'
+    kind: interactive
+  - id: taoffice-project-add-task
+    selector: '[data-testid="taoffice-project-add-task"]'
+    kind: interactive
+  - id: taoffice-project-new-name
+    selector: '[data-testid="taoffice-project-new-name"]'
+    kind: interactive
+  - id: taoffice-project-create-task
+    selector: '[data-testid="taoffice-project-create-task"]'
+    kind: interactive
+  - id: taoffice-project-task-start
+    selector: '[data-testid="taoffice-project-task-start"]'
+    kind: interactive
+  - id: taoffice-project-task-finish
+    selector: '[data-testid="taoffice-project-task-finish"]'
+    kind: interactive
+  - id: taoffice-project-apply-dates
+    selector: '[data-testid="taoffice-project-apply-dates"]'
+    kind: interactive
+  - id: taoffice-project-task-progress
+    selector: '[data-testid="taoffice-project-task-progress"]'
+    kind: interactive
+  - id: taoffice-project-apply-progress
+    selector: '[data-testid="taoffice-project-apply-progress"]'
+    kind: interactive
+  - id: taoffice-project-predecessor
+    selector: '[data-testid="taoffice-project-predecessor"]'
+    kind: interactive
+  - id: taoffice-project-link-type
+    selector: '[data-testid="taoffice-project-link-type"]'
+    kind: interactive
+  - id: taoffice-project-link-lag
+    selector: '[data-testid="taoffice-project-link-lag"]'
+    kind: interactive
+  - id: taoffice-project-link-lag-unit
+    selector: '[data-testid="taoffice-project-link-lag-unit"]'
+    kind: interactive
+  - id: taoffice-project-apply-link
+    selector: '[data-testid="taoffice-project-apply-link"]'
+    kind: interactive
+  - id: taoffice-project-task-links
+    selector: '[data-testid="taoffice-project-task-links"]'
+    kind: display
+  - id: taoffice-project-resource
+    selector: '[data-testid="taoffice-project-resource"]'
+    kind: interactive
+  - id: taoffice-project-resource-units
+    selector: '[data-testid="taoffice-project-resource-units"]'
+    kind: interactive
+  - id: taoffice-project-apply-resource
+    selector: '[data-testid="taoffice-project-apply-resource"]'
+    kind: interactive
+  - id: taoffice-project-task-assignments
+    selector: '[data-testid="taoffice-project-task-assignments"]'
+    kind: display
+  - id: taoffice-project-remove-task
+    selector: '[data-testid="taoffice-project-remove-task"]'
+    kind: interactive
+  - id: taoffice-project-confirm-remove
+    selector: '[data-testid="taoffice-project-confirm-remove"]'
     kind: interactive
   - id: taoffice-project-open-system
     selector: '[data-testid="taoffice-project-open-system"]'

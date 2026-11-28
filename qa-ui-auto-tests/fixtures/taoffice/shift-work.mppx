@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project xmlns="http://schemas.microsoft.com/project">
+  <Name>Release work plan</Name>
+  <ScheduleFromStart>1</ScheduleFromStart>
+  <StartDate>2026-12-01T08:00:00</StartDate>
+  <FinishDate>2026-12-03T12:00:00</FinishDate>
+  <CalendarUID>1</CalendarUID><MinutesPerDay>480</MinutesPerDay>
+  <Calendars>
+    <Calendar>
+      <UID>1</UID><Name>Release calendar</Name><IsBaseCalendar>1</IsBaseCalendar><BaseCalendarUID>-1</BaseCalendarUID>
+      <Exceptions><Exception>
+        <TimePeriod><FromDate>2026-12-02T00:00:00</FromDate><ToDate>2026-12-02T23:59:00</ToDate></TimePeriod>
+        <Name>Maintenance day</Name><Type>1</Type><Period>1</Period><DayWorking>0</DayWorking>
+      </Exception></Exceptions>
+    </Calendar>
+  </Calendars>
+  <Tasks>
+    <Task>
+      <UID>1</UID><ID>1</ID><Name>Stage the release</Name><OutlineLevel>1</OutlineLevel>
+      <Start>2026-12-01T08:00:00</Start><Finish>2026-12-01T17:00:00</Finish><Duration>PT8H0M0S</Duration>
+      <DurationFormat>5</DurationFormat><Critical>1</Critical>
+    </Task>
+    <Task>
+      <UID>2</UID><ID>2</ID><Name>Release review</Name><OutlineLevel>1</OutlineLevel>
+      <Start>2026-12-03T08:00:00</Start><Finish>2026-12-03T12:00:00</Finish><Duration>PT4H0M0S</Duration>
+      <DurationFormat>5</DurationFormat><Critical>1</Critical>
+      <PredecessorLink><PredecessorUID>1</PredecessorUID><Type>1</Type></PredecessorLink>
+    </Task>
+    <Task>
+      <UID>3</UID><ID>3</ID><Name>Send release notes</Name><OutlineLevel>1</OutlineLevel>
+      <Start>2026-12-01T08:00:00</Start><Finish>2026-12-01T10:00:00</Finish><Duration>PT2H0M0S</Duration>
+      <DurationFormat>5</DurationFormat><Critical>0</Critical>
+      <Baseline><Number>0</Number><Start>2026-12-01T08:00:00</Start><Finish>2026-12-01T10:00:00</Finish></Baseline>
+    </Task>
+  </Tasks>
+  <Resources><Resource><UID>8</UID><ID>1</ID><Name>Release engineer</Name></Resource></Resources>
+  <Assignments>
+    <Assignment><UID>1</UID><TaskUID>1</TaskUID><ResourceUID>8</ResourceUID><Units>1</Units></Assignment>
+    <Assignment><UID>2</UID><TaskUID>3</TaskUID><ResourceUID>8</ResourceUID><Notes>Preserve this assignment.</Notes><Units>0.25</Units></Assignment>
+  </Assignments>
+</Project>

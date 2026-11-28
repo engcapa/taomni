@@ -2,8 +2,8 @@ import { projectCalendars, projectChild, projectChildren, projectText } from "./
 import { DAY, MINUTE, SECOND, scheduleDate, scheduleDuration, shiftWork, workBetween } from "./scheduleTime.js";
 
 const LINK_EVENTS = [["finish", "finish"], ["finish", "start"], ["start", "finish"], ["start", "start"]];
-const ELAPSED_FORMATS = new Set([4, 6, 8, 10, 12, 20, 36, 38, 40, 42, 44, 52]);
-const PERCENT_FORMATS = new Set([19, 20, 51, 52]);
+export const ELAPSED_FORMATS = new Set([4, 6, 8, 10, 12, 20, 36, 38, 40, 42, 44, 52]);
+export const PERCENT_FORMATS = new Set([19, 20, 51, 52]);
 const flag = (node, field) => ["1", "true"].includes(projectText(node, field));
 const date = (node, field) => scheduleDate(projectText(node, field));
 

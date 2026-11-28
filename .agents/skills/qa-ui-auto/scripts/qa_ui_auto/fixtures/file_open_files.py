@@ -139,6 +139,10 @@ def setup(ctx: Any) -> None:
         plan = (TAOFFICE_ASSETS / "shift-plan.mppx").read_bytes()
         files["shift-plan.xml" if native else "shift-plan.mppx"] = plan
         ctx.values["taoffice_schedule_sha"] = hashlib.sha256(plan).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-037", "TC-TAOFFICE-038"}:
+        plan = (TAOFFICE_ASSETS / "shift-work.mppx").read_bytes()
+        files["shift-work.xml" if native else "shift-work.mppx"] = plan
+        ctx.values["taoffice_schedule_sha"] = hashlib.sha256(plan).hexdigest()
     if ctx.case_id in {"TC-TAOFFICE-029", "TC-TAOFFICE-030"}:
         files["linked-tasks.mpp"] = (TAOFFICE_ASSETS / "linked-tasks.mpp").read_bytes()
         files["damaged.mpp"] = b"This is not a Project file."

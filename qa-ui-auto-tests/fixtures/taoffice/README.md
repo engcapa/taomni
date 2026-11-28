@@ -12,3 +12,5 @@ WinRAR 6.11 created `records.RAR` with `-ma5 -m5 -s` and `legacy.rar` with `-ma4
 - `rollout-compatible.mkv` wraps the same VP8 frames in Matroska and adds a synthetic 440 Hz Opus track. It exercises audio and video retention in compatible playback.
 
 `forecast.xlsx` extends the quarterly workbook with a cross-sheet SUM and a dependent text-valued IF in Inventory. Changing Totals!B2 from 12 to 15.5 changes Totals!C2 to 31, Inventory!D2 to 47 and Inventory!E2 to Review.
+
+`shift-work.mppx` adds named resources and two assignments to the holiday-aware shift plan. It exercises new tasks, dependency recalculation and resource assignment round trips.
