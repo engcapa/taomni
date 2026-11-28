@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -17,6 +18,20 @@ def mach_o_lines(binary, *names):
         f"\t{name} (compatibility version 63.0.0, current version 63.24.100)\n"
         for name in names
     )
+
+
+class MediaSourceNoticeTests(unittest.TestCase):
+    def test_windows_candidate_and_unix_signer_check_out_identical_notice_bytes(self):
+        repo = stage.SOURCE.parents[4]
+        source = stage.SOURCE.relative_to(repo).as_posix()
+        blob = subprocess.check_output(["git", "show", f":{source}"], cwd=repo)
+        for autocrlf in ("true", "false"):
+            with self.subTest(autocrlf=autocrlf):
+                checkout = subprocess.check_output([
+                    "git", "-c", f"core.autocrlf={autocrlf}", "cat-file",
+                    "--filters", f"--path={source}", f":{source}",
+                ], cwd=repo)
+                self.assertEqual(checkout, blob)
 
 
 class MacosMediaStagingTests(unittest.TestCase):

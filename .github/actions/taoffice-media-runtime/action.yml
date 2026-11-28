@@ -7,6 +7,9 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Check signed Media notice bytes for Windows and Unix checkouts
+      shell: bash
+      run: python -m unittest discover -s src-tauri/plugins/taoffice-video/packaging -p test_stage.py -k MediaSourceNoticeTests
     - name: Install Linux build and relocation dependencies
       if: runner.os == 'Linux'
       shell: bash

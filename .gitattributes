@@ -6,6 +6,8 @@ src-tauri/Cargo.toml text eol=lf
 # Windows autocrlf must not alter the payload before hashing and signing.
 src-tauri/plugins/hello-plugin/frontend/*.js text eol=lf
 src-tauri/plugins/taoffice-*/frontend/**/*.js text eol=lf
+# The Media signer compares this staged notice with its own checkout byte for byte.
+src-tauri/plugins/taoffice-video/packaging/SOURCE.md text eol=lf
 # Keep the reported Markdown byte-identical on all QA hosts.
 .agents/skills/qa-ui-auto/scripts/qa_ui_auto/fixtures/data/markdown-testing.md text eol=lf
 src/components/viewer/markdown/vendor/viewer-static.min.js -text -diff
