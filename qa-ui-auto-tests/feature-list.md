@@ -16337,6 +16337,11 @@ status: implemented
 area: files/explorer
 components: [ExplorerPlatformView, ExplorerTabStrip, ExplorerTabIcon, ExplorerFileIcon, ExplorerShell, ExplorerNavTree, ExplorerFileList, ExplorerPreviewPane]
 files:
+  - src/components/search/FileSearchDialog.tsx
+  - src/components/search/useGlobalFileSearch.ts
+  - src/lib/explorer/globalFileSearch.ts
+  - src/stubs/globalFileSearch.ts
+  - src-tauri/crates/taomni-file-search/src/lib.rs
   - src/components/explorer/ExplorerPlatformView.tsx
   - src/components/explorer/ExplorerTabStrip.tsx
   - src/components/explorer/ExplorerTabIcon.tsx
@@ -16370,6 +16375,33 @@ files:
   - src-tauri/src/filebrowser/local_ops/mod.rs
   - src-tauri/src/filebrowser/local_ops/search.rs
 controls:
+  - id: explorer-global-file-search
+    selector: '[data-testid="explorer-global-file-search"]'
+    kind: interactive
+  - id: global-search-files
+    selector: '[data-testid="global-search-files"]'
+    kind: interactive
+  - id: file-search-dialog
+    selector: '[data-testid="file-search-dialog"]'
+    kind: display
+  - id: file-search-input
+    selector: '[data-testid="file-search-input"]'
+    kind: interactive
+  - id: file-search-submit
+    selector: '[data-testid="file-search-submit"]'
+    kind: interactive
+  - id: file-search-cancel
+    selector: '[data-testid="file-search-cancel"]'
+    kind: interactive
+  - id: file-search-result
+    selector: '[data-testid="file-search-result"]'
+    kind: interactive
+  - id: file-search-status
+    selector: '[data-testid="file-search-status"]'
+    kind: display
+  - id: file-search-close
+    selector: '[data-testid="file-search-close"]'
+    kind: interactive
   - id: explorer-main-menu-entry
     selector: '[data-testid="context-menu-item-file-explorer"]'
     kind: interactive
@@ -16864,6 +16896,8 @@ controls:
 -->
 
 File Explorer 是 Sessions 下方的独立工作区，Tools 面板不再提供入口；主菜单、工作区导航、项目树、本地终端、Home 与历史恢复统一跳转到这里。目录与支持内部查看的文件共用独立标签，只有显式选择 Code Workspace 或系统应用才离开。新建支持 TXT、MD、HTML、CSS、JS、TS、JSON；搜索支持普通文本、递归、`*`/`?`/`**`/字符类、两种路径分隔符、相对路径、错误重试、进度与取消。Explorer 激活后是 rail-only 表面：左侧重复的 Explorer 边栏与 `toggle-left-sidebar` 不再渲染，切回 Sessions/Workspaces 后各模式的侧栏控件恢复；标签使用 Sessions 同款 `.taomni-tab` 样式、类型图标与共享顺序右键菜单，空白处按下即关闭菜单。TC-EXPLORER-001..011 覆盖导航、预览、选择、文件操作、恢复、多类型新建、真实磁盘搜索、标签溢出分页/过滤、Overview 纳入与删除方式选择、rail-only 侧栏与 Sessions 对齐标签/菜单空白关闭；当前执行证据见 `docs-feature/file-explorer/implementation.md`，不以静态清单宣称原生通过。
+
+TC-EXPLORER-015 覆盖两个本机文件名搜索入口、显式提交、目录导航与通过模糊名称打开文件。TC-EXPLORER-016 核对独立系统索引探针与检索结果。TC-UIC-DLG-explorer-global-search 验证键盘焦点循环和返回。
 
 ## 全局文件打开 / 预览 / 编辑
 

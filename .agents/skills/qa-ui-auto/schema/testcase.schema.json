@@ -155,6 +155,8 @@
           "file_open_raster",
           "explorer_large_directory",
           "explorer_search_native",
+          "explorer_global_search",
+          "explorer_index_probe",
           "workspace_search_large",
           "workspace_compact_tree",
           "workspace_hidden_entries",

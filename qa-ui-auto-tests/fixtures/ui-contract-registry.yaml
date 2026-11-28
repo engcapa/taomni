@@ -1,5 +1,20 @@
 # Each entry reaches a private desktop control through its product UI.
 dialogs:
+  - slug: explorer-global-search
+    title: Global filename search keeps keyboard focus inside the dialog and returns to its Explorer entry
+    covers: [F-EXPLORER-1]
+    fixtures: [reset_db]
+    panel: file-search-dialog
+    heading: Search local files
+    first: file-search-input
+    last: file-search-close
+    return_to: explorer-global-file-search
+    open:
+      - open: ${cfg.app.base_url}
+      - vault_first_run: qa-global-file-search-dialog
+      - click: '[data-testid="side-tab-explorer"]'
+      - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+      - press: {selector: '[data-testid="explorer-global-file-search"]', key: Enter}
   - slug: explorer-new-file
     title: Explorer New file keeps focus inside the form and returns to the New menu button
     covers: [F-EXPLORER-1]

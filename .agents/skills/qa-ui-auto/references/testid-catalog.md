@@ -1294,6 +1294,15 @@
 
 ## files/explorer (F-EXPLORER-1)
 
+- `[data-testid="explorer-global-file-search"]` — interactive — F-EXPLORER-1.explorer-global-file-search
+- `[data-testid="global-search-files"]` — interactive — F-EXPLORER-1.global-search-files
+- `[data-testid="file-search-dialog"]` — display — F-EXPLORER-1.file-search-dialog
+- `[data-testid="file-search-input"]` — interactive — F-EXPLORER-1.file-search-input
+- `[data-testid="file-search-submit"]` — interactive — F-EXPLORER-1.file-search-submit
+- `[data-testid="file-search-cancel"]` — interactive — F-EXPLORER-1.file-search-cancel
+- `[data-testid="file-search-result"]` — interactive — F-EXPLORER-1.file-search-result
+- `[data-testid="file-search-status"]` — display — F-EXPLORER-1.file-search-status
+- `[data-testid="file-search-close"]` — interactive — F-EXPLORER-1.file-search-close
 - `[data-testid="context-menu-item-file-explorer"]` — interactive — F-EXPLORER-1.explorer-main-menu-entry
 - `[data-testid="explorer-delete-dialog"]` — display — F-EXPLORER-1.explorer-delete-dialog
 - `[data-testid="explorer-properties-dialog"]` — display — F-EXPLORER-1.explorer-properties-dialog

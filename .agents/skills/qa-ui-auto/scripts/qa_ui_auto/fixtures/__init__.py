@@ -59,7 +59,7 @@ from typing import Callable, Protocol
 from . import mobile_web, mobile_service, mobile_openssh
 from .. import servers_http_observation, servers_ssh_observation
 from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_desktop_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, vnc_required, welcome_recents, workspace_root
-from . import platform_workspace_root
+from . import platform_workspace_root, explorer_global_search, explorer_index_probe
 from . import sockscap_legacy, sockscap_redirector
 from . import workspace_restore_sessions
 from . import bookmark_assets
@@ -229,6 +229,8 @@ REGISTRY: dict[str, Fixture] = {
     "workspace_explorer": Fixture("workspace_explorer", workspace_explorer.setup),
     "workspace_drop_import": Fixture("workspace_drop_import", workspace_drop_import.setup, workspace_drop_import.teardown),
     "workspace_file_clipboard": Fixture("workspace_file_clipboard", workspace_file_clipboard.setup, workspace_file_clipboard.teardown),
+    "explorer_index_probe": Fixture("explorer_index_probe", explorer_index_probe.setup, platform_workspace_root.teardown),
+    "explorer_global_search": Fixture("explorer_global_search", explorer_global_search.setup, platform_workspace_root.teardown),
     "explorer_files": Fixture("explorer_files", explorer_files.setup, explorer_files.teardown),
     "file_open_files": Fixture("file_open_files", file_open_files.setup, file_open_files.teardown),
     "file_open_mail": Fixture("file_open_mail", file_open_files.setup_mail, mail_server.teardown),
