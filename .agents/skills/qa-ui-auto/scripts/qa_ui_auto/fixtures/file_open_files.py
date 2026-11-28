@@ -111,7 +111,7 @@ def setup(ctx: Any) -> None:
     if ctx.case_id == "TC-TAOFFICE-001":
         files["Build.mppx"] = b'<Project xmlns="http://schemas.microsoft.com/project"><Name>Build</Name></Project>'
         files["Review.mpp"] = (TAOFFICE_ASSETS / "linked-tasks.mpp").read_bytes()
-    if ctx.case_id in {"TC-TAOFFICE-007", "TC-TAOFFICE-008"}:
+    if ctx.case_id in {"TC-TAOFFICE-007", "TC-TAOFFICE-008", "TC-TAOFFICE-033", "TC-TAOFFICE-034"}:
         files["report.pdf"] = pdf_fixture()
         files["locked.pdf"] = locked_pdf_fixture()
         files["damaged.pdf"] = b"This is not a PDF."

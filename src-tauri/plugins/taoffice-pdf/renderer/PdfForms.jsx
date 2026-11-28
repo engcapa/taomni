@@ -1,19 +1,15 @@
-import { usePdfForms } from "./usePdfForms.js";
 import { originalValue } from "./pdfForms.js";
 
 const { React } = globalThis.__taomniHost;
 const { useId, useLayoutEffect, useRef } = React;
 
-export function PdfForms({
-  pdf, source, expanded, active, onClose, onPage, label, onForms, saveAction, onPreviewChange,
-}) {
-  const form = usePdfForms(pdf, source, label, onForms, saveAction, onPreviewChange);
+export function PdfForms({ form, source, expanded, active, onClose, onPage, label }) {
   const heading = useId();
   const panel = useRef(null);
   useLayoutEffect(() => {
     if (expanded && active) panel.current?.focus();
   }, [expanded, active]);
-  if (!expanded || !form.model?.fields.length) return null;
+  if (!expanded || !form.fields.length) return null;
 
   return <section aria-labelledby={heading} className="taoffice-pdf-form" data-testid="taoffice-pdf-form"
     ref={panel} tabIndex={-1} onKeyDown={(event) => {
@@ -42,8 +38,8 @@ export function PdfForms({
     {form.status && <p role="status" data-testid="taoffice-pdf-copy-output">{form.status}</p>}
     {form.error && <p role="alert" className="taoffice-pdf-error">{form.error}</p>}
     <div className="taoffice-pdf-form-fields">
-      {form.model.fields.map((field) => <FormField key={field.id} field={field} editable={form.canEdit && field.editable && !form.saving}
-        value={form.values.get(field.name) ?? originalValue(field)} onLocate={() => onPage(field.page + 1)}
+      {form.fields.map((field) => <FormField key={field.id} field={field} editable={form.canEdit && field.editable && !form.saving}
+        value={form.values.get(field.name) ?? originalValue(field)} onLocate={() => onPage(field.sourcePage)}
         onChange={(value) => form.change(field, value)} label={label} />)}
     </div>
   </section>;
@@ -77,7 +73,7 @@ function FormField({ field, value, onChange, onLocate, editable, label }) {
   return <div className="taoffice-pdf-form-row">
     <label><span title={name}>{name}</span>{control}</label>
     <button type="button" className="taomni-btn" onClick={onLocate}>
-      {label(`第 ${field.page + 1} 页`, `Page ${field.page + 1}`)}
+      {label(`第 ${field.visiblePage} 页`, `Page ${field.visiblePage}`)}
     </button>
   </div>;
 }

@@ -2,11 +2,11 @@ export function normalizePdfText(value) {
   return value.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-export async function findPdfPages(pdf, query, signal) {
+export async function findPdfPages(pdf, query, signal, layout) {
   const needle = normalizePdfText(query);
   const matches = [];
   if (!needle) return matches;
-  for (let number = 1; number <= pdf.numPages; number += 1) {
+  for (const { number } of layout) {
     signal.throwIfAborted();
     const page = await pdf.getPage(number);
     signal.throwIfAborted();

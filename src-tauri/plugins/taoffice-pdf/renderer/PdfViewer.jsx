@@ -4,10 +4,13 @@ import { PdfPage } from "./PdfPage.jsx";
 import { PdfOutline, PdfSearch } from "./PdfNavigation.jsx";
 import { PdfPassword } from "./PdfPassword.jsx";
 import { PdfForms } from "./PdfForms.jsx";
+import { PdfEditPanel } from "./PdfEditPanel.jsx";
+import { changePageLayout, originalPages } from "./pdfEditorState.js";
+import { usePdfForms } from "./usePdfForms.js";
 import styles from "./pdfViewer.css?inline";
 
 const { React, i18n } = globalThis.__taomniHost;
-const { useCallback, useEffect, useRef, useState } = React;
+const { useCallback, useEffect, useMemo, useRef, useState } = React;
 
 export default function PdfViewer({ document: source, active }) {
   const { locale } = i18n.useLocale();
@@ -26,7 +29,8 @@ export default function PdfViewer({ document: source, active }) {
   const [viewportWidth, setViewportWidth] = useState(0);
   const [navigation, setNavigation] = useState(null);
   const [highlight, setHighlight] = useState("");
-  const [hasForms, setHasForms] = useState(false);
+  const [tool, setTool] = useState("");
+  const [note, setNote] = useState("");
   const [formRevision, setFormRevision] = useState(0);
   const [previewRevision, setPreviewRevision] = useState(0);
   const updateFormPreview = useCallback(() => setFormRevision((value) => value + 1), []);
@@ -36,8 +40,15 @@ export default function PdfViewer({ document: source, active }) {
   const searchReturnFocus = useRef(null);
   const outlineButton = useRef(null);
   const formButton = useRef(null);
+  const editorButton = useRef(null);
   const isMac = source.platform === "macos";
   const modifier = isMac ? "⌘" : "Ctrl";
+  const pages = useMemo(() => originalPages(pdf?.numPages ?? 0), [pdf]);
+  const draft = usePdfForms(pdf, source, label, saveForm, updateFormPreview, pages);
+  const pageCount = draft.layout.length;
+  const currentPage = Math.min(page, pageCount || 1);
+  const selected = draft.layout[currentPage - 1];
+  const annotations = (selected && draft.markup.get(selected.number)) ?? [];
 
   useEffect(() => {
     let alive = true;
@@ -45,7 +56,8 @@ export default function PdfViewer({ document: source, active }) {
     setPdf(null);
     setFailure("");
     setChallenge(null);
-    setHasForms(false);
+    setTool("");
+    setNote("");
     if (cancelled) return;
     async function load() {
       const bytes = await (await source.read()).arrayBuffer();
@@ -81,19 +93,38 @@ export default function PdfViewer({ document: source, active }) {
     return () => resize.disconnect();
   }, []);
 
-  function go(number) {
-    const clamped = Math.max(1, Math.min(number, pdf?.numPages ?? 1));
+  function go(number, limit = pageCount) {
+    const clamped = Math.max(1, Math.min(number, limit || 1));
     setPage(clamped);
     setPageInput(String(clamped));
     setPageError(false);
     viewport.current?.scrollTo(0, 0);
+  }
+  function goSource(number) {
+    const index = draft.layout.findIndex((item) => item.number === number);
+    if (index === -1) return false;
+    go(index + 1);
+    return true;
   }
   function changeZoom(step) {
     if (scale !== null) setZoom(stepPageScale(zoom ?? scale, step));
   }
   function changeNavigation(next) {
     setHighlight("");
+    if (next !== "edit" || navigation === "edit") setTool("");
     setNavigation(next === navigation ? null : next);
+  }
+  function pageAction(action) {
+    if (!selected) return;
+    const next = changePageLayout(draft.layout, selected.number, action);
+    if (next === draft.layout) return;
+    draft.changeLayout(next);
+    const index = next.findIndex((item) => item.number === selected.number);
+    go(index < 0 ? currentPage : index + 1, next.length);
+  }
+  function closeEditor() {
+    changeNavigation(null);
+    editorButton.current?.focus();
   }
   function openSearch(origin) {
     searchReturnFocus.current = origin;
@@ -120,7 +151,6 @@ export default function PdfViewer({ document: source, active }) {
     event.stopPropagation();
   }
 
-  const currentPage = Math.min(page, pdf?.numPages ?? 1);
   const pageLabel = label("页码", "Page number");
   return <div className="taoffice-pdf" data-testid="taoffice-pdf">
     <style>{styles}</style>
@@ -129,7 +159,7 @@ export default function PdfViewer({ document: source, active }) {
         disabled={!pdf || currentPage <= 1} onClick={() => go(currentPage - 1)}>{label("上一页", "Previous page")}</button>
       <form onSubmit={(event) => {
         event.preventDefault();
-        const number = pageNumber(pageInput, pdf?.numPages ?? 0);
+        const number = pageNumber(pageInput, pageCount);
         if (number === null) setPageError(true);
         else go(number);
       }}>
@@ -142,10 +172,10 @@ export default function PdfViewer({ document: source, active }) {
               go(currentPage);
             }
           }} />
-        <span data-testid="taoffice-pdf-page-count" className="tabular-nums">/ {pdf?.numPages ?? "—"}</span>
+        <span data-testid="taoffice-pdf-page-count" className="tabular-nums">/ {pageCount || "—"}</span>
       </form>
       <button type="button" className="taomni-btn" data-testid="taoffice-pdf-next"
-        disabled={!pdf || currentPage >= pdf.numPages} onClick={() => go(currentPage + 1)}>{label("下一页", "Next page")}</button>
+        disabled={!pdf || currentPage >= pageCount} onClick={() => go(currentPage + 1)}>{label("下一页", "Next page")}</button>
       <button type="button" className="taomni-btn" data-testid="taoffice-pdf-zoom-out"
         title={`${label("缩小", "Zoom out")} (${modifier}+-)`}
         disabled={!pdf || scale === null || (zoom ?? scale) <= MIN_PAGE_SCALE} onClick={() => changeZoom(-1)}>{label("缩小", "Zoom out")}</button>
@@ -167,21 +197,28 @@ export default function PdfViewer({ document: source, active }) {
         disabled={!pdf} aria-expanded={navigation === "outline"} onClick={() => changeNavigation("outline")}>
         {label("大纲", "Outline")}
       </button>
-      {hasForms && <button ref={formButton} type="button" className="taomni-btn" data-testid="taoffice-pdf-form-toggle"
+      {draft.fields.length > 0 && <button ref={formButton} type="button" className="taomni-btn" data-testid="taoffice-pdf-form-toggle"
         aria-expanded={navigation === "form"} onClick={() => changeNavigation("form")}>
         {label("表单字段", "Form fields")}
+      </button>}
+      {draft.canEditPages && <button ref={editorButton} type="button" className="taomni-btn" data-testid="taoffice-pdf-edit-toggle"
+        aria-expanded={navigation === "edit"} onClick={() => navigation === "edit" ? closeEditor() : changeNavigation("edit")}>
+        {label("编辑页面", "Edit pages")}
       </button>}
     </div>
     {pageError && <p role="alert" data-testid="taoffice-pdf-page-error">
       {label("请输入文档范围内的页码。", "Enter a page number within the document.")}</p>}
-    {pdf && navigation === "search" && <PdfSearch pdf={pdf} label={label} input={searchInput}
-      onMatch={(number, query) => { setHighlight(query); if (number) go(number); }}
+    {pdf && navigation === "search" && <PdfSearch pdf={pdf} layout={draft.layout} label={label} input={searchInput}
+      onMatch={(number, query) => { setHighlight(query); if (number) goSource(number); }}
       onClose={closeSearch} />}
-    {pdf && navigation === "outline" && <PdfOutline pdf={pdf} label={label} onGo={go}
+    {pdf && navigation === "outline" && <PdfOutline pdf={pdf} label={label} onGo={goSource}
       onClose={() => { changeNavigation(null); outlineButton.current?.focus(); }} />}
-    {pdf && <PdfForms pdf={pdf} source={source} label={label} active={active} expanded={navigation === "form"}
-      onForms={setHasForms} saveAction={saveForm} onPage={go} onPreviewChange={updateFormPreview}
+    {pdf && <PdfForms form={draft} source={source} label={label} active={active} expanded={navigation === "form"}
+      onPage={goSource}
       onClose={() => { changeNavigation(null); formButton.current?.focus(); }} />}
+    {selected && navigation === "edit" && <PdfEditPanel draft={draft} pdf={pdf} sourceNumber={selected.number} page={currentPage} count={pageCount}
+      onPageAction={pageAction} annotations={annotations} tool={tool} onTool={setTool} note={note} onNote={setNote}
+      onUndo={() => draft.undoMarkup(selected.number)} onClose={closeEditor} label={label} source={source} active={active} />}
     <div className="taoffice-pdf-viewport" ref={viewport} tabIndex={0} aria-label={source.name}
       data-testid="taoffice-pdf-viewport" onKeyDown={onViewportKey}>
       {failure && <div className="taoffice-pdf-error">
@@ -204,9 +241,12 @@ export default function PdfViewer({ document: source, active }) {
           {label("输入密码", "Enter password")}
         </button>
       </div>}
-      {pdf && viewportWidth > 0 && <PdfPage
-        key={currentPage + "/" + (zoom ?? viewportWidth + "fit") + "/" + rotation}
-        pdf={pdf} number={currentPage} zoom={zoom} rotation={rotation} highlight={highlight} onScale={setScale}
+      {pdf && selected && viewportWidth > 0 && <PdfPage
+        key={selected.number + "/" + (zoom ?? viewportWidth + "fit") + "/" + (selected.rotation + rotation)}
+        pdf={pdf} number={currentPage} sourceNumber={selected.number} zoom={zoom}
+        rotation={(selected.rotation + rotation) % 360} highlight={highlight} onScale={setScale}
+        markup={{ tool: active && !draft.saving ? tool : "", note, annotations,
+          onAdd: (annotation) => draft.addMarkup(selected.number, annotation) }}
         formRevision={previewRevision}
         viewportWidth={zoom ? 0 : viewportWidth} label={label} />}
     </div>

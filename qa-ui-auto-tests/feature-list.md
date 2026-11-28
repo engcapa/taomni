@@ -16868,6 +16868,7 @@ TC-TAOFFICE-010 验证单文件 gzip 预览、直接解压成文件，以及重�
 TC-TAOFFICE-011 验证原生 7z 固实压缩包的预览和解压，TC-TAOFFICE-012 验证浏览器预览显示桌面打开提示。
 TC-TAOFFICE-013 覆盖原生固实 RAR4/RAR5 解码、只读预览、准确解压和加密包提示。TC-TAOFFICE-014 覆盖浏览器桌面打开提示。
 TC-TAOFFICE-015/016 覆盖独立 Excel 模块的工作表导航、选中单元格恢复、缓存值与原公式、隐藏工作表、输入文件散列以及原生签名安装和停用。
+TC-TAOFFICE-033/034 覆盖页面批注、撤销、旋转、排序、移除，以及另存后重开核对。
 TC-TAOFFICE-017/018 覆盖 PDF 表单填写、关闭守卫、保存副本和原生文件重新打开。
 TC-TAOFFICE-019/020 覆盖 XLSX 表格列标题只读、数据行文字与数字编辑、输入校验、取消、保存副本、公式保留和原始文件摘要。
 TC-TAOFFICE-021/022 覆盖 DOCX 页面、页眉、正文混合格式和表格单元格编辑，以及共享关闭守卫、签名安装、原生另存和副本重开。
@@ -17151,6 +17152,51 @@ controls:
   - id: taoffice-project-open-system
     selector: '[data-testid="taoffice-project-open-system"]'
     kind: interactive
+  - id: taoffice-pdf-edit-toggle
+    selector: '[data-testid="taoffice-pdf-edit-toggle"]'
+    kind: interactive
+  - id: taoffice-pdf-edit
+    selector: '[data-testid="taoffice-pdf-edit"]'
+    kind: display
+  - id: taoffice-pdf-edit-save
+    selector: '[data-testid="taoffice-pdf-edit-save"]'
+    kind: interactive
+  - id: taoffice-pdf-edit-close
+    selector: '[data-testid="taoffice-pdf-edit-close"]'
+    kind: interactive
+  - id: taoffice-pdf-edit-earlier
+    selector: '[data-testid="taoffice-pdf-edit-earlier"]'
+    kind: interactive
+  - id: taoffice-pdf-edit-later
+    selector: '[data-testid="taoffice-pdf-edit-later"]'
+    kind: interactive
+  - id: taoffice-pdf-edit-remove
+    selector: '[data-testid="taoffice-pdf-edit-remove"]'
+    kind: interactive
+  - id: taoffice-pdf-edit-rotate
+    selector: '[data-testid="taoffice-pdf-edit-rotate"]'
+    kind: interactive
+  - id: taoffice-pdf-edit-note
+    selector: '[data-testid="taoffice-pdf-edit-note"]'
+    kind: interactive
+  - id: taoffice-pdf-edit-tool
+    selector: '[data-testid="taoffice-pdf-edit-tool"]'
+    kind: interactive
+  - id: taoffice-pdf-edit-undo
+    selector: '[data-testid="taoffice-pdf-edit-undo"]'
+    kind: interactive
+  - id: taoffice-pdf-edit-output
+    selector: '[data-testid="taoffice-pdf-edit-output"]'
+    kind: display
+  - id: taoffice-pdf-markup
+    selector: '[data-testid="taoffice-pdf-markup"]'
+    kind: display
+  - id: taoffice-pdf-markup-surface
+    selector: '[data-testid="taoffice-pdf-markup-surface"]'
+    kind: interactive
+  - id: taoffice-pdf-annotations
+    selector: '[data-testid="taoffice-pdf-annotations"]'
+    kind: display
   - id: taoffice-pdf-form-toggle
     selector: '[data-testid="taoffice-pdf-form-toggle"]'
     kind: interactive

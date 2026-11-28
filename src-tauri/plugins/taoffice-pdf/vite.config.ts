@@ -25,6 +25,7 @@ export default defineConfig({
     writeBundle() {
       const destination = join(outDir, "pdfjs");
       mkdirSync(destination, { recursive: true });
+      cpSync(join(dirname(require.resolve("@cantoo/pdf-lib")), "../LICENSE.md"), join(outDir, "pdf-lib-LICENSE.md"));
       cpSync(join(pdfjs, "LICENSE"), join(destination, "LICENSE"));
       cpSync(join(pdfjs, "legacy/build/pdf.worker.min.mjs"), join(destination, "pdf.worker.mjs"));
       for (const folder of ["cmaps", "standard_fonts", "wasm", "iccs"]) {

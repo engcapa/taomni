@@ -1,11 +1,14 @@
 import { AnnotationMode, TextLayer } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { canvasScale, fitPageScale } from "./pdfGeometry.js";
 import { normalizePdfText } from "./pdfNavigation.js";
+import { PdfMarkupLayer } from "./PdfMarkupLayer.jsx";
 
 const { React } = globalThis.__taomniHost;
 const { useEffect, useRef, useState } = React;
 
-export function PdfPage({ pdf, number, zoom, rotation, viewportWidth, highlight, onScale, label, formRevision }) {
+export function PdfPage({
+  pdf, number, sourceNumber = number, zoom, rotation, viewportWidth, highlight, onScale, label, formRevision, markup,
+}) {
   const canvas = useRef(null);
   const layer = useRef(null);
   const textSpans = useRef([]);
@@ -16,7 +19,7 @@ export function PdfPage({ pdf, number, zoom, rotation, viewportWidth, highlight,
   const [textReady, setTextReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    void pdf.getPage(number).then((page) => {
+    void pdf.getPage(sourceNumber).then((page) => {
       if (cancelled) return;
       const angle = (page.rotate + rotation) % 360;
       const width = page.getViewport({ scale: 1, rotation: angle }).width;
@@ -26,7 +29,7 @@ export function PdfPage({ pdf, number, zoom, rotation, viewportWidth, highlight,
       onScale(scale);
     }).catch((reason) => { if (!cancelled) setError(String(reason)); });
     return () => { cancelled = true; };
-  }, [pdf, number, zoom, rotation, viewportWidth, onScale]);
+  }, [pdf, sourceNumber, zoom, rotation, viewportWidth, onScale]);
 
   useEffect(() => {
     if (!layout) return;
@@ -90,10 +93,11 @@ export function PdfPage({ pdf, number, zoom, rotation, viewportWidth, highlight,
     {failure && <p role="alert" className="taoffice-pdf-error">{failure}</p>}
     {!failure && paintedRevision === null && <p role="status">{label("正在渲染页面…", "Rendering page…")}</p>}
     <div className="taoffice-pdf-page" style={dimensions ?? undefined}
-      data-testid="taoffice-pdf-page" data-page={number} data-rotation={rotation}
+      data-testid="taoffice-pdf-page" data-page={number} data-source-page={sourceNumber} data-rotation={rotation}
       data-scale={layout?.scale} data-ready={ready}>
       <canvas ref={canvas} aria-hidden="true" />
       <div ref={layer} className="textLayer" data-testid="taoffice-pdf-text" />
+      {layout && markup && <PdfMarkupLayer key={markup.tool} viewport={layout.viewport} {...markup} label={label} />}
     </div>
   </>;
 }

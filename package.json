@@ -15,6 +15,7 @@
     "dev:mobile": "vite --config mobile-web/vite.config.ts"
   },
   "dependencies": {
+    "@cantoo/pdf-lib": "2.11.1",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.11.0",
     "@codemirror/lang-cpp": "^6.0.3",

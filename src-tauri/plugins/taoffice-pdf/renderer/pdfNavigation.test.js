@@ -9,10 +9,11 @@ describe("PDF navigation", () => {
         : [{ str: "Quarterly report" }] }),
     }));
     const pdf = { numPages: 2, getPage };
-    await expect(findPdfPages(pdf, " REVENUE   by region ", new AbortController().signal)).resolves.toEqual([2]);
+    await expect(findPdfPages(pdf, " REVENUE   by region ", new AbortController().signal, [{ number: 1 }, { number: 2 }])).resolves.toEqual([2]);
     const cancelled = AbortSignal.abort();
-    await expect(findPdfPages(pdf, "Revenue", cancelled)).rejects.toMatchObject({ name: "AbortError" });
-    expect(getPage).toHaveBeenCalledTimes(2);
+    await expect(findPdfPages(pdf, "Revenue", cancelled, [{ number: 2 }])).rejects.toMatchObject({ name: "AbortError" });
+    await expect(findPdfPages(pdf, "Revenue", new AbortController().signal, [{ number: 1 }])).resolves.toEqual([]);
+    expect(getPage.mock.calls.flat()).toEqual([1, 2, 1]);
   });
 
   it("shows internal destinations with depth and resolves named references", async () => {

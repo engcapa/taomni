@@ -3,7 +3,7 @@ import { findPdfPages, normalizePdfText, outlineEntries, outlinePage } from "./p
 const { React } = globalThis.__taomniHost;
 const { useEffect, useRef, useState } = React;
 
-export function PdfSearch({ pdf, label, input, onMatch, onClose }) {
+export function PdfSearch({ pdf, layout, label, input, onMatch, onClose }) {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState(null);
   const [notice, setNotice] = useState("");
@@ -17,13 +17,13 @@ export function PdfSearch({ pdf, label, input, onMatch, onClose }) {
     const { signal } = controller;
     setResult(null);
     setNotice("");
-    findPdfPages(pdf, search, signal).then((pages) => {
+    findPdfPages(pdf, search, signal, layout).then((pages) => {
       if (signal.aborted) return;
       setResult({ pages, index: 0 });
       if (pages.length) onMatchRef.current(pages[0], search);
     }).catch((error) => { if (!signal.aborted) setNotice(String(error)); });
     return () => controller.abort();
-  }, [pdf, search]);
+  }, [pdf, search, layout]);
 
   function move(direction) {
     if (!result?.pages.length) return;
@@ -104,7 +104,10 @@ export function PdfOutline({ pdf, label, onGo, onClose }) {
     const current = ++generation.current;
     try {
       const page = await outlinePage(pdf, destination);
-      if (generation.current === current) onGo(page);
+      if (generation.current === current) {
+        const found = onGo(page);
+        setError(found ? "" : label("目标页面已移除。", "The destination page has been removed."));
+      }
     } catch (reason) {
       if (generation.current === current) setError(String(reason));
     }
