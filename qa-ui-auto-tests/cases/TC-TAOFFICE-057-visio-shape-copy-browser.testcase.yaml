@@ -3,7 +3,7 @@ title: Edit and download simple Visio shapes
 description: Edit a selected VSDX shape, verify draft and focus behavior, save a copy and keep the source intact.
 modes: [browser]
 covers: [F-FILEOPEN-1]
-tags: [p0, file-open, taoffice, taoffice-visio]
+tags: [p0, file-open, taoffice, taoffice-visio, crash-regression]
 fixtures: [reset_db, file_open_files]
 ui_standard: [UI-BTN-03, UI-FOC-02, UI-INP-02, UI-INP-06, UI-OTH-03]
 timeout_sec: 300

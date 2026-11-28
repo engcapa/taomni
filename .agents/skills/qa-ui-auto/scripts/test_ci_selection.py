@@ -39,11 +39,11 @@ class ModuleProfileSelectionTests(unittest.TestCase):
         self.assertTrue(all("modular-release" in b["capabilities"] for b in full["builds"]))
         common_mode_cases = {"TC-FILE-OPEN-049": "mail", "TC-MODULES-102": "mfa"}
         browser_cases = {"TC-TAOFFICE-033": "taoffice-pdf", "TC-TAOFFICE-059": "taoffice-ppt", "TC-TAOFFICE-039": "taoffice-ppt",
-                         "TC-TAOFFICE-041": "taoffice-visio", "TC-TAOFFICE-043": "taoffice-video",
+                         "TC-TAOFFICE-041": "taoffice-visio", "TC-TAOFFICE-057": "taoffice-visio", "TC-TAOFFICE-043": "taoffice-video",
                          "TC-TAOFFICE-044": "taoffice-video", "TC-TAOFFICE-047": "taoffice-image",
                          "TC-TAOFFICE-049": "taoffice-excel", "TC-TAOFFICE-053": "taoffice-word"}
         native_cases = {"TC-TAOFFICE-034": "taoffice-pdf", "TC-TAOFFICE-060": "taoffice-ppt", "TC-TAOFFICE-040": "taoffice-ppt",
-                        "TC-TAOFFICE-042": "taoffice-visio", "TC-TAOFFICE-045": "taoffice-video",
+                        "TC-TAOFFICE-042": "taoffice-visio", "TC-TAOFFICE-058": "taoffice-visio", "TC-TAOFFICE-045": "taoffice-video",
                         "TC-TAOFFICE-046": "taoffice-video", "TC-TAOFFICE-048": "taoffice-image",
                         "TC-TAOFFICE-050": "taoffice-excel",
                         "TC-TAOFFICE-054": "taoffice-word"}
@@ -214,7 +214,7 @@ class SelectionTests(unittest.TestCase):
                     'TC-FILE-OPEN-007', 'TC-FILE-OPEN-008', 'TC-FILE-OPEN-009', 'TC-FILE-OPEN-010', 'TC-FILE-OPEN-011', 'TC-FILE-OPEN-012',
                     'TC-FILE-OPEN-013', 'TC-TAO-HOME-002', 'TC-EXPLORER-013', 'TC-FILE-OPEN-041',
                     'TC-FILE-OPEN-049', 'TC-MODULES-102', 'TC-TAOFFICE-001', 'TC-TAOFFICE-009',
-                    'TC-TAOFFICE-034', 'TC-TAOFFICE-040', 'TC-TAOFFICE-060', 'TC-TAOFFICE-042', 'TC-TAOFFICE-045', 'TC-TAOFFICE-046',
+                    'TC-TAOFFICE-034', 'TC-TAOFFICE-040', 'TC-TAOFFICE-060', 'TC-TAOFFICE-042', 'TC-TAOFFICE-058', 'TC-TAOFFICE-045', 'TC-TAOFFICE-046',
                     'TC-TAOFFICE-048', 'TC-TAOFFICE-050', 'TC-TAOFFICE-052', 'TC-TAOFFICE-054'}
         for entry in native:
             with self.subTest(profile=entry['linux_profile']):

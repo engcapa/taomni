@@ -17177,6 +17177,9 @@ controls:
   - id: taoffice-visio-shape-position
     selector: '[data-testid="taoffice-visio-shape-position"]'
     kind: interactive
+  - id: taoffice-visio-shape-validation
+    selector: '.taoffice-visio-editor [role="alert"]'
+    kind: display
   - id: taoffice-visio-shape-text
     selector: '[data-testid="taoffice-visio-shape-text"]'
     kind: interactive

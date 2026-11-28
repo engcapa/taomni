@@ -1531,6 +1531,7 @@
 - `[data-testid="taoffice-visio-shape"]` — interactive — F-FILEOPEN-1.taoffice-visio-shape
 - `[data-testid="taoffice-visio-shape-color"]` — interactive — F-FILEOPEN-1.taoffice-visio-shape-color
 - `[data-testid="taoffice-visio-shape-position"]` — interactive — F-FILEOPEN-1.taoffice-visio-shape-position
+- `.taoffice-visio-editor [role="alert"]` — display — F-FILEOPEN-1.taoffice-visio-shape-validation
 - `[data-testid="taoffice-visio-shape-text"]` — interactive — F-FILEOPEN-1.taoffice-visio-shape-text
 - `[data-testid="taoffice-visio-error"]` — display — F-FILEOPEN-1.taoffice-visio-error
 - `[data-testid="taoffice-visio-export"]` — interactive — F-FILEOPEN-1.taoffice-visio-export

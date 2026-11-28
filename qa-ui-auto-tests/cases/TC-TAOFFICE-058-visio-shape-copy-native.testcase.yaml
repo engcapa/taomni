@@ -3,7 +3,7 @@ title: Save and reopen a signed Visio shape copy through the native dialog
 description: Edit a selected VSDX shape, verify draft and focus behavior, save a copy and keep the source intact.
 modes: [native]
 covers: [F-FILEOPEN-1, F-Modules-1]
-tags: [p0, file-open, taoffice, taoffice-visio, native-boundary]
+tags: [p0, file-open, taoffice, taoffice-visio, native-boundary, crash-regression]
 fixtures: [reset_db, file_open_files, taoffice_signed_visio]
 ui_standard: [UI-BTN-03, UI-DLG-12, UI-FOC-02]
 timeout_sec: 300
