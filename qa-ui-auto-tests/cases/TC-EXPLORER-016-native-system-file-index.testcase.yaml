@@ -20,19 +20,27 @@ steps:
 - press: {selector: '[data-testid="file-search-input"]', key: Enter}
 - wait_for: '[data-testid="file-search-status"][data-state="done"]${fixture.index_probe_source}'
 - wait_for: '[data-testid="file-search-result"]${fixture.index_probe_result}'
+- fill: {selector: '[data-testid="file-search-input"]', value: '${fixture.index_probe_fuzzy}'}
+- assert_not_visible: '[data-testid="file-search-result"]${fixture.index_probe_result}'
+- press: {selector: '[data-testid="file-search-input"]', key: Enter}
+- wait_for: '[data-testid="file-search-status"][data-state="done"]${fixture.index_probe_source}'
+- wait_for: '[data-testid="file-search-result"]${fixture.index_probe_result}'
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: real-index
     ui_standard: [UI-DLG-03]
-    requirement: An external index hit outside the traversal roots requires both the real adapter name and the exact path. A runner without an indexed public control must still find a fresh local fixture and record the scope of that evidence.
-    actions: [9, 11, 12]
+    requirement: Case-insensitive and noncontiguous filename searches both retrieve the public path outside the traversal roots from the system index. A runner without an indexed public control must find a fresh local fixture and record the scope of that evidence.
+    actions: [9, 11, 12, 15, 17]
     checkpoints:
     - {step: 10, expectation: Explorer owns the search dialog.}
     - {step: 13, expectation: Search settled and identifies the expected available provider.}
     - {step: 14, expectation: The result contains the independent absolute path.}
-    results: [10, 13, 14]
+    - {step: 16, expectation: Editing the query removes the previous exact result.}
+    - {step: 18, expectation: The fuzzy search settles using the expected available provider.}
+    - {step: 19, expectation: The independently selected path appears for a name with an omitted character.}
+    results: [10, 13, 14, 16, 18, 19]
   visual:
   - {check: Search source and path, method: automated, reason: The actual search window exposes the settled source and the matching path.}
   native:

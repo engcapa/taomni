@@ -27,9 +27,9 @@
 | DEC-04 排序与范围（设计决策） | 读取文件内容、生成缩略图或计算编辑距离会增加 I/O 和 CPU，也会混淆文件名搜索与全文检索。 | 使用名称的大小写折叠和有序字符匹配，长度与跨度用于排序。每次最多保留 100 项；让用户缩小名称以查看超出预算的匹配。 |
 | DEC-05 恢复提醒（原型与实现） | 无路径草稿没有可比对的磁盘原件。具名文件可能同时存在磁盘变更与恢复的缓冲区。 | 未命名草稿静默恢复。具名恢复提示独立计时；真正的冲突继续由冲突区域处理。 |
 
-Windows Search 可经系统查询 API 使用现有目录。Windows Storage 的 QueryOptions 可以限定索引、搜索深度和名称过滤；基于 OLE DB 的 Search SQL 也是系统支持的入口，另起 PowerShell 进程的初始化成本会计入交互延迟。[Windows 存储查询](https://learn.microsoft.com/en-us/uwp/api/windows.storage.search.queryoptions) · [Windows Search 查询方式](https://learn.microsoft.com/en-us/windows/win32/search/using-sql-and-aqs-to-query-the-index) · [Everything 索引机制](https://www.voidtools.com/support/everything/indexes/)
+Windows 使用 OLE DB 的 Search SQL 查询当前用户可访问的现成索引。Windows Server 2025 上，独立 OLE DB 查询成功返回 ProgramData 中已入索引的文件，旧版 WinRT StorageFolder 全卷查询却遗漏了它。查询前先读取 WSearch 服务状态，仅在运行时启动单次无窗口的系统 PowerShell 查询，并由父进程限定用时。[WinRT 漏检的原生诊断](https://github.com/engcapa/taomni/actions/runs/46136138673) · [Windows Search 查询方式](https://learn.microsoft.com/en-us/windows/win32/search/using-sql-and-aqs-to-query-the-index) · [Everything 索引机制](https://www.voidtools.com/support/everything/indexes/)
 
-macOS 的 Spotlight 元数据查询支持 `kMDItemFSName`、大小写修饰符和通配符，`mdfind -0` 可无歧义地分隔含空格或换行的路径。文件名匹配无需读取 Spotlight 的文本内容属性；用户关闭索引或排除某些卷会影响结果覆盖。[Apple 文件元数据查询语法](https://developer.apple.com/library/archive/documentation/Carbon/Conceptual/SpotlightQuery/Concepts/QueryFormat.html)
+macOS 通过 `mdfind -0` 查询 `kMDItemFSName`。原生诊断确认，`mdfind` 的大小写修饰符 `c` 放在匹配值之后。连续名字直接查询，模糊分支查询多个独立的名称片段，再由 Rust 验证字符顺序和排序。用户关闭索引或排除某些卷会影响结果覆盖。[原生命令对照](https://github.com/engcapa/taomni/actions/runs/46136526568) · [Apple 文件元数据查询语法](https://developer.apple.com/library/archive/documentation/Carbon/Conceptual/SpotlightQuery/Concepts/QueryFormat.html)
 
 Linux 的 plocate 使用三字符倒排表加速含连续文字的匹配。完全拆开的短通配串难以利用这些 posting lists，要限制运行时间并尽量先取连续片段候选。按 basename 查询、NUL 分隔、限量及当前用户可见性来自工具本身。Linux 桌面未安装 plocate 或数据库缺失时，补查目录仍可用。[plocate 算法](https://plocate.sesse.net/) · [命令参数与退出状态](https://manpages.debian.org/bookworm/plocate/plocate.1.en.html)
 
@@ -51,8 +51,8 @@ Linux 的 plocate 使用三字符倒排表加速含连续文字的匹配。完�
 
 | 平台 | 生产接口 | 每次查询的资源约束 |
 | --- | --- | --- |
-| Windows | 进程内 WinRT StorageFolder，固定盘与 RAM 盘，深层 QueryOptions 指定 OnlyUseIndexer 和 System.FileName AQS。取消时调用 IAsyncOperation.Cancel。 | 各卷共享 850 ms 索引预算，无子进程冷启动。 |
-| macOS | 系统 mdfind，使用 kMDItemFSName 和 NUL 分隔，读取内核挂载表跳过远端文件系统。 | 系统查询单轮 450 ms；补充匹配受单独短预算限制。到期或取消时终止并回收查询进程。 |
+| Windows | 无窗口、低优先级的系统 PowerShell，通过 ADO 连接 Search.CollatorDSO。精确与模糊条件按 Search SQL 转义，以环境数据传入固定脚本。验证结果时只接纳固定盘和 RAM 盘路径。 | 单个进程内连续、模糊查询合计 1,600 ms。索引服务停止时直接进入有限补查。 |
+| macOS | 系统 mdfind 查询文件名，使用 NUL 分隔路径。读取内核挂载表以跳过远端文件系统。 | 连续匹配和最多两次片段查询共享 450 ms。到期或取消即终止并回收查询进程。 |
 | Linux | 低优先级 plocate basename 查询，先匹配连续字符，再按预算放宽到稀疏字符。 | 连续查询单轮至多 650 ms，稀疏查询至多 180 ms，已有命中时补查预算 25 ms。 |
 
 索引阶段最多读取 384 条候选和 512 KiB 输出，验证路径和文件类型的目标预算为 140 ms。补查使用 100 ms 时间预算，带索引时最多 1,500 项，降级时最多 6,000 项、512 个目录、深度六层。文件系统调用本身可能受磁盘负载影响，墙钟用时可能超过调度检查间隔。超过预算的子集会标为部分结果。

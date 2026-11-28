@@ -56,7 +56,7 @@ def system_index_target() -> tuple[str, Path | None, str]:
             continue
         path = Path(raw)
         if ((target is None or path == target) and path.is_absolute() and path.exists()
-                and not path.is_symlink() and 2 <= len(path.name) <= 96):
+                and not path.is_symlink() and 4 <= len(path.name) <= 96):
             return provider, path, "Public result outside fallback roots"
     return provider, None, "No accessible public control returned by the independent index"
 
@@ -72,11 +72,14 @@ def setup(ctx) -> None:
         expected = ctx.values["global_file_match"]
         source = "[data-provider]"
         query = ctx.values["global_file"]
+    middle = len(query) // 2
+    fuzzy = (query[:middle] + query[middle + 1:]).lower()
     ctx.values.update({
-        "index_probe_query": query,
+        "index_probe_query": query.lower(),
+        "index_probe_fuzzy": fuzzy,
         "index_probe_source": source,
         "index_probe_result": expected,
     })
-    receipt = {"provider": provider, "independentIndexHit": path is not None,
+    receipt = {"provider": provider, "independentIndexHit": path is not None, "fuzzyQuery": fuzzy,
                "path": path.as_posix() if path else None, "detail": detail}
     (ctx.case_dir / "index-probe.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")

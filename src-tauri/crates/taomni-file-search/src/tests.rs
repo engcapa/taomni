@@ -149,3 +149,45 @@ async fn indexed_linux_performance() {
         );
     }
 }
+
+#[cfg(any(windows, target_os = "macos"))]
+#[tokio::test]
+#[ignore = "opt-in verification against an independently indexed host file"]
+async fn indexed_system_control() {
+    use std::path::Path;
+    use std::time::Instant;
+
+    let expected = PathBuf::from(std::env::var_os("TAOMNI_FILE_SEARCH_INDEXED_CONTROL").unwrap());
+    let name = expected
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_lowercase();
+    let mut fuzzy: Vec<_> = name.chars().collect();
+    fuzzy.remove(fuzzy.len() / 2);
+    let fuzzy: String = fuzzy.into_iter().collect();
+    let provider = if cfg!(windows) {
+        Provider::WindowsSearch
+    } else {
+        Provider::Spotlight
+    };
+    for query in [name, fuzzy] {
+        let start = Instant::now();
+        let result = search(&query, None, Arc::new(AtomicBool::new(false)))
+            .await
+            .unwrap();
+        let found = result
+            .entries
+            .iter()
+            .any(|entry| Path::new(&entry.path) == expected);
+        println!(
+            "{provider:?} {query:?} in {} ms, hit={found}, delivered={:?}, limited={}",
+            start.elapsed().as_millis(),
+            result.provider,
+            result.truncated
+        );
+        assert_eq!(result.provider, provider);
+        assert!(found, "missing indexed {}", expected.display());
+    }
+}

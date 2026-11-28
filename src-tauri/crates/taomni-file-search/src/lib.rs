@@ -3,10 +3,14 @@ mod locations;
 mod matching;
 mod providers;
 mod scan;
+#[cfg(any(target_os = "macos", test))]
+mod spotlight;
 #[cfg(windows)]
 mod windows_index;
-#[cfg(not(windows))]
+#[cfg(not(any(target_os = "macos", windows)))]
 use providers as platform;
+#[cfg(target_os = "macos")]
+use spotlight as platform;
 #[cfg(windows)]
 use windows_index as platform;
 
