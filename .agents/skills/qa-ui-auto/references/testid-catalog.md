@@ -1535,6 +1535,7 @@
 - `[data-testid="taoffice-visio-shape-text"]` — interactive — F-FILEOPEN-1.taoffice-visio-shape-text
 - `[data-testid="taoffice-visio-error"]` — display — F-FILEOPEN-1.taoffice-visio-error
 - `[data-testid="taoffice-visio-export"]` — interactive — F-FILEOPEN-1.taoffice-visio-export
+- `[data-testid="taoffice-visio-export-pdf"]` — interactive — F-FILEOPEN-1.taoffice-visio-export-pdf
 - `[data-testid="taoffice-visio-export-error"]` — display — F-FILEOPEN-1.taoffice-visio-export-error
 - `[data-testid="taoffice-visio-export-pending"]` — display — F-FILEOPEN-1.taoffice-visio-export-pending
 - `[data-testid="taoffice-visio-export-status"]` — display — F-FILEOPEN-1.taoffice-visio-export-status

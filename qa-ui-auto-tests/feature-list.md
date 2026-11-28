@@ -17189,6 +17189,9 @@ controls:
   - id: taoffice-visio-export
     selector: '[data-testid="taoffice-visio-export"]'
     kind: interactive
+  - id: taoffice-visio-export-pdf
+    selector: '[data-testid="taoffice-visio-export-pdf"]'
+    kind: interactive
   - id: taoffice-visio-export-error
     selector: '[data-testid="taoffice-visio-export-error"]'
     kind: display

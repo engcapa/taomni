@@ -1,6 +1,6 @@
 id: TC-TAOFFICE-057
 title: Edit and download simple Visio shapes
-description: Edit a selected VSDX shape, verify draft and focus behavior, save a copy and keep the source intact.
+description: Edit a selected VSDX shape, export its edited page as PDF, verify draft and focus behavior, save a copy and keep the source intact.
 modes: [browser]
 covers: [F-FILEOPEN-1]
 tags: [p0, file-open, taoffice, taoffice-visio, crash-regression]
@@ -41,6 +41,12 @@ steps:
     filename: visio-routing - copy.svg
     contains: ['<svg', Release confirmed, Routing approval]
 - assert_download:
+    trigger: '[data-testid="taoffice-visio-export-pdf"]:enabled'
+    filename: visio-routing - copy.pdf
+    artifact: visio-review-pdf
+- assert_text: {selector: '[data-testid="taoffice-visio-export-status"]', contains: visio-routing - copy.pdf}
+- assert_enabled: '[data-testid="taoffice-visio-save-copy"]'
+- assert_download:
     trigger: '[data-testid="taoffice-visio-save-copy"]'
     filename: visio-routing - copy.vsdx
     contains: ['visio/pages/page2.xml', 'visio/pages/page1.xml']
@@ -71,24 +77,33 @@ verification:
   - id: R2
     ui_standard: [UI-BTN-03, UI-OTH-03]
     requirement: Editing a shape enables saving and updates the rendered SVG and VSDX copy.
-    actions: [19, 20, 25]
+    actions: [19, 20, 28]
     checkpoints:
     - {step: 23, expectation: Save copy becomes available.}
     - {step: 24, expectation: The SVG contains the edited shape text.}
-    - {step: 25, expectation: The VSDX download contains both page parts.}
-    - {step: 27, expectation: Saving clears the dirty state.}
-    results: [23, 24, 25, 27]
+    - {step: 28, expectation: The VSDX download contains both page parts.}
+    - {step: 30, expectation: Saving clears the dirty state.}
+    results: [23, 24, 28, 30]
   - id: R3
     ui_standard: [UI-INP-02, UI-INP-06]
     requirement: Invalid shape coordinates block saving and Escape during composition preserves the editor.
-    actions: [30, 34, 36]
+    actions: [33, 37, 39]
     checkpoints:
-    - {step: 31, expectation: The invalid coordinate input reports aria-invalid.}
-    - {step: 32, expectation: The shape editor displays the validation message.}
-    - {step: 33, expectation: A draft with an invalid position cannot be saved.}
-    - {step: 35, expectation: Correcting the coordinate restores the save action.}
-    - {step: 37, expectation: The textarea retains focus after a composing Escape.}
-    results: [31, 32, 33, 35, 37]
+    - {step: 34, expectation: The invalid coordinate input reports aria-invalid.}
+    - {step: 35, expectation: The shape editor displays the validation message.}
+    - {step: 36, expectation: A draft with an invalid position cannot be saved.}
+    - {step: 38, expectation: Correcting the coordinate restores the save action.}
+    - {step: 40, expectation: The textarea retains focus after a composing Escape.}
+    results: [34, 35, 36, 38, 40]
+  - id: R4
+    ui_standard: [UI-BTN-03, UI-OTH-03]
+    requirement: Exporting a review PDF of the edited second page keeps the VSDX draft available to save.
+    actions: [25]
+    checkpoints:
+    - {step: 25, expectation: The downloaded one-page PDF keeps the drawing dimensions and the edited shape on the second page.}
+    - {step: 26, expectation: The export status identifies the PDF destination.}
+    - {step: 27, expectation: The user can still save the VSDX edits.}
+    results: [25, 26, 27]
   visual:
   - {check: Shape editor and page rendering, method: automated, reason: The test exercises the visible editor and checks the decoded page image.}
   native:
