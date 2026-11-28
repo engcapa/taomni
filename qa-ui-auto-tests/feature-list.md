@@ -17360,6 +17360,9 @@ controls:
   - id: taoffice-excel-edit-cell
     selector: '[data-testid="taoffice-excel-edit-cell"]'
     kind: interactive
+  - id: taoffice-excel-cell-editor
+    selector: '[data-testid="taoffice-excel-cell-editor"]'
+    kind: display
   - id: taoffice-excel-input
     selector: '[data-testid="taoffice-excel-input"]'
     kind: interactive

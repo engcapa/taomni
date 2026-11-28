@@ -12,7 +12,8 @@ export function Worksheet({ range, cursor, move, active, pending, label, platfor
   const restoreFocus = useRef(false);
   const [anchor, setAnchor] = useState(null);
   const [clipboardError, setClipboardError] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(null);
+  const editing = draft !== null;
   const cells = useMemo(() => new Map(window.cells.map((cell) => {
     const address = columnName(cell.column) + (cell.row + 1);
     const edit = editor.edits.get(excelEditKey(range.sheet, address));
@@ -41,12 +42,12 @@ export function Worksheet({ range, cursor, move, active, pending, label, platfor
   }
 
   function onGridKey(event) {
-    if (pending || event.nativeEvent.isComposing || event.altKey) return;
+    if (editing || !active || pending || event.nativeEvent.isComposing || event.keyCode === 229 || event.altKey) return;
     const mod = platform === "macos" ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
-    if (!mod && editable && (event.key === "F2" || event.key === "Enter")) {
+    if (editable && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.key === "F2") {
       event.preventDefault();
       event.stopPropagation();
-      setEditing(true);
+      setDraft(selected.value);
       return;
     }
     if (mod && event.key.toLowerCase() === "c") {
@@ -56,11 +57,12 @@ export function Worksheet({ range, cursor, move, active, pending, label, platfor
       void navigator.clipboard.writeText(tsv(cells, anchor ?? cursor, cursor)).catch(() => setClipboardError(true));
       return;
     }
+    if (event.key === "Tab" || (event.key === "Enter" && (event.ctrlKey || event.metaKey))) return;
     const next = moveInSheet(event, cursor, window);
     if (!next) return;
     event.preventDefault();
     event.stopPropagation();
-    select(next, event.shiftKey);
+    select(next, event.shiftKey && event.key !== "Enter");
   }
 
   const inRange = (row, column) => row >= Math.min(cursor.row, anchor?.row ?? cursor.row)
@@ -68,28 +70,19 @@ export function Worksheet({ range, cursor, move, active, pending, label, platfor
     && column >= Math.min(cursor.column, anchor?.column ?? cursor.column)
     && column <= Math.max(cursor.column, anchor?.column ?? cursor.column);
 
-  function endEdit(offset = 0) {
-    restoreFocus.current = true;
-    setEditing(false);
-    const column = Math.max(0, Math.min(window.columns - 1, cursor.column + offset));
-    if (offset) select({ row: cursor.row, column });
+  function endEdit(event = null, focusCell = true) {
+    restoreFocus.current = focusCell;
+    setDraft(null);
+    if (event) select(moveInSheet(event, cursor, window));
   }
 
   return <>
     <div className="taoffice-excel-formula">
       <span className="taomni-mono" data-testid="taoffice-excel-cell-address">{address}</span>
-      {editing && editable ? <CellEdit key={address} type={selected.editType} address={address}
-        original={selected.value} label={label} platform={platform} onCancel={endEdit}
-        onSave={() => { void editor.save().catch(() => {}); }}
-        onCommit={(value, offset) => {
-          if (!editor.apply(range.sheet, address, selected.original ?? selected.value, value)) return false;
-          endEdit(offset);
-          return true;
-        }} />
-        : <input className="taomni-input" readOnly aria-label={label("单元格内容或公式", "Cell value or formula")}
-          data-testid="taoffice-excel-formula" value={selected?.formula ? `=${selected.formula}` : (selected?.value ?? "")} />}
+      <input className="taomni-input" readOnly aria-label={label("单元格内容或公式", "Cell value or formula")}
+        data-testid="taoffice-excel-formula" value={draft ?? (selected?.formula ? `=${selected.formula}` : (selected?.value ?? ""))} />
       {editor.permitted && !editing && <button type="button" className="taomni-btn" disabled={!editable}
-        data-testid="taoffice-excel-edit-cell" onClick={() => setEditing(true)}>{label("编辑单元格", "Edit cell")}</button>}
+        title={label("编辑单元格 (F2)", "Edit cell (F2)")} data-testid="taoffice-excel-edit-cell" onClick={() => setDraft(selected.value)}>{label("编辑单元格", "Edit cell")}</button>}
     </div>
     {selected?.truncated && <p className="taoffice-excel-feedback" role="status">
       {label("单元格内容过长，查看器显示前 960 个字符。", "This cell preview shows the first 960 characters.")}
@@ -101,7 +94,9 @@ export function Worksheet({ range, cursor, move, active, pending, label, platfor
     <div className="taoffice-excel-grid">
       <table role="grid" aria-label={label("工作表单元格", "Worksheet cells")} aria-busy={pending}
         aria-rowcount={window.rows + 1} aria-colcount={window.columns + 1} aria-readonly={!editor.permitted} aria-multiselectable="true"
-        tabIndex={-1} onKeyDown={onGridKey} ref={grid} data-testid="taoffice-excel-grid">
+        tabIndex={-1} onKeyDown={onGridKey} onBlur={(event) => {
+          if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) restoreFocus.current = false;
+        }} ref={grid} data-testid="taoffice-excel-grid">
         <thead><tr aria-rowindex={1}><th aria-colindex={1} aria-label={label("行号", "Row number")} />
           {Array.from({ length: columnCount }, (_, offset) => <th key={offset} scope="col"
             aria-colindex={start.column + offset + 2}>{columnName(start.column + offset)}</th>)}</tr></thead>
@@ -116,7 +111,26 @@ export function Worksheet({ range, cursor, move, active, pending, label, platfor
                 aria-readonly={!editor.permitted || !cells.get(key)?.editType}
                 aria-selected={inRange(row, column)} tabIndex={focused ? 0 : -1} ref={focused ? current : null}
                 data-testid="taoffice-excel-cell" data-address={`${columnName(column)}${row + 1}`}
-                title={cells.get(key)?.value} onClick={(event) => { setEditing(false); select({ row, column }, event.shiftKey); }}>{cells.get(key)?.value}</td>;
+                title={cells.get(key)?.value}
+                onClick={(event) => {
+                  if (editing) {
+                    if (!focused) current.current?.querySelector("input")?.focus();
+                    return;
+                  }
+                  select({ row, column }, event.shiftKey);
+                }}
+                onDoubleClick={() => {
+                  if (focused && editable) setDraft(selected.value);
+                }}>
+                {focused && editing && editable ? <CellEdit key={address} type={selected.editType} address={address}
+                  value={draft} onChange={setDraft} label={label} platform={platform} onCancel={endEdit}
+                  onSave={() => { void editor.save().catch(() => {}); }}
+                  onCommit={(value, event, focusCell) => {
+                    if (!editor.apply(range.sheet, address, selected.original ?? selected.value, value)) return false;
+                    endEdit(event, focusCell);
+                    return true;
+                  }} /> : cells.get(key)?.value}
+              </td>;
             })}
           </tr>;
         })}</tbody>
