@@ -10,7 +10,7 @@ from unittest.mock import Mock, call, patch
 import xml.etree.ElementTree as ET
 
 from ci_live_monitor import discover_selection, main
-from ci_live_shards import GitHubArtifacts, collect, report_shard
+from ci_live_shards import GitHubArtifacts, blocked_entries, collect, report_shard
 from qa_ui_auto.reporter import write_junit
 
 
@@ -182,6 +182,19 @@ class MonitorCommandTests(unittest.TestCase):
 
 
 class LiveCollectionTests(unittest.TestCase):
+    def test_waits_for_macos_browser_and_recognizes_its_own_cancelled_group(self):
+        shard = "macos-browser-shard-2"
+        entries = {shard: {"mode": "browser", "platform_key": "macos"}}
+        shared = {"name": "execute-browser", "status": "completed", "conclusion": "skipped"}
+        job = {"name": "execute-macos-browser / " + shard, "status": "in_progress"}
+        self.assertEqual(blocked_entries(entries, [shared, job]), set())
+        job.update(status="completed", conclusion="cancelled")
+        self.assertEqual(blocked_entries(entries, [shared, job]), {shard})
+        skipped = {"name": "execute-macos-browser", "status": "completed", "conclusion": "skipped"}
+        self.assertEqual(blocked_entries(entries, [skipped]), {shard})
+        old = {"name": "execute-browser / " + shard, "status": "completed"}
+        self.assertEqual(blocked_entries(entries, [old]), {shard})
+
     def test_collects_browser_before_native_producer_finishes_and_reports_actual_failure(self):
         clock = Clock()
         client = Mock()
