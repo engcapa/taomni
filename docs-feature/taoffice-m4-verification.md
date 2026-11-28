@@ -19,6 +19,12 @@ Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”�
 
 使用 Project 0.5.0 宿主的导入代码转换了 MPXJ 固定版本中的全部 19 份 MPX。独立 XML 解析器从生成的 MSPDI 文件读到 305 项任务、23 条前置关系、16 项资源、6 项分配和 39 份日历。德语样本中任务 12 的前置 UID 为 11，滞后量为 4800 个十分之一分钟，开始日期为 2003-01-09。逐文件记录保留了原始 Git blob、输入与输出 SHA-256 和各项计数。 [语料及逐文件回执](taoffice-research/project-exchange-63cdc4e.csv)
 
+## Visio 页面与外观
+
+从 libvisio 0.1.12 的官方源码包取出全部 34 份 VSD 和 VSDX。使用 `adc72e276` 的模块 WASM 和产品 SVG 清理函数解码，再以 Chromium 渲染页面。在独立配置中使用 LibreOffice Draw 24.2.7.2 打开原文件并导出 PDF。32 份图形在两端共得到 34 对可比较页面。另两份 `recursion-cycle.vsdx` 和 `tab-short-prefix.vsdx` 的解码器返回零宽高页面，TaOffice 显示格式错误，Draw 也没有导出 PDF。 [固定版本语料](https://dev-www.libreoffice.org/src/libvisio/libvisio-0.1.12.tar.xz) · [逐页回执](taoffice-research/visio-libvisio-0.1.12.csv)
+
+比较时将页面等比放入 480 × 480 白底画布。34 对页面的宽高比相对差均小于 1.5%。用任一颜色通道低于 224 判定有墨迹后，33 对有墨迹的页面中，两个渲染结果的交并比中位数为 0.3821。薄线、文字换行和图形填充可明显影响该数值。抽查中，`color-boxes.vsdx` 的色块位置吻合，`Visio11PlanWithDimensions.vsd` 的文字换行有差异，`dwg.vsdx` 的嵌入对象填充和 `tdf154379-QuickStyleFillMatrix.vsdx` 的主题填充也有差异。Microsoft Visio 的原应用外观仍待对照。 [六份样本并排截图](taoffice-research/visio-libvisio-0.1.12.png)
+
 ## Linux 回归
 
 在上述产品提交运行 TaOffice、UI 契约和完整崩溃回归 Browser 选集，88 项中通过 86 项。所有 TaOffice 用例通过。`TC-FILE-OPEN-008` 缺少 SSH/SFTP 夹具。`TC-FILE-OPEN-004` 在第 102 步等待 Markdown HTML 下载超时，相同步骤已在基线 `8eea6ebea` 复现。Browser 回执为 `receipt-run-20261128-115028-521141847`。
