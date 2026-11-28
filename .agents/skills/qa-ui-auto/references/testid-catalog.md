@@ -1524,6 +1524,8 @@
 - `[data-testid="taoffice-ppt-preview"]` — display — F-FILEOPEN-1.taoffice-ppt-preview
 - `[data-testid="taoffice-ppt-save"]` — interactive — F-FILEOPEN-1.taoffice-ppt-save
 - `[data-testid="taoffice-ppt-save-hint"]` — display — F-FILEOPEN-1.taoffice-ppt-save-hint
+- `[data-testid="taoffice-ppt-thumbnail"]` — interactive — F-FILEOPEN-1.taoffice-ppt-thumbnail
+- `[data-testid="taoffice-ppt-thumbnails"]` — display — F-FILEOPEN-1.taoffice-ppt-thumbnails
 - `[data-testid="taoffice-visio"]` — display — F-FILEOPEN-1.taoffice-visio
 - `[data-testid="taoffice-visio-copy-output"]` — display — F-FILEOPEN-1.taoffice-visio-copy-output
 - `[data-testid="taoffice-visio-edit-shapes"]` — interactive — F-FILEOPEN-1.taoffice-visio-edit-shapes

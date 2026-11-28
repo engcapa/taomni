@@ -11,7 +11,7 @@ function pngFromCanvas(canvas) {
   });
 }
 
-async function render({ bytes, index, width, height }) {
+async function render({ bytes, index, width, height, thumbnailOnly }) {
   if (bytes) {
     viewer?.destroy();
     viewer = new PPTXViewer({
@@ -27,7 +27,14 @@ async function render({ bytes, index, width, height }) {
     viewer.setCanvas(canvas);
   }
   await viewer.renderSlide(index, canvas);
-  return pngFromCanvas(canvas);
+  const thumbnail = document.createElement("canvas");
+  const scale = Math.min(1, 192 / canvas.width, 144 / canvas.height);
+  thumbnail.width = Math.max(1, Math.round(canvas.width * scale));
+  thumbnail.height = Math.max(1, Math.round(canvas.height * scale));
+  const context = thumbnail.getContext("2d");
+  context.drawImage(canvas, 0, 0, thumbnail.width, thumbnail.height);
+  const thumb = await pngFromCanvas(thumbnail);
+  return thumbnailOnly ? { thumb } : { thumb, image: await pngFromCanvas(canvas) };
 }
 
 function connect(event) {
@@ -38,8 +45,8 @@ function connect(event) {
     if (working) return;
     working = true;
     try {
-      const image = await render(data);
-      port.postMessage({ id: data.id, image });
+      const result = await render(data);
+      port.postMessage({ id: data.id, ...result });
     } catch {
       port.postMessage({ id: data.id, failed: true });
     } finally {

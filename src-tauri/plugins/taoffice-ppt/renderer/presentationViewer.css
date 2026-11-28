@@ -31,6 +31,79 @@
   font-variant-numeric: tabular-nums;
 }
 
+.taoffice-ppt-normal {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 140px;
+  min-width: 0;
+}
+
+.taoffice-ppt-thumbnails {
+  display: flex;
+  flex: 0 0 clamp(68px, 20%, 174px);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+  overflow: auto;
+  padding: 6px 4px;
+  border-inline-end: 1px solid var(--taomni-divider);
+  background: var(--taomni-panel-bg);
+}
+
+.taoffice-ppt-thumbnails .taomni-btn {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 4px;
+  flex-shrink: 0;
+  height: auto;
+  min-height: 26px;
+  padding: 4px;
+  text-align: start;
+}
+
+.taoffice-ppt-thumbnails [aria-selected="true"] {
+  background: var(--taomni-selected);
+  border-inline-start: 3px solid var(--taomni-accent);
+  font-weight: 600;
+}
+
+.taoffice-ppt-thumbnails :focus-visible {
+  outline: 2px solid var(--taomni-focus-ring);
+  outline-offset: -2px;
+}
+
+.taoffice-ppt-thumb-number {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--taomni-fs-small);
+}
+
+.taoffice-ppt-thumb-page {
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 100%;
+  max-height: 140px;
+  overflow: hidden;
+  border: 1px solid var(--taomni-divider);
+  background: var(--taomni-card-bg);
+}
+
+.taoffice-ppt-thumb-page img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+}
+
+.taoffice-ppt-thumb-page span {
+  overflow: hidden;
+  max-width: 100%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .taoffice-ppt-slide {
   display: grid;
   flex: 1 1 0;
@@ -61,6 +134,8 @@
 }
 
 .taoffice-ppt-editor {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;

@@ -5,7 +5,7 @@ modes: [native]
 covers: [F-FILEOPEN-1, F-Modules-1]
 tags: [p0, file-open, taoffice, taoffice-ppt, native-boundary, crash-regression]
 fixtures: [reset_db, file_open_files, taoffice_signed_ppt]
-ui_standard: [UI-BTN-03, UI-DLG-12, UI-FOC-02]
+ui_standard: [UI-BTN-03, UI-DLG-12, UI-FOC-02, UI-LST-03, UI-LST-05]
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
@@ -65,6 +65,20 @@ steps:
 - press: {selector: '[data-testid="taoffice-ppt-next"]', key: Enter}
 - wait_for: {selector: '[data-testid="taoffice-ppt-preview"][data-image-ready="true"][alt*="Delivery appendix"]', timeout_sec: 45}
 - assert_text_equals: {selector: '[data-testid="taoffice-ppt-position"]', equals: Slide 2 of 2}
+- wait_for: '[data-testid="taoffice-ppt-thumbnails"][role="listbox"]'
+- wait_for: '[data-testid="taoffice-ppt-thumbnail"][data-slide="1"] img[src^="blob:"]'
+- wait_for: '[data-testid="taoffice-ppt-thumbnail"][data-slide="2"] img[src^="blob:"]'
+- click: '[data-testid="taoffice-ppt-thumbnail"][data-slide="1"]'
+- assert_attribute: {selector: '[data-testid="taoffice-ppt-thumbnail"][data-slide="1"]', name: aria-selected, equals: 'true'}
+- press: {selector: '[data-testid="taoffice-ppt-thumbnail"][data-slide="1"]', key: End}
+- assert_focus_on: '[data-testid="taoffice-ppt-thumbnail"][data-slide="2"]'
+- assert_attribute: {selector: '[data-testid="taoffice-ppt-thumbnail"][data-slide="2"]', name: aria-selected, equals: 'true'}
+- wait_for: '[data-testid="taoffice-ppt-preview"][data-image-ready="true"][alt*="Delivery appendix"]'
+- press: {selector: '[data-testid="taoffice-ppt-thumbnail"][data-slide="2"]', key: ArrowUp}
+- assert_focus_on: '[data-testid="taoffice-ppt-thumbnail"][data-slide="1"]'
+- assert_attribute: {selector: '[data-testid="taoffice-ppt-thumbnail"][data-slide="2"]', name: tabindex, equals: '-1'}
+- assert_text_equals: {selector: '[data-testid="taoffice-ppt-position"]', equals: Slide 1 of 2}
+- screenshot: ppt-normal-view.png
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -97,6 +111,20 @@ verification:
     - {step: 23, expectation: The first editable paragraph receives focus.}
     - {step: 27, expectation: Escape restores focus to the Edit slide text control.}
     results: [23, 27]
+  - id: R4
+    ui_standard: [UI-LST-03, UI-LST-05]
+    requirement: The thumbnail pane shows rendered slide miniatures and keeps the single focus stop, selection and large canvas synchronized.
+    actions: [54, 56, 60]
+    checkpoints:
+    - {step: 52, expectation: The first slide has a rendered thumbnail.}
+    - {step: 53, expectation: The second slide has its own rendered thumbnail.}
+    - {step: 57, expectation: End focuses the last thumbnail.}
+    - {step: 58, expectation: The last slide is selected.}
+    - {step: 59, expectation: The large canvas displays Delivery appendix.}
+    - {step: 61, expectation: Up returns focus to the first slide.}
+    - {step: 62, expectation: The other thumbnail is outside the Tab sequence.}
+    - {step: 63, expectation: The slide position returns to the first slide.}
+    results: [52, 53, 57, 58, 59, 61, 62, 63]
   visual:
   - {check: Edited and retained slide previews, method: automated, reason: The case waits for each reopened slide's decoded image and checks the matching title and page position.}
   native:

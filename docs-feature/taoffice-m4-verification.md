@@ -1,5 +1,9 @@
 # TaOffice M4 验证记录
 
+## PowerPoint 普通视图的幻灯片导航
+
+PowerPoint 0.1.2 在左侧显示按顺序编号的真实幻灯片缩略图，右侧显示所选页或其文本编辑器。单击缩略图、在列表内按上下方向键、Home、End、Page Up 或 Page Down 会同步焦点、选中标记和当前页，输入标题前缀可定位幻灯片。预览和可见缩略图在同一个隔离渲染器中共享已加载的 PPTX，缩略图最长 192 像素、最高 144 像素。浏览器 039 和原生 040 对照 UI-LST-03、UI-LST-05 检查缩略图、焦点、画布以及原有的编辑和另存流程。[Microsoft 365 普通视图说明](https://support.microsoft.com/en-us/powerpoint/training/choose-the-right-view-for-the-task-in-powerpoint)
+
 ## Word 与 PowerPoint 语料往返
 
 在 Linux x86_64 使用产品提交 `adc72e2760a950bdeb624dbefaf4d8adda751244` 的 Word 0.2.0 和 PowerPoint 0.1.0 读写实现。样本固定于 Apache POI 的 `f63b77bb7497d950073969f9d418f2270dd87edd`。每份输入均比对了 Git blob 身份，原件、输出的 SHA-256 以及逐文件结果列于回执中。 [Word 语料](https://github.com/apache/poi/tree/f63b77bb7497d950073969f9d418f2270dd87edd/test-data/document) · [PowerPoint 语料](https://github.com/apache/poi/tree/f63b77bb7497d950073969f9d418f2270dd87edd/test-data/slideshow) · [逐文件回执](taoffice-research/office-roundtrip-f63b77b.csv)

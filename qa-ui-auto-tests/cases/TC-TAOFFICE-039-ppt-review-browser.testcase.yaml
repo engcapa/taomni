@@ -5,7 +5,7 @@ modes: [browser]
 covers: [F-FILEOPEN-1]
 tags: [p0, file-open, taoffice, taoffice-ppt, crash-regression]
 fixtures: [reset_db, file_open_files]
-ui_standard: [UI-BTN-03, UI-DLG-04, UI-DLG-06, UI-FND-03a, UI-FND-13, UI-FOC-02, UI-INP-01, UI-INP-06]
+ui_standard: [UI-BTN-03, UI-DLG-04, UI-DLG-06, UI-FND-03a, UI-FND-13, UI-FOC-02, UI-INP-01, UI-INP-06, UI-LST-03, UI-LST-05]
 timeout_sec: 250
 steps:
 - open: ${cfg.app.base_url}
@@ -93,6 +93,20 @@ steps:
 - assert_text: {selector: '[data-testid="taoffice-ppt-error"]', contains: Could not open the PowerPoint file.}
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]:has-text("ppt-review.pptx")'
 - wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-preview"][data-image-ready="true"]'
+- wait_for: '[data-testid="taoffice-ppt-thumbnails"][role="listbox"]'
+- wait_for: '[data-testid="taoffice-ppt-thumbnail"][data-slide="1"] img[src^="blob:"]'
+- wait_for: '[data-testid="taoffice-ppt-thumbnail"][data-slide="2"] img[src^="blob:"]'
+- click: '[data-testid="taoffice-ppt-thumbnail"][data-slide="1"]'
+- assert_attribute: {selector: '[data-testid="taoffice-ppt-thumbnail"][data-slide="1"]', name: aria-selected, equals: 'true'}
+- press: {selector: '[data-testid="taoffice-ppt-thumbnail"][data-slide="1"]', key: End}
+- assert_focus_on: '[data-testid="taoffice-ppt-thumbnail"][data-slide="2"]'
+- assert_attribute: {selector: '[data-testid="taoffice-ppt-thumbnail"][data-slide="2"]', name: aria-selected, equals: 'true'}
+- wait_for: '[data-testid="taoffice-ppt-preview"][data-image-ready="true"][alt*="Delivery appendix"]'
+- press: {selector: '[data-testid="taoffice-ppt-thumbnail"][data-slide="2"]', key: ArrowUp}
+- assert_focus_on: '[data-testid="taoffice-ppt-thumbnail"][data-slide="1"]'
+- assert_attribute: {selector: '[data-testid="taoffice-ppt-thumbnail"][data-slide="2"]', name: tabindex, equals: '-1'}
+- assert_text_equals: {selector: '[data-testid="taoffice-ppt-position"]', equals: Slide 1 of 2}
+- screenshot: ppt-normal-view.png
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -149,6 +163,20 @@ verification:
     - {step: 66, expectation: Dark status text meets the 4.5 to 1 contrast minimum.}
     - {step: 67, expectation: Each toolbar button fits in the viewport with a minimum target size.}
     results: [53, 58, 59, 61, 65, 66, 67]
+  - id: R6
+    ui_standard: [UI-LST-03, UI-LST-05]
+    requirement: The thumbnail pane shows rendered slide miniatures and keeps the single focus stop, selection and large canvas synchronized.
+    actions: [78, 80, 84]
+    checkpoints:
+    - {step: 76, expectation: The first slide has a rendered thumbnail.}
+    - {step: 77, expectation: The second slide has its own rendered thumbnail.}
+    - {step: 81, expectation: End focuses the last thumbnail.}
+    - {step: 82, expectation: The last slide is selected.}
+    - {step: 83, expectation: The large canvas displays Delivery appendix.}
+    - {step: 85, expectation: Up returns focus to the first slide.}
+    - {step: 86, expectation: The other thumbnail is outside the Tab sequence.}
+    - {step: 87, expectation: The slide position returns to the first slide.}
+    results: [76, 77, 81, 82, 83, 85, 86, 87]
   visual:
   - {check: Slide preview dimensions and navigation, method: automated, reason: The case waits for decoded slide images and checks their native bitmap dimensions and active page state.}
   native:
