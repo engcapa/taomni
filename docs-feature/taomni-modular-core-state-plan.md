@@ -102,6 +102,8 @@ Core helper entrypoints (`--ssh-stdio-forward`, Windows `--screenshot-scroll-inp
 
 ## Explicit compatibility façade
 
+Explorer filename search is owned by the core. Its additive `explorer_global_file_search` command shares Explorer operation cancellation. Search, draft restoration and their core-only regression selection run without an installed business module. The module protocol stays at `coreApiVersion: "1"`. Exercise TC-EXPLORER-015/016 and TC-FILE-OPEN-050/051. [Search contract and QA scope](file-explorer/global-filename-search.md)
+
 - Keep `AppState` as the managed composition object and preserve core Tauri command names/serializable contracts. Field usage is always `.core.*` or `.legacy.*`; no `Deref`, public duplicate fields, or macro-generated implicit access.
 - Existing `mail_db` and other truly shared methods may explicitly delegate to the core owner. A plugin command façade maps its exact legacy payload/result to `plugin_invoke(slug, command, typed_payload)` once that plugin migrates.
 - Transitional feature routing is selected explicitly in composition, not on host failure. Disabled/missing/invalid plugins return stable unavailable errors or placeholders; they must never execute the legacy implementation as a fallback.

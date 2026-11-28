@@ -16395,6 +16395,10 @@ controls:
     kind: interactive
   - id: file-search-result
     selector: '[data-testid="file-search-result"]'
+    aliases:
+    - '[data-testid="file-search-result"]${fixture.global_dir_match}'
+    - '[data-testid="file-search-result"]${fixture.global_file_match}'
+    - '[data-testid="file-search-result"]${fixture.index_probe_result}'
     kind: interactive
   - id: file-search-status
     selector: '[data-testid="file-search-status"]'

@@ -1301,6 +1301,9 @@
 - `[data-testid="file-search-submit"]` — interactive — F-EXPLORER-1.file-search-submit
 - `[data-testid="file-search-cancel"]` — interactive — F-EXPLORER-1.file-search-cancel
 - `[data-testid="file-search-result"]` — interactive — F-EXPLORER-1.file-search-result
+  ↳ `[data-testid="file-search-result"]${fixture.global_dir_match}` — alias
+  ↳ `[data-testid="file-search-result"]${fixture.global_file_match}` — alias
+  ↳ `[data-testid="file-search-result"]${fixture.index_probe_result}` — alias
 - `[data-testid="file-search-status"]` — display — F-EXPLORER-1.file-search-status
 - `[data-testid="file-search-close"]` — interactive — F-EXPLORER-1.file-search-close
 - `[data-testid="context-menu-item-file-explorer"]` — interactive — F-EXPLORER-1.explorer-main-menu-entry
