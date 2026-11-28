@@ -101,7 +101,7 @@ class FileOpenAssetsTests(unittest.TestCase):
             oracle.run(self.ctx, {"path": path, "absent": True}, mode="browser")
         self.ctx.page.evaluate.assert_not_called()
         self.ctx.page.locator.return_value.evaluate_all.return_value = [path]
-        self.ctx.page.evaluate.return_value = {"exists": True, "bytes": [65]}
+        self.ctx.page.evaluate.return_value = {"exists": True, "size": 1, "sha256": hashlib.sha256(b"A").hexdigest()}
         oracle.run(self.ctx, {"selector": ".readonly-viewer", "remember": "copy", "equals": "A"}, mode="browser")
         self.ctx.page.evaluate.return_value = {"exists": False}
         oracle.run(self.ctx, {"remember": "copy", "absent": True}, mode="browser")
@@ -129,6 +129,7 @@ class FileOpenAssetsTests(unittest.TestCase):
         # controlled; this reproduces deletion between the two asynchronous reads.
         script = r"""
 import assert from "node:assert/strict";
+import { createHash, webcrypto } from "node:crypto";
 import { createContext, SourceTextModule, SyntheticModule } from "node:vm";
 
 const source = process.argv[1];
@@ -136,11 +137,15 @@ const path = "/preview/.viewer-temp/owned/copy.txt";
 const missing = () => new Error(`Not found: ${path}`);
 const notFile = () => new Error(`Not a file: ${path}`);
 const file = { fileType: "file" };
+const fingerprint = bytes => ({ exists: true, size: bytes.length, sha256: createHash("sha256").update(Uint8Array.from(bytes)).digest("hex") });
+const large = new Uint8Array(8 * 1024 * 1024).fill(0xe7);
 const fixtures = [
+  { name: "large member returns a digest and size", stats: [file], bytes: large,
+    expected: fingerprint(large), calls: ["stat", "read"] },
   { name: "regular binary bytes", stats: [file], bytes: [0, 255, 128],
-    expected: { exists: true, bytes: [0, 255, 128] }, calls: ["stat", "read"] },
+    expected: fingerprint([0, 255, 128]), calls: ["stat", "read"] },
   { name: "empty file exists", stats: [file], bytes: [],
-    expected: { exists: true, bytes: [] }, calls: ["stat", "read"] },
+    expected: fingerprint([]), calls: ["stat", "read"] },
   { name: "already deleted", stats: [missing()], expected: { exists: false }, calls: ["stat"] },
   { name: "deleted after first stat", stats: [file, missing()], readError: notFile(),
     expected: { exists: false }, calls: ["stat", "read", "stat"] },
@@ -169,7 +174,7 @@ const fixtures = [
 for (const fixture of fixtures) {
   const calls = [];
   const stats = [...fixture.stats];
-  const context = createContext({ Error });
+  const context = createContext({ Error, crypto: webcrypto });
   const vfs = new SyntheticModule(["vfsStat", "vfsReadBytes"], function () {
     this.setExport("vfsStat", async (actual) => {
       assert.equal(actual, path, fixture.name);
