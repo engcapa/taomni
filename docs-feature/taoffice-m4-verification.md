@@ -1,5 +1,17 @@
 # TaOffice M4 验证记录
 
+## Windows 编辑与另存验收
+
+受测产品提交为 `f6388728bbf1ce74f1567d0fb2b8321946c86cb8`。Windows Browser 选集通过 94 项，Native 通过 100 项，各有 1 项因缺少 SSH/SFTP 夹具而跳过。两个模式下的 TaOffice 均为 33/33。Browser 的 UI 契约为 40/40，崩溃回归为 34/35。Native 分别为 42/42、38/39。跳过的是同一个 `TC-FILE-OPEN-008`。
+
+| 编辑入口 | Windows Browser | Windows Native |
+| --- | --- | --- |
+| Word 页面 | 021 验证在纸张内编辑正文与表格、保留混合格式和取消关闭后的草稿。053 验证旧格式转存及归档内只读预览。 | 022 将两页 DOCX 另存并从磁盘重开。054 将 DOC、ODT、RTF 分别转存为 DOCX，并检查原件哈希。 |
+| Excel 工作表 | 019 验证网格内输入、无效数值反馈、Tab 提交与移动、表头与公式保护、取消关闭后的草稿。 | 020 安装签名模块、取消系统另存、再次保存并重开 XLSX。Microsoft Excel 16.0 build 20625.0 用普通只读方式打开副本，Totals 工作表保留 QuarterlyTotals 表，A2 为 Mechanical Keyboard，B2 为 15.5，C2 保留公式 `=B2*2` 并读到结果 31。 |
+| PowerPoint 普通视图 | 039 验证缩略图键盘导航、选中页与编辑区同步、编辑另存和新建演示文稿。059 验证 PPT 与 ODP 导入。 | 040 在取消系统另存后重试，重开并核对两页 PPTX。060 将 PPT 和 ODP 分别转存为 PPTX，再从磁盘重开。 |
+
+Browser 回执为 `receipt-run-20261128-163532-846234100`，Native 主选集回执为 `receipt-run-20261128-164911-719051300`。截图按 Word 页面编辑、Excel 单元格编辑、PowerPoint 缩略图导航排列。其中 Word 截图来自同一提交的 Browser 回执 `receipt-run-20261128-163517-477624800`。Word 纸面与焦点对应 UI-FND-04 和 UI-FOC-02，Excel 输入与键盘行为对应 UI-INP-06、UI-INP-07、UI-KEY-04，PowerPoint 列表导航对应 UI-LST-03 和 UI-LST-05。[三个编辑界面](taoffice-research/office-windows-editing-f6388728b.jpg) · [Windows 原应用逐文件读回](taoffice-research/office-microsoft-reopen-f6388728b.csv)
+
 ## PowerPoint 普通视图的幻灯片导航
 
 PowerPoint 0.1.2 在左侧显示按顺序编号的真实幻灯片缩略图，右侧显示所选页或其文本编辑器。单击缩略图、在列表内按上下方向键、Home、End、Page Up 或 Page Down 会同步焦点、选中标记和当前页，输入标题前缀可定位幻灯片。预览和可见缩略图在同一个隔离渲染器中共享已加载的 PPTX，缩略图最长 192 像素、最高 144 像素。浏览器 039 和原生 040 对照 UI-LST-03、UI-LST-05 检查缩略图、焦点、画布以及原有的编辑和另存流程。[Microsoft 365 普通视图说明](https://support.microsoft.com/en-us/powerpoint/training/choose-the-right-view-for-the-task-in-powerpoint)
@@ -13,11 +25,11 @@ PowerPoint 0.1.2 在左侧显示按顺序编号的真实幻灯片缩略图，右
 | DOCX | 30 | 20 | 9 | 1 | 20/20 |
 | PPTX | 30 | 22 | 7 | 1 | 22/22 |
 
-每次运行选取第一个受支持的非空段落，替换为 `TaOffice roundtrip <原文件名>`。保存后重读编辑值，对比 OPC 部件名和每个解压部件的字节。Word 副本仅变更 `word/document.xml`，PowerPoint 副本仅变更选中段落所在的幻灯片。使用 LibreOffice 24.2.7.2 的独立配置以只读模式打开全部副本，禁用宏和外部链接更新，遍历 Writer 文本与表格及 Impress 形状与表格。42 份副本均读到替换文本。另经 PDF 导出和文本提取，38 份能读到完整替换文本。其余 4 份 PPTX 的编辑值已在 Impress 文档模型中核实，页面可见文字的完整呈现仍待逐页对照。
+每次运行选取第一个受支持的非空段落，替换为 `TaOffice roundtrip <原文件名>`。保存后重读编辑值，对比 OPC 部件名和每个解压部件的字节。Word 副本仅变更 `word/document.xml`，PowerPoint 副本仅变更选中段落所在的幻灯片。使用 LibreOffice 24.2.7.2 的独立配置以只读模式打开全部副本，禁用宏和外部链接更新，遍历 Writer 文本与表格及 Impress 形状与表格。42 份副本均读到替换文本。另经 PDF 导出和文本提取，38 份能读到完整替换文本。其余 4 份 PPTX 的完整编辑值仅在这次 Impress 文档模型读回中检出。
 
-`deep-table-cell.docx` 触发 Word 的 128 层 XML 嵌套上限。`keyframes.pptx` 内部声明宏演示文稿类型，并包含 `ppt/vbaProject.bin`。语料中的保护文档、字段、SmartArt、图片和嵌入媒体保留其只读语义。Microsoft Word 与 PowerPoint 的原应用重开仍待实机验证。
+`deep-table-cell.docx` 触发 Word 的 128 层 XML 嵌套上限。`keyframes.pptx` 内部声明宏演示文稿类型，并包含 `ppt/vbaProject.bin`。语料中的保护文档、字段、SmartArt、图片和嵌入媒体保留其只读语义。
 
-Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”重开和导出了这 42 份副本。逐文件回执记录了每个 PDF 的 SHA-256、页数以及按空白规范化后能否提取完整编辑值。Word 为 20/20，PowerPoint 为 17/22。以下 5 份演示文稿的 PDF 未检出完整编辑值：`45541_Footer.pptx`、`45541_Header.pptx`、`45545_Comment.pptx`、`highlight-test-case.pptx`、`table-with-different-font-colors.pptx`。这 5 份的文档模型读回均成功，页面显示保真度仍待对照。Project 与 Visio 的原应用重开另待有相应应用的环境验证。
+Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”重开和导出了这 42 份副本。逐文件回执记录了每个 PDF 的 SHA-256、页数以及按空白规范化后能否提取完整编辑值。Word 为 20/20，PowerPoint 为 17/22。`45541_Footer.pptx`、`45541_Header.pptx`、`45545_Comment.pptx`、`highlight-test-case.pptx` 和 `table-with-different-font-colors.pptx` 的 WPS PDF 均未检出完整编辑值。下节记录这五份原件及副本在 Microsoft PowerPoint 中的首页对照。Microsoft Project 和 Visio 原应用重开仍待有相应应用的环境验证。
 
 ### Windows Microsoft PowerPoint 首页对照
 
@@ -25,7 +37,11 @@ Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”�
 
 ### Windows Microsoft Word 与 PowerPoint 重开
 
-Microsoft Word 与 PowerPoint 16.0 build 20625 使用普通只读打开方式读回了 27 份副本。Windows Native 在产品提交 `1acd5cf3a216f60fe5e6f228290d1a1fd7536ee2` 的 022、040、054、060 中通过系统另存生成 4 份 DOCX、3 份 PPTX。Word 读回正文与表格，PowerPoint 读回两页幻灯片及其预期标题。另用同一批公开输入重建了 20 份 Word 语料副本，逐文件与历史 Linux 输出的 SHA-256 匹配，Word 全部读到了相应编辑标记。27 份文件在重开前后都通过 SHA-256 对比。Native 回执为 `receipt-run-20261128-145838-889896600`。[逐文件读回与摘要](taoffice-research/office-microsoft-reopen.csv)
+在 `f6388728b` 的 Windows Native 主选集结束后，按 runner 回执核对 022、040、054、060 的模块包与输出摘要。Microsoft Word 和 PowerPoint 16.0 build 20625 各以普通只读方式重新打开本轮实际保存的 4 份 DOCX 与 3 份 PPTX。全部读回预期编辑值，关闭后文件 SHA-256 均与打开前相同。与上一轮各自的输出逐部件比较，6 份的所有 OOXML 部件字节一致，RTF 转存件仅有 `docProps/core.xml` 的创建与修改时间变化。
+
+同一 PowerPoint 会话还打开了用 `f6388728b` 的演示文稿模块对上述 Apache POI 语料重新编辑得到的 22 份 PPTX。逐件核对输入与输出 SHA-256，每份仅变更 `ppt/slides/slide1.xml`。22/22 均以实际页数打开，从首页形状或表格单元格读回完整编辑文本，正常关闭后副本哈希均保持一致。对前节五份样本又分别导出原件和副本首页。在 1280 像素宽的画布上，五组图片的差异像素外框均与前节记录相同。逐像素对照覆盖这五份的首页，其余样本的结果覆盖页数和首页编辑值。[本轮 30 份 Office 副本的输入、输出与读回值](taoffice-research/office-microsoft-reopen-f6388728b.csv)
+
+历史提交 `1acd5cf3a216f60fe5e6f228290d1a1fd7536ee2` 的 27 份回执包含其 Windows Native 的 7 份系统另存副本，以及 20 份与历史 Linux 输出逐文件 SHA-256 相同的公开 Word 副本。Word 读回正文与表格，PowerPoint 读回两页及其预期标题。27 份文件在原应用重开前后都通过 SHA-256 对比。这 20 份公开 Word 的原应用证据来自该轮，Native 回执为 `receipt-run-20261128-145838-889896600`。[历史逐文件读回与摘要](taoffice-research/office-microsoft-reopen.csv)
 
 ## Word 页面编辑与缩放
 
