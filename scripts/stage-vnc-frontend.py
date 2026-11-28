@@ -26,7 +26,7 @@ def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, P
         expected.update(f"screenshot-ocr/{name}" for name in SCREENSHOT_ASSETS)
     if slug == "taoffice-pdf":
         directories.update({"pdfjs", "pdfjs/cmaps", "pdfjs/iccs", "pdfjs/standard_fonts", "pdfjs/wasm"})
-        expected.update({"pdfjs/LICENSE", "pdfjs/pdf.worker.mjs"})
+        expected.update({"pdfjs/LICENSE", "pdfjs/pdf.worker.mjs", "pdf-lib-LICENSE.md"})
     if slug == "taoffice-video":
         expected.add("mediabunny-LICENSE.txt")
     if with_receipt:
