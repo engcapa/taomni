@@ -11,6 +11,12 @@ fn fallback() -> Indexed {
 }
 
 #[test]
+fn ipc_search_future_can_run_on_the_multithreaded_desktop_runtime() {
+    fn require_send<T: Send>(_: T) {}
+    require_send(search("xy", None, Default::default()));
+}
+
+#[test]
 fn validation_counts_unicode_and_rejects_controls_and_oversize_queries() {
     assert_eq!(validate("  档案  ").unwrap(), "档案");
     assert!(validate("档").is_err());

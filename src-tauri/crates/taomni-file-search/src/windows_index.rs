@@ -65,15 +65,32 @@ async fn query_drive(
 ) -> Option<(Vec<PathBuf>, bool)> {
     let root = HSTRING::from(format!("{}:\\", char::from(drive)));
     let open = StorageFolder::GetFolderFromPathAsync(&root).ok()?;
-    let folder = wait(open, deadline, cancelled).await?;
-    let query = folder.CreateItemQueryWithOptions(options).ok()?;
-    let fetch = query.GetItemsAsync(0, remaining as u32).ok()?;
-    let items = wait(fetch, deadline, cancelled).await?;
-    let count = items.Size().ok()?;
+    // StorageFolder, StorageItemQueryResult and IVectorView are apartment
+    // objects. Retain only agile asynchronous operations across await points
+    // so Tauri can move its command future between runtime threads.
+    let (fetch, mut index_state) = {
+        let folder = wait(open, deadline, cancelled).await?;
+        let query = folder.CreateItemQueryWithOptions(options).ok()?;
+        (
+            query.GetItemsAsync(0, remaining as u32).ok()?,
+            Pending(folder.GetIndexedStateAsync().ok()),
+        )
+    };
+    let (count, paths) = {
+        let items = wait(fetch, deadline, cancelled).await?;
+        let count = items.Size().ok()?;
+        let paths = (0..count)
+            .filter_map(|i| {
+                let path = items.GetAt(i).ok()?.Path().ok()?;
+                Some(PathBuf::from(path.to_os_string()))
+            })
+            .collect();
+        (count, paths)
+    };
     if count == 0 {
         // A disabled index and a completed index with zero hits are different
         // user-visible states. Do not label an unindexed drive a healthy search.
-        let state = wait(folder.GetIndexedStateAsync().ok()?, deadline, cancelled).await?;
+        let state = wait(index_state.0.take()?, deadline, cancelled).await?;
         if !matches!(
             state,
             IndexedState::PartiallyIndexed | IndexedState::FullyIndexed
@@ -81,12 +98,6 @@ async fn query_drive(
             return None;
         }
     }
-    let paths = (0..count)
-        .filter_map(|i| {
-            let path = items.GetAt(i).ok()?.Path().ok()?;
-            Some(PathBuf::from(path.to_os_string()))
-        })
-        .collect();
     Some((paths, count as usize == remaining))
 }
 
