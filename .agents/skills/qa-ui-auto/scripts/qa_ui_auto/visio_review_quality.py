@@ -13,13 +13,16 @@ def shape_bounds(rgb, name, color, expected):
     # Include antialiased/compressed fills, but distinguish the blue first
     # page from the green second page and both from the light yellow node.
     mask = np.max(np.abs(rgb - color), axis=2) <= 7
-    y, x = np.nonzero(mask)
-    if not x.size:
-        raise StepError(f"Visio PDF lost the {name} fill")
-    bounds = np.array([x.min(), y.min(), x.max() + 1, y.max() + 1]) / PIXELS_PER_POINT
+    # Antialiased glyphs in other nodes can acquire the same color as this
+    # fill. Measure rows and columns with several points of solid paint.
     left, top, right, bottom = expected
+    ys, = np.nonzero(mask.sum(axis=1) >= (right - left) * PIXELS_PER_POINT / 2)
+    xs, = np.nonzero(mask.sum(axis=0) >= (bottom - top) * PIXELS_PER_POINT / 2)
+    if not xs.size or not ys.size:
+        raise StepError(f"Visio PDF lost the {name} fill")
+    bounds = np.array([xs.min(), ys.min(), xs.max() + 1, ys.max() + 1]) / PIXELS_PER_POINT
     area = (right - left) * (bottom - top) * PIXELS_PER_POINT ** 2
-    if np.max(np.abs(bounds - expected)) > 2 or x.size < area * 0.75:
+    if np.max(np.abs(bounds - expected)) > 2 or mask.sum() < area * 0.75:
         raise StepError(f"Visio PDF {name} has incorrect visible bounds or fill area: {bounds.tolist()}")
     return bounds.tolist()
 

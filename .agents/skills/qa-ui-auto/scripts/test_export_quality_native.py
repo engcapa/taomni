@@ -106,6 +106,9 @@ class VisioReviewPdfTest(unittest.TestCase):
                     page.draw_rect((left, 115.2, left + 144, 172.8), color=color("#1e3a5f"),
                                    fill=color(fill), width=1.44)
                     page.insert_text((left, 144), text, fontsize=13)
+                # Glyph antialiasing can also yield a few pixels of the
+                # green node's color within the neighboring yellow node.
+                page.draw_rect((340, 140, 342, 142), color=None, fill=color(approval_color))
             if extra_page:
                 doc.new_page()
             if flatten:
