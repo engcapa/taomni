@@ -1,14 +1,17 @@
 import { appendFileSync, cpSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createRequire, findPackageJSON } from "node:module";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { defineConfig } from "vite";
 
 const outDir = fileURLToPath(new URL("./dist/frontend", import.meta.url));
 const wasmBuild = fileURLToPath(new URL("./wasm/.build", import.meta.url));
 const assets = ["visio.wasm", "visio-icu.dat", "visio-third-party-notices.txt"];
-const notices = [
-  ["fflate", "LICENSE"], ["@cantoo/pdf-lib", "LICENSE.md"], ["culori", "LICENSE"],
-  ["html-entities", "LICENSE"], ["node-html-better-parser", "LICENSE"], ["tslib", "LICENSE.txt"],
+const pdfEntry = pathToFileURL(createRequire(import.meta.url).resolve("@cantoo/pdf-lib"));
+const notices: Array<[string, string, string | URL]> = [
+  ["fflate", "LICENSE", import.meta.url], ["@cantoo/pdf-lib", "LICENSE.md", import.meta.url],
+  ["culori", "LICENSE", pdfEntry], ["html-entities", "LICENSE", pdfEntry],
+  ["node-html-better-parser", "LICENSE", pdfEntry], ["tslib", "LICENSE.txt", pdfEntry],
 ];
 
 export default defineConfig({
@@ -30,8 +33,10 @@ export default defineConfig({
     },
     writeBundle() {
       for (const asset of assets) cpSync(join(wasmBuild, asset), join(outDir, asset));
-      for (const [name, file] of notices) {
-        const license = new URL(`../../../node_modules/${name}/${file}`, import.meta.url);
+      for (const [name, file, owner] of notices) {
+        const manifest = findPackageJSON(name, owner);
+        if (!manifest) this.error(`Missing package manifest for ${name}`);
+        const license = join(dirname(manifest), file);
         appendFileSync(join(outDir, "visio-third-party-notices.txt"), `\n${name}\n${readFileSync(license, "utf8")}`);
       }
     },
