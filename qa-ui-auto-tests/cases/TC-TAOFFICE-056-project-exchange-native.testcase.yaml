@@ -5,6 +5,7 @@ modes: [native]
 covers: [F-FILEOPEN-1, F-Modules-1]
 tags: [p0, file-open, taoffice, taoffice-project, native-boundary]
 fixtures: [reset_db, file_open_files, taoffice_signed_project]
+ui_standard: [UI-FOC-02, UI-OTH-03]
 timeout_sec: 250
 steps:
 - open: ${cfg.app.base_url}
@@ -35,8 +36,16 @@ steps:
 - assert_visible: '[data-testid="taoffice-project-task"][data-uid="12"] [data-testid="taoffice-project-bar"]'
 - assert_visible: '[data-testid="taoffice-project-task"][data-uid="21"]'
 - press: {selector: '[data-testid="taoffice-project-task"][data-uid="12"] [data-testid="taoffice-project-rename"]', key: Enter}
+- assert_focus_on: '[data-testid="taoffice-project-task-name"]'
 - fill: {selector: '[data-testid="taoffice-project-task-name"]', value: 'Review imported lag'}
 - press: Enter
+- assert_focus_on: '[data-testid="taoffice-project-task"][data-uid="12"] [data-testid="taoffice-project-rename"]'
+- native_file_dialog:
+    kind: save
+    action: cancel
+    trigger: '[data-testid="taoffice-project-save"]'
+- wait_for: '[data-testid="taoffice-project-save"]:enabled'
+- assert_text: {selector: '[data-testid="taoffice-project-task"][data-uid="12"]', contains: 'Review imported lag'}
 - native_file_dialog:
     kind: save
     action: choose
@@ -59,3 +68,30 @@ steps:
     name: data-start
     equals: '2003-01-09T00:00:00'
 - assert_no_runtime_errors: null
+
+verification:
+  review: reviewed
+  requirements:
+  - id: task-rename
+    ui_standard: [UI-FOC-02]
+    requirement: Enter moves focus into the task name and applying the edit restores the rename control.
+    actions: [28, 31]
+    checkpoints:
+    - {step: 29, expectation: The task name field has focus.}
+    - {step: 32, expectation: The rename control for the same imported task has focus.}
+    results: [29, 32]
+  - id: xml-copy
+    ui_standard: [UI-OTH-03]
+    requirement: Cancelling the native save chooser retains the edit and the second invocation writes a new XML file.
+    actions: [33, 36]
+    checkpoints:
+    - {step: 34, expectation: The save button is available for another attempt.}
+    - {step: 35, expectation: The in-memory task still shows the edited name.}
+    - {step: 38, expectation: The original MPX retains its input SHA-256.}
+    - {step: 46, expectation: The reopened XML copy shows the edited name.}
+    - {step: 47, expectation: The imported start date is preserved.}
+    results: [34, 35, 38, 46, 47]
+  visual:
+  - {check: Imported timeline, method: automated, reason: The dated German MPX task has a visible Gantt bar and retains its start date in the reopened copy.}
+  native:
+  - {check: Native save chooser, method: automated, reason: The signed host imports the original MPX and the OS copy is reopened through Explorer.}

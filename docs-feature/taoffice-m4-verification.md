@@ -28,3 +28,5 @@ Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”�
 ## Linux 回归
 
 在上述产品提交运行 TaOffice、UI 契约和完整崩溃回归 Browser 选集，88 项中通过 86 项。所有 TaOffice 用例通过。`TC-FILE-OPEN-008` 缺少 SSH/SFTP 夹具。`TC-FILE-OPEN-004` 在第 102 步等待 Markdown HTML 下载超时，相同步骤已在基线 `8eea6ebea` 复现。Browser 回执为 `receipt-run-20261128-115028-521141847`。
+
+相同产品提交的 Linux Native 使用 QA release、七份独立签名模块包和隔离的 Xvfb `:108`、D-Bus 与 XDG 目录。主选集 94 项中 91 项通过，1 项缺少 SSH/SFTP 夹具。媒体裁剪另存和 Vault 键盘解锁首轮失败，在相同二进制及原用例上各自重跑通过。媒体回执包含取消后恢复控件、原件哈希、导出尺寸与时长，以及重新打开并播放输出。主选集回执为 `receipt-run-20261128-120958-984431962`，媒体与 Vault 的复跑回执为 `receipt-run-20261128-125125-036784396` 和 `receipt-run-20261128-131503-783536615`。
