@@ -1,0 +1,39 @@
+id: TC-TAOFFICE-025
+title: Video playback accepts keyboard seek and pauses when its tab is hidden
+description: Decode a sample produced from an older codec, seek before playing, and pause when switching tabs.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, media, taoffice-video]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 140
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-video.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="rollout-replay.webm"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="rollout-replay.webm"]'
+- wait_for: {selector: 'video[data-testid="taoffice-media-player"][data-ready="true"]', timeout_sec: 30}
+- eval_readonly:
+    expression: document.querySelector('video').videoWidth === 160 && document.querySelector('video').videoHeight === 90 && Math.abs(document.querySelector('video').duration - 12) < 0.2
+- press: {selector: 'video[data-testid="taoffice-media-player"]', key: ArrowRight}
+- eval_readonly:
+    expression: document.querySelector('video').currentTime > 4.8 && document.querySelector('video').currentTime < 5.2
+- press: {selector: 'video[data-testid="taoffice-media-player"]', key: Space}
+- eval_readonly:
+    timeout_sec: 10
+    expression: document.querySelector('video').paused === false && document.querySelector('video').currentTime > 5.2
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
+- wait_for: 'video[data-testid="taoffice-media-player"][data-ready="true"]'
+- eval_readonly:
+    expression: document.querySelector('video').paused === true
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/rollout-replay.webm', sha256: '${fixture.taoffice_video_sha}'}
+- assert_no_runtime_errors: null

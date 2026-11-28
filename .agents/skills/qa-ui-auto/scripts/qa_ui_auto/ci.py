@@ -96,6 +96,12 @@ def capabilities(cases, mode: str) -> list[str]:
             result.add("taoffice-pdf")
         if mode == "browser" and "taoffice-excel" in case.tags:
             result.add("taoffice-excel")
+        if mode == "browser" and "taoffice-word" in case.tags:
+            result.add("taoffice-word")
+        if mode == "browser" and "taoffice-project" in case.tags:
+            result.add("taoffice-project")
+        if mode == "browser" and "taoffice-video" in case.tags:
+            result.add("taoffice-video")
         if mode == "native" and "mobile_service" in fixtures:
             result.add("mobile")
         if fixtures & {"ssh_required", "sftp_required"}:
@@ -140,6 +146,10 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.add("signed-taoffice-pdf")
             if "taoffice_signed_excel" in fixtures:
                 result.add("signed-taoffice-excel")
+            if "taoffice_signed_word" in fixtures:
+                result.add("signed-taoffice-word")
+            if "taoffice_signed_project" in fixtures:
+                result.add("signed-taoffice-project")
             if "module_signed_voice_archive" in fixtures:
                 result.add("signed-local-voice")
             if "module_signed_sockscap_archive" in fixtures:

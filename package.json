@@ -15,6 +15,7 @@
     "dev:mobile": "vite --config mobile-web/vite.config.ts"
   },
   "dependencies": {
+    "@cantoo/pdf-lib": "2.11.1",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.11.0",
     "@codemirror/lang-cpp": "^6.0.3",
@@ -63,6 +64,7 @@
     "konva": "^10.5.0",
     "lucide-react": "^1.45.0",
     "marked": "18.0.13",
+    "mediabunny": "1.66.5",
     "mermaid": "^11.17.2",
     "perfect-freehand": "^1.2.3",
     "qr": "0.7.2",
@@ -92,9 +94,11 @@
     "@xterm/addon-serialize": "0.14.0",
     "@xterm/headless": "6.0.0",
     "autoprefixer": "^10.6.0",
+    "docx-preview": "0.4.1",
     "jsdom": "^29.1.1",
     "pdfjs-dist": "6.5.438",
     "postcss": "^8.5.28",
+    "saxes": "6.0.0",
     "ssh2": "^1.17.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",

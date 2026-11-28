@@ -1,0 +1,53 @@
+id: TC-TAOFFICE-024
+title: Signed Project module saves and reopens the edited schedule
+description: Enable the signed Project renderer, rename a task, and reopen the saved schedule with its milestone and original dates.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, file-open, taoffice, taoffice-project, native-boundary]
+fixtures: [reset_db, file_open_files, taoffice_signed_project]
+timeout_sec: 250
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.project_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.project_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- wait_for: '[data-testid="module-action-enable-taoffice-project"]:enabled'
+- press: {selector: '[data-testid="module-action-enable-taoffice-project"]', key: Enter}
+- wait_for: '[data-testid="module-action-disable-taoffice-project"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="rollout.xml"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="rollout.xml"]'
+- wait_for: '[data-testid="taoffice-project-schedule"]'
+- click: '[data-testid="taoffice-project-task"][data-uid="2"] [data-testid="taoffice-project-rename"]'
+- fill: {selector: '[data-testid="taoffice-project-task-name"]', value: Pilot & approval}
+- press: {selector: '[data-testid="taoffice-project-task-name"]', key: Enter}
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.file_open_root}/revised.xml
+    trigger: '[data-testid="taoffice-project-save"]'
+- wait_for: '[data-testid="taoffice-project-output"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/rollout.xml', sha256: '${fixture.taoffice_project_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="revised.xml"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="revised.xml"]'
+- assert_text:
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-project-task"][data-uid="2"]'
+    contains: Pilot & approval
+- assert_text:
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-project-schedule"]'
+    contains: 2026-12-01 – 2026-12-10
+- assert_visible: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-project-task"][data-uid="3"] [data-milestone="true"]'
+- assert_no_runtime_errors: null

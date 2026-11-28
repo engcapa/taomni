@@ -3,7 +3,7 @@ title: An enabled TaOffice Media module decodes a WAV and recovers from a damage
 description: The browser module fixture provides the manifest and lifecycle. The player uses the production module ESM and the browser media decoder.
 modes: [browser]
 covers: [F-FILEOPEN-1]
-tags: [p0, file-open, taoffice, media]
+tags: [p0, file-open, taoffice, media, taoffice-video]
 fixtures: [reset_db, file_open_files]
 timeout_sec: 180
 steps:

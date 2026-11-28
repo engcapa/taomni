@@ -4,7 +4,9 @@ export const MAX_EXPORTED_BYTES = 32 * 1024 * 1024;
 const SUPPORTED = new Set(["text", "checkbox", "combobox", "listbox"]);
 
 export async function loadForm(pdf) {
-  const [fieldObjects, permissions] = await Promise.all([pdf.getFieldObjects(), pdf.getPermissions()]);
+  const [fieldObjects, permissions, metadata] = await Promise.all([
+    pdf.getFieldObjects(), pdf.getPermissions(), pdf.getMetadata(),
+  ]);
   const all = fieldObjects instanceof Map ? [...fieldObjects.values()].flat() : [];
   const names = new Set();
   const fields = all.filter((field) => {
@@ -15,10 +17,11 @@ export async function loadForm(pdf) {
     if (supported) names.add(field.name);
     return supported;
   }).map((field) => ({ ...field, widgets: all.filter((item) => item.name === field.name && item.type === field.type) }));
+  const signed = Boolean(metadata.info.IsSignaturesPresent) || all.some((field) => field.type === "signature");
   return {
     fields,
-    editable: (!permissions || permissions.has(PermissionFlag.FILL_INTERACTIVE_FORMS))
-      && !all.some((field) => field.type === "signature"),
+    editable: (!permissions || permissions.has(PermissionFlag.FILL_INTERACTIVE_FORMS)) && !signed,
+    pageEditable: !permissions && !signed && !metadata.info.IsXFAPresent,
   };
 }
 

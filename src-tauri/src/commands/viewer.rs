@@ -100,12 +100,13 @@ async fn viewer_document_save_copy(
         let source =
             viewer::document_access::approved_path(&registry, &protected, &path, &slug, &version)?;
         viewer::document_copy::validate(&source, &bytes)?;
-        let Some(selected) = viewer::document_copy::select_destination(&window, &source)? else {
+        let Some(selected) = viewer::document_copy::select_destination(&window, &source, &slug)?
+        else {
             return Ok(None);
         };
         let source =
             viewer::document_access::approved_path(&registry, &protected, &path, &slug, &version)?;
-        viewer::document_copy::write(&source, &selected, &protected, &bytes).map(Some)
+        viewer::document_copy::write(&source, &slug, &selected, &protected, &bytes).map(Some)
     })
     .await
 }

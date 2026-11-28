@@ -165,6 +165,8 @@ REGISTRY: dict[str, Fixture] = {
     "taoffice_signed_media": Fixture("taoffice_signed_media", taoffice_media.setup),
     "taoffice_signed_pdf": Fixture("taoffice_signed_pdf", taoffice_media.setup_pdf),
     "taoffice_signed_excel": Fixture("taoffice_signed_excel", taoffice_media.setup_excel),
+    "taoffice_signed_word": Fixture("taoffice_signed_word", taoffice_media.setup_word),
+    "taoffice_signed_project": Fixture("taoffice_signed_project", taoffice_media.setup_project),
     "module_signed_mfa_archive": Fixture("module_signed_mfa_archive", module_signed_archive.setup_mfa),
     "module_signed_vnc_archive": Fixture("module_signed_vnc_archive", module_signed_archive.setup_vnc),
     "module_signed_rdp_archive": Fixture("module_signed_rdp_archive", module_signed_archive.setup_rdp),

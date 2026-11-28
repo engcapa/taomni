@@ -13,7 +13,8 @@ export function saveModuleDocumentCopy(path: string, name: string, slug: string,
     return Promise.reject(new Error("Document copies are limited to 32 MiB."));
   }
   if (isTauriRuntime()) return invoke("viewer_document_save_copy", { path, slug, version, bytes: Array.from(bytes) });
-  const filename = name.replace(/\.([^.]+)$/, " - copy.$1");
+  const filename = name.replace(/\.([^.]+)$/, (_suffix, extension: string) =>
+    ` - copy.${slug === "taoffice-project" && extension.toLowerCase() === "mpp" ? "xml" : extension}`);
   const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/octet-stream" }));
   const link = document.createElement("a");
   link.href = url;

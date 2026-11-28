@@ -109,11 +109,9 @@ def setup(ctx: Any) -> None:
         files["damaged.wav"] = b"Invalid WAV fixture"
         ctx.values["taoffice_wav_sha"] = hashlib.sha256(files["sample.wav"]).hexdigest()
     if ctx.case_id == "TC-TAOFFICE-001":
-        for name in ("Build", "Review"):
-            files[f"{name}.mppx"] = (
-                f'<Project xmlns="http://schemas.microsoft.com/project"><Name>{name}</Name></Project>'
-            ).encode()
-    if ctx.case_id in {"TC-TAOFFICE-007", "TC-TAOFFICE-008"}:
+        files["Build.mppx"] = b'<Project xmlns="http://schemas.microsoft.com/project"><Name>Build</Name></Project>'
+        files["Review.mpp"] = (TAOFFICE_ASSETS / "linked-tasks.mpp").read_bytes()
+    if ctx.case_id in {"TC-TAOFFICE-007", "TC-TAOFFICE-008", "TC-TAOFFICE-033", "TC-TAOFFICE-034"}:
         files["report.pdf"] = pdf_fixture()
         files["locked.pdf"] = locked_pdf_fixture()
         files["damaged.pdf"] = b"This is not a PDF."
@@ -124,6 +122,34 @@ def setup(ctx: Any) -> None:
     if ctx.case_id in {"TC-TAOFFICE-017", "TC-TAOFFICE-018"}:
         files["order-form.pdf"] = (TAOFFICE_ASSETS / "order-form.pdf").read_bytes()
         ctx.values["taoffice_pdf_form_sha"] = hashlib.sha256(files["order-form.pdf"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-021", "TC-TAOFFICE-022"}:
+        files["planning-notes.docx"] = (TAOFFICE_ASSETS / "planning-notes.docx").read_bytes()
+        files["damaged.docx"] = b"This is not a Word document."
+        ctx.values["taoffice_word_sha"] = hashlib.sha256(files["planning-notes.docx"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-023", "TC-TAOFFICE-024"}:
+        schedule = (TAOFFICE_ASSETS / "rollout.mppx").read_bytes()
+        files["rollout.xml" if native else "rollout.mppx"] = schedule
+        ctx.values["taoffice_project_sha"] = hashlib.sha256(schedule).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-025", "TC-TAOFFICE-026"}:
+        files["rollout-replay.webm"] = (TAOFFICE_ASSETS / "rollout-replay.webm").read_bytes()
+        ctx.values["taoffice_video_sha"] = hashlib.sha256(files["rollout-replay.webm"]).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-027", "TC-TAOFFICE-028"}:
+        plan = (TAOFFICE_ASSETS / "shift-plan.mppx").read_bytes()
+        files["shift-plan.xml" if native else "shift-plan.mppx"] = plan
+        ctx.values["taoffice_schedule_sha"] = hashlib.sha256(plan).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-029", "TC-TAOFFICE-030"}:
+        files["linked-tasks.mpp"] = (TAOFFICE_ASSETS / "linked-tasks.mpp").read_bytes()
+        files["damaged.mpp"] = b"This is not a Project file."
+        digest = hashlib.sha256(files["linked-tasks.mpp"]).hexdigest()
+        ctx.values["taoffice_mpp_sha"] = digest
+        if not native:
+            ctx.values["taoffice_mpp_preview"] = json.dumps({
+                "hash": digest, "xml": (TAOFFICE_ASSETS / "linked-tasks-preview.xml").read_text(encoding="utf-8"),
+            })
+    if ctx.case_id in {"TC-TAOFFICE-031", "TC-TAOFFICE-032"}:
+        data = (TAOFFICE_ASSETS / "rollout-compatible.mkv").read_bytes()
+        files["rollout-compatible.mkv"] = data
+        ctx.values["taoffice_mkv_sha"] = hashlib.sha256(data).hexdigest()
     if native:
         for relative, data in files.items():
             destination = Path(root) / relative

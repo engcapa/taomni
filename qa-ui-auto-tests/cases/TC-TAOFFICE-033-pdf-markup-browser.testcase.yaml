@@ -1,0 +1,62 @@
+id: TC-TAOFFICE-033
+title: Annotate and rearrange PDF pages before saving a copy
+description: Mark the original first page, move and rotate it, remove the other page, undo a second annotation and export a one-page copy.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-pdf, crash-regression]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-pdf.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- dblclick: '[data-testid="explorer-file-row"][data-name="report.pdf"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-ready="true"]'
+- click: '[data-testid="taoffice-pdf-edit-toggle"]'
+- wait_for: '[data-testid="taoffice-pdf-edit"]:focus'
+- select_option: {selector: '[data-testid="taoffice-pdf-edit-tool"]', value: note}
+- fill: {selector: '[data-testid="taoffice-pdf-edit-note"]', value: Check contract totals}
+- press: {selector: '[data-testid="taoffice-pdf-markup-surface"]', key: ArrowRight}
+- press: {selector: '[data-testid="taoffice-pdf-markup-surface"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-pdf-annotations"]', contains: Check contract totals}
+- click: '[data-testid="taoffice-pdf-edit-rotate"]'
+- click: '[data-testid="taoffice-pdf-edit-later"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="2"][data-source-page="1"][data-rotation="90"][data-ready="true"]'
+- assert_text: {selector: '[data-testid="taoffice-pdf-text"]', contains: Quarterly report}
+- assert_disabled: '[data-testid="taoffice-pdf-edit-later"]'
+- click: '[data-testid="taoffice-pdf-previous"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-source-page="2"][data-ready="true"]'
+- assert_text: {selector: '[data-testid="taoffice-pdf-text"]', contains: Revenue by region}
+- click: '[data-testid="taoffice-pdf-edit-remove"]'
+- wait_for: '[data-testid="taoffice-pdf-page"][data-page="1"][data-source-page="1"][data-rotation="90"][data-ready="true"]'
+- assert_disabled: '[data-testid="taoffice-pdf-edit-remove"]'
+- assert_text: {selector: '[data-testid="taoffice-pdf-annotations"]', contains: Check contract totals}
+- select_option: {selector: '[data-testid="taoffice-pdf-edit-tool"]', value: highlight}
+- press: {selector: '[data-testid="taoffice-pdf-markup-surface"]', key: Enter}
+- wait_for: '[data-testid="taoffice-pdf-markup"][data-kind="highlight"]'
+- click: '[data-testid="taoffice-pdf-edit-undo"]'
+- wait_for: {selector: '[data-testid="taoffice-pdf-markup"][data-kind="highlight"]', state: detached}
+- wait_for: '[data-testid="taoffice-pdf-markup"][data-kind="note"]'
+- screenshot: pdf-annotated-page.png
+- press: {selector: '[data-testid="taoffice-pdf-edit-close"]', key: Escape}
+- assert_focus_on: '[data-testid="taoffice-pdf-edit-toggle"]'
+- click: '[data-testid="taoffice-pdf-find"]'
+- fill: {selector: '[data-testid="taoffice-pdf-search-input"]', value: Revenue}
+- press: {selector: '[data-testid="taoffice-pdf-search-input"]', key: Enter}
+- assert_text: {selector: '[data-testid="taoffice-pdf-search-status"]', contains: No text found}
+- click: '[data-testid="taoffice-pdf-edit-toggle"]'
+- assert_download:
+    trigger: '[data-testid="taoffice-pdf-edit-save"]'
+    filename: report - copy.pdf
+    contains: ['%PDF-']
+- wait_for: '[data-testid="taoffice-pdf-edit-save"]:disabled'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/report.pdf', sha256: '${fixture.taoffice_pdf_sha}'}
+- assert_no_runtime_errors: null

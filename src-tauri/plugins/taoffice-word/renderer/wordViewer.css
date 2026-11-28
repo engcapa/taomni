@@ -1,0 +1,51 @@
+.taoffice-word,
+.taoffice-word-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.taoffice-word-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--taomni-divider);
+}
+
+.taoffice-word-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--taomni-fs-title);
+  font-weight: 600;
+}
+
+.taoffice-word-preview {
+  border: 0;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.taoffice-word-paragraphs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.taoffice-word-paragraphs label {
+  display: grid;
+  gap: 4px;
+  font-size: var(--taomni-fs-body);
+}
+
+.taoffice-word-feedback {
+  margin: 8px;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,68 @@
+id: TC-TAOFFICE-022
+title: Signed Word module saves and reopens a DOCX copy through the native chooser
+description: Enable the signed Word renderer and reopen a copy with edited body and table text and preserved formatting and header. Check the source bytes.
+modes: [native]
+covers: [F-FILEOPEN-1, F-Modules-1]
+tags: [p0, file-open, taoffice, taoffice-word, native-boundary]
+fixtures: [reset_db, file_open_files, taoffice_signed_word]
+timeout_sec: 250
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.word_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.word_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- wait_for: '[data-testid="module-action-enable-taoffice-word"]:enabled'
+- press: {selector: '[data-testid="module-action-enable-taoffice-word"]', key: Enter}
+- wait_for: '[data-testid="module-action-disable-taoffice-word"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="planning-notes.docx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="planning-notes.docx"]'
+- wait_for: '[data-testid="taoffice-word-preview"]'
+- click: '[data-testid="taoffice-word-edit"]'
+- fill: {selector: '[data-testid="taoffice-word-paragraph"][value="Baseline plan & owners"]', value: Pilot moves to Tuesday & Wednesday}
+- fill: {selector: '[data-testid="taoffice-word-paragraph"][value="Owner approval is required."]', value: Manager approval is required.}
+- fill: {selector: '[data-testid="taoffice-word-paragraph"][data-location="table"][value="Ready"]', value: Waiting for approval}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="viewer-close-dialog"]'
+- native_file_dialog:
+    kind: save
+    action: cancel
+    trigger: '[data-testid="viewer-close-save"]'
+- wait_for: '[data-testid="viewer-close-save"]:enabled'
+- assert_visible: '[data-testid="explorer-workspace-tab"][data-active="true"] [data-testid="viewer-tab-dirty"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.file_open_root}/revised.docx
+    trigger: '[data-testid="viewer-close-save"]'
+- wait_for: {selector: '[data-testid="viewer-close-dialog"]', state: detached}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/planning-notes.docx', sha256: '${fixture.taoffice_word_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="revised.docx"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="revised.docx"]'
+- wait_for: '[data-testid="taoffice-word-preview"]'
+- eval_readonly:
+    expression: >-
+      document.querySelector('iframe.taoffice-word-preview')?.contentDocument?.body?.textContent.includes('Pilot moves to Tuesday & Wednesday')
+      && document.querySelector('iframe.taoffice-word-preview').contentDocument.body.textContent.includes('Keep the next page unchanged.')
+- eval_readonly:
+    expression: >-
+      document.querySelector('iframe.taoffice-word-preview').contentDocument?.querySelector('table tr:nth-child(2) td:nth-child(2)')?.textContent === 'Waiting for approval'
+      && document.querySelector('iframe.taoffice-word-preview').contentDocument.querySelector('header')?.textContent.includes('Operations planning')
+- eval_readonly:
+    expression: >-
+      document.querySelector('iframe.taoffice-word-preview').contentDocument?.querySelector('article p:nth-of-type(3) > span:last-child')?.style.fontWeight === 'bold' &&
+      document.querySelector('iframe.taoffice-word-preview').contentDocument?.body?.textContent.includes('Manager approval is required.')
+- assert_no_runtime_errors: null

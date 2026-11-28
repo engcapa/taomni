@@ -1,0 +1,22 @@
+{
+  "id": "taomni-plugin-taoffice-word",
+  "slug": "taoffice-word",
+  "name": "TaOffice Word",
+  "description": "Preview DOCX pages and edit body and table cell text with existing styling. Save changes to a DOCX copy.",
+  "version": "0.2.0",
+  "coreApiVersion": "1",
+  "kind": "media",
+  "status": "provisional",
+  "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
+  "entry": { "frontend": "frontend/index.js", "protocol": 1 },
+  "document": { "fileKinds": ["word"], "extensions": ["docx"] },
+  "tabs": [],
+  "commands": [],
+  "permissions": ["fs.readUserFile"],
+  "dataDir": "plugins/taoffice-word",
+  "dataSchemaVersion": 1,
+  "backupPaths": [],
+  "legacyTables": [],
+  "vaultFixedKeys": [],
+  "snapshot": "file"
+}

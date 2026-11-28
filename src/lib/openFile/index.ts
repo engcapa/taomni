@@ -16,6 +16,7 @@ import type { FileViewerTabInfo } from "../../types";
 import { activateCodeDocument, removeCleanViewerTabs } from "./codeDocumentOwner";
 import { readViewerDrafts } from "../../stores/viewerDrafts";
 import { documentProvider } from "./documentProvider";
+import { isProjectXml } from "./projectXml";
 
 export { classifyFile, fileExtension, supportsFileViewer } from "./classifyFile";
 export type { FileKind } from "./classifyFile";
@@ -165,12 +166,14 @@ export function openFile(target: OpenFileTarget | string, options: OpenFileOptio
   const result = previous.catch(() => undefined).then(async () => {
     let path = input.path;
     try { path = await explorerCanonicalPath(path); } catch { /* Missing paths still have a recoverable viewer error state. */ }
-    const classified = classifyFile(input.path);
-    const provider = documentProvider(input.path);
-    const kind = classified === "binary" && provider ? "document" : classified;
     const preferences = useFileOpenPreferences.getState();
-    let mode: OpenFileMode = options.mode ?? preferences.associations[fileExtension(input.path)] ?? preferences.defaultHandler;
+    const extension = fileExtension(input.path);
+    let mode: OpenFileMode = options.mode ?? preferences.associations[extension] ?? preferences.defaultHandler;
     if (options.alternate) mode = mode === "system" ? "taomni" : "system";
+    const projectXml = extension === "xml" && (mode === "taomni" || mode === "taoffice") && await isProjectXml(path);
+    const classified = classifyFile(input.path);
+    const provider = documentProvider(input.path, projectXml);
+    const kind = projectXml || (classified === "binary" && provider) ? "document" : classified;
 
     const descriptor = mode === "source" ? getFileHandler("notepad") : getFileHandler(mode);
     if (descriptor && !descriptor.available()) {

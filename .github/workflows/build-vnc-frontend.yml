@@ -40,6 +40,8 @@ jobs:
             sockscap) dependencies=(src/lib/sockscap src/lib/sockscap.ts src/lib/sessionPaths.ts src/lib/sockscapPreflight.ts) ;;
             rdp-server|vnc-server|servers) dependencies=(vite-plugins/serverSettings.ts src/lib/servers) ;;
             taoffice-pdf|taoffice-excel) dependencies=() ;;
+            taoffice-video) dependencies=(src-tauri/plugins/taoffice-video/frontend) ;;
+            taoffice-word|taoffice-project) dependencies=(src-tauri/crates/taomni-plugin-api/frontend/documentDraft.js) ;;
             *) echo 'Unknown module frontend' >&2; exit 1 ;;
           esac
           case "$MODULE_SLUG" in
