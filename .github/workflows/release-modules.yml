@@ -307,6 +307,11 @@ jobs:
               'module': slug,
           }, sort_keys=True) + '\n', encoding='utf-8')
           PY
+      - name: Include the locked Project reader source, license and relink instructions
+        if: needs.source.outputs.slug == 'taoffice-project'
+        env:
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: python src-tauri/plugins/taoffice-project/packaging/project_source.py stage unsigned-module "$MODULE_SOURCE_SHA"
       - name: Stage the TaOffice Media shared runtime and source notices
         if: needs.source.outputs.slug == 'taoffice-video'
         env:
@@ -400,6 +405,13 @@ jobs:
               raise SystemExit('candidate module status or identity is invalid for this release')
           if any(path.is_symlink() for path in root.rglob('*')):
               raise SystemExit('candidate payload contains a symlink')
+          if os.environ['MODULE_SLUG'] == 'taoffice-project' and host:
+              sys.path.insert(0, 'src-tauri/plugins/taoffice-project/packaging')
+              from project_source import verify as verify_project_source
+              payload = root / 'unsigned-module'
+              allowed = {'module.json', host, *verify_project_source(payload, os.environ['MODULE_SOURCE_SHA'])}
+              if {path.relative_to(payload).as_posix() for path in payload.rglob('*') if path.is_file()} != allowed:
+                  raise SystemExit('candidate contains unexpected Project files')
           if os.environ['MODULE_SLUG'] == 'taoffice-video' and host:
               sys.path.insert(0, 'src-tauri/plugins/taoffice-video/packaging')
               from stage import runtime_files as media_files, verify_payload as verify_media

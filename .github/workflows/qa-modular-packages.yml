@@ -274,6 +274,11 @@ jobs:
               stage('mfa', 'unsigned-roster-mfa')
           pathlib.Path('candidate-source.json').write_text(json.dumps({'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': os.environ['QA_MODULE']}), encoding='utf-8')
           PY
+      - name: Include the locked Project reader source, license and relink instructions
+        if: env.QA_MODULE == 'taoffice-project'
+        env:
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: python src-tauri/plugins/taoffice-project/packaging/project_source.py stage unsigned-module "$MODULE_SOURCE_SHA"
       - name: Stage the TaOffice Media shared runtime and source notices
         if: env.QA_MODULE == 'taoffice-video'
         env:
@@ -411,6 +416,10 @@ jobs:
                   binaries.add('taomni-vnc-key-helper.exe')
               payload = root / folder
               resources = set(redirector.files(slug, platform))
+              if slug == 'taoffice-project':
+                  sys.path.insert(0, str(trusted_source / 'packaging'))
+                  from project_source import verify as verify_project_source
+                  resources.update(verify_project_source(payload, os.environ['MODULE_SOURCE_SHA']))
               if slug == 'taoffice-video' and expected['entry'].get('host'):
                   sys.path.insert(0, str(trusted_source / 'packaging'))
                   from stage import runtime_files as media_files, verify_payload as verify_media

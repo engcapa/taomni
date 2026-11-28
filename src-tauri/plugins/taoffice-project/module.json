@@ -3,7 +3,7 @@
   "slug": "taoffice-project",
   "name": "TaOffice Project",
   "description": "Open Microsoft Project MPP, MPX and XML schedules, edit tasks, dependencies and allocations, and save a recalculated XML copy.",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "coreApiVersion": "1",
   "kind": "media",
   "status": "provisional",
