@@ -184,6 +184,12 @@ def setup(ctx: Any) -> None:
         data = (TAOFFICE_ASSETS / "rollout-compatible.mkv").read_bytes()
         files["rollout-compatible.mkv"] = data
         ctx.values["taoffice_mkv_sha"] = hashlib.sha256(data).hexdigest()
+    if ctx.case_id in {"TC-TAOFFICE-059", "TC-TAOFFICE-060"}:
+        for extension in ("ppt", "odp"):
+            name = f"legacy-review.{extension}"
+            files[name] = (TAOFFICE_ASSETS / name).read_bytes()
+            ctx.values[f"taoffice_legacy_{extension}_sha"] = hashlib.sha256(files[name]).hexdigest()
+        files["legacy-damaged.ppt"] = b"This is not a PowerPoint document."
     if ctx.case_id in {"TC-TAOFFICE-039", "TC-TAOFFICE-040"}:
         data = (TAOFFICE_ASSETS / "ppt-review.pptx").read_bytes()
         files["ppt-review.pptx"] = data

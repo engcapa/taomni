@@ -1,0 +1,103 @@
+id: TC-TAOFFICE-059
+title: Import legacy PowerPoint and OpenDocument presentations
+description: Open two real decks, download the converted slides, edit a paragraph, verify keyboard focus and retry a damaged input.
+modes: [browser]
+covers: [F-FILEOPEN-1]
+tags: [p0, file-open, taoffice, taoffice-ppt, crash-regression]
+fixtures: [reset_db, file_open_files]
+ui_standard: [UI-BTN-03, UI-FOC-02, UI-FBK-03]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: taoffice-document
+- seed_storage:
+    key: taomni.preview.modules.taoffice-ppt.v1
+    value: '{"lifecycle":"enabled","values":[]}'
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.file_open_root}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="legacy-review.ppt"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-review.ppt"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-preview"][data-image-ready="true"]', timeout_sec: 45}
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-conversion"]', contains: Imported as PPTX}
+- assert_text_equals: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-position"]', equals: Slide 1 of 2}
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-save"]', contains: Save PPTX copy}
+- assert_download:
+    trigger: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-save"]'
+    filename: legacy-review - copy.pptx
+    contains: [ppt/presentation.xml, ppt/slides/slide1.xml, ppt/slides/slide2.xml]
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-output"]'
+- assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-save"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-review.ppt', sha256: '${fixture.taoffice_legacy_ppt_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="legacy-review.odp"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-review.odp"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-preview"][data-image-ready="true"]', timeout_sec: 45}
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-conversion"]', contains: Imported as PPTX}
+- assert_text_equals: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-position"]', equals: Slide 1 of 2}
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-save"]', contains: Save PPTX copy}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-edit"]', key: Enter}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-paragraph"][value="Quarterly review"]'
+- fill: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-paragraph"][value="Quarterly review"]', value: Reviewed ODP import}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-paragraph"][value="Reviewed ODP import"]', key: Escape}
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-edit"]'
+- assert_download:
+    trigger: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-save"]'
+    filename: legacy-review - copy.pptx
+    contains: [ppt/presentation.xml, ppt/slides/slide1.xml, ppt/slides/slide2.xml]
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-output"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/legacy-review.odp', sha256: '${fixture.taoffice_legacy_odp_sha}'}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="legacy-damaged.ppt"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="legacy-damaged.ppt"]'
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-error"]', contains: Could not convert the presentation}
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-retry"]', key: Enter}
+- assert_text: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-error"]', contains: Could not convert the presentation}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-BTN-03]
+    requirement: The save action describes the new format and reflects pending changes.
+    actions: [14]
+    checkpoints:
+    - {step: 15, expectation: The save action names the PPTX format.}
+    - {step: 18, expectation: Saving a clean conversion disables the action until the next edit.}
+    - {step: 27, expectation: The save action names the PPTX format.}
+    results: [15, 18, 27]
+  - id: R2
+    ui_standard: [UI-FOC-02]
+    requirement: Keyboard editing focuses the first paragraph and returns focus on Escape.
+    actions: [28, 31]
+    checkpoints:
+    - {step: 29, expectation: The slide title receives keyboard focus.}
+    - {step: 32, expectation: Escape returns focus to Edit slide text.}
+    results: [29, 32]
+  - id: R3
+    ui_standard: [UI-BTN-03]
+    requirement: The independent PPTX retains both slides and preserves the source bytes.
+    actions: [15]
+    checkpoints:
+    - {step: 16, expectation: The browser downloads the two-slide PPTX before any edit.}
+    - {step: 19, expectation: The PPT source still has the fixture SHA-256.}
+    - {step: 33, expectation: The edited ODP presentation downloads as a two-slide PPTX.}
+    - {step: 35, expectation: The ODP source still has the fixture SHA-256.}
+    results: [16, 19, 33, 35]
+  - id: R4
+    ui_standard: [UI-FBK-03]
+    requirement: Conversion failures have a visible recovery action.
+    actions: [41]
+    checkpoints:
+    - {step: 40, expectation: A damaged PPT shows recovery guidance.}
+    - {step: 42, expectation: Retry repeats the visible conversion failure.}
+    results: [40, 42]
+  visual:
+  - {check: Converted slides display, method: automated, reason: The case waits for a decoded image and checks the slide count.}
+  native:
+  - {check: Native chooser and independent files, method: external, reason: TC-TAOFFICE-060 installs the signed module and reopens disk copies.}

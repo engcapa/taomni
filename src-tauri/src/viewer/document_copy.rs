@@ -33,6 +33,13 @@ fn extension<'a>(
         return Err("permission: The requested document copy format is unavailable".into());
     }
     let extension = source.extension().ok_or("Missing document extension")?;
+    if slug == "taoffice-ppt"
+        && ["ppt", "odp"]
+            .iter()
+            .any(|legacy| extension.eq_ignore_ascii_case(legacy))
+    {
+        return Ok(OsStr::new("pptx"));
+    }
     if slug == "taoffice-word"
         && ["doc", "odt", "rtf"]
             .iter()
@@ -250,6 +257,31 @@ mod tests {
             write(&source, slug, target.to_str().unwrap(), &[], b"docx", None).unwrap();
             assert_eq!(fs::read(&source).unwrap(), b"legacy document");
             assert_eq!(fs::read(&target).unwrap(), b"docx");
+        }
+    }
+
+    #[test]
+    fn legacy_presentations_suggest_pptx_and_reject_the_input_extension() {
+        let root = tempfile::tempdir().unwrap();
+        for extension in ["PPT", "oDp"] {
+            let source = root.path().join(format!("review.{extension}"));
+            fs::write(&source, b"original").unwrap();
+            assert_eq!(
+                suggested_name(&source, "taoffice-ppt", None).unwrap(),
+                "review - copy.pptx"
+            );
+            assert!(
+                write(
+                    &source,
+                    "taoffice-ppt",
+                    source.to_str().unwrap(),
+                    &[],
+                    b"converted",
+                    None
+                )
+                .is_err()
+            );
+            assert_eq!(fs::read(source).unwrap(), b"original");
         }
     }
 

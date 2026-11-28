@@ -1505,6 +1505,9 @@
 - `[data-testid="taoffice-media-preparing"]` — display [optional] — F-FILEOPEN-1.taoffice-media-preparing
 - `[data-testid="taoffice-media-retry"]` — interactive — F-FILEOPEN-1.taoffice-media-retry
 - `[data-testid="taoffice-ppt"]` — display — F-FILEOPEN-1.taoffice-ppt
+- `[data-testid="taoffice-ppt-conversion"]` — display — F-FILEOPEN-1.taoffice-ppt-conversion
+- `[data-testid="taoffice-ppt-conversion-cancel"]` — interactive — F-FILEOPEN-1.taoffice-ppt-conversion-cancel
+- `[data-testid="taoffice-ppt-retry"]` — interactive — F-FILEOPEN-1.taoffice-ppt-retry
 - `[data-testid="taoffice-ppt-edit"]` — interactive — F-FILEOPEN-1.taoffice-ppt-edit
 - `[data-testid="taoffice-ppt-error"]` — display — F-FILEOPEN-1.taoffice-ppt-error
 - `[data-testid="taoffice-ppt-new"]` — interactive — F-FILEOPEN-1.taoffice-ppt-new

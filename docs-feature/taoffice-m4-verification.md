@@ -19,6 +19,12 @@ Linux WPS Office 12.1.2.29183 在隔离的 X11 会话中用“另存为 PDF”�
 
 使用 Windows 上的 Microsoft PowerPoint 16.0 重开上述 5 份原件，以及用同一组 Apache POI 输入和本分支读写代码重新生成的 5 份副本。逐份核对输入 SHA-256。副本均只变更 `ppt/slides/slide1.xml`，PowerPoint 形状模型和导出的 PDF 首页都读到完整编辑值。直接导出原件和副本的首页 PNG 并排对照，三个标题保留了原色、对齐和两行排版。后两份表格中的较长替换文字在单元格内换行，行高随之增加，邻近内容也出现在截图中。原 Linux WPS 导出的 5 份 PDF 仍保留各自的文本提取结果。[首页对照截图](taoffice-research/pptx-powerpoint-first-page.png) · [逐文件哈希与对照区域](taoffice-research/pptx-powerpoint-first-page.csv)
 
+## 旧版演示文稿导入
+
+Windows Browser 回执 `run-20261128-142945-077647600` 同时通过 039、059。059 使用 Microsoft PowerPoint 导出的两页 PPT、ODP，在 Explorer 内导入，直接下载 PPT 的转换结果，编辑 ODP 首页标题后下载。PowerPoint 16.0 build 20625 用普通打开命令重开两份下载文件，读回两页及各自首页标题，第二页均为 Delivery appendix。原件的 SHA-256 在用例中独立核对。PPT 副本的 SHA-256 为 `a0a1fd54e5d38910339a68052d4cb4bbf560e2566fc9d05c64fb7c3fb3b32407`，ODP 编辑副本为 `b7901ddd7af796693111fc8b2d1f836b535b359fd5d60a0b23044717c9b9dc61`。
+
+首次重开暴露两处生成器兼容性问题。Office Oxide 的幻灯片母版和备注母版引用了同一主题部件，PowerPoint 需要独立的备注主题。OfficeParser 生成了空的 normalViewPr，而此节点需要两个恢复布局元素。导入模块在生成副本时分别处理这两种情况，并保留独立的单元回归。签名模块的安装、系统另存与重开由 TC-TAOFFICE-060 验证。
+
 ## Project 交换格式语料
 
 使用 Project 0.5.0 宿主的导入代码转换了 MPXJ 固定版本中的全部 19 份 MPX。独立 XML 解析器从生成的 MSPDI 文件读到 305 项任务、23 条前置关系、16 项资源、6 项分配和 39 份日历。德语样本中任务 12 的前置 UID 为 11，滞后量为 4800 个十分之一分钟，开始日期为 2003-01-09。逐文件记录保留了原始 Git blob、输入与输出 SHA-256 和各项计数。 [语料及逐文件回执](taoffice-research/project-exchange-63cdc4e.csv)

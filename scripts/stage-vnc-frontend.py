@@ -32,7 +32,8 @@ def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, P
         expected.add("mediabunny-LICENSE.txt")
     if slug == "taoffice-ppt":
         expected.update({"slide-engine.js", "PPTXViewJS-LICENSE.txt", "Chart.js-LICENSE.txt",
-                         "JSZip-LICENSE.txt", "PptxGenJS-LICENSE.txt"})
+                         "JSZip-LICENSE.txt", "PptxGenJS-LICENSE.txt", "OfficeParser-LICENSE.txt",
+                         "legacy-ppt.worker.txt", "legacy-odp.worker.txt", "ppt-converter_bg.wasm", "ppt-converter-NOTICES.txt"})
     if slug == "taoffice-visio":
         expected.update({"visio.wasm", "visio-icu.dat", "visio-third-party-notices.txt"})
     if slug == "taoffice-image":

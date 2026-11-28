@@ -89,7 +89,7 @@ steps:
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="ppt-damaged.pptx"]'
 - assert_text: {selector: '[data-testid="taoffice-ppt-error"]', contains: Could not open the PowerPoint file.}
-- press: {selector: '[data-testid="taoffice-ppt-error"] button', key: Enter}
+- press: {selector: '[data-testid="taoffice-ppt-retry"]', key: Enter}
 - assert_text: {selector: '[data-testid="taoffice-ppt-error"]', contains: Could not open the PowerPoint file.}
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]:has-text("ppt-review.pptx")'
 - wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="taoffice-ppt-preview"][data-image-ready="true"]'

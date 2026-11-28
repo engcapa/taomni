@@ -753,6 +753,15 @@ jobs:
       source: ${{ needs.plan.outputs.head }}
       artifact: taoffice-word-browser-${{ needs.plan.outputs.artifact_key }}
 
+  taoffice-ppt-browser-frontend:
+    needs: plan
+    if: contains(needs.plan.outputs.browser_matrix, 'taoffice-ppt') || contains(needs.plan.outputs.macos_browser_matrix, 'taoffice-ppt')
+    uses: ./.github/workflows/build-vnc-frontend.yml
+    with:
+      module: taoffice-ppt
+      source: ${{ needs.plan.outputs.head }}
+      artifact: taoffice-ppt-browser-${{ needs.plan.outputs.artifact_key }}
+
   taoffice-image-browser-frontend:
     needs: plan
     if: contains(needs.plan.outputs.browser_matrix, 'taoffice-image') || contains(needs.plan.outputs.macos_browser_matrix, 'taoffice-image')
@@ -763,8 +772,8 @@ jobs:
       artifact: taoffice-image-browser-${{ needs.plan.outputs.artifact_key }}
 
   execute-browser:
-    needs: [plan, taoffice-visio-browser-frontend, taoffice-image-browser-frontend, taoffice-word-browser-frontend]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.has_browser == 'true' && (!contains(needs.plan.outputs.browser_matrix, 'taoffice-visio') || needs.taoffice-visio-browser-frontend.result == 'success') && (!contains(needs.plan.outputs.browser_matrix, 'taoffice-image') || needs.taoffice-image-browser-frontend.result == 'success') && (!contains(needs.plan.outputs.browser_matrix, 'taoffice-word') || needs.taoffice-word-browser-frontend.result == 'success') }}
+    needs: [plan, taoffice-visio-browser-frontend, taoffice-image-browser-frontend, taoffice-word-browser-frontend, taoffice-ppt-browser-frontend]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.has_browser == 'true' && (!contains(needs.plan.outputs.browser_matrix, 'taoffice-visio') || needs.taoffice-visio-browser-frontend.result == 'success') && (!contains(needs.plan.outputs.browser_matrix, 'taoffice-image') || needs.taoffice-image-browser-frontend.result == 'success') && (!contains(needs.plan.outputs.browser_matrix, 'taoffice-word') || needs.taoffice-word-browser-frontend.result == 'success') && (!contains(needs.plan.outputs.browser_matrix, 'taoffice-ppt') || needs.taoffice-ppt-browser-frontend.result == 'success') }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
       matrix: ${{ needs.plan.outputs.browser_matrix }}
@@ -777,8 +786,8 @@ jobs:
   # browser shards. Schedule browser separately with a smaller cap so native
   # shards get the slots first.
   execute-macos-browser:
-    needs: [plan, taoffice-visio-browser-frontend, taoffice-image-browser-frontend, taoffice-word-browser-frontend]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.has_macos_browser == 'true' && (!contains(needs.plan.outputs.macos_browser_matrix, 'taoffice-visio') || needs.taoffice-visio-browser-frontend.result == 'success') && (!contains(needs.plan.outputs.macos_browser_matrix, 'taoffice-image') || needs.taoffice-image-browser-frontend.result == 'success') && (!contains(needs.plan.outputs.macos_browser_matrix, 'taoffice-word') || needs.taoffice-word-browser-frontend.result == 'success') }}
+    needs: [plan, taoffice-visio-browser-frontend, taoffice-image-browser-frontend, taoffice-word-browser-frontend, taoffice-ppt-browser-frontend]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.has_macos_browser == 'true' && (!contains(needs.plan.outputs.macos_browser_matrix, 'taoffice-visio') || needs.taoffice-visio-browser-frontend.result == 'success') && (!contains(needs.plan.outputs.macos_browser_matrix, 'taoffice-image') || needs.taoffice-image-browser-frontend.result == 'success') && (!contains(needs.plan.outputs.macos_browser_matrix, 'taoffice-word') || needs.taoffice-word-browser-frontend.result == 'success') && (!contains(needs.plan.outputs.macos_browser_matrix, 'taoffice-ppt') || needs.taoffice-ppt-browser-frontend.result == 'success') }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
       max_parallel: 3
@@ -986,7 +995,7 @@ jobs:
   summarize:
     name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, tool-contracts, sftp-contracts, selected-build-checks, frontend-contracts, signed-modular-packages, signed-mfa-linux, signed-mfa-windows, signed-mfa-macos, signed-vnc-linux, signed-vnc-windows, signed-vnc-macos, signed-rdp-linux, signed-rdp-windows, signed-rdp-macos, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-taoffice-video, signed-taoffice-pdf, signed-taoffice-excel, signed-taoffice-word, signed-taoffice-project, signed-taoffice-ppt, signed-taoffice-visio, signed-taoffice-image, signed-rdp-server-linux, signed-rdp-server-windows, signed-rdp-server-macos, taoffice-visio-browser-frontend, taoffice-image-browser-frontend, taoffice-word-browser-frontend, execute-browser, execute-macos-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
+    needs: [plan, tool-contracts, sftp-contracts, selected-build-checks, frontend-contracts, signed-modular-packages, signed-mfa-linux, signed-mfa-windows, signed-mfa-macos, signed-vnc-linux, signed-vnc-windows, signed-vnc-macos, signed-rdp-linux, signed-rdp-windows, signed-rdp-macos, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-taoffice-video, signed-taoffice-pdf, signed-taoffice-excel, signed-taoffice-word, signed-taoffice-project, signed-taoffice-ppt, signed-taoffice-visio, signed-taoffice-image, signed-rdp-server-linux, signed-rdp-server-windows, signed-rdp-server-macos, taoffice-visio-browser-frontend, taoffice-image-browser-frontend, taoffice-word-browser-frontend, taoffice-ppt-browser-frontend, execute-browser, execute-macos-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

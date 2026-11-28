@@ -45,9 +45,13 @@ jobs:
             taoffice-video) dependencies=(src-tauri/plugins/taoffice-video/frontend) ;;
             taoffice-word)
               dependencies=(src-tauri/crates/taomni-plugin-api/frontend/documentDraft.js scripts/rust-wasm-notices.py
-                src-tauri/plugins/taoffice-word/legacy-doc-wasm)
+                src-tauri/crates/taomni-plugin-api/frontend/documentConversion.js src-tauri/plugins/taoffice-word/legacy-doc-wasm)
               ;;
-            taoffice-project|taoffice-ppt) dependencies=(src-tauri/crates/taomni-plugin-api/frontend/documentDraft.js) ;;
+            taoffice-ppt)
+              dependencies=(src-tauri/crates/taomni-plugin-api/frontend/documentDraft.js scripts/rust-wasm-notices.py
+                src-tauri/crates/taomni-plugin-api/frontend/documentConversion.js src-tauri/plugins/taoffice-ppt/legacy-ppt-wasm)
+              ;;
+            taoffice-project) dependencies=(src-tauri/crates/taomni-plugin-api/frontend/documentDraft.js) ;;
             *) echo 'Unknown module frontend' >&2; exit 1 ;;
           esac
           case "$MODULE_SLUG" in
@@ -70,8 +74,8 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - name: Build the pinned Word DOC WebAssembly converter
-        if: inputs.module == 'taoffice-word'
+      - name: Build the selected Office binary import converter
+        if: inputs.module == 'taoffice-word' || inputs.module == 'taoffice-ppt'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -82,7 +86,10 @@ jobs:
           echo "9687f3bb551b9f66f37ed32a40d7913a00f7962db653054e56857bc306c3227f  $RUNNER_TEMP/$archive" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP"
           export PATH="$RUNNER_TEMP/${archive%.tar.gz}:$PATH"
-          bash src-tauri/plugins/taoffice-word/legacy-doc-wasm/build.sh
+          case "${{ inputs.module }}" in
+            taoffice-word) bash src-tauri/plugins/taoffice-word/legacy-doc-wasm/build.sh ;;
+            taoffice-ppt) bash src-tauri/plugins/taoffice-ppt/legacy-ppt-wasm/build.sh ;;
+          esac
       - name: Build the pinned HEIF WebAssembly decoder
         if: inputs.module == 'taoffice-image'
         run: |

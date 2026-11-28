@@ -35,6 +35,9 @@ export function saveModuleDocumentCopy(
   }
   const filename = name.replace(/\.([^.]+)$/, (_suffix, extension: string) => {
     const defaultExtension = slug === "taoffice-project" && ["mpp", "mpx"].includes(extension.toLowerCase()) ? "xml" : extension;
+    if (slug === "taoffice-ppt" && ["ppt", "odp"].includes(extension.toLowerCase())) {
+      return " - copy.pptx";
+    }
     if (slug === "taoffice-word" && ["doc", "odt", "rtf"].includes(extension.toLowerCase())) {
       return " - copy.docx";
     }

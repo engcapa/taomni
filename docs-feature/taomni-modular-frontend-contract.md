@@ -76,6 +76,8 @@ TaOffice Media 0.1.2 在已加载且聚焦的播放器中支持 Space 播放或�
 
 Media 0.3.0 的原生宿主使用模块包内的 FFmpeg 库处理 AVI、FLV、WMV 和 RM 等旧格式。浏览器预览在支持 WebCodecs 的环境中使用 Mediabunny。转换分别限制输入和输出为 32 MiB，原生直播放继续流式读源。另存支持以毫秒为精度裁剪，按原比例缩小，并输出 VP8/Opus WebM 或 H.264/AAC MP4。处理期间可取消，转换数据随标签或宿主释放。TC-TAOFFICE-043 至 046 验证转换前预览、恢复、播放和副本重开。
 
+PowerPoint 0.1.1 在独立模块内离线导入 PPT、ODP。PPT 使用受内存限制的 Office Oxide WASM，ODP 使用 OfficeParser。转换在可取消的模块 worker 内进行，最多 24 MiB、300 张幻灯片，25 秒超时后可以重试。用户可以直接另存转换结果，也可以编辑文字后另存。核心仅授权独立 PPTX 目标文件。两个 worker、WASM 和依赖许可证计入签名前端回执。TC-TAOFFICE-059/060 覆盖导入、另存和重开，沿用 UI-BTN-03、UI-FOC-02、UI-FBK-03、UI-DLG-12。文件关联沿用既有数据目录、迁移和备份范围。
+
 PowerPoint 0.1.0 通过独立前端渲染 PPTX。可在已打开的文档中替换受支持段落的文字并继承已有文字样式，或生成一页新的演示文稿。编辑副本只改动涉及的幻灯片部件。TC-TAOFFICE-039/040 使用两页 PPTX 验证预览、焦点、保存和重开。
 
 Visio 0.1.0 使用模块内的 libvisio WebAssembly 解码器预览 VSDX、VSD 和相应模板。解码在独立 Worker 中运行，页面先清理成自包含 SVG，再用于预览和导出。查看器提供分页、缩放、查找和系统打开。TC-TAOFFICE-041/042 验证现代与旧版文件、坏文件恢复和导出的实际字节。

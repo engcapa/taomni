@@ -21,4 +21,6 @@ WinRAR 6.11 created `records.RAR` with `-ma5 -m5 -s` and `legacy.rar` with `-ma4
 
 `media-edit.webm` and `media-legacy.*` use synthetic test patterns and tones. The browser case trims the VP8/Opus WebM fixture. The native cases open AVI, FLV, WMV and RealMedia, and save a resized H.264/AAC copy of the AVI.
 
+Microsoft PowerPoint on Windows exported legacy-review.ppt (PowerPoint 97–2003) and legacy-review.odp from ppt-review.pptx. Both have two slides with the quarterly review and delivery appendix.
+
 Visio fixture inputs and provenance are documented in [visio-sources.md](visio-sources.md).

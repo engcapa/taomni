@@ -17099,6 +17099,15 @@ controls:
   - id: taoffice-ppt
     selector: '[data-testid="taoffice-ppt"]'
     kind: display
+  - id: taoffice-ppt-conversion
+    selector: '[data-testid="taoffice-ppt-conversion"]'
+    kind: display
+  - id: taoffice-ppt-conversion-cancel
+    selector: '[data-testid="taoffice-ppt-conversion-cancel"]'
+    kind: interactive
+  - id: taoffice-ppt-retry
+    selector: '[data-testid="taoffice-ppt-retry"]'
+    kind: interactive
   - id: taoffice-ppt-edit
     selector: '[data-testid="taoffice-ppt-edit"]'
     kind: interactive
